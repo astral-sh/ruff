@@ -1075,8 +1075,8 @@ impl<'a> Generator<'a> {
                 }
                 self.p(")");
             }
-            Expr::FString(ast::ExprFString { parts, .. }) => {
-                self.unparse_fstring(parts, false);
+            Expr::FString(ast::ExprFString { elements, .. }) => {
+                self.unparse_fstring(elements, false);
             }
             Expr::Constant(ast::ExprConstant { value, range: _ }) => {
                 self.unparse_constant(value);
@@ -1256,7 +1256,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_fstring_body(&mut self, values: &[ast::FStringPart]) {
+    fn unparse_fstring_body(&mut self, values: &[ast::FStringElement]) {
         for value in values {
             self.unparse_fstring_elem(value);
         }
@@ -1267,7 +1267,7 @@ impl<'a> Generator<'a> {
         val: &Expr,
         debug_text: Option<&DebugText>,
         conversion: ConversionFlag,
-        spec: &[ast::FStringPart],
+        spec: &[ast::FStringElement],
     ) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
@@ -1303,12 +1303,12 @@ impl<'a> Generator<'a> {
         self.p("}");
     }
 
-    fn unparse_fstring_elem(&mut self, part: &ast::FStringPart) {
-        match part {
-            ast::FStringPart::Literal(ast::PartialString { value, .. }) => {
+    fn unparse_fstring_elem(&mut self, element: &ast::FStringElement) {
+        match element {
+            ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
                 self.unparse_fstring_literal(value);
             }
-            ast::FStringPart::FormattedValue(ast::FormattedValue {
+            ast::FStringElement::Expression(ast::FStringExpressionElement {
                 expression,
                 debug_text,
                 conversion,
@@ -1323,7 +1323,7 @@ impl<'a> Generator<'a> {
         self.p(&s);
     }
 
-    fn unparse_fstring(&mut self, values: &[ast::FStringPart], is_spec: bool) {
+    fn unparse_fstring(&mut self, values: &[ast::FStringElement], is_spec: bool) {
         if is_spec {
             self.unparse_fstring_body(values);
         } else {

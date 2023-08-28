@@ -6,15 +6,15 @@ FString(
     ExprFString {
         range: 2..37,
         implicit_concatenated: false,
-        parts: [
+        elements: [
             Literal(
-                PartialString {
+                FStringLiteralElement {
                     range: 2..6,
                     value: "mix ",
                 },
             ),
-            FormattedValue(
-                FormattedValue {
+            Expression(
+                FStringExpressionElement {
                     range: 6..13,
                     expression: Name(
                         ExprName {
@@ -34,13 +34,13 @@ FString(
                 },
             ),
             Literal(
-                PartialString {
+                FStringLiteralElement {
                     range: 13..28,
                     value: " with text and ",
                 },
             ),
-            FormattedValue(
-                FormattedValue {
+            Expression(
+                FStringExpressionElement {
                     range: 28..37,
                     expression: Name(
                         ExprName {

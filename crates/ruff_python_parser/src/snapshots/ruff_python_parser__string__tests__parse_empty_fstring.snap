@@ -6,6 +6,6 @@ FString(
     ExprFString {
         range: 2..2,
         implicit_concatenated: false,
-        parts: [],
+        elements: [],
     },
 )

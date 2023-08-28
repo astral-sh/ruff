@@ -56,12 +56,12 @@ impl AlwaysAutofixableViolation for ExplicitFStringTypeConversion {
 pub(crate) fn explicit_f_string_type_conversion(
     checker: &mut Checker,
     expr: &Expr,
-    values: &[ast::FStringPart],
+    values: &[ast::FStringElement],
 ) {
     for (index, formatted_value) in values
         .iter()
         .filter_map(|expr| {
-            if let ast::FStringPart::FormattedValue(expr) = &expr {
+            if let ast::FStringElement::Expression(expr) = &expr {
                 Some(expr)
             } else {
                 None
@@ -69,7 +69,7 @@ pub(crate) fn explicit_f_string_type_conversion(
         })
         .enumerate()
     {
-        let ast::FormattedValue {
+        let ast::FStringExpressionElement {
             expression,
             conversion,
             ..

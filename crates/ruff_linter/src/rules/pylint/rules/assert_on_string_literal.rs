@@ -72,21 +72,21 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
             }
             _ => {}
         },
-        Expr::FString(ast::ExprFString { parts, .. }) => {
+        Expr::FString(ast::ExprFString { elements, .. }) => {
             checker.diagnostics.push(Diagnostic::new(
                 AssertOnStringLiteral {
-                    kind: if parts.iter().all(|part| match part {
-                        ast::FStringPart::Literal(ast::PartialString { value, .. }) => {
-                            value.is_empty()
-                        }
-                        ast::FStringPart::FormattedValue(_) => false,
+                    kind: if elements.iter().all(|element| match element {
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            value, ..
+                        }) => value.is_empty(),
+                        ast::FStringElement::Expression(_) => false,
                     }) {
                         Kind::Empty
-                    } else if parts.iter().any(|part| match part {
-                        ast::FStringPart::Literal(ast::PartialString { value, .. }) => {
-                            !value.is_empty()
-                        }
-                        ast::FStringPart::FormattedValue(_) => false,
+                    } else if elements.iter().any(|element| match element {
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            value, ..
+                        }) => !value.is_empty(),
+                        ast::FStringElement::Expression(_) => false,
                     }) {
                         Kind::NonEmpty
                     } else {

@@ -520,25 +520,27 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableFStringPart<'a> {
+pub enum ComparableFStringElement<'a> {
     Literal(&'a str),
-    FormattedValue(FormattedValue<'a>),
+    FStringExpressionElement(FStringExpressionElement<'a>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct FormattedValue<'a> {
+pub struct FStringExpressionElement<'a> {
     expression: ComparableExpr<'a>,
     debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
-    format_spec: Vec<ComparableFStringPart<'a>>,
+    format_spec: Vec<ComparableFStringElement<'a>>,
 }
 
-impl<'a> From<&'a ast::FStringPart> for ComparableFStringPart<'a> {
-    fn from(fstring_part: &'a ast::FStringPart) -> Self {
+impl<'a> From<&'a ast::FStringElement> for ComparableFStringElement<'a> {
+    fn from(fstring_part: &'a ast::FStringElement) -> Self {
         match fstring_part {
-            ast::FStringPart::Literal(ast::PartialString { value, .. }) => Self::Literal(value),
-            ast::FStringPart::FormattedValue(formatted_value) => {
-                Self::FormattedValue(FormattedValue {
+            ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
+                Self::Literal(value)
+            }
+            ast::FStringElement::Expression(formatted_value) => {
+                Self::FStringExpressionElement(FStringExpressionElement {
                     expression: (&formatted_value.expression).into(),
                     debug_text: formatted_value.debug_text.as_ref(),
                     conversion: formatted_value.conversion,
@@ -672,16 +674,16 @@ pub struct ExprCall<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprFormattedValue<'a> {
+pub struct ExprFStringExpressionElement<'a> {
     value: Box<ComparableExpr<'a>>,
     debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
-    format_spec: Vec<ComparableFStringPart<'a>>,
+    format_spec: Vec<ComparableFStringElement<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprFString<'a> {
-    parts: Vec<ComparableFStringPart<'a>>,
+    elements: Vec<ComparableFStringElement<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -753,7 +755,7 @@ pub enum ComparableExpr<'a> {
     YieldFrom(ExprYieldFrom<'a>),
     Compare(ExprCompare<'a>),
     Call(ExprCall<'a>),
-    FormattedValue(ExprFormattedValue<'a>),
+    FStringExpressionElement(ExprFStringExpressionElement<'a>),
     FString(ExprFString<'a>),
     Constant(ExprConstant<'a>),
     Attribute(ExprAttribute<'a>),
@@ -911,11 +913,11 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 arguments: arguments.into(),
             }),
             ast::Expr::FString(ast::ExprFString {
-                parts,
+                elements,
                 implicit_concatenated: _,
                 range: _,
             }) => Self::FString(ExprFString {
-                parts: parts.iter().map(Into::into).collect(),
+                elements: elements.iter().map(Into::into).collect(),
             }),
             ast::Expr::Constant(ast::ExprConstant { value, range: _ }) => {
                 Self::Constant(ExprConstant {

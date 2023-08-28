@@ -9,8 +9,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::call_path::CallPath;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, FStringPart, MatchCase, Pattern, Stmt,
-    TypeParam,
+    self as ast, Arguments, Constant, ExceptHandler, Expr, FStringElement, MatchCase, Pattern,
+    Stmt, TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -122,9 +122,9 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
         }
-        Expr::FString(ast::ExprFString { parts, .. }) => {
-            parts.iter().any(|part| any_over_fstring_part(part, func))
-        }
+        Expr::FString(ast::ExprFString { elements, .. }) => elements
+            .iter()
+            .any(|element| any_over_fstring_element(element, func)),
         Expr::NamedExpr(ast::ExprNamedExpr {
             target,
             value,
@@ -287,10 +287,10 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
     }
 }
 
-pub fn any_over_fstring_part(part: &FStringPart, func: &dyn Fn(&Expr) -> bool) -> bool {
-    match part {
-        FStringPart::Literal(_) => false,
-        FStringPart::FormattedValue(ast::FormattedValue {
+pub fn any_over_fstring_element(element: &FStringElement, func: &dyn Fn(&Expr) -> bool) -> bool {
+    match element {
+        FStringElement::Literal(_) => false,
+        FStringElement::Expression(ast::FStringExpressionElement {
             expression,
             format_spec,
             ..
@@ -298,7 +298,7 @@ pub fn any_over_fstring_part(part: &FStringPart, func: &dyn Fn(&Expr) -> bool) -
             any_over_expr(expression, func)
                 || format_spec
                     .iter()
-                    .any(|spec_part| any_over_fstring_part(spec_part, func))
+                    .any(|spec_element| any_over_fstring_element(spec_element, func))
         }
     }
 }
@@ -1089,14 +1089,14 @@ impl Truthiness {
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
             },
-            Expr::FString(ast::ExprFString { parts, .. }) => {
-                if parts.is_empty() {
+            Expr::FString(ast::ExprFString { elements, .. }) => {
+                if elements.is_empty() {
                     Some(false)
-                } else if parts.iter().any(|part| match part {
-                    ast::FStringPart::Literal(ast::PartialString { value, .. }) => {
+                } else if elements.iter().any(|element| match element {
+                    ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
                         !value.is_empty()
                     }
-                    ast::FStringPart::FormattedValue(_) => true,
+                    ast::FStringElement::Expression(_) => true,
                 }) {
                     Some(true)
                 } else {

@@ -10,9 +10,9 @@ expression: parse_ast
                 ExprFString {
                     range: 0..11,
                     implicit_concatenated: false,
-                    parts: [
-                        FormattedValue(
-                            FormattedValue {
+                    elements: [
+                        Expression(
+                            FStringExpressionElement {
                                 range: 5..8,
                                 expression: Name(
                                     ExprName {

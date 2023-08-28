@@ -48,12 +48,15 @@ impl<'a> AnyString<'a> {
         match self {
             Self::Constant(_) => Quoting::CanChange,
             Self::FString(f_str) => {
-                if f_str.parts.iter().any(|value| match value {
-                    ast::FStringPart::FormattedValue(ast::FormattedValue { range, .. }) => {
+                if f_str.elements.iter().any(|value| match value {
+                    ast::FStringElement::Expression(ast::FStringExpressionElement {
+                        range,
+                        ..
+                    }) => {
                         let string_content = locator.slice(*range);
                         string_content.contains(['"', '\''])
                     }
-                    ast::FStringPart::Literal(_) => false,
+                    ast::FStringElement::Literal(_) => false,
                 }) {
                     Quoting::Preserve
                 } else {

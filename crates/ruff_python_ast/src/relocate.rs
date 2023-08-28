@@ -128,10 +128,12 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_keyword(keyword, location);
             }
         }
-        Expr::FString(nodes::ExprFString { parts, range, .. }) => {
+        Expr::FString(nodes::ExprFString {
+            elements, range, ..
+        }) => {
             *range = location;
-            for part in parts {
-                relocate_fstring_part(part, location);
+            for element in elements {
+                relocate_fstring_element(element, location);
             }
         }
         Expr::Constant(nodes::ExprConstant { range, .. }) => {
@@ -193,14 +195,14 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
     }
 }
 
-/// Change a f-string part's location (recursively) to match a desired, fixed
+/// Change a f-string element's location (recursively) to match a desired, fixed
 /// location.
-fn relocate_fstring_part(part: &mut nodes::FStringPart, location: TextRange) {
-    match part {
-        nodes::FStringPart::Literal(nodes::PartialString { range, .. }) => {
+fn relocate_fstring_element(element: &mut nodes::FStringElement, location: TextRange) {
+    match element {
+        nodes::FStringElement::Literal(nodes::FStringLiteralElement { range, .. }) => {
             *range = location;
         }
-        nodes::FStringPart::FormattedValue(nodes::FormattedValue {
+        nodes::FStringElement::Expression(nodes::FStringExpressionElement {
             range,
             expression,
             format_spec,
@@ -208,8 +210,8 @@ fn relocate_fstring_part(part: &mut nodes::FStringPart, location: TextRange) {
         }) => {
             *range = location;
             relocate_expr(expression, location);
-            for spec_part in format_spec {
-                relocate_fstring_part(spec_part, location);
+            for spec_element in format_spec {
+                relocate_fstring_element(spec_element, location);
             }
         }
     }

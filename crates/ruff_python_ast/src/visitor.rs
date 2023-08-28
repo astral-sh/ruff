@@ -4,7 +4,7 @@ pub mod preorder;
 
 use crate::{
     self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, ExprContext, FStringPart, Keyword, MatchCase, Operator, Parameter,
+    ExceptHandler, Expr, ExprContext, FStringElement, Keyword, MatchCase, Operator, Parameter,
     Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamTypeVar,
     TypeParams, UnaryOp, WithItem,
 };
@@ -92,8 +92,8 @@ pub trait Visitor<'a> {
     fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
     }
-    fn visit_fstring_part(&mut self, fstring_part: &'a FStringPart) {
-        walk_fstring_part(self, fstring_part);
+    fn visit_fstring_element(&mut self, fstring_element: &'a FStringElement) {
+        walk_fstring_element(self, fstring_element);
     }
 }
 
@@ -464,9 +464,9 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             visitor.visit_expr(func);
             visitor.visit_arguments(arguments);
         }
-        Expr::FString(ast::ExprFString { parts, .. }) => {
-            for part in parts {
-                visitor.visit_fstring_part(part);
+        Expr::FString(ast::ExprFString { elements, .. }) => {
+            for element in elements {
+                visitor.visit_fstring_element(element);
             }
         }
         Expr::Constant(_) => {}
@@ -709,19 +709,19 @@ pub fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
     visitor.visit_pattern(&pattern_keyword.pattern);
 }
 
-pub fn walk_fstring_part<'a, V: Visitor<'a> + ?Sized>(
+pub fn walk_fstring_element<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
-    fstring_part: &'a FStringPart,
+    fstring_element: &'a FStringElement,
 ) {
-    if let ast::FStringPart::FormattedValue(ast::FormattedValue {
+    if let ast::FStringElement::Expression(ast::FStringExpressionElement {
         expression,
         format_spec,
         ..
-    }) = fstring_part
+    }) = fstring_element
     {
         visitor.visit_expr(expression);
-        for spec_part in format_spec {
-            walk_fstring_part(visitor, spec_part);
+        for spec_element in format_spec {
+            walk_fstring_element(visitor, spec_element);
         }
     }
 }

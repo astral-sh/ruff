@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Arguments, Constant, ConversionFlag, Expr};
 use ruff_text_size::TextRange;
 
-/// Wrap an expression in a `FormattedValue` with no special formatting.
-fn to_formatted_value_expr(inner: &Expr) -> ast::FStringPart {
-    ast::FStringPart::FormattedValue(ast::FormattedValue {
+/// Wrap an expression in a `FStringExpressionElement` with no special formatting.
+fn to_formatted_value_expr(inner: &Expr) -> ast::FStringElement {
+    ast::FStringElement::Expression(ast::FStringExpressionElement {
         expression: Box::new(inner.clone()),
         debug_text: None,
         conversion: ConversionFlag::None,
@@ -13,8 +13,8 @@ fn to_formatted_value_expr(inner: &Expr) -> ast::FStringPart {
 }
 
 /// Convert a string to a constant string expression.
-pub(super) fn to_constant_string(s: &str) -> ast::FStringPart {
-    ast::FStringPart::Literal(ast::PartialString {
+pub(super) fn to_constant_string(s: &str) -> ast::FStringElement {
+    ast::FStringElement::Literal(ast::FStringLiteralElement {
         value: s.to_owned(),
         range: TextRange::default(),
     })
@@ -49,13 +49,13 @@ fn is_simple_callee(func: &Expr) -> bool {
 }
 
 /// Convert an expression to a f-string element (if it looks like a good idea).
-pub(super) fn to_fstring_part(expr: &Expr) -> Option<ast::FStringPart> {
+pub(super) fn to_fstring_element(expr: &Expr) -> Option<ast::FStringElement> {
     match expr {
         // These are directly handled by `unparse_f_string_element`:
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(value),
             range,
-        }) => Some(ast::FStringPart::Literal(ast::PartialString {
+        }) => Some(ast::FStringElement::Literal(ast::FStringLiteralElement {
             value: value.to_string(),
             range: *range,
         })),

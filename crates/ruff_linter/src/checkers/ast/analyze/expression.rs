@@ -957,15 +957,15 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::await_outside_async(checker, expr);
             }
         }
-        Expr::FString(ast::ExprFString { parts, .. }) => {
+        Expr::FString(ast::ExprFString { elements, .. }) => {
             if checker.enabled(Rule::FStringMissingPlaceholders) {
-                pyflakes::rules::f_string_missing_placeholders(expr, parts, checker);
+                pyflakes::rules::f_string_missing_placeholders(expr, elements, checker);
             }
             if checker.enabled(Rule::HardcodedSQLExpression) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
             if checker.enabled(Rule::ExplicitFStringTypeConversion) {
-                ruff::rules::explicit_f_string_type_conversion(checker, expr, parts);
+                ruff::rules::explicit_f_string_type_conversion(checker, expr, elements);
             }
         }
         Expr::BinOp(ast::ExprBinOp {

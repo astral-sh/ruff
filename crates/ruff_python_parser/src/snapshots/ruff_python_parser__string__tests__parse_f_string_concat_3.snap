@@ -10,15 +10,15 @@ expression: parse_ast
                 ExprFString {
                     range: 0..22,
                     implicit_concatenated: true,
-                    parts: [
+                    elements: [
                         Literal(
-                            PartialString {
+                            FStringLiteralElement {
                                 range: 1..16,
                                 value: "Hello world",
                             },
                         ),
-                        FormattedValue(
-                            FormattedValue {
+                        Expression(
+                            FStringExpressionElement {
                                 range: 16..21,
                                 expression: Constant(
                                     ExprConstant {

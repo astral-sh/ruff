@@ -82,15 +82,15 @@ expression: parse_ast
                                                         ExprFString {
                                                             range: 62..81,
                                                             implicit_concatenated: false,
-                                                            parts: [
+                                                            elements: [
                                                                 Literal(
-                                                                    PartialString {
+                                                                    FStringLiteralElement {
                                                                         range: 64..71,
                                                                         value: "caught ",
                                                                     },
                                                                 ),
-                                                                FormattedValue(
-                                                                    FormattedValue {
+                                                                Expression(
+                                                                    FStringExpressionElement {
                                                                         range: 71..80,
                                                                         expression: Call(
                                                                             ExprCall {
@@ -174,15 +174,15 @@ expression: parse_ast
                                                         ExprFString {
                                                             range: 114..133,
                                                             implicit_concatenated: false,
-                                                            parts: [
+                                                            elements: [
                                                                 Literal(
-                                                                    PartialString {
+                                                                    FStringLiteralElement {
                                                                         range: 116..123,
                                                                         value: "caught ",
                                                                     },
                                                                 ),
-                                                                FormattedValue(
-                                                                    FormattedValue {
+                                                                Expression(
+                                                                    FStringExpressionElement {
                                                                         range: 123..132,
                                                                         expression: Call(
                                                                             ExprCall {

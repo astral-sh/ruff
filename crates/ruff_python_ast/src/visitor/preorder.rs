@@ -1,9 +1,9 @@
 use crate::node::{AnyNodeRef, AstNode};
 use crate::{
     Alias, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ElifElseClause,
-    ExceptHandler, Expr, FStringPart, FormattedValue, Keyword, MatchCase, Mod, Operator, Parameter,
-    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, TypeParam,
-    TypeParams, UnaryOp, WithItem,
+    ExceptHandler, Expr, FStringElement, FStringExpressionElement, Keyword, MatchCase, Mod,
+    Operator, Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments,
+    PatternKeyword, Stmt, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -150,8 +150,8 @@ pub trait PreorderVisitor<'a> {
     }
 
     #[inline]
-    fn visit_fstring_part(&mut self, fstring_part: &'a FStringPart) {
-        walk_fstring_part(self, fstring_part);
+    fn visit_fstring_element(&mut self, fstring_element: &'a FStringElement) {
+        walk_fstring_element(self, fstring_element);
     }
 }
 
@@ -498,19 +498,19 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_fstring_part<'a, V: PreorderVisitor<'a> + ?Sized>(
+pub fn walk_fstring_element<'a, V: PreorderVisitor<'a> + ?Sized>(
     visitor: &mut V,
-    fstring_part: &'a FStringPart,
+    fstring_element: &'a FStringElement,
 ) {
-    if let FStringPart::FormattedValue(FormattedValue {
+    if let FStringElement::Expression(FStringExpressionElement {
         expression,
         format_spec,
         ..
-    }) = fstring_part
+    }) = fstring_element
     {
         visitor.visit_expr(expression);
-        for spec_part in format_spec {
-            walk_fstring_part(visitor, spec_part);
+        for spec_element in format_spec {
+            walk_fstring_element(visitor, spec_element);
         }
     }
 }

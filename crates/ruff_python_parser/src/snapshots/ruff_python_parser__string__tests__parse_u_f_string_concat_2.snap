@@ -10,9 +10,9 @@ expression: parse_ast
                 ExprFString {
                     range: 0..22,
                     implicit_concatenated: true,
-                    parts: [
+                    elements: [
                         Literal(
-                            PartialString {
+                            FStringLiteralElement {
                                 range: 2..21,
                                 value: "Hello world!",
                             },

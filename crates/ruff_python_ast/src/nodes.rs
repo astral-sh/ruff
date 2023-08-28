@@ -875,16 +875,16 @@ impl From<ExprCall> for Expr {
 
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
-pub struct FormattedValue {
+pub struct FStringExpressionElement {
     pub range: TextRange,
     pub expression: Box<Expr>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
-    pub format_spec: Vec<FStringPart>,
+    pub format_spec: Vec<FStringElement>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct PartialString {
+pub struct FStringLiteralElement {
     pub range: TextRange,
     pub value: String,
 }
@@ -930,7 +930,7 @@ pub struct ExprFString {
     pub range: TextRange,
     /// Whether the f-string contains multiple string tokens that were implicitly concatenated.
     pub implicit_concatenated: bool,
-    pub parts: Vec<FStringPart>,
+    pub elements: Vec<FStringElement>,
 }
 
 impl From<ExprFString> for Expr {
@@ -940,9 +940,9 @@ impl From<ExprFString> for Expr {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum FStringPart {
-    Literal(PartialString),
-    FormattedValue(FormattedValue),
+pub enum FStringElement {
+    Literal(FStringLiteralElement),
+    Expression(FStringExpressionElement),
 }
 
 /// See also [Constant](https://docs.python.org/3/library/ast.html#ast.Constant)
@@ -3376,22 +3376,22 @@ mod size_assertions {
     assert_eq_size!(Mod, [u8; 32]);
 }
 
-impl Ranged for crate::nodes::FormattedValue {
+impl Ranged for crate::nodes::FStringExpressionElement {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-impl Ranged for crate::nodes::FStringPart {
+impl Ranged for crate::nodes::FStringElement {
     fn range(&self) -> TextRange {
         match self {
-            FStringPart::Literal(node) => node.range(),
-            FStringPart::FormattedValue(node) => node.range(),
+            FStringElement::Literal(node) => node.range(),
+            FStringElement::Expression(node) => node.range(),
         }
     }
 }
 
-impl Ranged for crate::nodes::PartialString {
+impl Ranged for crate::nodes::FStringLiteralElement {
     fn range(&self) -> TextRange {
         self.range
     }

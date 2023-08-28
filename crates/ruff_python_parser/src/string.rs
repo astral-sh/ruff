@@ -173,7 +173,10 @@ impl<'a> StringParser<'a> {
         }
     }
 
-    fn parse_formatted_value(&mut self, nested: u8) -> Result<Vec<ast::FStringPart>, LexicalError> {
+    fn parse_formatted_value(
+        &mut self,
+        nested: u8,
+    ) -> Result<Vec<ast::FStringElement>, LexicalError> {
         use FStringErrorType::{
             EmptyExpression, ExpressionNestedTooDeeply, InvalidConversionFlag, InvalidExpression,
             MismatchedDelimiter, UnclosedLbrace, Unmatched, UnterminatedString,
@@ -317,31 +320,37 @@ impl<'a> StringParser<'a> {
                         let leading =
                             &expression[..usize::from(value.start() - start_location) - 1];
                         let trailing = &expression[usize::from(value.end() - start_location) - 1..];
-                        vec![ast::FStringPart::FormattedValue(ast::FormattedValue {
-                            expression: Box::new(value),
-                            debug_text: Some(ast::DebugText {
-                                leading: leading.to_string(),
-                                trailing: trailing.to_string(),
-                            }),
-                            conversion,
-                            format_spec: spec,
-                            range: self.range(start_location),
-                        })]
+                        vec![ast::FStringElement::Expression(
+                            ast::FStringExpressionElement {
+                                expression: Box::new(value),
+                                debug_text: Some(ast::DebugText {
+                                    leading: leading.to_string(),
+                                    trailing: trailing.to_string(),
+                                }),
+                                conversion,
+                                format_spec: spec,
+                                range: self.range(start_location),
+                            },
+                        )]
                     } else {
-                        vec![ast::FStringPart::FormattedValue(ast::FormattedValue {
-                            expression: Box::new(
-                                parse_fstring_expr(&expression, start_location).map_err(|e| {
-                                    FStringError::new(
-                                        InvalidExpression(Box::new(e.error)),
-                                        start_location,
-                                    )
-                                })?,
-                            ),
-                            debug_text: None,
-                            conversion,
-                            format_spec: spec,
-                            range: self.range(start_location),
-                        })]
+                        vec![ast::FStringElement::Expression(
+                            ast::FStringExpressionElement {
+                                expression: Box::new(
+                                    parse_fstring_expr(&expression, start_location).map_err(
+                                        |e| {
+                                            FStringError::new(
+                                                InvalidExpression(Box::new(e.error)),
+                                                start_location,
+                                            )
+                                        },
+                                    )?,
+                                ),
+                                debug_text: None,
+                                conversion,
+                                format_spec: spec,
+                                range: self.range(start_location),
+                            },
+                        )]
                     };
                     return Ok(ret);
                 }
@@ -373,7 +382,7 @@ impl<'a> StringParser<'a> {
         Err(FStringError::new(UnclosedLbrace, self.get_pos()).into())
     }
 
-    fn parse_spec(&mut self, nested: u8) -> Result<Vec<ast::FStringPart>, LexicalError> {
+    fn parse_spec(&mut self, nested: u8) -> Result<Vec<ast::FStringElement>, LexicalError> {
         let mut spec_constructor = Vec::new();
         let mut constant_piece = String::new();
         let mut start_location = self.get_pos();
@@ -381,10 +390,12 @@ impl<'a> StringParser<'a> {
             match next {
                 '{' => {
                     if !constant_piece.is_empty() {
-                        spec_constructor.push(ast::FStringPart::Literal(ast::PartialString {
-                            value: std::mem::take(&mut constant_piece),
-                            range: self.range(start_location),
-                        }));
+                        spec_constructor.push(ast::FStringElement::Literal(
+                            ast::FStringLiteralElement {
+                                value: std::mem::take(&mut constant_piece),
+                                range: self.range(start_location),
+                            },
+                        ));
                     }
                     let parsed_expr = self.parse_formatted_value(nested + 1)?;
                     spec_constructor.extend(parsed_expr);
@@ -401,7 +412,7 @@ impl<'a> StringParser<'a> {
             self.next_char();
         }
         if !constant_piece.is_empty() {
-            spec_constructor.push(ast::FStringPart::Literal(ast::PartialString {
+            spec_constructor.push(ast::FStringElement::Literal(ast::FStringLiteralElement {
                 value: std::mem::take(&mut constant_piece),
                 range: self.range(start_location),
             }));
@@ -414,8 +425,8 @@ impl<'a> StringParser<'a> {
 
         let mut content = String::new();
         let start_location = self.get_pos();
-        let mut part_start_location = self.get_pos();
-        let mut parts = vec![];
+        let mut element_start_location = self.get_pos();
+        let mut elements = vec![];
 
         while let Some(ch) = self.peek() {
             match ch {
@@ -435,15 +446,15 @@ impl<'a> StringParser<'a> {
                         }
                     }
                     if !content.is_empty() {
-                        parts.push(ast::FStringPart::Literal(ast::PartialString {
+                        elements.push(ast::FStringElement::Literal(ast::FStringLiteralElement {
                             value: std::mem::take(&mut content),
-                            range: self.range(part_start_location),
+                            range: self.range(element_start_location),
                         }));
                     }
 
-                    let parsed_parts = self.parse_formatted_value(nested)?;
-                    parts.extend(parsed_parts);
-                    part_start_location = self.get_pos();
+                    let parsed_elements = self.parse_formatted_value(nested)?;
+                    elements.extend(parsed_elements);
+                    element_start_location = self.get_pos();
                 }
                 '}' => {
                     if nested > 0 {
@@ -469,14 +480,14 @@ impl<'a> StringParser<'a> {
         }
 
         if !content.is_empty() {
-            parts.push(ast::FStringPart::Literal(ast::PartialString {
+            elements.push(ast::FStringElement::Literal(ast::FStringLiteralElement {
                 value: content,
-                range: self.range(part_start_location),
+                range: self.range(element_start_location),
             }));
         }
 
         Ok(Expr::from(ast::ExprFString {
-            parts,
+            elements,
             implicit_concatenated: false,
             range: self.range(start_location),
         }))
@@ -628,13 +639,13 @@ pub(crate) fn parse_strings(
     }
 
     // De-duplicate adjacent constants.
-    let mut deduped: Vec<ast::FStringPart> = vec![];
+    let mut deduped: Vec<ast::FStringElement> = vec![];
     let mut current: Vec<String> = vec![];
     let mut current_start = initial_start;
     let mut current_end = last_end;
 
-    let take_current = |current: &mut Vec<String>, start, end| -> ast::FStringPart {
-        ast::FStringPart::Literal(ast::PartialString {
+    let take_current = |current: &mut Vec<String>, start, end| -> ast::FStringElement {
+        ast::FStringElement::Literal(ast::FStringLiteralElement {
             value: current.drain(..).collect::<String>(),
             range: TextRange::new(start, end),
         })
@@ -643,10 +654,10 @@ pub(crate) fn parse_strings(
     for (start, (source, kind, triple_quoted), _) in values {
         let value = parse_string(&source, kind, triple_quoted, start)?;
         match value {
-            Expr::FString(ast::ExprFString { parts, .. }) => {
-                for part in parts {
-                    match part {
-                        ast::FStringPart::Literal(ast::PartialString {
+            Expr::FString(ast::ExprFString { elements, .. }) => {
+                for element in elements {
+                    match element {
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
                             value: inner,
                             range,
                         }) => {
@@ -656,7 +667,9 @@ pub(crate) fn parse_strings(
                             current_end = range.end();
                             current.push(inner);
                         }
-                        ast::FStringPart::FormattedValue(ast::FormattedValue { .. }) => {
+                        ast::FStringElement::Expression(ast::FStringExpressionElement {
+                            ..
+                        }) => {
                             if !current.is_empty() {
                                 deduped.push(take_current(
                                     &mut current,
@@ -664,7 +677,7 @@ pub(crate) fn parse_strings(
                                     current_end,
                                 ));
                             }
-                            deduped.push(part);
+                            deduped.push(element);
                         }
                     }
                 }
@@ -687,7 +700,7 @@ pub(crate) fn parse_strings(
     }
 
     Ok(Expr::FString(ast::ExprFString {
-        parts: deduped,
+        elements: deduped,
         implicit_concatenated,
         range: TextRange::new(initial_start, last_end),
     }))

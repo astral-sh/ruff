@@ -198,15 +198,15 @@ expression: parse_ast
                                                         ExprFString {
                                                             range: 133..179,
                                                             implicit_concatenated: false,
-                                                            parts: [
+                                                            elements: [
                                                                 Literal(
-                                                                    PartialString {
+                                                                    FStringLiteralElement {
                                                                         range: 135..142,
                                                                         value: "caught ",
                                                                     },
                                                                 ),
-                                                                FormattedValue(
-                                                                    FormattedValue {
+                                                                Expression(
+                                                                    FStringExpressionElement {
                                                                         range: 142..151,
                                                                         expression: Call(
                                                                             ExprCall {
@@ -239,13 +239,13 @@ expression: parse_ast
                                                                     },
                                                                 ),
                                                                 Literal(
-                                                                    PartialString {
+                                                                    FStringLiteralElement {
                                                                         range: 151..164,
                                                                         value: " with nested ",
                                                                     },
                                                                 ),
-                                                                FormattedValue(
-                                                                    FormattedValue {
+                                                                Expression(
+                                                                    FStringExpressionElement {
                                                                         range: 164..178,
                                                                         expression: Attribute(
                                                                             ExprAttribute {
@@ -321,15 +321,15 @@ expression: parse_ast
                                                         ExprFString {
                                                             range: 213..259,
                                                             implicit_concatenated: false,
-                                                            parts: [
+                                                            elements: [
                                                                 Literal(
-                                                                    PartialString {
+                                                                    FStringLiteralElement {
                                                                         range: 215..222,
                                                                         value: "caught ",
                                                                     },
                                                                 ),
-                                                                FormattedValue(
-                                                                    FormattedValue {
+                                                                Expression(
+                                                                    FStringExpressionElement {
                                                                         range: 222..231,
                                                                         expression: Call(
                                                                             ExprCall {
@@ -362,13 +362,13 @@ expression: parse_ast
                                                                     },
                                                                 ),
                                                                 Literal(
-                                                                    PartialString {
+                                                                    FStringLiteralElement {
                                                                         range: 231..244,
                                                                         value: " with nested ",
                                                                     },
                                                                 ),
-                                                                FormattedValue(
-                                                                    FormattedValue {
+                                                                Expression(
+                                                                    FStringExpressionElement {
                                                                         range: 244..258,
                                                                         expression: Attribute(
                                                                             ExprAttribute {

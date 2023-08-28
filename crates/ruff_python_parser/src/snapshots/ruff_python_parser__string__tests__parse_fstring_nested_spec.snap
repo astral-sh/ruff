@@ -6,9 +6,9 @@ FString(
     ExprFString {
         range: 2..14,
         implicit_concatenated: false,
-        parts: [
-            FormattedValue(
-                FormattedValue {
+        elements: [
+            Expression(
+                FStringExpressionElement {
                     range: 2..14,
                     expression: Name(
                         ExprName {
@@ -20,8 +20,8 @@ FString(
                     debug_text: None,
                     conversion: None,
                     format_spec: [
-                        FormattedValue(
-                            FormattedValue {
+                        Expression(
+                            FStringExpressionElement {
                                 range: 7..13,
                                 expression: Name(
                                     ExprName {

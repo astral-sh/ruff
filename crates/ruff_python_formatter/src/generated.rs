@@ -1932,74 +1932,74 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExceptHandlerExceptHandler
     }
 }
 
-impl FormatRule<ast::FormattedValue, PyFormatContext<'_>>
-    for crate::other::formatted_value::FormatFormattedValue
+impl FormatRule<ast::FStringExpressionElement, PyFormatContext<'_>>
+    for crate::other::formatted_value::FormatFStringExpressionElement
 {
     #[inline]
-    fn fmt(&self, node: &ast::FormattedValue, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::FormattedValue>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::FStringExpressionElement, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::FStringExpressionElement>::fmt(self, node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::FormattedValue {
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::FStringExpressionElement {
     type Format<'a> = FormatRefWithRule<
         'a,
-        ast::FormattedValue,
-        crate::other::formatted_value::FormatFormattedValue,
+        ast::FStringExpressionElement,
+        crate::other::formatted_value::FormatFStringExpressionElement,
         PyFormatContext<'ast>,
     >;
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(
             self,
-            crate::other::formatted_value::FormatFormattedValue::default(),
+            crate::other::formatted_value::FormatFStringExpressionElement::default(),
         )
     }
 }
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FormattedValue {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FStringExpressionElement {
     type Format = FormatOwnedWithRule<
-        ast::FormattedValue,
-        crate::other::formatted_value::FormatFormattedValue,
+        ast::FStringExpressionElement,
+        crate::other::formatted_value::FormatFStringExpressionElement,
         PyFormatContext<'ast>,
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(
             self,
-            crate::other::formatted_value::FormatFormattedValue::default(),
+            crate::other::formatted_value::FormatFStringExpressionElement::default(),
         )
     }
 }
 
-impl FormatRule<ast::PartialString, PyFormatContext<'_>>
-    for crate::other::partial_string::FormatPartialString
+impl FormatRule<ast::FStringLiteralElement, PyFormatContext<'_>>
+    for crate::other::partial_string::FormatFStringLiteralElement
 {
     #[inline]
-    fn fmt(&self, node: &ast::PartialString, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PartialString>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::FStringLiteralElement, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::FStringLiteralElement>::fmt(self, node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PartialString {
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::FStringLiteralElement {
     type Format<'a> = FormatRefWithRule<
         'a,
-        ast::PartialString,
-        crate::other::partial_string::FormatPartialString,
+        ast::FStringLiteralElement,
+        crate::other::partial_string::FormatFStringLiteralElement,
         PyFormatContext<'ast>,
     >;
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(
             self,
-            crate::other::partial_string::FormatPartialString::default(),
+            crate::other::partial_string::FormatFStringLiteralElement::default(),
         )
     }
 }
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PartialString {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FStringLiteralElement {
     type Format = FormatOwnedWithRule<
-        ast::PartialString,
-        crate::other::partial_string::FormatPartialString,
+        ast::FStringLiteralElement,
+        crate::other::partial_string::FormatFStringLiteralElement,
         PyFormatContext<'ast>,
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(
             self,
-            crate::other::partial_string::FormatPartialString::default(),
+            crate::other::partial_string::FormatFStringLiteralElement::default(),
         )
     }
 }

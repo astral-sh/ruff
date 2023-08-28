@@ -1,12 +1,12 @@
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatResult;
-use ruff_python_ast::PartialString;
+use ruff_python_ast::FStringLiteralElement;
 
 #[derive(Default)]
-pub struct FormatPartialString;
+pub struct FormatFStringLiteralElement;
 
-impl FormatNodeRule<PartialString> for FormatPartialString {
-    fn fmt_fields(&self, _item: &PartialString, _f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<FStringLiteralElement> for FormatFStringLiteralElement {
+    fn fmt_fields(&self, _item: &FStringLiteralElement, _f: &mut PyFormatter) -> FormatResult<()> {
         unreachable!("Handled inside of `FormatExprFString");
     }
 }
