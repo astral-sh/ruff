@@ -22,3 +22,4 @@ MyType = typing.NamedTuple("MyType", a=int, b=tuple[str, ...])
 # unfixable
 MyType = typing.NamedTuple("MyType", [("a", int)], [("b", str)])
 MyType = typing.NamedTuple("MyType", [("a", int)], b=str)
+MyType = typing.NamedTuple(typename="MyType", a=int, b=str)
