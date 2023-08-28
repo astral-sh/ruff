@@ -65,7 +65,7 @@ function Content({
           case "FIR":
             language = "fir";
             break;
-          
+
           case "Comments":
             language = "Comments";
             break;

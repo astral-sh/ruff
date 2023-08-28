@@ -138,7 +138,7 @@ export default function Editor() {
               content: workspace.format_ir(pythonSource),
             };
             break;
-          
+
           case "Comments":
             secondary = {
               status: "ok",

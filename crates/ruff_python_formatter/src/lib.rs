@@ -169,17 +169,13 @@ pub fn format_node<'a>(
 
 /// Public function for generating a printable string of the debug comments.
 pub fn pretty_comments(formatted: &Formatted<PyFormatContext>, source: &str) -> String {
-    let comments = formatted
-        .context()
-        .comments()
-        .debug(SourceCode::new(source));
+    let comments = formatted.context().comments();
 
     // When comments are empty we'd display an empty map '{}'
-    if comments.empty() {
-        String::new()
-    } else {
-        std::format!("{comments:#?}")
-    }
+    std::format!(
+        "{comments:#?}",
+        comments = comments.debug(SourceCode::new(source))
+    )
 }
 
 pub(crate) struct NotYetImplementedCustomText<'a> {

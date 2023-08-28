@@ -49,10 +49,6 @@ impl<'a> DebugComments<'a> {
             source_code,
         }
     }
-
-    pub(crate) fn empty(&self) -> bool {
-        self.comments.keys().len() == 0
-    }
 }
 
 impl Debug for DebugComments<'_> {
