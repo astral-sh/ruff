@@ -52,7 +52,10 @@ jobs:
           echo "### Ecosystem" >> comment.txt
           cat pr/ecosystem/ecosystem-result >> comment.txt
           echo "" >> comment.txt
+
+          echo 'comment<<EOF' >> $GITHUB_OUTPUT
           cat comment.txt >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Find Comment
         uses: peter-evans/find-comment@v2
@@ -67,7 +70,7 @@ jobs:
         if: steps.find-comment.outcome == 'success'
         uses: peter-evans/create-or-update-comment@v3
         with:
-          comment-d: ${{ steps.find-comment.outputs.comment-id }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ steps.pr-number.outputs.pr-number }}
           body-path: comment.txt
           edit-mode: replace
