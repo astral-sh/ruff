@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 use ruff::linter::add_noqa_to_path;
 use ruff::warn_user_once;
-use ruff_python_stdlib::path::{is_jupyter_notebook, is_project_toml};
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
 
 use crate::args::Overrides;
@@ -46,15 +46,17 @@ pub(crate) fn add_noqa(
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            if is_project_toml(path) || is_jupyter_notebook(path) {
+            let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
+                SourceType::from(path)
+            else {
                 return None;
-            }
+            };
             let package = path
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
             let settings = resolver.resolve(path, pyproject_config);
-            match add_noqa_to_path(path, package, settings) {
+            match add_noqa_to_path(path, package, source_type, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
                     error!("Failed to add noqa to {}: {e}", path.display());
