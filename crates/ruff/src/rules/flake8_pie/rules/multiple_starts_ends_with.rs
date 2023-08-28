@@ -3,9 +3,9 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
-use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier, Ranged};
+use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

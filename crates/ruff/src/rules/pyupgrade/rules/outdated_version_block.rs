@@ -1,13 +1,13 @@
 use std::cmp::Ordering;
 
 use num_bigint::{BigInt, Sign};
-use ruff_python_ast::{self as ast, CmpOp, Constant, ElifElseClause, Expr, Ranged, StmtIf};
-use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_ast::{self as ast, CmpOp, Constant, ElifElseClause, Expr, StmtIf};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;

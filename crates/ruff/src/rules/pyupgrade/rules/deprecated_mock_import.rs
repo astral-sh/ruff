@@ -4,7 +4,7 @@ use libcst_native::{
     ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -13,6 +13,7 @@ use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};

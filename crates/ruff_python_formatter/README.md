@@ -3,6 +3,15 @@
 The goal of our formatter is to be compatible with Black except for rare edge cases (mostly
 involving comment placement).
 
+You can try an experimental version of the formatter on your project with:
+
+```shell
+cargo run --bin ruff -- format path/to/your/project
+```
+
+Note that currently the only supported option is `line-length` and that both the CLI and the
+formatting are a work-in-progress and will change before the stable release.
+
 ## Dev tools
 
 **Testing your changes** You can use the `ruff_python_formatter` binary to format individual files

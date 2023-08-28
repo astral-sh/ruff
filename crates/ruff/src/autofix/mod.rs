@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::collections::BTreeSet;
 
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel};
@@ -138,11 +138,9 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use ruff_text_size::TextSize;
+    use ruff_text_size::{Ranged, TextSize};
 
-    use ruff_diagnostics::Diagnostic;
-    use ruff_diagnostics::Edit;
-    use ruff_diagnostics::Fix;
+    use ruff_diagnostics::{Diagnostic, Edit, Fix};
     use ruff_source_file::Locator;
 
     use crate::autofix::source_map::SourceMarker;

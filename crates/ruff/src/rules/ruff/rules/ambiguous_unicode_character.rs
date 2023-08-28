@@ -1,10 +1,11 @@
-use bitflags::bitflags;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::fmt;
+
+use bitflags::bitflags;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::registry::AsRule;
 use crate::rules::ruff::rules::confusables::confusable;

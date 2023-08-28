@@ -5,9 +5,10 @@ use libcst_native::{
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call_mut, match_name, transform_expression};

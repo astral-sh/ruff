@@ -13,11 +13,12 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp,
+    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
 };
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;

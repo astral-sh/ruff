@@ -2,12 +2,12 @@ use std::cmp::Ordering;
 
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters, Ranged};
+use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters};
 use ruff_python_trivia::{
     find_only_token_in_range, indentation_at_offset, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
@@ -434,7 +434,7 @@ fn handle_own_line_comment_around_body<'a>(
     // ```
     let maybe_token = SimpleTokenizer::new(
         locator.contents(),
-        TextRange::new(preceding.end(), comment.slice().start()),
+        TextRange::new(preceding.end(), comment.start()),
     )
     .skip_trivia()
     .next();
@@ -475,7 +475,7 @@ fn handle_own_line_comment_between_branches<'a>(
 
     // It depends on the indentation level of the comment if it is a leading comment for the
     // following branch or if it a trailing comment of the previous body's last statement.
-    let comment_indentation = indentation_at_offset(comment.slice().start(), locator)
+    let comment_indentation = indentation_at_offset(comment.start(), locator)
         .unwrap_or_default()
         .len();
 
@@ -559,7 +559,7 @@ fn handle_own_line_comment_after_branch<'a>(
 
     // We only care about the length because indentations with mixed spaces and tabs are only valid if
     // the indent-level doesn't depend on the tab width (the indent level must be the same if the tab width is 1 or 8).
-    let comment_indentation = indentation_at_offset(comment.slice().start(), locator)
+    let comment_indentation = indentation_at_offset(comment.start(), locator)
         .unwrap_or_default()
         .len();
 
@@ -848,7 +848,7 @@ fn handle_slice_comments<'a>(
 
     // Check for `foo[ # comment`, but only if they are on the same line
     let after_lbracket = matches!(
-        SimpleTokenizer::up_to_without_back_comment(comment.slice().start(), locator.contents())
+        SimpleTokenizer::up_to_without_back_comment(comment.start(), locator.contents())
             .skip_trivia()
             .next_back(),
         Some(SimpleToken {
@@ -881,7 +881,7 @@ fn handle_slice_comments<'a>(
     };
 
     if let Some(node) = node {
-        if comment.slice().start() < node.start() {
+        if comment.start() < node.start() {
             CommentPlacement::leading(node.as_ref(), comment)
         } else {
             // If a trailing comment is an end of line comment that's fine because we have a node
@@ -977,7 +977,7 @@ fn handle_dict_unpacking_comment<'a>(
     };
     let mut tokens = SimpleTokenizer::new(
         locator.contents(),
-        TextRange::new(preceding_end, comment.slice().start()),
+        TextRange::new(preceding_end, comment.start()),
     )
     .skip_trivia()
     .skip_while(|token| token.kind == SimpleTokenKind::RParen);
@@ -1138,7 +1138,7 @@ fn handle_expr_if_comment<'a>(
         locator.contents(),
     );
     // Between `if` and `test`
-    if if_token.range.start() < comment.slice().start() && comment.slice().start() < test.start() {
+    if if_token.start() < comment.start() && comment.start() < test.start() {
         return CommentPlacement::leading(test.as_ref(), comment);
     }
 
@@ -1148,9 +1148,7 @@ fn handle_expr_if_comment<'a>(
         locator.contents(),
     );
     // Between `else` and `orelse`
-    if else_token.range.start() < comment.slice().start()
-        && comment.slice().start() < orelse.start()
-    {
+    if else_token.start() < comment.start() && comment.start() < orelse.start() {
         return CommentPlacement::leading(orelse.as_ref(), comment);
     }
 
@@ -1585,7 +1583,7 @@ fn handle_comprehension_comment<'a>(
     //      in c
     //  ]
     // ```
-    if comment.slice().start() < in_token.start() {
+    if comment.start() < in_token.start() {
         // attach as dangling comments on the target
         // (to be rendered as leading on the "in")
         return if is_own_line {
@@ -1604,7 +1602,7 @@ fn handle_comprehension_comment<'a>(
     //      c
     //  ]
     // ```
-    if comment.slice().start() < comprehension.iter.start() {
+    if comment.start() < comprehension.iter.start() {
         return if is_own_line {
             CommentPlacement::Default(comment)
         } else {
@@ -1639,12 +1637,10 @@ fn handle_comprehension_comment<'a>(
             locator.contents(),
         );
         if is_own_line {
-            if last_end < comment.slice().start() && comment.slice().start() < if_token.start() {
+            if last_end < comment.start() && comment.start() < if_token.start() {
                 return CommentPlacement::dangling(if_node, comment);
             }
-        } else if if_token.start() < comment.slice().start()
-            && comment.slice().start() < if_node.start()
-        {
+        } else if if_token.start() < comment.start() && comment.start() < if_node.start() {
             return CommentPlacement::dangling(if_node, comment);
         }
         last_end = if_node.end();

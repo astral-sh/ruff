@@ -1,7 +1,7 @@
 use memchr::{memchr2, memchr3, memrchr3_iter};
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::{is_python_whitespace, Cursor};
 
@@ -131,18 +131,11 @@ impl SimpleToken {
     pub const fn kind(&self) -> SimpleTokenKind {
         self.kind
     }
+}
 
-    #[allow(unused)]
-    pub const fn range(&self) -> TextRange {
+impl Ranged for SimpleToken {
+    fn range(&self) -> TextRange {
         self.range
-    }
-
-    pub const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    pub const fn end(&self) -> TextSize {
-        self.range.end()
     }
 }
 

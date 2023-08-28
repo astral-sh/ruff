@@ -4,10 +4,11 @@ use anyhow::{bail, Result};
 use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
-use ruff_python_ast::{Ranged, Stmt};
 
+use ruff_python_ast::Stmt;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_statement;

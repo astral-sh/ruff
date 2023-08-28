@@ -1,8 +1,9 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

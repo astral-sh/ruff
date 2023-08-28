@@ -1,9 +1,9 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Stmt,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

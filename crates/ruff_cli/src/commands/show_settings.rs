@@ -4,8 +4,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 use itertools::Itertools;
 
-use ruff::resolver;
-use ruff::resolver::PyprojectConfig;
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
 
 use crate::args::Overrides;
 
@@ -17,7 +16,7 @@ pub(crate) fn show_settings(
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
 
     // Print the list of files.
     let Some(entry) = paths

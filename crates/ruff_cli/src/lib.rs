@@ -4,8 +4,9 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::CommandFactory;
+use clap::FromArgMatches;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
@@ -145,7 +146,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
         Command::Linter { format } => commands::linter::linter(format)?,
         Command::Clean => commands::clean::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
-            shell.generate(&mut Args::command(), &mut io::stdout());
+            shell.generate(&mut Args::command(), &mut stdout());
         }
         Command::Check(args) => return check(args, log_level),
         Command::Format { files } => return format(&files),
@@ -154,32 +155,35 @@ quoting the executed command, along with the relevant file contents and `pyproje
     Ok(ExitStatus::Success)
 }
 
-fn format(files: &[PathBuf]) -> Result<ExitStatus> {
+fn format(paths: &[PathBuf]) -> Result<ExitStatus> {
     warn_user_once!(
-        "`ruff format` is a work-in-progress, subject to change at any time, and intended for \
-        internal use only."
+        "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
+        experimentation."
     );
 
-    match &files {
-        // Check if we should read from stdin
-        [path] if path == Path::new("-") => {
-            let unformatted = read_from_stdin()?;
-            let options = PyFormatOptions::from_extension(Path::new("stdin.py"));
-            let formatted = format_module(&unformatted, options)?;
-            stdout().lock().write_all(formatted.as_code().as_bytes())?;
-        }
-        _ => {
-            for file in files {
-                let unformatted = std::fs::read_to_string(file)
-                    .with_context(|| format!("Could not read {}: ", file.display()))?;
-                let options = PyFormatOptions::from_extension(file);
-                let formatted = format_module(&unformatted, options)?;
-                std::fs::write(file, formatted.as_code().as_bytes())
-                    .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
-            }
-        }
+    // We want to use the same as `ruff check <files>`, but we don't actually want to allow
+    // any of the linter settings.
+    // TODO(konstin): Refactor this to allow getting config and resolver without going
+    // though clap.
+    let args_matches = CheckArgs::command()
+        .no_binary_name(true)
+        .get_matches_from(paths);
+    let check_args: CheckArgs = CheckArgs::from_arg_matches(&args_matches)?;
+    let (cli, overrides) = check_args.partition();
+
+    if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
+        let unformatted = read_from_stdin()?;
+        let options = cli
+            .stdin_filename
+            .as_deref()
+            .map(PyFormatOptions::from_extension)
+            .unwrap_or_default();
+        let formatted = format_module(&unformatted, options)?;
+        stdout().lock().write_all(formatted.as_code().as_bytes())?;
+        Ok(ExitStatus::Success)
+    } else {
+        commands::format::format(&cli, &overrides)
     }
-    Ok(ExitStatus::Success)
 }
 
 pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {

@@ -1,10 +1,9 @@
-use ruff_python_ast::{Expr, PySourceType, Ranged};
-use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{Expr, PySourceType};
+use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

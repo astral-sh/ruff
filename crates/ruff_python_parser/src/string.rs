@@ -1,6 +1,6 @@
+use ruff_python_ast::ConversionFlag;
 use ruff_python_ast::{self as ast, BytesConstant, Constant, Expr, StringConstant};
-use ruff_python_ast::{ConversionFlag, Ranged};
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 // Contains the logic for parsing string literals (mostly concerned with f-strings.)
 //

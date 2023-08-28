@@ -12,13 +12,12 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod autofix;
 mod checkers;
-mod codes;
+pub mod codes;
 mod comments;
 mod cst;
 pub mod directives;
 mod doc_lines;
 mod docstrings;
-pub mod flake8_to_ruff;
 pub mod fs;
 mod importer;
 pub mod jupyter;
@@ -32,9 +31,8 @@ pub mod packaging;
 pub mod pyproject_toml;
 pub mod registry;
 mod renamer;
-pub mod resolver;
 mod rule_redirects;
-mod rule_selector;
+pub mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
@@ -42,3 +40,5 @@ pub mod upstream_categories;
 
 #[cfg(any(test, fuzzing))]
 pub mod test;
+
+pub const RUFF_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");

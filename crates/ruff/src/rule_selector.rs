@@ -263,7 +263,7 @@ mod schema {
 }
 
 impl RuleSelector {
-    pub(crate) fn specificity(&self) -> Specificity {
+    pub fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
             RuleSelector::Nursery => Specificity::All,
@@ -286,7 +286,7 @@ impl RuleSelector {
 }
 
 #[derive(EnumIter, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
-pub(crate) enum Specificity {
+pub enum Specificity {
     All,
     LinterGroup,
     Linter,

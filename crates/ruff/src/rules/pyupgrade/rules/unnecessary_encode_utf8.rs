@@ -1,9 +1,9 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, PySourceType, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, PySourceType};
 use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
@@ -119,17 +119,17 @@ fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
 }
 
 /// Return a [`Fix`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal<T: Ranged>(
+fn replace_with_bytes_literal(
     locator: &Locator,
-    expr: &T,
+    call: &ast::ExprCall,
     source_type: PySourceType,
 ) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
-    let contents = locator.slice(expr.range());
+    let contents = locator.slice(call.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
-    let mut prev = expr.start();
+    let mut prev = call.start();
     for (tok, range) in
-        lexer::lex_starts_at(contents, source_type.as_mode(), expr.start()).flatten()
+        lexer::lex_starts_at(contents, source_type.as_mode(), call.start()).flatten()
     {
         match tok {
             Tok::Dot => break,
@@ -148,7 +148,7 @@ fn replace_with_bytes_literal<T: Ranged>(
         prev = range.end();
     }
 
-    Fix::automatic(Edit::range_replacement(replacement, expr.range()))
+    Fix::automatic(Edit::range_replacement(replacement, call.range()))
 }
 
 /// UP012

@@ -7,7 +7,7 @@ pub struct PrinterOptions {
     pub tab_width: TabWidth,
 
     /// What's the max width of a line. Defaults to 80
-    pub print_width: PrintWidth,
+    pub line_width: LineWidth,
 
     /// The type of line ending to apply to the printed input
     pub line_ending: LineEnding,
@@ -27,14 +27,14 @@ where
     fn from(options: &'a O) -> Self {
         PrinterOptions::default()
             .with_indent(options.indent_style())
-            .with_print_width(options.line_width().into())
+            .with_line_width(options.line_width())
     }
 }
 
 impl PrinterOptions {
     #[must_use]
-    pub fn with_print_width(mut self, width: PrintWidth) -> Self {
-        self.print_width = width;
+    pub fn with_line_width(mut self, width: LineWidth) -> Self {
+        self.line_width = width;
         self
     }
 
@@ -66,10 +66,10 @@ impl PrinterOptions {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct PrintWidth(u32);
+pub struct PrintWidth(u16);
 
 impl PrintWidth {
-    pub fn new(width: u32) -> Self {
+    pub fn new(width: u16) -> Self {
         Self(width)
     }
 }
@@ -82,17 +82,17 @@ impl Default for PrintWidth {
 
 impl From<LineWidth> for PrintWidth {
     fn from(width: LineWidth) -> Self {
-        Self(u32::from(u16::from(width)))
-    }
-}
-
-impl From<PrintWidth> for usize {
-    fn from(width: PrintWidth) -> Self {
-        width.0 as usize
+        Self(u16::from(width))
     }
 }
 
 impl From<PrintWidth> for u32 {
+    fn from(width: PrintWidth) -> Self {
+        u32::from(width.0)
+    }
+}
+
+impl From<PrintWidth> for u16 {
     fn from(width: PrintWidth) -> Self {
         width.0
     }

@@ -2,8 +2,8 @@ use itertools::Itertools;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;

@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Ranged;
 use ruff_python_semantic::Binding;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for the inclusion of invalid objects in `__all__`.

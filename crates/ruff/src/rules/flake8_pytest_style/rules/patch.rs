@@ -3,7 +3,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, Parameters, Ranged};
+use ruff_python_ast::{self as ast, Expr, Parameters};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for mocked calls that use a dummy `lambda` function instead of

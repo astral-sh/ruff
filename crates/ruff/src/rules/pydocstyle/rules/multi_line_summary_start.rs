@@ -1,11 +1,9 @@
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_semantic::Definition;
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;

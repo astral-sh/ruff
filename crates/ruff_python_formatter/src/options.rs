@@ -135,7 +135,7 @@ impl FormatOptions for PyFormatOptions {
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
             tab_width: self.tab_width,
-            print_width: self.line_width.into(),
+            line_width: self.line_width,
             line_ending: LineEnding::LineFeed,
             indent_style: self.indent_style,
             source_map_generation: self.source_map_generation,
