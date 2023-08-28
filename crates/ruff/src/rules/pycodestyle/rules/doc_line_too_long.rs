@@ -11,7 +11,9 @@ use crate::settings::Settings;
 /// ## Why is this bad?
 /// For flowing long blocks of text (docstrings or comments), overlong lines
 /// can hurt readability. [PEP 8], for example, recommends that such lines be
-/// limited to 72 characters.
+/// limited to 72 characters, while this rule enforces the limit specified by
+/// the [`pycodestyle.max-doc-length`] setting. (If no value is provided, this
+/// rule will be ignored, even if it's added to your `--select` list.)
 ///
 /// In the context of this rule, a "doc line" is defined as a line consisting
 /// of either a standalone comment or a standalone string, like a docstring.
@@ -21,11 +23,6 @@ use crate::settings::Settings;
 /// consist of a single "word" (i.e., without any whitespace between its
 /// characters), and lines that end with a URL (as long as the URL starts
 /// before the line-length threshold).
-///
-/// Note that this rule will only be enforced after providing a value for
-/// [`pycodestyle.max-doc-length`] in your Ruff configuration file. If no
-/// value is provided, this rule will be ignored, even if it's added to your
-/// `--select` list.
 ///
 /// If [`pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
 /// also ignore comments that start with any of the specified [`task-tags`]
