@@ -6,7 +6,6 @@ use std::sync::mpsc::channel;
 
 use anyhow::Result;
 use clap::CommandFactory;
-use clap::FromArgMatches;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
@@ -16,7 +15,7 @@ use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
 use ruff_python_formatter::{format_module, PyFormatOptions};
 
-use crate::args::{Args, CheckArgs, Command};
+use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::commands::run_stdin::read_from_stdin;
 use crate::printer::{Flags as PrinterFlags, Printer};
 
@@ -149,27 +148,19 @@ quoting the executed command, along with the relevant file contents and `pyproje
             shell.generate(&mut Args::command(), &mut stdout());
         }
         Command::Check(args) => return check(args, log_level),
-        Command::Format { files } => return format(&files),
+        Command::Format(args) => return format(args),
     }
 
     Ok(ExitStatus::Success)
 }
 
-fn format(paths: &[PathBuf]) -> Result<ExitStatus> {
+fn format(args: FormatCommand) -> Result<ExitStatus> {
     warn_user_once!(
         "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
         experimentation."
     );
 
-    // We want to use the same as `ruff check <files>`, but we don't actually want to allow
-    // any of the linter settings.
-    // TODO(konstin): Refactor this to allow getting config and resolver without going
-    // though clap.
-    let args_matches = CheckArgs::command()
-        .no_binary_name(true)
-        .get_matches_from(paths);
-    let check_args: CheckArgs = CheckArgs::from_arg_matches(&args_matches)?;
-    let (cli, overrides) = check_args.partition();
+    let (cli, overrides) = args.partition();
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         let unformatted = read_from_stdin()?;
@@ -186,7 +177,7 @@ fn format(paths: &[PathBuf]) -> Result<ExitStatus> {
     }
 }
 
-pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
+pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
