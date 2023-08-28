@@ -105,6 +105,9 @@ class Repository(NamedTuple):
         return git_sha_stdout.decode().strip()
 
 
+# Repositories to check
+# We check most repositories with the default ruleset instead of all rules to avoid
+# noisy reports when new rules are added; see https://github.com/astral-sh/ruff/pull/3590
 REPOSITORIES: list[Repository] = [
     Repository("DisnakeDev", "disnake", "master"),
     Repository("PostHog", "HouseWatch", "main"),
