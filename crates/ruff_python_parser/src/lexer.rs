@@ -706,6 +706,8 @@ impl<'source> Lexer<'source> {
         // We reached end of file.
         // First of all, we need all nestings to be finished.
         if self.nesting > 0 {
+            // Reset the nesting to avoid going into infinite loop.
+            self.nesting = 0;
             return Err(LexicalError {
                 error: LexicalErrorType::Eof,
                 location: self.offset(),
@@ -1679,5 +1681,13 @@ def f(arg=%timeit a = b):
                 Tok::Newline,
             ]
         );
+    }
+
+    // This test case is to just make sure that the lexer doesn't go into
+    // infinite loop on invalid input.
+    #[test]
+    fn test_infite_loop() {
+        let source = "[1";
+        let _ = lex(source, Mode::Module).collect::<Vec<_>>();
     }
 }
