@@ -196,6 +196,9 @@ pub enum Linter {
     /// [Perflint](https://pypi.org/project/perflint/)
     #[prefix = "PERF"]
     Perflint,
+    /// [refurb](https://pypi.org/project/refurb/)
+    #[prefix = "FURB"]
+    Refurb,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
