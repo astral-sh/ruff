@@ -1703,7 +1703,6 @@ impl<Context> Format<Context> for ExpandParent {
 /// ```
 /// use ruff_formatter::{format_args, format, LineWidth, SimpleFormatOptions};
 /// use ruff_formatter::prelude::*;
-/// use ruff_formatter::printer::PrintWidth;
 ///
 /// fn main() -> FormatResult<()> {
 /// let context = SimpleFormatContext::new(SimpleFormatOptions {

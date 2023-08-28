@@ -9,8 +9,8 @@ use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 
 use ruff::registry::{Linter, Rule, RuleNamespace};
-use ruff::settings::options::Options;
 use ruff_diagnostics::AutofixKind;
+use ruff_workspace::options::Options;
 
 use crate::ROOT_DIR;
 

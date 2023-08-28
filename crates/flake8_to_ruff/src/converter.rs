@@ -1,25 +1,25 @@
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
-use anyhow::Result;
 use itertools::Itertools;
 
-use crate::line_width::LineLength;
-use crate::registry::Linter;
-use crate::rule_selector::RuleSelector;
-use crate::rules::flake8_pytest_style::types::{
+use ruff::line_width::LineLength;
+use ruff::registry::Linter;
+use ruff::rule_selector::RuleSelector;
+use ruff::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
-use crate::rules::flake8_quotes::settings::Quote;
-use crate::rules::flake8_tidy_imports::settings::Strictness;
-use crate::rules::pydocstyle::settings::Convention;
-use crate::rules::{
-    flake8_annotations, flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_pytest_style,
-    flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
+use ruff::rules::flake8_quotes::settings::Quote;
+use ruff::rules::flake8_tidy_imports::settings::Strictness;
+use ruff::rules::pydocstyle::settings::Convention;
+use ruff::settings::types::PythonVersion;
+use ruff::warn_user;
+use ruff_workspace::options::{
+    Flake8AnnotationsOptions, Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ErrMsgOptions,
+    Flake8PytestStyleOptions, Flake8QuotesOptions, Flake8TidyImportsOptions, McCabeOptions,
+    Options, Pep8NamingOptions, PydocstyleOptions,
 };
-use crate::settings::options::Options;
-use crate::settings::pyproject::Pyproject;
-use crate::settings::types::PythonVersion;
-use crate::warn_user;
+use ruff_workspace::pyproject::Pyproject;
 
 use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
@@ -30,11 +30,11 @@ const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::Linter(Linter::Pycodestyle),
 ];
 
-pub fn convert(
+pub(crate) fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
     external_config: &ExternalConfig,
     plugins: Option<Vec<Plugin>>,
-) -> Result<Pyproject> {
+) -> Pyproject {
     // Extract the Flake8 section.
     let flake8 = config
         .get("flake8")
@@ -103,16 +103,16 @@ pub fn convert(
 
     // Parse each supported option.
     let mut options = Options::default();
-    let mut flake8_annotations = flake8_annotations::settings::Options::default();
-    let mut flake8_bugbear = flake8_bugbear::settings::Options::default();
-    let mut flake8_builtins = flake8_builtins::settings::Options::default();
-    let mut flake8_errmsg = flake8_errmsg::settings::Options::default();
-    let mut flake8_pytest_style = flake8_pytest_style::settings::Options::default();
-    let mut flake8_quotes = flake8_quotes::settings::Options::default();
-    let mut flake8_tidy_imports = flake8_tidy_imports::options::Options::default();
-    let mut mccabe = mccabe::settings::Options::default();
-    let mut pep8_naming = pep8_naming::settings::Options::default();
-    let mut pydocstyle = pydocstyle::settings::Options::default();
+    let mut flake8_annotations = Flake8AnnotationsOptions::default();
+    let mut flake8_bugbear = Flake8BugbearOptions::default();
+    let mut flake8_builtins = Flake8BuiltinsOptions::default();
+    let mut flake8_errmsg = Flake8ErrMsgOptions::default();
+    let mut flake8_pytest_style = Flake8PytestStyleOptions::default();
+    let mut flake8_quotes = Flake8QuotesOptions::default();
+    let mut flake8_tidy_imports = Flake8TidyImportsOptions::default();
+    let mut mccabe = McCabeOptions::default();
+    let mut pep8_naming = Pep8NamingOptions::default();
+    let mut pydocstyle = PydocstyleOptions::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
             match key.as_str() {
@@ -120,10 +120,8 @@ pub fn convert(
                 "builtins" => {
                     options.builtins = Some(parser::parse_strings(value.as_ref()));
                 }
-                "max-line-length" | "max_line_length" => match value.parse::<usize>() {
-                    Ok(line_length) => {
-                        options.line_length = Some(LineLength::from(line_length));
-                    }
+                "max-line-length" | "max_line_length" => match LineLength::from_str(value) {
+                    Ok(line_length) => options.line_length = Some(line_length),
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
                     }
@@ -372,41 +370,41 @@ pub fn convert(
             .sorted_by_key(RuleSelector::prefix_and_code)
             .collect(),
     );
-    if flake8_annotations != flake8_annotations::settings::Options::default() {
+    if flake8_annotations != Flake8AnnotationsOptions::default() {
         options.flake8_annotations = Some(flake8_annotations);
     }
-    if flake8_bugbear != flake8_bugbear::settings::Options::default() {
+    if flake8_bugbear != Flake8BugbearOptions::default() {
         options.flake8_bugbear = Some(flake8_bugbear);
     }
-    if flake8_builtins != flake8_builtins::settings::Options::default() {
+    if flake8_builtins != Flake8BuiltinsOptions::default() {
         options.flake8_builtins = Some(flake8_builtins);
     }
-    if flake8_errmsg != flake8_errmsg::settings::Options::default() {
+    if flake8_errmsg != Flake8ErrMsgOptions::default() {
         options.flake8_errmsg = Some(flake8_errmsg);
     }
-    if flake8_pytest_style != flake8_pytest_style::settings::Options::default() {
+    if flake8_pytest_style != Flake8PytestStyleOptions::default() {
         options.flake8_pytest_style = Some(flake8_pytest_style);
     }
-    if flake8_quotes != flake8_quotes::settings::Options::default() {
+    if flake8_quotes != Flake8QuotesOptions::default() {
         options.flake8_quotes = Some(flake8_quotes);
     }
-    if flake8_tidy_imports != flake8_tidy_imports::options::Options::default() {
+    if flake8_tidy_imports != Flake8TidyImportsOptions::default() {
         options.flake8_tidy_imports = Some(flake8_tidy_imports);
     }
-    if mccabe != mccabe::settings::Options::default() {
+    if mccabe != McCabeOptions::default() {
         options.mccabe = Some(mccabe);
     }
-    if pep8_naming != pep8_naming::settings::Options::default() {
+    if pep8_naming != Pep8NamingOptions::default() {
         options.pep8_naming = Some(pep8_naming);
     }
-    if pydocstyle != pydocstyle::settings::Options::default() {
+    if pydocstyle != PydocstyleOptions::default() {
         options.pydocstyle = Some(pydocstyle);
     }
 
     // Extract any settings from the existing `pyproject.toml`.
     if let Some(black) = &external_config.black {
         if let Some(line_length) = &black.line_length {
-            options.line_length = Some(LineLength::from(*line_length));
+            options.line_length = Some(*line_length);
         }
 
         if let Some(target_version) = &black.target_version {
@@ -439,7 +437,7 @@ pub fn convert(
     }
 
     // Create the pyproject.toml.
-    Ok(Pyproject::new(options))
+    Pyproject::new(options)
 }
 
 /// Resolve the set of enabled `RuleSelector` values for the given
@@ -458,19 +456,20 @@ mod tests {
     use anyhow::Result;
     use itertools::Itertools;
     use pep440_rs::VersionSpecifiers;
-    use pretty_assertions::assert_eq;
 
-    use crate::flake8_to_ruff::converter::DEFAULT_SELECTORS;
-    use crate::flake8_to_ruff::pep621::Project;
-    use crate::flake8_to_ruff::ExternalConfig;
-    use crate::line_width::LineLength;
-    use crate::registry::Linter;
-    use crate::rule_selector::RuleSelector;
-    use crate::rules::pydocstyle::settings::Convention;
-    use crate::rules::{flake8_quotes, pydocstyle};
-    use crate::settings::options::Options;
-    use crate::settings::pyproject::Pyproject;
-    use crate::settings::types::PythonVersion;
+    use pretty_assertions::assert_eq;
+    use ruff::line_width::LineLength;
+    use ruff::registry::Linter;
+    use ruff::rule_selector::RuleSelector;
+    use ruff::rules::flake8_quotes;
+    use ruff::rules::pydocstyle::settings::Convention;
+    use ruff::settings::types::PythonVersion;
+    use ruff_workspace::options::{Flake8QuotesOptions, Options, PydocstyleOptions};
+    use ruff_workspace::pyproject::Pyproject;
+
+    use crate::converter::DEFAULT_SELECTORS;
+    use crate::pep621::Project;
+    use crate::ExternalConfig;
 
     use super::super::plugin::Plugin;
     use super::convert;
@@ -491,20 +490,18 @@ mod tests {
     }
 
     #[test]
-    fn it_converts_empty() -> Result<()> {
+    fn it_converts_empty() {
         let actual = convert(
             &HashMap::from([("flake8".to_string(), HashMap::default())]),
             &ExternalConfig::default(),
             None,
-        )?;
+        );
         let expected = Pyproject::new(default_options([]));
         assert_eq!(actual, expected);
-
-        Ok(())
     }
 
     #[test]
-    fn it_converts_dashes() -> Result<()> {
+    fn it_converts_dashes() {
         let actual = convert(
             &HashMap::from([(
                 "flake8".to_string(),
@@ -512,18 +509,16 @@ mod tests {
             )]),
             &ExternalConfig::default(),
             Some(vec![]),
-        )?;
+        );
         let expected = Pyproject::new(Options {
-            line_length: Some(LineLength::from(100)),
+            line_length: Some(LineLength::try_from(100).unwrap()),
             ..default_options([])
         });
         assert_eq!(actual, expected);
-
-        Ok(())
     }
 
     #[test]
-    fn it_converts_underscores() -> Result<()> {
+    fn it_converts_underscores() {
         let actual = convert(
             &HashMap::from([(
                 "flake8".to_string(),
@@ -531,18 +526,16 @@ mod tests {
             )]),
             &ExternalConfig::default(),
             Some(vec![]),
-        )?;
+        );
         let expected = Pyproject::new(Options {
-            line_length: Some(LineLength::from(100)),
+            line_length: Some(LineLength::try_from(100).unwrap()),
             ..default_options([])
         });
         assert_eq!(actual, expected);
-
-        Ok(())
     }
 
     #[test]
-    fn it_ignores_parse_errors() -> Result<()> {
+    fn it_ignores_parse_errors() {
         let actual = convert(
             &HashMap::from([(
                 "flake8".to_string(),
@@ -550,15 +543,13 @@ mod tests {
             )]),
             &ExternalConfig::default(),
             Some(vec![]),
-        )?;
+        );
         let expected = Pyproject::new(default_options([]));
         assert_eq!(actual, expected);
-
-        Ok(())
     }
 
     #[test]
-    fn it_converts_plugin_options() -> Result<()> {
+    fn it_converts_plugin_options() {
         let actual = convert(
             &HashMap::from([(
                 "flake8".to_string(),
@@ -566,9 +557,9 @@ mod tests {
             )]),
             &ExternalConfig::default(),
             Some(vec![]),
-        )?;
+        );
         let expected = Pyproject::new(Options {
-            flake8_quotes: Some(flake8_quotes::settings::Options {
+            flake8_quotes: Some(Flake8QuotesOptions {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
                 docstring_quotes: None,
@@ -577,12 +568,10 @@ mod tests {
             ..default_options([])
         });
         assert_eq!(actual, expected);
-
-        Ok(())
     }
 
     #[test]
-    fn it_converts_docstring_conventions() -> Result<()> {
+    fn it_converts_docstring_conventions() {
         let actual = convert(
             &HashMap::from([(
                 "flake8".to_string(),
@@ -593,9 +582,9 @@ mod tests {
             )]),
             &ExternalConfig::default(),
             Some(vec![Plugin::Flake8Docstrings]),
-        )?;
+        );
         let expected = Pyproject::new(Options {
-            pydocstyle: Some(pydocstyle::settings::Options {
+            pydocstyle: Some(PydocstyleOptions {
                 convention: Some(Convention::Numpy),
                 ignore_decorators: None,
                 property_decorators: None,
@@ -603,12 +592,10 @@ mod tests {
             ..default_options([Linter::Pydocstyle.into()])
         });
         assert_eq!(actual, expected);
-
-        Ok(())
     }
 
     #[test]
-    fn it_infers_plugins_if_omitted() -> Result<()> {
+    fn it_infers_plugins_if_omitted() {
         let actual = convert(
             &HashMap::from([(
                 "flake8".to_string(),
@@ -616,9 +603,9 @@ mod tests {
             )]),
             &ExternalConfig::default(),
             None,
-        )?;
+        );
         let expected = Pyproject::new(Options {
-            flake8_quotes: Some(flake8_quotes::settings::Options {
+            flake8_quotes: Some(Flake8QuotesOptions {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
                 docstring_quotes: None,
@@ -627,8 +614,6 @@ mod tests {
             ..default_options([Linter::Flake8Quotes.into()])
         });
         assert_eq!(actual, expected);
-
-        Ok(())
     }
 
     #[test]
@@ -642,7 +627,7 @@ mod tests {
                 ..ExternalConfig::default()
             },
             Some(vec![]),
-        )?;
+        );
         let expected = Pyproject::new(Options {
             target_version: Some(PythonVersion::Py38),
             ..default_options([])

@@ -78,7 +78,7 @@ pub(crate) fn doc_line_too_long(line: &Line, settings: &Settings) -> Option<Diag
     )
     .map(|overlong| {
         Diagnostic::new(
-            DocLineTooLong(overlong.width(), limit.get()),
+            DocLineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
         )
     })

@@ -8,7 +8,6 @@ use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff::logging::LogLevel;
-use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
 use ruff_cli::args::{CheckArgs, LogLevelArgs};
 use ruff_cli::resolve::resolve;
@@ -16,11 +15,13 @@ use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_python_formatter::{
     format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
 };
+use ruff_workspace::resolver::python_files_in_path;
 use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::num::NonZeroU16;
 use std::ops::{Add, AddAssign};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
@@ -838,7 +839,7 @@ struct PyprojectTomlTool {
 struct BlackOptions {
     // Black actually allows both snake case and kebab case
     #[serde(alias = "line-length")]
-    line_length: u16,
+    line_length: NonZeroU16,
     #[serde(alias = "skip-magic-trailing-comma")]
     skip_magic_trailing_comma: bool,
     #[allow(unused)]
@@ -849,7 +850,7 @@ struct BlackOptions {
 impl Default for BlackOptions {
     fn default() -> Self {
         Self {
-            line_length: 88,
+            line_length: NonZeroU16::new(88).unwrap(),
             skip_magic_trailing_comma: false,
             force_exclude: None,
         }
@@ -893,9 +894,7 @@ impl BlackOptions {
 
     fn to_py_format_options(&self, file: &Path) -> PyFormatOptions {
         PyFormatOptions::from_extension(file)
-            .with_line_width(
-                LineWidth::try_from(self.line_length).expect("Invalid line length limit"),
-            )
+            .with_line_width(LineWidth::from(self.line_length))
             .with_magic_trailing_comma(if self.skip_magic_trailing_comma {
                 MagicTrailingComma::Ignore
             } else {

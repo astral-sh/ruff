@@ -12,7 +12,7 @@ use ruff_python_trivia::{leading_indentation, textwrap::indent, PythonWhitespace
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::line_width::LineWidth;
+use crate::line_width::LineWidthBuilder;
 use crate::registry::AsRule;
 use crate::settings::Settings;
 
@@ -121,7 +121,7 @@ pub(crate) fn organize_imports(
         comments,
         locator,
         settings.line_length,
-        LineWidth::new(settings.tab_size).add_str(indentation),
+        LineWidthBuilder::new(settings.tab_size).add_str(indentation),
         stylist,
         &settings.src,
         package,

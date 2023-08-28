@@ -1,8 +1,10 @@
-mod call_stack;
-mod line_suffixes;
-mod printer_options;
-mod queue;
-mod stack;
+use std::num::NonZeroU8;
+
+use drop_bomb::DebugDropBomb;
+use unicode_width::UnicodeWidthChar;
+
+pub use printer_options::*;
+use ruff_text_size::{Ranged, TextLen, TextSize};
 
 use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
@@ -21,11 +23,12 @@ use crate::{
     ActualStart, FormatElement, GroupId, IndentStyle, InvalidDocumentError, PrintError,
     PrintResult, Printed, SourceMarker, TextRange,
 };
-use drop_bomb::DebugDropBomb;
-pub use printer_options::*;
-use ruff_text_size::{TextLen, TextSize};
-use std::num::NonZeroU8;
-use unicode_width::UnicodeWidthChar;
+
+mod call_stack;
+mod line_suffixes;
+mod printer_options;
+mod queue;
+mod stack;
 
 /// Prints the format elements into a string
 #[derive(Debug, Default)]
@@ -1191,7 +1194,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::Tag(StartLineSuffix { reserved_width }) => {
                 self.state.line_width += reserved_width;
-                if self.state.line_width > self.options().print_width.into() {
+                if self.state.line_width > self.options().line_width.into() {
                     return Ok(Fits::No);
                 }
                 self.queue.skip_content(TagKind::LineSuffix);
@@ -1317,7 +1320,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             self.state.line_width += char_width;
         }
 
-        if self.state.line_width > self.options().print_width.into() {
+        if self.state.line_width > self.options().line_width.into() {
             return Fits::No;
         }
 
@@ -1434,10 +1437,11 @@ impl From<BestFittingMode> for MeasureMode {
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
-    use crate::printer::{LineEnding, PrintWidth, Printer, PrinterOptions};
+    use crate::printer::{LineEnding, Printer, PrinterOptions};
     use crate::source_code::SourceCode;
     use crate::{
-        format_args, write, Document, FormatState, IndentStyle, Printed, TabWidth, VecBuffer,
+        format_args, write, Document, FormatState, IndentStyle, LineWidth, Printed, TabWidth,
+        VecBuffer,
     };
 
     fn format(root: &dyn Format<SimpleFormatContext>) -> Printed {
@@ -1589,7 +1593,7 @@ two lines`,
         let options = PrinterOptions {
             indent_style: IndentStyle::Tab,
             tab_width: TabWidth::try_from(4).unwrap(),
-            print_width: PrintWidth::new(19),
+            line_width: LineWidth::try_from(19).unwrap(),
             ..PrinterOptions::default()
         };
 
@@ -1694,7 +1698,7 @@ two lines`,
 
         let printed = Printer::new(
             SourceCode::default(),
-            PrinterOptions::default().with_print_width(PrintWidth::new(10)),
+            PrinterOptions::default().with_line_width(LineWidth::try_from(10).unwrap()),
         )
         .print(&document)
         .unwrap();

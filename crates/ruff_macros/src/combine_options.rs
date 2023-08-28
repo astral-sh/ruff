@@ -16,9 +16,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
                 .collect::<Result<Vec<_>, _>>()?;
 
             Ok(quote! {
-                use crate::settings::configuration::CombinePluginOptions;
-
-                impl CombinePluginOptions for #ident {
+                impl crate::configuration::CombinePluginOptions for #ident {
                     fn combine(self, other: Self) -> Self {
                         Self {
                         #(

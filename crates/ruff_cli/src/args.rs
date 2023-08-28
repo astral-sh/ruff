@@ -3,17 +3,17 @@ use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
+use ruff::line_width::LineLength;
 use rustc_hash::FxHashMap;
 
-use ruff::line_width::LineLength;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
-use ruff::resolver::ConfigProcessor;
-use ruff::settings::configuration::RuleSelection;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
 use ruff::RuleSelector;
+use ruff_workspace::configuration::{Configuration, RuleSelection};
+use ruff_workspace::resolver::ConfigProcessor;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -256,7 +256,7 @@ pub struct CheckArgs {
     /// Set the line-length for length-associated rules and automatic
     /// formatting.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
-    pub line_length: Option<usize>,
+    pub line_length: Option<LineLength>,
     /// Regular expression matching the name of dummy variables.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
@@ -497,7 +497,7 @@ pub struct Overrides {
     pub extend_unfixable: Option<Vec<RuleSelector>>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub ignore: Option<Vec<RuleSelector>>,
-    pub line_length: Option<usize>,
+    pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
@@ -514,7 +514,7 @@ pub struct Overrides {
 }
 
 impl ConfigProcessor for Overrides {
-    fn process_config(&self, config: &mut ruff::settings::configuration::Configuration) {
+    fn process_config(&self, config: &mut Configuration) {
         if let Some(cache_dir) = &self.cache_dir {
             config.cache_dir = Some(cache_dir.clone());
         }
@@ -560,7 +560,7 @@ impl ConfigProcessor for Overrides {
             config.force_exclude = Some(*force_exclude);
         }
         if let Some(line_length) = &self.line_length {
-            config.line_length = Some(LineLength::from(*line_length));
+            config.line_length = Some(*line_length);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
