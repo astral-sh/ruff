@@ -9,11 +9,11 @@ use thiserror::Error;
 use tracing::{span, Level};
 
 use ruff::fs;
-use ruff::resolver::python_files_in_path;
 use ruff::warn_user_once;
 use ruff_formatter::LineWidth;
 use ruff_python_ast::PySourceType;
 use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
+use ruff_workspace::resolver::python_files_in_path;
 
 use crate::args::{Arguments, Overrides};
 use crate::resolve::resolve;
