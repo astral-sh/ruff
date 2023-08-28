@@ -14,7 +14,7 @@ use ruff_text_size::TextLen;
 use crate::comments::{
     dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
-use crate::context::PyFormatContext;
+pub use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
 use crate::verbatim::suppressed_node;
 
@@ -165,6 +165,17 @@ pub fn format_node<'a>(
         .comments()
         .assert_all_formatted(SourceCode::new(source));
     Ok(formatted)
+}
+
+/// Public function for generating a printable string of the debug comments.
+pub fn pretty_comments(formatted: &Formatted<PyFormatContext>, source: &str) -> String {
+    let comments = formatted.context().comments();
+
+    // When comments are empty we'd display an empty map '{}'
+    std::format!(
+        "{comments:#?}",
+        comments = comments.debug(SourceCode::new(source))
+    )
 }
 
 pub(crate) struct NotYetImplementedCustomText<'a> {

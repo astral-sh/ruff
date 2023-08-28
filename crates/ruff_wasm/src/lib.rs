@@ -10,10 +10,11 @@ use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
 use ruff::settings::types::PythonVersion;
 use ruff::settings::{defaults, flags, Settings};
-use ruff_python_ast::PySourceType;
+use ruff_formatter::{FormatResult, Formatted};
+use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module, format_node, PyFormatOptions};
-use ruff_python_index::{CommentRangesBuilder, Indexer};
+use ruff_python_formatter::{format_node, pretty_comments, PyFormatContext, PyFormatOptions};
+use ruff_python_index::{CommentRanges, CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
 use ruff_python_parser::{parse_tokens, Mode};
@@ -230,30 +231,26 @@ impl Workspace {
     }
 
     pub fn format(&self, contents: &str) -> Result<String, Error> {
-        // TODO(konstin): Add an options for py/pyi to the UI (1/2)
-        let options = PyFormatOptions::from_source_type(PySourceType::default());
-        let printed = format_module(contents, options).map_err(into_error)?;
+        let parsed = ParsedModule::from_source(contents)?;
+        let formatted = parsed.format().map_err(into_error)?;
+        let printed = formatted.print().map_err(into_error)?;
 
         Ok(printed.into_code())
     }
 
     pub fn format_ir(&self, contents: &str) -> Result<String, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
-        let mut comment_ranges = CommentRangesBuilder::default();
-
-        for (token, range) in tokens.iter().flatten() {
-            comment_ranges.visit_token(token, *range);
-        }
-
-        let comment_ranges = comment_ranges.finish();
-        let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
-
-        // TODO(konstin): Add an options for py/pyi to the UI (2/2)
-        let options = PyFormatOptions::from_source_type(PySourceType::default());
-        let formatted =
-            format_node(&module, &comment_ranges, contents, options).map_err(into_error)?;
+        let parsed = ParsedModule::from_source(contents)?;
+        let formatted = parsed.format().map_err(into_error)?;
 
         Ok(format!("{formatted}"))
+    }
+
+    pub fn comments(&self, contents: &str) -> Result<String, Error> {
+        let parsed = ParsedModule::from_source(contents)?;
+        let formatted = parsed.format().map_err(into_error)?;
+        let comments = pretty_comments(&formatted, contents);
+
+        Ok(comments)
     }
 
     /// Parses the content and returns its AST
@@ -272,4 +269,41 @@ impl Workspace {
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
     Error::new(&err.to_string())
+}
+
+struct ParsedModule<'a> {
+    source_code: &'a str,
+    module: Mod,
+    comment_ranges: CommentRanges,
+}
+
+impl<'a> ParsedModule<'a> {
+    fn from_source(source: &'a str) -> Result<Self, Error> {
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source, Mode::Module).collect();
+        let mut comment_ranges = CommentRangesBuilder::default();
+
+        for (token, range) in tokens.iter().flatten() {
+            comment_ranges.visit_token(token, *range);
+        }
+        let comment_ranges = comment_ranges.finish();
+        let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
+
+        Ok(Self {
+            source_code: source,
+            comment_ranges,
+            module,
+        })
+    }
+
+    fn format(&self) -> FormatResult<Formatted<PyFormatContext>> {
+        // TODO(konstin): Add an options for py/pyi to the UI (2/2)
+        let options = PyFormatOptions::from_source_type(PySourceType::default());
+
+        format_node(
+            &self.module,
+            &self.comment_ranges,
+            self.source_code,
+            options,
+        )
+    }
 }
