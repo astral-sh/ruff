@@ -150,7 +150,7 @@ fn format_import(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(stmt.range());
+    let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text)?;
     let import = match_import(&mut tree)?;
 
@@ -177,7 +177,7 @@ fn format_import_from(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(stmt.range());
+    let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text).unwrap();
     let import = match_import_from(&mut tree)?;
 

@@ -17,7 +17,7 @@ pub(super) fn remove_unused_format_arguments_from_dict(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let source_code = locator.slice(dict.range());
+    let source_code = locator.slice(dict);
     transform_expression(source_code, stylist, |mut expression| {
         let dict = match_dict(&mut expression)?;
 
@@ -41,7 +41,7 @@ pub(super) fn remove_unused_keyword_arguments_from_format_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let source_code = locator.slice(call.range());
+    let source_code = locator.slice(call);
     transform_expression(source_code, stylist, |mut expression| {
         let call = match_call_mut(&mut expression)?;
 
@@ -69,7 +69,7 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let source_code = locator.slice(call.range());
+    let source_code = locator.slice(call);
     transform_expression(source_code, stylist, |mut expression| {
         let call = match_call_mut(&mut expression)?;
 

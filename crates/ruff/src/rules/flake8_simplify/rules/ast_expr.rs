@@ -238,10 +238,10 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
 
     let expected = format!(
         "{}({})",
-        checker.locator().slice(func.range()),
-        checker.locator().slice(key.range())
+        checker.locator().slice(func.as_ref()),
+        checker.locator().slice(key)
     );
-    let original = checker.locator().slice(expr.range()).to_string();
+    let original = checker.locator().slice(expr).to_string();
 
     let mut diagnostic = Diagnostic::new(
         DictGetWithNoneDefault {

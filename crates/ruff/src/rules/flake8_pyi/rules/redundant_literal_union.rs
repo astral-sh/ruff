@@ -88,7 +88,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr
         if builtin_types_in_union.contains(&constant_type) {
             checker.diagnostics.push(Diagnostic::new(
                 RedundantLiteralUnion {
-                    literal: checker.locator().slice(literal_expr.range()).to_string(),
+                    literal: checker.locator().slice(literal_expr).to_string(),
                     builtin_type: constant_type,
                 },
                 literal_expr.range(),

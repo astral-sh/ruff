@@ -99,7 +99,7 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
         checker.semantic(),
     )?;
 
-    let iterable = checker.locator().slice(iterable.range());
+    let iterable = checker.locator().slice(iterable);
 
     Ok(Fix::suggested_edits(
         Edit::range_replacement(

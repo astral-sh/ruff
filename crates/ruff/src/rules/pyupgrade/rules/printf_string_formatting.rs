@@ -163,7 +163,7 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple(checker: &mut Checker, right: &Expr, locator: &Locator) -> String {
-    let mut contents = checker.locator().slice(right.range()).to_string();
+    let mut contents = checker.locator().slice(right).to_string();
     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &right {
         if elts.len() == 1 {
             if !locator.contains_line_break(right.range()) {
@@ -224,7 +224,7 @@ fn clean_params_dictionary(
                             }
                         }
 
-                        let value_string = checker.locator().slice(value.range());
+                        let value_string = checker.locator().slice(value);
                         arguments.push(format!("{key_string}={value_string}"));
                     } else {
                         // If there are any non-string keys, abort.
@@ -232,7 +232,7 @@ fn clean_params_dictionary(
                     }
                 }
                 None => {
-                    let value_string = checker.locator().slice(value.range());
+                    let value_string = checker.locator().slice(value);
                     arguments.push(format!("**{value_string}"));
                 }
             }
@@ -343,7 +343,7 @@ pub(crate) fn printf_string_formatting(
     let mut strings: Vec<TextRange> = vec![];
     let mut extension = None;
     for (tok, range) in lexer::lex_starts_at(
-        checker.locator().slice(expr.range()),
+        checker.locator().slice(expr),
         checker.source_type.as_mode(),
         expr.start(),
     )
@@ -404,16 +404,16 @@ pub(crate) fn printf_string_formatting(
     // Parse the parameters.
     let params_string = match right {
         Expr::Constant(_) | Expr::FString(_) => {
-            format!("({})", checker.locator().slice(right.range()))
+            format!("({})", checker.locator().slice(right))
         }
         Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
-                format!("(**{})", checker.locator().slice(right.range()))
+                format!("(**{})", checker.locator().slice(right))
             } else if num_positional_arguments > 1 {
                 // If we have multiple fields, but no named fields, assume the right-hand side is a
                 // tuple.
-                format!("(*{})", checker.locator().slice(right.range()))
+                format!("(*{})", checker.locator().slice(right))
             } else {
                 // Otherwise, if we have a single field, we can't make any assumptions about the
                 // right-hand side. It _could_ be a tuple, but it could also be a single value,

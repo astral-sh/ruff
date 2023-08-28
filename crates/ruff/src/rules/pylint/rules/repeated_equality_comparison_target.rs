@@ -187,10 +187,10 @@ fn merged_membership_test(
         BoolOp::Or => "in",
         BoolOp::And => "not in",
     };
-    let left = locator.slice(left.range());
+    let left = locator.slice(left);
     let members = comparators
         .iter()
-        .map(|comparator| locator.slice(comparator.range()))
+        .map(|comparator| locator.slice(comparator))
         .join(", ");
     format!("{left} {op} ({members})",)
 }

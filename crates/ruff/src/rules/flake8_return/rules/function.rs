@@ -537,7 +537,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
                 // Replace the `x = 1` statement with `return 1`.
-                let content = checker.locator().slice(assign.range());
+                let content = checker.locator().slice(assign);
                 let equals_index = content
                     .find('=')
                     .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;

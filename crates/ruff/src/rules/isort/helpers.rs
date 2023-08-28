@@ -13,7 +13,7 @@ pub(super) fn trailing_comma(
     locator: &Locator,
     source_type: PySourceType,
 ) -> TrailingComma {
-    let contents = locator.slice(stmt.range());
+    let contents = locator.slice(stmt);
     let mut count = 0u32;
     let mut trailing_comma = TrailingComma::Absent;
     for (tok, _) in lexer::lex_starts_at(contents, source_type.as_mode(), stmt.start()).flatten() {

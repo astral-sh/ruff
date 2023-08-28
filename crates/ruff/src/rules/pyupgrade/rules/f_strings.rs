@@ -74,7 +74,7 @@ impl<'a> FormatSummaryValues<'a> {
 
         for arg in &call.arguments.args {
             if matches!(arg, Expr::Starred(..))
-                || contains_quotes(locator.slice(arg.range()))
+                || contains_quotes(locator.slice(arg))
                 || locator.contains_line_break(arg.range())
             {
                 return None;
@@ -90,9 +90,7 @@ impl<'a> FormatSummaryValues<'a> {
             let Some(key) = arg else {
                 return None;
             };
-            if contains_quotes(locator.slice(value.range()))
-                || locator.contains_line_break(value.range())
-            {
+            if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
                 return None;
             }
             extracted_kwargs.insert(key, value);
@@ -142,7 +140,7 @@ enum FormatContext {
 
 /// Given an [`Expr`], format it for use in a formatted expression within an f-string.
 fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>) -> Cow<'a, str> {
-    let text = locator.slice(expr.range());
+    let text = locator.slice(expr);
     let parenthesize = match (context, expr) {
         // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
         (
@@ -373,7 +371,7 @@ pub(crate) fn f_strings(
         return;
     }
 
-    let mut contents = String::with_capacity(checker.locator().slice(call.range()).len());
+    let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
     for (range, fstring) in patches {
         contents.push_str(

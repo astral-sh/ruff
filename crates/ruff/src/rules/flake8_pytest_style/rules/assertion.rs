@@ -411,7 +411,7 @@ fn to_pytest_raises_args<'a>(
         "assertRaises" | "failUnlessRaises" => {
             match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
                 // Ex) `assertRaises(Exception)`
-                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg.range())),
+                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg)),
                 // Ex) `assertRaises(expected_exception=Exception)`
                 ([], [kwarg])
                     if kwarg
@@ -429,8 +429,8 @@ fn to_pytest_raises_args<'a>(
                 // Ex) `assertRaisesRegex(Exception, regex)`
                 ([arg1, arg2], []) => Cow::Owned(format!(
                     "{}, match={}",
-                    checker.locator().slice(arg1.range()),
-                    checker.locator().slice(arg2.range())
+                    checker.locator().slice(arg1),
+                    checker.locator().slice(arg2)
                 )),
                 // Ex) `assertRaisesRegex(Exception, expected_regex=regex)`
                 ([arg], [kwarg])
@@ -441,7 +441,7 @@ fn to_pytest_raises_args<'a>(
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
-                        checker.locator().slice(arg.range()),
+                        checker.locator().slice(arg),
                         checker.locator().slice(kwarg.value.range())
                     ))
                 }
