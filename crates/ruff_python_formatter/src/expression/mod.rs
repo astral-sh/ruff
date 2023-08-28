@@ -8,7 +8,7 @@ use ruff_formatter::{
 use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
-use ruff_python_ast::{Expr, ExpressionRef, Operator};
+use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::leading_comments;
@@ -521,6 +521,25 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
+            Expr::Constant(ast::ExprConstant {
+                value:
+                    Constant::Str(ast::StringConstant {
+                        implicit_concatenated: true,
+                        ..
+                    })
+                    | Constant::Bytes(ast::BytesConstant {
+                        implicit_concatenated: true,
+                        ..
+                    }),
+                ..
+            })
+            | Expr::FString(ast::ExprFString {
+                implicit_concatenated: true,
+                ..
+            }) => {
+                self.update_max_priority(OperatorPriority::String);
+            }
+
             Expr::NamedExpr(_)
             | Expr::GeneratorExp(_)
             | Expr::Lambda(_)
@@ -767,8 +786,6 @@ enum OperatorPriority {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
-    // TODO(micha)
-    #[allow(unused)]
     String,
     BooleanOperation,
     Conditional,
