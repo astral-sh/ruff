@@ -140,14 +140,14 @@ struct AppendGroup<'a> {
     is_consecutive: bool,
 }
 
-impl<'a> AppendGroup<'a> {
-    fn name(&self) -> &'a str {
+impl AppendGroup<'_> {
+    fn name(&self) -> &str {
         assert!(!self.appends.is_empty());
         &self.appends.first().unwrap().receiver.id
     }
 }
 
-impl<'a> Ranged for AppendGroup<'a> {
+impl Ranged for AppendGroup<'_> {
     fn range(&self) -> TextRange {
         assert!(!self.appends.is_empty());
         TextRange::new(
@@ -167,7 +167,7 @@ fn match_consecutive_appends<'a>(
 
     // In order to match consecutive statements, we need to go to the tree ancestor of the
     // given statement, find its position there, and match all 'appends' from there.
-    let siblings: &'a [Stmt] = if semantic.at_top_level() {
+    let siblings: &[Stmt] = if semantic.at_top_level() {
         // If the statement is at the top level, we should go to the parent module.
         // Module is available in the definitions list.
         let module = semantic.definitions[DefinitionId::module()].as_module()?;
@@ -201,9 +201,9 @@ fn match_consecutive_appends<'a>(
 }
 
 /// Group the given appends by the associated bindings.
-fn group_appends<'a>(appends: Vec<Append<'a>>) -> Vec<AppendGroup<'a>> {
+fn group_appends(appends: Vec<Append<'_>>) -> Vec<AppendGroup<'_>> {
     // We want to go over the given list of appends and group the by receivers.
-    let mut map: FxHashMap<BindingId, AppendGroup<'a>> = FxHashMap::default();
+    let mut map: FxHashMap<BindingId, AppendGroup> = FxHashMap::default();
     let mut iter = appends.into_iter();
     let mut last_binding = {
         let first_append = iter.next().unwrap();
