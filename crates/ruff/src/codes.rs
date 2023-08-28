@@ -866,7 +866,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Slots, "002") => (RuleGroup::Unspecified, rules::flake8_slots::rules::NoSlotsInNamedtupleSubclass),
 
         // refurb
-        (Refurb, "113") => (RuleGroup::Unspecified, rules::refurb::rules::RepeatedAppend),
+        (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
 
         _ => return None,
     })
