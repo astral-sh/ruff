@@ -371,26 +371,22 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
 ///       to understand if the value gets initialized from a call to a function always returning
 ///       lists. This also implies no interfile analysis.
 fn is_list<'a>(semantic: &'a SemanticModel, binding: &'a Binding, name: &str) -> bool {
-    let Some(statement_id) = binding.source else {
-        return false;
-    };
-    let stmt = semantic.statement(statement_id);
     match binding.kind {
-        BindingKind::Assignment => match stmt {
-            Stmt::Assign(ast::StmtAssign { value, .. }) => {
+        BindingKind::Assignment => match binding.statement(semantic) {
+            Some(Stmt::Assign(ast::StmtAssign { value, .. })) => {
                 let value_type: ResolvedPythonType = value.as_ref().into();
                 let ResolvedPythonType::Atom(candidate) = value_type else {
                     return false;
                 };
                 matches!(candidate, PythonType::List)
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+            Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
                 is_list_annotation(semantic, annotation.as_ref())
             }
             _ => false,
         },
-        BindingKind::Argument => match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. }) => {
+        BindingKind::Argument => match binding.statement(semantic) {
+            Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) => {
                 let Some(parameter) = find_parameter_by_name(parameters.as_ref(), name) else {
                     return false;
                 };
@@ -401,8 +397,8 @@ fn is_list<'a>(semantic: &'a SemanticModel, binding: &'a Binding, name: &str) ->
             }
             _ => false,
         },
-        BindingKind::Annotation => match stmt {
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+        BindingKind::Annotation => match binding.statement(semantic) {
+            Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
                 is_list_annotation(semantic, annotation.as_ref())
             }
             _ => false,
