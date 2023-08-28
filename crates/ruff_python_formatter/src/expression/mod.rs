@@ -434,14 +434,15 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
     // Visits a subexpression, ignoring whether it is parenthesized or not
     fn visit_subexpression(&mut self, expr: &'input Expr) {
         match expr {
-            Expr::Dict(_) | Expr::List(_) | Expr::Tuple(_) | Expr::Set(_) => {
+            Expr::Dict(_)
+            | Expr::List(_)
+            | Expr::Tuple(_)
+            | Expr::Set(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::DictComp(_) => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
-                return;
-            }
-            Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) => {
-                self.any_parenthesized_expressions = true;
-                self.update_max_priority(OperatorPriority::Comprehension);
                 return;
             }
             // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
@@ -789,7 +790,6 @@ enum OperatorPriority {
     String,
     BooleanOperation,
     Conditional,
-    Comprehension,
 }
 
 impl From<ast::Operator> for OperatorPriority {
