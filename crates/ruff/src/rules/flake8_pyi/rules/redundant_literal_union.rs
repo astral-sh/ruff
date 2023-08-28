@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 
 /// ## What it does
@@ -38,7 +39,7 @@ use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 /// ```
 #[violation]
 pub struct RedundantLiteralUnion {
-    literal: String,
+    literal: SourceCodeSnippet,
     builtin_type: ExprType,
 }
 
@@ -49,7 +50,11 @@ impl Violation for RedundantLiteralUnion {
             literal,
             builtin_type,
         } = self;
-        format!("`Literal[{literal}]` is redundant in a union with `{builtin_type}`",)
+        if let Some(literal) = literal.full_display() {
+            format!("`Literal[{literal}]` is redundant in a union with `{builtin_type}`")
+        } else {
+            format!("`Literal` is redundant in a union with `{builtin_type}`")
+        }
     }
 }
 
@@ -88,7 +93,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr
         if builtin_types_in_union.contains(&constant_type) {
             checker.diagnostics.push(Diagnostic::new(
                 RedundantLiteralUnion {
-                    literal: checker.locator().slice(literal_expr).to_string(),
+                    literal: SourceCodeSnippet::from_str(checker.locator().slice(literal_expr)),
                     builtin_type: constant_type,
                 },
                 literal_expr.range(),

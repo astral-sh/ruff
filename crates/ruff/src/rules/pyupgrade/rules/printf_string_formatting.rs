@@ -1,18 +1,18 @@
 use std::str::FromStr;
 
-use ruff_python_ast::{self as ast, Constant, Expr};
-use ruff_python_literal::cformat::{
-    CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
-};
-use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::{Ranged, TextRange};
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_codegen::Stylist;
+use ruff_python_literal::cformat::{
+    CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
+};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -162,8 +162,8 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 }
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
-fn clean_params_tuple(checker: &mut Checker, right: &Expr, locator: &Locator) -> String {
-    let mut contents = checker.locator().slice(right).to_string();
+fn clean_params_tuple(right: &Expr, locator: &Locator) -> String {
+    let mut contents = locator.slice(right).to_string();
     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &right {
         if elts.len() == 1 {
             if !locator.contains_line_break(right.range()) {
@@ -182,11 +182,7 @@ fn clean_params_tuple(checker: &mut Checker, right: &Expr, locator: &Locator) ->
 
 /// Converts a dictionary to a function call while preserving as much styling as
 /// possible.
-fn clean_params_dictionary(
-    checker: &mut Checker,
-    right: &Expr,
-    locator: &Locator,
-) -> Option<String> {
+fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -> Option<String> {
     let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
     if let Expr::Dict(ast::ExprDict {
@@ -220,11 +216,11 @@ fn clean_params_dictionary(
                         seen.push(key_string);
                         if is_multi_line {
                             if indent.is_none() {
-                                indent = indentation(checker.locator(), key);
+                                indent = indentation(locator, key);
                             }
                         }
 
-                        let value_string = checker.locator().slice(value);
+                        let value_string = locator.slice(value);
                         arguments.push(format!("{key_string}={value_string}"));
                     } else {
                         // If there are any non-string keys, abort.
@@ -232,7 +228,7 @@ fn clean_params_dictionary(
                     }
                 }
                 None => {
-                    let value_string = checker.locator().slice(value);
+                    let value_string = locator.slice(value);
                     arguments.push(format!("**{value_string}"));
                 }
             }
@@ -248,16 +244,16 @@ fn clean_params_dictionary(
             };
 
             for item in &arguments {
-                contents.push_str(checker.stylist().line_ending().as_str());
+                contents.push_str(stylist.line_ending().as_str());
                 contents.push_str(indent);
                 contents.push_str(item);
                 contents.push(',');
             }
 
-            contents.push_str(checker.stylist().line_ending().as_str());
+            contents.push_str(stylist.line_ending().as_str());
 
             // For the ending parentheses, go back one indent.
-            let default_indent: &str = checker.stylist().indentation();
+            let default_indent: &str = stylist.indentation();
             if let Some(ident) = indent.strip_prefix(default_indent) {
                 contents.push_str(ident);
             } else {
@@ -333,12 +329,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 }
 
 /// UP031
-pub(crate) fn printf_string_formatting(
-    checker: &mut Checker,
-    expr: &Expr,
-    right: &Expr,
-    locator: &Locator,
-) {
+pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<TextRange> = vec![];
     let mut extension = None;
@@ -427,9 +418,11 @@ pub(crate) fn printf_string_formatting(
                 return;
             }
         }
-        Expr::Tuple(_) => clean_params_tuple(checker, right, locator),
+        Expr::Tuple(_) => clean_params_tuple(right, checker.locator()),
         Expr::Dict(_) => {
-            if let Some(params_string) = clean_params_dictionary(checker, right, locator) {
+            if let Some(params_string) =
+                clean_params_dictionary(right, checker.locator(), checker.stylist())
+            {
                 params_string
             } else {
                 return;
