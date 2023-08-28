@@ -1,11 +1,12 @@
 use std::io;
 use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use anyhow::Result;
 use colored::Colorize;
-use log::warn;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use log::{debug, warn};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use thiserror::Error;
 use tracing::{span, Level};
 
@@ -35,6 +36,7 @@ pub(crate) fn format(cli: &FormatArguments, overrides: &Overrides) -> Result<Exi
         return Ok(ExitStatus::Success);
     }
 
+    let start = Instant::now();
     let result = paths
         .into_par_iter()
         .map(|entry| {
@@ -47,7 +49,6 @@ pub(crate) fn format(cli: &FormatArguments, overrides: &Overrides) -> Result<Exi
                 let line_length = resolver.resolve(path, &pyproject_config).line_length;
                 let options = PyFormatOptions::from_extension(path)
                     .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
-
                 format_path(path, options)
             } else {
                 Ok(())
@@ -60,6 +61,8 @@ pub(crate) fn format(cli: &FormatArguments, overrides: &Overrides) -> Result<Exi
             })
         })
         .collect::<Result<(), _>>();
+    let duration = start.elapsed();
+    debug!("Checked {:?} files in: {:?}", paths.len(), duration);
 
     if result.is_ok() {
         Ok(ExitStatus::Success)
