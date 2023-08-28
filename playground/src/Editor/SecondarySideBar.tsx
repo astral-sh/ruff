@@ -56,7 +56,7 @@ export default function SecondarySideBar({
       </SideBarEntry>
 
       <SideBarEntry
-        title="Comments"
+        title="Formatter comments"
         position={"right"}
         selected={selected === SecondaryTool.Comments}
         onClick={() => onSelected(SecondaryTool.Comments)}

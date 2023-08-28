@@ -2532,6 +2532,7 @@ dependencies = [
  "log",
  "ruff",
  "ruff_diagnostics",
+ "ruff_formatter",
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_formatter",

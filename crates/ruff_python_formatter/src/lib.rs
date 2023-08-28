@@ -14,7 +14,7 @@ use ruff_text_size::TextLen;
 use crate::comments::{
     dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
-use crate::context::PyFormatContext;
+pub use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
 use crate::verbatim::suppressed_node;
 
