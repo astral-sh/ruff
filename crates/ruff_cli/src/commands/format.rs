@@ -1,15 +1,20 @@
+use std::fs::File;
 use std::io;
+use std::io::{BufWriter, Write};
 use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use anyhow::Result;
 use colored::Colorize;
-use log::warn;
+use log::{debug, warn};
+use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
 use tracing::{span, Level};
 
 use ruff::fs;
+use ruff::logging::LogLevel;
 use ruff::warn_user_once;
 use ruff_formatter::LineWidth;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -21,7 +26,11 @@ use crate::resolve::resolve;
 use crate::ExitStatus;
 
 /// Format a set of files, and return the exit status.
-pub(crate) fn format(cli: &FormatArguments, overrides: &Overrides) -> Result<ExitStatus> {
+pub(crate) fn format(
+    cli: &FormatArguments,
+    overrides: &Overrides,
+    log_level: LogLevel,
+) -> Result<ExitStatus> {
     let pyproject_config = resolve(
         cli.isolated,
         cli.config.as_deref(),
@@ -35,33 +44,53 @@ pub(crate) fn format(cli: &FormatArguments, overrides: &Overrides) -> Result<Exi
         return Ok(ExitStatus::Success);
     }
 
-    let result = paths
+    let start = Instant::now();
+    let (results, errors): (Vec<_>, Vec<_>) = paths
         .into_par_iter()
         .map(|entry| {
             let entry = entry?;
             let path = entry.path();
-            if matches!(
-                SourceType::from(path),
-                SourceType::Python(PySourceType::Python | PySourceType::Stub)
-            ) {
+            if let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
+                SourceType::from(path)
+            {
                 let line_length = resolver.resolve(path, &pyproject_config).line_length;
-                let options = PyFormatOptions::from_extension(path)
+                let options = PyFormatOptions::from_source_type(source_type)
                     .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
-
                 format_path(path, options)
             } else {
-                Ok(())
+                Ok(FormatResult::Skipped)
             }
         })
-        .map(|result| {
-            result.map_err(|err| {
-                err.show_user();
-                err
-            })
-        })
-        .collect::<Result<(), _>>();
+        .partition_map(|result| match result {
+            Ok(diagnostic) => Left(diagnostic),
+            Err(err) => Right(err),
+        });
+    let duration = start.elapsed();
+    debug!("Formatted files in: {:?}", duration);
 
-    if result.is_ok() {
+    // Report on any errors.
+    if !errors.is_empty() {
+        warn!("Encountered {} errors while formatting:", errors.len());
+        for error in &errors {
+            error.show_user();
+        }
+    }
+
+    // Report on the formatting changes.
+    if log_level >= LogLevel::Default {
+        let mut writer: Box<dyn Write> = match &cli.output_file {
+            Some(path) => {
+                colored::control::set_override(false);
+                let file = File::create(path)?;
+                Box::new(BufWriter::new(file))
+            }
+            _ => Box::new(BufWriter::new(io::stdout())),
+        };
+        let summary = FormatResultSummary::from(results);
+        summary.show_user(&mut writer)?;
+    }
+
+    if errors.is_empty() {
         Ok(ExitStatus::Success)
     } else {
         Ok(ExitStatus::Error)
@@ -69,7 +98,10 @@ pub(crate) fn format(cli: &FormatArguments, overrides: &Overrides) -> Result<Exi
 }
 
 #[tracing::instrument(skip_all, fields(path = %path.display()))]
-fn format_path(path: &Path, options: PyFormatOptions) -> Result<(), FormatterIterationError> {
+fn format_path(
+    path: &Path,
+    options: PyFormatOptions,
+) -> Result<FormatResult, FormatterIterationError> {
     let unformatted = std::fs::read_to_string(path)
         .map_err(|err| FormatterIterationError::Read(path.to_path_buf(), err))?;
     let formatted = {
@@ -78,9 +110,80 @@ fn format_path(path: &Path, options: PyFormatOptions) -> Result<(), FormatterIte
         format_module(&unformatted, options)
             .map_err(|err| FormatterIterationError::FormatModule(path.to_path_buf(), err))?
     };
-    std::fs::write(path, formatted.as_code().as_bytes())
-        .map_err(|err| FormatterIterationError::Write(path.to_path_buf(), err))?;
-    Ok(())
+    let formatted = formatted.as_code();
+    if formatted.len() == unformatted.len() && formatted == unformatted {
+        Ok(FormatResult::Unchanged)
+    } else {
+        std::fs::write(path, formatted.as_bytes())
+            .map_err(|err| FormatterIterationError::Write(path.to_path_buf(), err))?;
+        Ok(FormatResult::Formatted)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FormatResult {
+    /// The file was formatted.
+    Formatted,
+    /// The file was unchanged, as the formatted contents matched the existing contents.
+    Unchanged,
+    /// The file was skipped, as it was not a Python file.
+    Skipped,
+}
+
+#[derive(Debug, Default)]
+struct FormatResultSummary {
+    /// The number of files that were formatted.
+    formatted: usize,
+    /// The number of files that were unchanged.
+    unchanged: usize,
+    /// The number of files that were skipped.
+    skipped: usize,
+}
+
+impl From<Vec<FormatResult>> for FormatResultSummary {
+    fn from(diagnostics: Vec<FormatResult>) -> Self {
+        let mut path_diagnostics = Self::default();
+        for diagnostic in diagnostics {
+            match diagnostic {
+                FormatResult::Formatted => path_diagnostics.formatted += 1,
+                FormatResult::Unchanged => path_diagnostics.unchanged += 1,
+                FormatResult::Skipped => path_diagnostics.skipped += 1,
+            }
+        }
+        path_diagnostics
+    }
+}
+
+impl FormatResultSummary {
+    /// Pretty-print a [`FormatResultSummary`] for user-facing display.
+    fn show_user(&self, writer: &mut dyn Write) -> Result<(), io::Error> {
+        if self.formatted > 0 && self.unchanged > 0 {
+            writeln!(
+                writer,
+                "{} file{} reformatted, {} file{} left unchanged",
+                self.formatted,
+                if self.formatted == 1 { "" } else { "s" },
+                self.unchanged,
+                if self.unchanged == 1 { "" } else { "s" },
+            )
+        } else if self.formatted > 0 {
+            writeln!(
+                writer,
+                "{} file{} reformatted",
+                self.formatted,
+                if self.formatted == 1 { "" } else { "s" },
+            )
+        } else if self.unchanged > 0 {
+            writeln!(
+                writer,
+                "{} file{} left unchanged",
+                self.unchanged,
+                if self.unchanged == 1 { "" } else { "s" },
+            )
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// An error that can occur while formatting a set of files.

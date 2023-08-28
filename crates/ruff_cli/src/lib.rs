@@ -148,13 +148,13 @@ quoting the executed command, along with the relevant file contents and `pyproje
             shell.generate(&mut Args::command(), &mut stdout());
         }
         Command::Check(args) => return check(args, log_level),
-        Command::Format(args) => return format(args),
+        Command::Format(args) => return format(args, log_level),
     }
 
     Ok(ExitStatus::Success)
 }
 
-fn format(args: FormatCommand) -> Result<ExitStatus> {
+fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
     warn_user_once!(
         "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
         experimentation."
@@ -173,7 +173,7 @@ fn format(args: FormatCommand) -> Result<ExitStatus> {
         stdout().lock().write_all(formatted.as_code().as_bytes())?;
         Ok(ExitStatus::Success)
     } else {
-        commands::format::format(&cli, &overrides)
+        commands::format::format(&cli, &overrides, log_level)
     }
 }
 
