@@ -16,12 +16,12 @@ use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
 use ruff_workspace::resolver::python_files_in_path;
 
-use crate::args::{Arguments, Overrides};
+use crate::args::{FormatArguments, Overrides};
 use crate::resolve::resolve;
 use crate::ExitStatus;
 
 /// Format a set of files, and return the exit status.
-pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatus> {
+pub(crate) fn format(cli: &FormatArguments, overrides: &Overrides) -> Result<ExitStatus> {
     let pyproject_config = resolve(
         cli.isolated,
         cli.config.as_deref(),
@@ -59,7 +59,7 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatu
                 err
             })
         })
-        .collect::<Result<Vec<_>, _>>();
+        .collect::<Result<(), _>>();
 
     if result.is_ok() {
         Ok(ExitStatus::Success)

@@ -56,7 +56,7 @@ enum Command {
     /// Run a ruff command n times for profiling/benchmarking
     Repeat {
         #[clap(flatten)]
-        args: ruff_cli::args::CheckArgs,
+        args: ruff_cli::args::CheckCommand,
         #[clap(flatten)]
         log_level_args: ruff_cli::args::LogLevelArgs,
         /// Run this many times

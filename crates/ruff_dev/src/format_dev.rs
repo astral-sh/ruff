@@ -1,23 +1,3 @@
-use anyhow::{bail, format_err, Context, Error};
-use clap::{CommandFactory, FromArgMatches};
-use ignore::DirEntry;
-use imara_diff::intern::InternedInput;
-use imara_diff::sink::Counter;
-use imara_diff::{diff, Algorithm};
-use indicatif::ProgressStyle;
-#[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use ruff::logging::LogLevel;
-use ruff::settings::types::{FilePattern, FilePatternSet};
-use ruff_cli::args::{CheckArgs, LogLevelArgs};
-use ruff_cli::resolve::resolve;
-use ruff_formatter::{FormatError, LineWidth, PrintError};
-use ruff_python_formatter::{
-    format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
-};
-use ruff_workspace::resolver::python_files_in_path;
-use serde::Deserialize;
-use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -28,6 +8,18 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 use std::{fmt, fs, io, iter};
+
+use anyhow::{bail, format_err, Context, Error};
+use clap::{CommandFactory, FromArgMatches};
+use ignore::DirEntry;
+use imara_diff::intern::InternedInput;
+use imara_diff::sink::Counter;
+use imara_diff::{diff, Algorithm};
+use indicatif::ProgressStyle;
+#[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use serde::Deserialize;
+use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
 use tracing::{debug, error, info, info_span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
@@ -36,13 +28,23 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
+use ruff::logging::LogLevel;
+use ruff::settings::types::{FilePattern, FilePatternSet};
+use ruff_cli::args::{FormatCommand, LogLevelArgs};
+use ruff_cli::resolve::resolve;
+use ruff_formatter::{FormatError, LineWidth, PrintError};
+use ruff_python_formatter::{
+    format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
+};
+use ruff_workspace::resolver::python_files_in_path;
+
 /// Find files that ruff would check so we can format them. Adapted from `ruff_cli`.
 fn ruff_check_paths(dirs: &[PathBuf]) -> anyhow::Result<Vec<Result<DirEntry, ignore::Error>>> {
-    let args_matches = CheckArgs::command()
+    let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
-    let check_args: CheckArgs = CheckArgs::from_arg_matches(&args_matches)?;
-    let (cli, overrides) = check_args.partition();
+    let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    let (cli, overrides) = arguments.partition();
     let mut pyproject_config = resolve(
         cli.isolated,
         cli.config.as_deref(),
