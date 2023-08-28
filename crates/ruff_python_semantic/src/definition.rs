@@ -117,7 +117,7 @@ impl Ranged for Member<'_> {
 }
 
 /// A definition within a Python program.
-#[derive(Debug)]
+#[derive(Debug, is_macro::Is)]
 pub enum Definition<'a> {
     Module(Module<'a>),
     Member(Member<'a>),

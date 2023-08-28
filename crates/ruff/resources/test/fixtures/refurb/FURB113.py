@@ -1,20 +1,22 @@
 from typing import List
 
 
-def foo():
+def func():
     pass
+
 
 nums = []
 nums2 = []
-nums3: list[int] = foo()
+nums3: list[int] = func()
 nums4: List[int]
+
 
 class C:
     def append(self, x):
         pass
 
 
-# these will match
+# Errors.
 
 
 # FURB113
@@ -115,7 +117,7 @@ def yes_five(x: list[int], y: list[int]):
     x.append(3)
 
 
-# these will not
+# Non-errors.
 
 nums.append(1)
 pass
@@ -155,7 +157,7 @@ def not_two(x: C):
     x.append(2)
 
 
-# redefining a list variable with a new type shouldn't confuse ruff
+# redefining a list variable with a new type shouldn't confuse ruff.
 nums2 = C()
 nums2.append(1)
 nums2.append(2)
