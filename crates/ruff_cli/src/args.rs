@@ -329,6 +329,9 @@ pub struct CheckCommand {
 pub struct FormatCommand {
     /// List of files or directories to format.
     pub files: Vec<PathBuf>,
+    /// Specify file to write the linter output to (default: stdout).
+    #[arg(short, long)]
+    pub output_file: Option<PathBuf>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
@@ -480,6 +483,7 @@ impl FormatCommand {
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
+                output_file: self.output_file,
                 stdin_filename: self.stdin_filename,
             },
             Overrides {
@@ -540,6 +544,7 @@ pub struct FormatArguments {
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
+    pub output_file: Option<PathBuf>,
     pub stdin_filename: Option<PathBuf>,
 }
 
