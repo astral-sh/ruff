@@ -1684,7 +1684,7 @@ def f(arg=%timeit a = b):
     }
 
     // This test case is to just make sure that the lexer doesn't go into
-    // inifite loop on invalid input.
+    // infinite loop on invalid input.
     #[test]
     fn test_infite_loop() {
         let source = "[1";
