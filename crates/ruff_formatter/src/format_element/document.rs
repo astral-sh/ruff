@@ -7,10 +7,9 @@ use crate::format_element::tag::{Condition, DedentMode};
 use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
 use crate::source_code::SourceCode;
-use crate::{format, write, TabWidth};
 use crate::{
-    BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
-    IndentStyle, LineWidth, PrinterOptions,
+    format, write, BufferExtensions, Format, FormatContext, FormatElement, FormatOptions,
+    FormatResult, Formatter, IndentStyle, LineWidth, PrinterOptions, TabWidth,
 };
 
 use super::tag::Tag;
@@ -222,12 +221,12 @@ impl FormatOptions for IrFormatOptions {
     }
 
     fn line_width(&self) -> LineWidth {
-        LineWidth(80)
+        LineWidth::try_from(80).unwrap()
     }
 
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
-            print_width: self.line_width().into(),
+            line_width: self.line_width(),
             indent_style: IndentStyle::Space(2),
             ..PrinterOptions::default()
         }

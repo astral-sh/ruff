@@ -12,7 +12,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::fs::relativize_path;
 use crate::jupyter::{Notebook, NotebookIndex};
-use crate::line_width::{LineWidth, TabSize};
+use crate::line_width::{LineWidthBuilder, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
@@ -292,7 +292,7 @@ fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut line_width = LineWidth::new(TabSize::default());
+    let mut line_width = LineWidthBuilder::new(TabSize::default());
 
     for (index, c) in source.char_indices() {
         let old_width = line_width.get();

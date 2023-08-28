@@ -10,7 +10,7 @@ use ruff_python_ast::traversal;
 use ruff_python_codegen::Generator;
 
 use crate::checkers::ast::Checker;
-use crate::line_width::LineWidth;
+use crate::line_width::LineWidthBuilder;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -98,7 +98,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
-            if LineWidth::new(checker.settings.tab_size)
+            if LineWidthBuilder::new(checker.settings.tab_size)
                 .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt.start())])
                 .add_str(&contents)
                 > checker.settings.line_length
@@ -180,7 +180,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
-            if LineWidth::new(checker.settings.tab_size)
+            if LineWidthBuilder::new(checker.settings.tab_size)
                 .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt.start())])
                 .add_str(&contents)
                 > checker.settings.line_length

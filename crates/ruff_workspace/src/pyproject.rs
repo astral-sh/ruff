@@ -199,7 +199,7 @@ line-length = 79
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    line_length: Some(LineLength::from(79)),
+                    line_length: Some(LineLength::try_from(79).unwrap()),
                     ..Options::default()
                 })
             })
@@ -299,7 +299,7 @@ other-attribute = 1
         assert_eq!(
             config,
             Options {
-                line_length: Some(LineLength::from(88)),
+                line_length: Some(LineLength::try_from(88).unwrap()),
                 extend_exclude: Some(vec![
                     "excluded_file.py".to_string(),
                     "migrations".to_string(),

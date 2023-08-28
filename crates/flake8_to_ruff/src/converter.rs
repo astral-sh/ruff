@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 use itertools::Itertools;
 
@@ -119,10 +120,8 @@ pub(crate) fn convert(
                 "builtins" => {
                     options.builtins = Some(parser::parse_strings(value.as_ref()));
                 }
-                "max-line-length" | "max_line_length" => match value.parse::<usize>() {
-                    Ok(line_length) => {
-                        options.line_length = Some(LineLength::from(line_length));
-                    }
+                "max-line-length" | "max_line_length" => match LineLength::from_str(value) {
+                    Ok(line_length) => options.line_length = Some(line_length),
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
                     }
@@ -405,7 +404,7 @@ pub(crate) fn convert(
     // Extract any settings from the existing `pyproject.toml`.
     if let Some(black) = &external_config.black {
         if let Some(line_length) = &black.line_length {
-            options.line_length = Some(LineLength::from(*line_length));
+            options.line_length = Some(*line_length);
         }
 
         if let Some(target_version) = &black.target_version {
@@ -512,7 +511,7 @@ mod tests {
             Some(vec![]),
         );
         let expected = Pyproject::new(Options {
-            line_length: Some(LineLength::from(100)),
+            line_length: Some(LineLength::try_from(100).unwrap()),
             ..default_options([])
         });
         assert_eq!(actual, expected);
@@ -529,7 +528,7 @@ mod tests {
             Some(vec![]),
         );
         let expected = Pyproject::new(Options {
-            line_length: Some(LineLength::from(100)),
+            line_length: Some(LineLength::try_from(100).unwrap()),
             ..default_options([])
         });
         assert_eq!(actual, expected);

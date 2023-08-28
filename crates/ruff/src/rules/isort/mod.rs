@@ -19,7 +19,7 @@ use sorting::cmp_either_import;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, EitherImport, TrailingComma};
 
-use crate::line_width::{LineLength, LineWidth};
+use crate::line_width::{LineLength, LineWidthBuilder};
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
@@ -69,7 +69,7 @@ pub(crate) fn format_imports(
     comments: Vec<Comment>,
     locator: &Locator,
     line_length: LineLength,
-    indentation_width: LineWidth,
+    indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -179,7 +179,7 @@ pub(crate) fn format_imports(
 fn format_import_block(
     block: ImportBlock,
     line_length: LineLength,
-    indentation_width: LineWidth,
+    indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
