@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use ruff_python_ast::{
     Expr, ExprBinOp, ExprSubscript, ExprTuple, Identifier, Operator, ParameterWithDefault,
-    Parameters, Ranged,
+    Parameters,
 };
 use smallvec::SmallVec;
 
@@ -10,6 +10,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

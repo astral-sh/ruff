@@ -1,7 +1,8 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -83,7 +84,7 @@ pub(crate) fn unreliable_callable_check(
         if id == "hasattr" {
             if checker.semantic().is_builtin("callable") {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    format!("callable({})", checker.locator().slice(obj.range())),
+                    format!("callable({})", checker.locator().slice(obj)),
                     expr.range(),
                 )));
             }

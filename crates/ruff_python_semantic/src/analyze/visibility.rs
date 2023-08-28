@@ -121,7 +121,7 @@ pub fn is_test(name: &str) -> bool {
 
 /// Returns `true` if a module name indicates public visibility.
 fn is_public_module(module_name: &str) -> bool {
-    !module_name.starts_with('_') || (module_name.starts_with("__") && module_name.ends_with("__"))
+    !module_name.starts_with('_') || is_magic(module_name)
 }
 
 /// Returns `true` if a module name indicates private visibility.
@@ -201,7 +201,7 @@ pub(crate) fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
     }
 
     // Is this a magic method?
-    if function.name.starts_with("__") && function.name.ends_with("__") {
+    if is_magic(&function.name) {
         return Visibility::Public;
     }
 

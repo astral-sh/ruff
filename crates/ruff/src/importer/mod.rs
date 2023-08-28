@@ -7,8 +7,8 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt, Suite};
-use ruff_text_size::TextSize;
+use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
@@ -319,7 +319,7 @@ impl<'a> Importer<'a> {
 
     /// Add the given member to an existing `Stmt::ImportFrom` statement.
     fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
-        let mut statement = match_statement(self.locator.slice(stmt.range()))?;
+        let mut statement = match_statement(self.locator.slice(stmt))?;
         let import_from = match_import_from(&mut statement)?;
         let aliases = match_aliases(import_from)?;
         aliases.push(ImportAlias {

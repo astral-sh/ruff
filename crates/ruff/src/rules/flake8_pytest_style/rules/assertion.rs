@@ -13,11 +13,12 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp,
+    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
 };
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
@@ -410,7 +411,7 @@ fn to_pytest_raises_args<'a>(
         "assertRaises" | "failUnlessRaises" => {
             match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
                 // Ex) `assertRaises(Exception)`
-                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg.range())),
+                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg)),
                 // Ex) `assertRaises(expected_exception=Exception)`
                 ([], [kwarg])
                     if kwarg
@@ -428,8 +429,8 @@ fn to_pytest_raises_args<'a>(
                 // Ex) `assertRaisesRegex(Exception, regex)`
                 ([arg1, arg2], []) => Cow::Owned(format!(
                     "{}, match={}",
-                    checker.locator().slice(arg1.range()),
-                    checker.locator().slice(arg2.range())
+                    checker.locator().slice(arg1),
+                    checker.locator().slice(arg2)
                 )),
                 // Ex) `assertRaisesRegex(Exception, expected_regex=regex)`
                 ([arg], [kwarg])
@@ -440,7 +441,7 @@ fn to_pytest_raises_args<'a>(
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
-                        checker.locator().slice(arg.range()),
+                        checker.locator().slice(arg),
                         checker.locator().slice(kwarg.value.range())
                     ))
                 }

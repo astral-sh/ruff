@@ -1,7 +1,7 @@
 use std::ops::Add;
 
-use ruff_python_ast::{self as ast, ElifElseClause, Expr, Ranged, Stmt};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -537,7 +537,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
                 // Replace the `x = 1` statement with `return 1`.
-                let content = checker.locator().slice(assign.range());
+                let content = checker.locator().slice(assign);
                 let equals_index = content
                     .find('=')
                     .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;

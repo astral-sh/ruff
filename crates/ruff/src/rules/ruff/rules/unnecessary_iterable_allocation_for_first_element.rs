@@ -4,9 +4,9 @@ use num_traits::Zero;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;

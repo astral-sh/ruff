@@ -1,9 +1,10 @@
-use ruff_python_ast::{self as ast, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Expr, Keyword};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

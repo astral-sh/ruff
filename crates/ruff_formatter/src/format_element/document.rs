@@ -7,10 +7,9 @@ use crate::format_element::tag::{Condition, DedentMode};
 use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
 use crate::source_code::SourceCode;
-use crate::{format, write, TabWidth};
 use crate::{
-    BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
-    IndentStyle, LineWidth, PrinterOptions,
+    format, write, BufferExtensions, Format, FormatContext, FormatElement, FormatOptions,
+    FormatResult, Formatter, IndentStyle, LineWidth, PrinterOptions, TabWidth,
 };
 
 use super::tag::Tag;
@@ -222,12 +221,12 @@ impl FormatOptions for IrFormatOptions {
     }
 
     fn line_width(&self) -> LineWidth {
-        LineWidth(80)
+        LineWidth::try_from(80).unwrap()
     }
 
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
-            print_width: self.line_width().into(),
+            line_width: self.line_width(),
             indent_style: IndentStyle::Space(2),
             ..PrinterOptions::default()
         }
@@ -459,8 +458,16 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             )?;
                         }
 
-                        StartLineSuffix => {
-                            write!(f, [text("line_suffix(")])?;
+                        StartLineSuffix { reserved_width } => {
+                            write!(
+                                f,
+                                [
+                                    text("line_suffix("),
+                                    dynamic_text(&std::format!("{reserved_width:?}"), None),
+                                    text(","),
+                                    space(),
+                                ]
+                            )?;
                         }
 
                         StartVerbatim(_) => {
@@ -672,7 +679,9 @@ impl FormatElements for [FormatElement] {
             match element {
                 // Line suffix
                 // Ignore if any of its content breaks
-                FormatElement::Tag(Tag::StartLineSuffix | Tag::StartFitsExpanded(_)) => {
+                FormatElement::Tag(
+                    Tag::StartLineSuffix { reserved_width: _ } | Tag::StartFitsExpanded(_),
+                ) => {
                     ignore_depth += 1;
                 }
                 FormatElement::Tag(Tag::EndLineSuffix | Tag::EndFitsExpanded) => {

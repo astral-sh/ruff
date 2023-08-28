@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Operator, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Operator};
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
 use ruff_diagnostics::Diagnostic;
@@ -6,6 +6,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::types::Node;
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::ScopeKind;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -1038,12 +1039,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
                 if checker.enabled(Rule::PrintfStringFormatting) {
-                    pyupgrade::rules::printf_string_formatting(
-                        checker,
-                        expr,
-                        right,
-                        checker.locator,
-                    );
+                    pyupgrade::rules::printf_string_formatting(checker, expr, right);
                 }
                 if checker.enabled(Rule::BadStringFormatCharacter) {
                     pylint::rules::bad_string_format_character::percent(checker, expr);

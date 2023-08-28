@@ -3,17 +3,17 @@ use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
+use ruff::line_width::LineLength;
 use rustc_hash::FxHashMap;
 
-use ruff::line_width::LineLength;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
-use ruff::resolver::ConfigProcessor;
-use ruff::settings::configuration::RuleSelection;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
 use ruff::RuleSelector;
+use ruff_workspace::configuration::{Configuration, RuleSelection};
+use ruff_workspace::resolver::ConfigProcessor;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -34,7 +34,7 @@ pub struct Args {
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     /// Run Ruff on the given files or directories (default).
-    Check(CheckArgs),
+    Check(CheckCommand),
     /// Explain a rule (or all rules).
     #[clap(alias = "--explain")]
     #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
@@ -51,9 +51,9 @@ pub enum Command {
         #[arg(long, value_enum, default_value = "text")]
         format: HelpFormat,
     },
-    /// List or describe the available configuration options
+    /// List or describe the available configuration options.
     Config { option: Option<String> },
-    /// List all supported upstream linters
+    /// List all supported upstream linters.
     Linter {
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
@@ -65,19 +65,16 @@ pub enum Command {
     /// Generate shell completion.
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
-    /// Format the given files, or stdin when using `-`.
+    /// Run the Ruff formatter on the given files or directories.
     #[doc(hidden)]
     #[clap(hide = true)]
-    Format {
-        /// List of files or directories to format or `-` for stdin
-        files: Vec<PathBuf>,
-    },
+    Format(FormatCommand),
 }
 
 // The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
 #[derive(Clone, Debug, clap::Parser)]
-#[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
-pub struct CheckArgs {
+#[allow(clippy::struct_excessive_bools)]
+pub struct CheckCommand {
     /// List of files or directories to check.
     pub files: Vec<PathBuf>,
     /// Attempt to automatically fix lint violations.
@@ -95,15 +92,13 @@ pub struct CheckArgs {
     show_fixes: bool,
     #[clap(long, overrides_with("show_fixes"), hide = true)]
     no_show_fixes: bool,
-    /// Avoid writing any fixed files back; instead, output a diff for each
-    /// changed file to stdout. Implies `--fix-only`.
+    /// Avoid writing any fixed files back; instead, output a diff for each changed file to stdout. Implies `--fix-only`.
     #[arg(long, conflicts_with = "show_fixes")]
     pub diff: bool,
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
     pub watch: bool,
-    /// Fix any fixable lint violations, but don't report on leftover
-    /// violations. Implies `--fix`.
+    /// Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
@@ -124,8 +119,7 @@ pub struct CheckArgs {
     /// configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
-    /// Comma-separated list of rule codes to enable (or ALL, to enable all
-    /// rules).
+    /// Comma-separated list of rule codes to enable (or ALL, to enable all rules).
     #[arg(
         long,
         value_delimiter = ',',
@@ -145,8 +139,7 @@ pub struct CheckArgs {
         hide_possible_values = true
     )]
     pub ignore: Option<Vec<RuleSelector>>,
-    /// Like --select, but adds additional rule codes on top of those already
-    /// specified.
+    /// Like --select, but adds additional rule codes on top of those already specified.
     #[arg(
         long,
         value_delimiter = ',',
@@ -169,8 +162,7 @@ pub struct CheckArgs {
     /// List of mappings from file pattern to code to exclude.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
-    /// Like `--per-file-ignores`, but adds additional ignores on top of
-    /// those already specified.
+    /// Like `--per-file-ignores`, but adds additional ignores on top of those already specified.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// List of paths, used to omit files and/or directories from analysis.
@@ -181,8 +173,7 @@ pub struct CheckArgs {
         help_heading = "File selection"
     )]
     pub exclude: Option<Vec<FilePattern>>,
-    /// Like --exclude, but adds additional files and directories on top of
-    /// those already excluded.
+    /// Like --exclude, but adds additional files and directories on top of those already excluded.
     #[arg(
         long,
         value_delimiter = ',',
@@ -190,8 +181,7 @@ pub struct CheckArgs {
         help_heading = "File selection"
     )]
     pub extend_exclude: Option<Vec<FilePattern>>,
-    /// List of rule codes to treat as eligible for autofix. Only applicable
-    /// when autofix itself is enabled (e.g., via `--fix`).
+    /// List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
@@ -201,8 +191,7 @@ pub struct CheckArgs {
         hide_possible_values = true
     )]
     pub fixable: Option<Vec<RuleSelector>>,
-    /// List of rule codes to treat as ineligible for autofix. Only applicable
-    /// when autofix itself is enabled (e.g., via `--fix`).
+    /// List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
@@ -212,8 +201,7 @@ pub struct CheckArgs {
         hide_possible_values = true
     )]
     pub unfixable: Option<Vec<RuleSelector>>,
-    /// Like --fixable, but adds additional rule codes on top of those already
-    /// specified.
+    /// Like --fixable, but adds additional rule codes on top of those already specified.
     #[arg(
         long,
         value_delimiter = ',',
@@ -233,8 +221,7 @@ pub struct CheckArgs {
         hide = true
     )]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
-    /// Respect file exclusions via `.gitignore` and other standard ignore
-    /// files.
+    /// Respect file exclusions via `.gitignore` and other standard ignore files.
     #[arg(
         long,
         overrides_with("no_respect_gitignore"),
@@ -243,8 +230,7 @@ pub struct CheckArgs {
     respect_gitignore: bool,
     #[clap(long, overrides_with("respect_gitignore"), hide = true)]
     no_respect_gitignore: bool,
-    /// Enforce exclusions, even for paths passed to Ruff directly on the
-    /// command-line.
+    /// Enforce exclusions, even for paths passed to Ruff directly on the command-line.
     #[arg(
         long,
         overrides_with("no_force_exclude"),
@@ -253,10 +239,9 @@ pub struct CheckArgs {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
-    /// Set the line-length for length-associated rules and automatic
-    /// formatting.
+    /// Set the line-length for length-associated rules and automatic formatting.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
-    pub line_length: Option<usize>,
+    pub line_length: Option<LineLength>,
     /// Regular expression matching the name of dummy variables.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
@@ -280,8 +265,7 @@ pub struct CheckArgs {
         conflicts_with = "exit_non_zero_on_fix"
     )]
     pub exit_zero: bool,
-    /// Exit with a non-zero status code if any files were modified via
-    /// autofix, even if no lint violations remain.
+    /// Exit with a non-zero status code if any files were modified via autofix, even if no lint violations remain.
     #[arg(long, help_heading = "Miscellaneous", conflicts_with = "exit_zero")]
     pub exit_non_zero_on_fix: bool,
     /// Show counts for every rule with at least one violation.
@@ -340,6 +324,46 @@ pub struct CheckArgs {
     pub ecosystem_ci: bool,
 }
 
+#[derive(Clone, Debug, clap::Parser)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct FormatCommand {
+    /// List of files or directories to format.
+    pub files: Vec<PathBuf>,
+    /// The minimum Python version that should be supported.
+    #[arg(long, value_enum)]
+    pub target_version: Option<PythonVersion>,
+    /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
+    #[arg(long, conflicts_with = "isolated")]
+    pub config: Option<PathBuf>,
+    /// Respect file exclusions via `.gitignore` and other standard ignore files.
+    #[arg(
+        long,
+        overrides_with("no_respect_gitignore"),
+        help_heading = "File selection"
+    )]
+    respect_gitignore: bool,
+    #[clap(long, overrides_with("respect_gitignore"), hide = true)]
+    no_respect_gitignore: bool,
+    /// Enforce exclusions, even for paths passed to Ruff directly on the command-line.
+    #[arg(
+        long,
+        overrides_with("no_force_exclude"),
+        help_heading = "File selection"
+    )]
+    force_exclude: bool,
+    #[clap(long, overrides_with("force_exclude"), hide = true)]
+    no_force_exclude: bool,
+    /// Set the line-length.
+    #[arg(long, help_heading = "Rule configuration", hide = true)]
+    pub line_length: Option<LineLength>,
+    /// Ignore all configuration files.
+    #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
+    pub isolated: bool,
+    /// The name of the file when passing it through stdin.
+    #[arg(long, help_heading = "Miscellaneous")]
+    pub stdin_filename: Option<PathBuf>,
+}
+
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum HelpFormat {
     Text,
@@ -367,8 +391,7 @@ pub struct LogLevelArgs {
         help_heading = "Log levels"
     )]
     pub quiet: bool,
-    /// Disable all logging (but still exit with status code "1" upon detecting
-    /// lint violations).
+    /// Disable all logging (but still exit with status code "1" upon detecting lint violations).
     #[arg(
         short,
         long,
@@ -393,12 +416,12 @@ impl From<&LogLevelArgs> for LogLevel {
     }
 }
 
-impl CheckArgs {
+impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (Arguments, Overrides) {
+    pub fn partition(self) -> (CheckArguments, Overrides) {
         (
-            Arguments {
+            CheckArguments {
                 add_noqa: self.add_noqa,
                 config: self.config,
                 diff: self.diff,
@@ -448,6 +471,32 @@ impl CheckArgs {
     }
 }
 
+impl FormatCommand {
+    /// Partition the CLI into command-line arguments and configuration
+    /// overrides.
+    pub fn partition(self) -> (FormatArguments, Overrides) {
+        (
+            FormatArguments {
+                config: self.config,
+                files: self.files,
+                isolated: self.isolated,
+                stdin_filename: self.stdin_filename,
+            },
+            Overrides {
+                line_length: self.line_length,
+                respect_gitignore: resolve_bool_arg(
+                    self.respect_gitignore,
+                    self.no_respect_gitignore,
+                ),
+                force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
+                target_version: self.target_version,
+                // Unsupported on the formatter CLI, but required on `Overrides`.
+                ..Overrides::default()
+            },
+        )
+    }
+}
+
 fn parse_rule_selector(env: &str) -> Result<RuleSelector, std::io::Error> {
     RuleSelector::from_str(env)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))
@@ -465,7 +514,7 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
 #[allow(clippy::struct_excessive_bools)]
-pub struct Arguments {
+pub struct CheckArguments {
     pub add_noqa: bool,
     pub config: Option<PathBuf>,
     pub diff: bool,
@@ -484,6 +533,16 @@ pub struct Arguments {
     pub watch: bool,
 }
 
+/// CLI settings that are distinct from configuration (commands, lists of files,
+/// etc.).
+#[allow(clippy::struct_excessive_bools)]
+pub struct FormatArguments {
+    pub config: Option<PathBuf>,
+    pub files: Vec<PathBuf>,
+    pub isolated: bool,
+    pub stdin_filename: Option<PathBuf>,
+}
+
 /// CLI settings that function as configuration overrides.
 #[derive(Clone, Default)]
 #[allow(clippy::struct_excessive_bools)]
@@ -497,7 +556,7 @@ pub struct Overrides {
     pub extend_unfixable: Option<Vec<RuleSelector>>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub ignore: Option<Vec<RuleSelector>>,
-    pub line_length: Option<usize>,
+    pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
@@ -513,8 +572,8 @@ pub struct Overrides {
     pub show_fixes: Option<bool>,
 }
 
-impl ConfigProcessor for &Overrides {
-    fn process_config(&self, config: &mut ruff::settings::configuration::Configuration) {
+impl ConfigProcessor for Overrides {
+    fn process_config(&self, config: &mut Configuration) {
         if let Some(cache_dir) = &self.cache_dir {
             config.cache_dir = Some(cache_dir.clone());
         }
@@ -560,7 +619,7 @@ impl ConfigProcessor for &Overrides {
             config.force_exclude = Some(*force_exclude);
         }
         if let Some(line_length) = &self.line_length {
-            config.line_length = Some(LineLength::from(*line_length));
+            config.line_length = Some(*line_length);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));

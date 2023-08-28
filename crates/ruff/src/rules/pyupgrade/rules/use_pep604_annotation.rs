@@ -1,11 +1,12 @@
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -99,7 +100,7 @@ pub(crate) fn use_pep604_annotation(
                     _ => {
                         // Single argument.
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                            checker.locator().slice(slice.range()).to_string(),
+                            checker.locator().slice(slice).to_string(),
                             expr.range(),
                         )));
                     }
@@ -112,7 +113,7 @@ pub(crate) fn use_pep604_annotation(
 
 /// Format the expression as a PEP 604-style optional.
 fn optional(expr: &Expr, locator: &Locator) -> String {
-    format!("{} | None", locator.slice(expr.range()))
+    format!("{} | None", locator.slice(expr))
 }
 
 /// Format the expressions as a PEP 604-style union.
@@ -127,7 +128,7 @@ fn union(elts: &[Expr], locator: &Locator) -> String {
     if elts.peek().is_none() {
         "()".to_string()
     } else {
-        elts.map(|expr| locator.slice(expr.range())).join(" | ")
+        elts.map(|expr| locator.slice(expr)).join(" | ")
     }
 }
 

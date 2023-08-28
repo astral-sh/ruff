@@ -4,7 +4,7 @@ use std::ops::Add;
 
 use memchr::{memchr2, memrchr2};
 use once_cell::unsync::OnceCell;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::newlines::find_newline;
 use crate::{LineIndex, OneIndexed, SourceCode, SourceLocation};
@@ -95,7 +95,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -122,7 +122,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -152,7 +152,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -176,7 +176,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -199,7 +199,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -222,7 +222,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -246,7 +246,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -278,7 +278,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -302,7 +302,7 @@ impl<'a> Locator<'a> {
     /// Returns true if the text of `range` contains any line break.
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -327,7 +327,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -355,7 +355,7 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
     /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
@@ -390,8 +390,8 @@ impl<'a> Locator<'a> {
 
     /// Take the source code between the given [`TextRange`].
     #[inline]
-    pub fn slice(&self, range: TextRange) -> &'a str {
-        &self.contents[range]
+    pub fn slice<T: Ranged>(&self, ranged: T) -> &'a str {
+        &self.contents[ranged.range()]
     }
 
     /// Return the underlying source code.

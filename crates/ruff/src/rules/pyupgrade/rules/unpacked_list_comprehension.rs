@@ -1,8 +1,9 @@
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -67,7 +68,7 @@ pub(crate) fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr
 
     let mut diagnostic = Diagnostic::new(UnpackedListComprehension, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let existing = checker.locator().slice(value.range());
+        let existing = checker.locator().slice(value);
 
         let mut content = String::with_capacity(existing.len());
         content.push('(');

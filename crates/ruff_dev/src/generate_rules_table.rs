@@ -6,9 +6,9 @@ use itertools::Itertools;
 use strum::IntoEnumIterator;
 
 use ruff::registry::{Linter, Rule, RuleNamespace};
-use ruff::settings::options::Options;
 use ruff::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_diagnostics::AutofixKind;
+use ruff_workspace::options::Options;
 
 const FIX_SYMBOL: &str = "🛠";
 const NURSERY_SYMBOL: &str = "🌅";

@@ -4,11 +4,11 @@ use anyhow::{anyhow, Result};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, PySourceType, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, PySourceType};
 use ruff_python_parser::{lexer, AsMode};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
-use ruff_text_size::TextSize;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -204,7 +204,7 @@ fn create_remove_param_fix<T: Ranged>(
     mode_param: &Expr,
     source_type: PySourceType,
 ) -> Result<Edit> {
-    let content = locator.slice(expr.range());
+    let content = locator.slice(expr);
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
     let mut fix_start: Option<TextSize> = None;

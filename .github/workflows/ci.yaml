@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v37
+      - uses: tj-actions/changed-files@v38
         id: changed
         with:
           files_yaml: |

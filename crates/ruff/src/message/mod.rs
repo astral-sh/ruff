@@ -15,7 +15,7 @@ pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_source_file::{SourceFile, SourceLocation};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use text::TextEmitter;
 
 use crate::jupyter::Notebook;
@@ -66,14 +66,6 @@ impl Message {
     pub fn compute_end_location(&self) -> SourceLocation {
         self.file.to_source_code().source_location(self.end())
     }
-
-    pub const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    pub const fn end(&self) -> TextSize {
-        self.range.end()
-    }
 }
 
 impl Ord for Message {
@@ -85,6 +77,12 @@ impl Ord for Message {
 impl PartialOrd for Message {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl Ranged for Message {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -154,7 +152,7 @@ mod tests {
 
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_source_file::SourceFileBuilder;
-    use ruff_text_size::{TextRange, TextSize};
+    use ruff_text_size::{Ranged, TextRange, TextSize};
 
     use crate::message::{Emitter, EmitterContext, Message};
 

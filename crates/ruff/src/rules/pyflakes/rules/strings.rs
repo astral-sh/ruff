@@ -1,11 +1,11 @@
 use std::string::ToString;
 
-use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword, Ranged};
-use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

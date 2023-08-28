@@ -1,9 +1,10 @@
 use std::fmt;
 
-use ruff_python_ast::{Expr, Keyword, Ranged};
+use ruff_python_ast::{Expr, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

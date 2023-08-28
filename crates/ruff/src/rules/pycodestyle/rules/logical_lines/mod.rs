@@ -13,9 +13,8 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use bitflags::bitflags;
-use ruff_python_ast::Ranged;
 use ruff_python_parser::lexer::LexResult;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::is_python_whitespace;

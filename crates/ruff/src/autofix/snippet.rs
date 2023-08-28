@@ -9,6 +9,10 @@ impl SourceCodeSnippet {
         Self(source_code)
     }
 
+    pub(crate) fn from_str(source_code: &str) -> Self {
+        Self(source_code.to_string())
+    }
+
     /// Return the full snippet for user-facing display, or `None` if the snippet should be
     /// truncated.
     pub(crate) fn full_display(&self) -> Option<&str> {

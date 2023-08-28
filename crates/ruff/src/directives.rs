@@ -5,7 +5,7 @@ use std::str::FromStr;
 use bitflags::bitflags;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;

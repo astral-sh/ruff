@@ -5,12 +5,12 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Stmt,
 };
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -71,8 +71,7 @@ fn match_typed_dict_assign<'a>(
     value: &'a Expr,
     semantic: &SemanticModel,
 ) -> Option<(&'a str, &'a Arguments, &'a Expr)> {
-    let target = targets.get(0)?;
-    let Expr::Name(ast::ExprName { id: class_name, .. }) = target else {
+    let [Expr::Name(ast::ExprName { id: class_name, .. })] = targets else {
         return None;
     };
     let Expr::Call(ast::ExprCall {
@@ -210,28 +209,34 @@ fn match_properties_and_total(arguments: &Arguments) -> Result<(Vec<Stmt>, Optio
     // ```
     // MyType = TypedDict('MyType', {'a': int, 'b': str}, a=int, b=str)
     // ```
-    if let Some(dict) = arguments.args.get(1) {
-        let total = arguments.find_keyword("total");
-        match dict {
-            Expr::Dict(ast::ExprDict {
-                keys,
-                values,
-                range: _,
-            }) => Ok((properties_from_dict_literal(keys, values)?, total)),
-            Expr::Call(ast::ExprCall {
-                func,
-                arguments: Arguments { keywords, .. },
-                ..
-            }) => Ok((properties_from_dict_call(func, keywords)?, total)),
-            _ => bail!("Expected `arg` to be `Expr::Dict` or `Expr::Call`"),
+    match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+        // Ex) `TypedDict("MyType", {"a": int, "b": str})`
+        ([_typename, fields], [..]) => {
+            let total = arguments.find_keyword("total");
+            match fields {
+                Expr::Dict(ast::ExprDict {
+                    keys,
+                    values,
+                    range: _,
+                }) => Ok((properties_from_dict_literal(keys, values)?, total)),
+                Expr::Call(ast::ExprCall {
+                    func,
+                    arguments: Arguments { keywords, .. },
+                    range: _,
+                }) => Ok((properties_from_dict_call(func, keywords)?, total)),
+                _ => bail!("Expected `arg` to be `Expr::Dict` or `Expr::Call`"),
+            }
         }
-    } else if !arguments.keywords.is_empty() {
-        Ok((properties_from_keywords(&arguments.keywords)?, None))
-    } else {
-        let node = Stmt::Pass(ast::StmtPass {
-            range: TextRange::default(),
-        });
-        Ok((vec![node], None))
+        // Ex) `TypedDict("MyType")`
+        ([_typename], []) => {
+            let node = Stmt::Pass(ast::StmtPass {
+                range: TextRange::default(),
+            });
+            Ok((vec![node], None))
+        }
+        // Ex) `TypedDict("MyType", a=int, b=str)`
+        ([_typename], fields) => Ok((properties_from_keywords(fields)?, None)),
+        _ => bail!("Expected `args` to have exactly one or two elements"),
     }
 }
 

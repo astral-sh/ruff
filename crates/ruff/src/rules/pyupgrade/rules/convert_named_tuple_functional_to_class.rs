@@ -1,9 +1,9 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Stmt,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -72,8 +72,7 @@ fn match_named_tuple_assign<'a>(
     value: &'a Expr,
     semantic: &SemanticModel,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
-    let target = targets.get(0)?;
-    let Expr::Name(ast::ExprName { id: typename, .. }) = target else {
+    let [Expr::Name(ast::ExprName { id: typename, .. })] = targets else {
         return None;
     };
     let Expr::Call(ast::ExprCall {
@@ -209,13 +208,13 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         return;
     };
 
-    let properties = match (&args[1..], keywords) {
+    let properties = match (args, keywords) {
         // Ex) NamedTuple("MyType")
-        ([], []) => vec![Stmt::Pass(ast::StmtPass {
+        ([_typename], []) => vec![Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         })],
         // Ex) NamedTuple("MyType", [("a", int), ("b", str)])
-        ([fields], []) => {
+        ([_typename, fields], []) => {
             if let Ok(properties) = create_properties_from_fields_arg(fields) {
                 properties
             } else {
@@ -224,7 +223,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             }
         }
         // Ex) NamedTuple("MyType", a=int, b=str)
-        ([], keywords) => {
+        ([_typename], keywords) => {
             if let Ok(properties) = create_properties_from_keywords(keywords) {
                 properties
             } else {

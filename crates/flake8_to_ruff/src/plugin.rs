@@ -3,9 +3,8 @@ use std::fmt;
 use std::str::FromStr;
 
 use anyhow::anyhow;
-
-use crate::registry::Linter;
-use crate::rule_selector::RuleSelector;
+use ruff::registry::Linter;
+use ruff::RuleSelector;
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {

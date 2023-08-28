@@ -1,8 +1,9 @@
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of the `assert` keyword.
