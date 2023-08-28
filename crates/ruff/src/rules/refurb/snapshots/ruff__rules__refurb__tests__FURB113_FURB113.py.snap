@@ -310,4 +310,26 @@ FURB113.py:114:5: FURB113 Use `x.extend((1, 2, 3))` instead of repeatedly callin
     |
     = help: Replace with `x.extend((1, 2, 3))`
 
+FURB113.py:122:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+    |
+120 |   def yes_six(x: list):
+121 |       # FURB113
+122 |       x.append(1)
+    |  _____^
+123 | |     x.append(2)
+    | |_______________^ FURB113
+    |
+    = help: Replace with `x.extend((1, 2))`
+
+ℹ Suggested fix
+119 119 | 
+120 120 | def yes_six(x: list):
+121 121 |     # FURB113
+122     |-    x.append(1)
+123     |-    x.append(2)
+    122 |+    x.extend((1, 2))
+124 123 | 
+125 124 | 
+126 125 | # Non-errors.
+
 

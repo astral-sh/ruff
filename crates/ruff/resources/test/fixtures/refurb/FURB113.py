@@ -117,6 +117,12 @@ def yes_five(x: list[int], y: list[int]):
     x.append(3)
 
 
+def yes_six(x: list):
+    # FURB113
+    x.append(1)
+    x.append(2)
+
+
 # Non-errors.
 
 nums.append(1)

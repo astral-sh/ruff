@@ -3,6 +3,7 @@ use rustc_hash::FxHashMap;
 use ast::{traversal, ParameterWithDefault, Parameters};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
@@ -412,9 +413,7 @@ fn is_list<'a>(semantic: &'a SemanticModel, binding: &'a Binding, name: &str) ->
 
 #[inline]
 fn is_list_annotation(semantic: &SemanticModel, annotation: &Expr) -> bool {
-    let Expr::Subscript(ast::ExprSubscript { value, .. }) = annotation else {
-        return false;
-    };
+    let value = map_subscript(annotation);
     match_builtin_list_type(semantic, value) || semantic.match_typing_expr(value, "List")
 }
 
