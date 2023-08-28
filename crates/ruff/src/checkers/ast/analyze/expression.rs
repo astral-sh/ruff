@@ -1039,12 +1039,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
                 if checker.enabled(Rule::PrintfStringFormatting) {
-                    pyupgrade::rules::printf_string_formatting(
-                        checker,
-                        expr,
-                        right,
-                        checker.locator,
-                    );
+                    pyupgrade::rules::printf_string_formatting(checker, expr, right);
                 }
                 if checker.enabled(Rule::BadStringFormatCharacter) {
                     pylint::rules::bad_string_format_character::percent(checker, expr);

@@ -1,5 +1,6 @@
 use itertools::Itertools;
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{CmpOp, Expr};
@@ -24,19 +25,18 @@ use crate::rules::pylint::helpers::CmpOpExt;
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]
 pub struct ComparisonWithItself {
-    left: String,
-    op: CmpOp,
-    right: String,
+    actual: SourceCodeSnippet,
 }
 
 impl Violation for ComparisonWithItself {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ComparisonWithItself { left, op, right } = self;
-        format!(
-            "Name compared with itself, consider replacing `{left} {} {right}`",
-            CmpOpExt::from(op)
-        )
+        let ComparisonWithItself { actual } = self;
+        if let Some(actual) = actual.full_display() {
+            format!("Name compared with itself, consider replacing `{actual}`")
+        } else {
+            format!("Name compared with itself")
+        }
     }
 }
 
@@ -55,11 +55,15 @@ pub(crate) fn comparison_with_itself(
         match (left, right) {
             // Ex) `foo == foo`
             (Expr::Name(left_name), Expr::Name(right_name)) if left_name.id == right_name.id => {
+                let actual = format!(
+                    "{} {} {}",
+                    checker.locator().slice(left),
+                    CmpOpExt::from(op),
+                    checker.locator().slice(right)
+                );
                 checker.diagnostics.push(Diagnostic::new(
                     ComparisonWithItself {
-                        left: checker.generator().expr(left),
-                        op: *op,
-                        right: checker.generator().expr(right),
+                        actual: SourceCodeSnippet::new(actual),
                     },
                     left_name.range(),
                 ));
@@ -99,11 +103,15 @@ pub(crate) fn comparison_with_itself(
                     "id" | "len" | "type" | "int" | "bool" | "str" | "repr" | "bytes"
                 ) && checker.semantic().is_builtin(&left_func.id)
                 {
+                    let actual = format!(
+                        "{} {} {}",
+                        checker.locator().slice(left),
+                        CmpOpExt::from(op),
+                        checker.locator().slice(right)
+                    );
                     checker.diagnostics.push(Diagnostic::new(
                         ComparisonWithItself {
-                            left: checker.generator().expr(left),
-                            op: *op,
-                            right: checker.generator().expr(right),
+                            actual: SourceCodeSnippet::new(actual),
                         },
                         left_call.range(),
                     ));
