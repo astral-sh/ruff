@@ -35,4 +35,11 @@ def f():
     items = [1, 2, 3, 4]
     result = Foo()
     for i in items:
-        result.append(i)  # Ok
+        result.append(i)  # OK
+
+
+def f():
+    import sys
+
+    for path in ("foo", "bar"):
+        sys.path.append(path)  # OK

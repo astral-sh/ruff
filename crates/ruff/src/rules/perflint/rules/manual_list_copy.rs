@@ -81,14 +81,25 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
         return;
     };
 
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+        return;
+    };
+
+    if !matches!(attr.as_str(), "append" | "insert") {
+        return;
+    }
+
     // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
     if !arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
         return;
     }
 
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    // Avoid, e.g., `for x in y: filtered[x].append(x)`.
+    if any_over_expr(value, &|expr| {
+        expr.as_name_expr().is_some_and(|expr| expr.id == *id)
+    }) {
         return;
-    };
+    }
 
     // Avoid non-list values.
     let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
@@ -105,17 +116,6 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
     };
 
     if !is_list(binding, checker.semantic()) {
-        return
-    }
-
-    if !matches!(attr.as_str(), "append" | "insert") {
-        return;
-    }
-
-    // Avoid, e.g., `for x in y: filtered[x].append(x)`.
-    if any_over_expr(value, &|expr| {
-        expr.as_name_expr().is_some_and(|expr| expr.id == *id)
-    }) {
         return;
     }
 
