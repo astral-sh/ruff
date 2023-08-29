@@ -881,7 +881,7 @@
           }
         },
         "banned-from": {
-          "description": "A list of modules that should not be imported from using the `import ... from ...` syntax.\n\nFor example, given `banned-from = [\"pandas\"]`, `from pandas import DataFrame` would be disallowed, while `import pandas` would be allowed.",
+          "description": "A list of modules that should not be imported from using the `from ... import ...` syntax.\n\nFor example, given `banned-from = [\"pandas\"]`, `from pandas import DataFrame` would be disallowed, while `import pandas` would be allowed.",
           "type": [
             "array",
             "null"

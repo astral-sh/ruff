@@ -1000,7 +1000,7 @@ pub struct Flake8ImportConventionsOptions {
     "#
     )]
     /// A list of modules that should not be imported from using the
-    /// `import ... from ...` syntax.
+    /// `from ... import ...` syntax.
     ///
     /// For example, given `banned-from = ["pandas"]`, `from pandas import DataFrame`
     /// would be disallowed, while `import pandas` would be allowed.
