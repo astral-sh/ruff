@@ -1,10 +1,9 @@
 //! Lint rules based on checking physical lines.
-use ruff_text_size::TextSize;
-
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::{Locator, UniversalNewlines};
+use ruff_text_size::TextSize;
 
 use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::missing_copyright_notice;
@@ -99,11 +98,10 @@ pub(crate) fn check_physical_lines(
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::lexer::lex;
-    use ruff_python_parser::Mode;
-
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
+    use ruff_python_parser::lexer::lex;
+    use ruff_python_parser::Mode;
     use ruff_source_file::Locator;
 
     use crate::line_width::LineLength;
@@ -132,7 +130,7 @@ mod tests {
                 },
             )
         };
-        let line_length = LineLength::from(8);
+        let line_length = LineLength::try_from(8).unwrap();
         assert_eq!(check_with_max_line_length(line_length), vec![]);
         assert_eq!(check_with_max_line_length(line_length), vec![]);
     }

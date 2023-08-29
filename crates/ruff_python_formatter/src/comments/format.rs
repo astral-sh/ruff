@@ -1,5 +1,4 @@
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
@@ -151,10 +150,13 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                 write!(
                     f,
                     [
-                        line_suffix(&format_args![
-                            empty_lines(lines_before_comment),
-                            format_comment(trailing)
-                        ]),
+                        line_suffix(
+                            &format_args![
+                                empty_lines(lines_before_comment),
+                                format_comment(trailing)
+                            ],
+                            0
+                        ),
                         expand_parent()
                     ]
                 )?;
@@ -162,7 +164,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                 write!(
                     f,
                     [
-                        line_suffix(&format_args![space(), space(), format_comment(trailing)]),
+                        line_suffix(&format_args![space(), space(), format_comment(trailing)], 0),
                         expand_parent()
                     ]
                 )?;
@@ -267,7 +269,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
             write!(
                 f,
                 [
-                    line_suffix(&format_args!(space(), space(), format_comment(comment))),
+                    line_suffix(&format_args!(space(), space(), format_comment(comment)), 0),
                     expand_parent()
                 ]
             )?;

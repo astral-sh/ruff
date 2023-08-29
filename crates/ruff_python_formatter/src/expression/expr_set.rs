@@ -1,5 +1,6 @@
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{ExprSet, Ranged};
+use ruff_python_ast::ExprSet;
+use ruff_text_size::Ranged;
 
 use crate::comments::SourceComment;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};

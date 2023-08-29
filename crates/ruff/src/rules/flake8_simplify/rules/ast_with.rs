@@ -3,13 +3,13 @@ use log::error;
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Ranged, Stmt, WithItem};
+use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::UniversalNewlines;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::line_width::LineWidth;
+use crate::line_width::LineWidthBuilder;
 use crate::registry::AsRule;
 
 use super::fix_with;
@@ -142,7 +142,7 @@ pub(crate) fn multiple_with_statements(
                             .unwrap_or_default()
                             .universal_newlines()
                             .all(|line| {
-                                LineWidth::new(checker.settings.tab_size).add_str(&line)
+                                LineWidthBuilder::new(checker.settings.tab_size).add_str(&line)
                                     <= checker.settings.line_length
                             })
                         {

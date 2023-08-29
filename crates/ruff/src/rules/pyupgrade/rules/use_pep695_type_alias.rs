@@ -2,15 +2,15 @@ use ast::{Constant, ExprCall, ExprConstant};
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
-    Expr, ExprName, ExprSubscript, Identifier, Ranged, Stmt, StmtAnnAssign, StmtAssign,
-    StmtTypeAlias, TypeParam, TypeParamTypeVar,
+    Expr, ExprName, ExprSubscript, Identifier, Stmt, StmtAnnAssign, StmtAssign, StmtTypeAlias,
+    TypeParam, TypeParamTypeVar,
 };
 use ruff_python_semantic::SemanticModel;
 
 use crate::{registry::AsRule, settings::types::PythonVersion};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 

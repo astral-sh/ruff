@@ -37,3 +37,6 @@ map(lambda x: lambda x: x, range(4))
 map(lambda x=1: x, nums)
 map(lambda *args: len(args), range(4))
 map(lambda **kwargs: len(kwargs), range(4))
+
+# Ok because multiple arguments are allowed.
+dict(map(lambda k, v: (k, v), keys, values))

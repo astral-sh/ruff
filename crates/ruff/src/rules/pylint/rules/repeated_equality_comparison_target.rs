@@ -8,8 +8,9 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::hashable::HashableExpr;
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, Ranged};
+use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
@@ -186,10 +187,10 @@ fn merged_membership_test(
         BoolOp::Or => "in",
         BoolOp::And => "not in",
     };
-    let left = locator.slice(left.range());
+    let left = locator.slice(left);
     let members = comparators
         .iter()
-        .map(|comparator| locator.slice(comparator.range()))
+        .map(|comparator| locator.slice(comparator))
         .join(", ");
     format!("{left} {op} ({members})",)
 }

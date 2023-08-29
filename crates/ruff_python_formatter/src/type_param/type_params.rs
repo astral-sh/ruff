@@ -1,12 +1,13 @@
+use ruff_formatter::write;
+use ruff_formatter::FormatResult;
+use ruff_python_ast::node::AstNode;
+use ruff_python_ast::TypeParams;
+use ruff_text_size::Ranged;
+
 use crate::builders::PyFormatterExtensions;
 use crate::comments::{trailing_comments, SourceComment};
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
-use ruff_formatter::write;
-use ruff_formatter::FormatResult;
-use ruff_python_ast::node::AstNode;
-
-use ruff_python_ast::{Ranged, TypeParams};
 
 #[derive(Default)]
 pub struct FormatTypeParams;

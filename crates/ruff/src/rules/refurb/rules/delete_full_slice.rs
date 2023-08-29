@@ -1,20 +1,21 @@
-use ast::Ranged;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{Binding, SemanticModel};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::refurb::helpers::{is_dict, is_list};
 
 /// ## What it does
-/// Checks for delete statements with full slice on lists and dictionaries.
+/// Checks for `del` statements that delete the entire slice of a list or
+/// dictionary.
 ///
 /// ## Why is this bad?
-/// It is faster and more succinct to remove all items via the `clear()` method.
+/// It's is faster and more succinct to remove all items via the `clear()`
+/// method.
 ///
 /// ## Example
 /// ```python
@@ -36,7 +37,7 @@ use crate::rules::refurb::helpers::{is_dict, is_list};
 ///
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html?highlight=list#mutable-sequence-types)
-/// - [Python documentation: dict.clear()](https://docs.python.org/3/library/stdtypes.html?highlight=list#dict.clear)
+/// - [Python documentation: `dict.clear()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#dict.clear)
 #[violation]
 pub struct DeleteFullSlice;
 
@@ -45,7 +46,7 @@ impl Violation for DeleteFullSlice {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `clear` over deleting the full slice")
+        format!("Prefer `clear` over deleting a full slice")
     }
 
     fn autofix_title(&self) -> Option<String> {
@@ -53,17 +54,17 @@ impl Violation for DeleteFullSlice {
     }
 }
 
-// FURB131
+/// FURB131
 pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete) {
-    // ATM, we can only auto-fix when delete has a single target.
-    let only_target = delete.targets.len() == 1;
     for target in &delete.targets {
-        let Some(name) = match_full_slice(checker.semantic(), target) else {
+        let Some(name) = match_full_slice(target, checker.semantic()) else {
             continue;
         };
-        let mut diagnostic = Diagnostic::new(DeleteFullSlice {}, delete.range);
 
-        if checker.patch(diagnostic.kind.rule()) && only_target {
+        let mut diagnostic = Diagnostic::new(DeleteFullSlice, delete.range);
+
+        // Fix is only supported for single-target deletions.
+        if checker.patch(diagnostic.kind.rule()) && delete.targets.len() == 1 {
             let replacement = make_suggestion(name, checker.generator());
             diagnostic.set_fix(Fix::suggested(Edit::replacement(
                 replacement,
@@ -74,6 +75,50 @@ pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete)
 
         checker.diagnostics.push(diagnostic);
     }
+}
+
+/// Match `del expr[:]` where `expr` is a list or a dict.
+fn match_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a str> {
+    // Check that it is `del expr[...]`.
+    let subscript = expr.as_subscript_expr()?;
+
+    // Check that it is` `del expr[:]`.
+    if !matches!(
+        subscript.slice.as_ref(),
+        Expr::Slice(ast::ExprSlice {
+            lower: None,
+            upper: None,
+            step: None,
+            range: _,
+        })
+    ) {
+        return None;
+    }
+
+    // Check that it is del var[:]
+    let ast::ExprName { id: name, .. } = subscript.value.as_name_expr()?;
+
+    // Let's find definition for var
+    let scope = semantic.current_scope();
+    let bindings: Vec<&Binding> = scope
+        .get_all(name)
+        .map(|binding_id| semantic.binding(binding_id))
+        .collect();
+
+    // NOTE: Maybe it is too strict of a limitation, but it seems reasonable.
+    let [binding] = bindings.as_slice() else {
+        return None;
+    };
+
+    // It should only apply to variables that are known to be lists or dicts.
+    if binding.source.is_none()
+        || !(is_dict(binding, name, semantic) || is_list(binding, name, semantic))
+    {
+        return None;
+    }
+
+    // Name is needed for the fix suggestion.
+    Some(name)
 }
 
 /// Make fix suggestion for the given name, ie `name.clear()`.
@@ -109,49 +154,4 @@ fn make_suggestion(name: &str, generator: Generator) -> String {
         range: TextRange::default(),
     };
     generator.stmt(&stmt.into())
-}
-
-fn match_full_slice<'a>(semantic: &SemanticModel, expr: &'a Expr) -> Option<&'a str> {
-    // Check that it is del expr[...]
-    let Expr::Subscript(subscript) = expr else {
-        return None;
-    };
-
-    // Check that it is del expr[:]
-    let Expr::Slice(ast::ExprSlice {
-        lower: None,
-        upper: None,
-        step: None,
-        ..
-    }) = subscript.slice.as_ref()
-    else {
-        return None;
-    };
-
-    // Check that it is del var[:]
-    let Expr::Name(ast::ExprName { id: name, .. }) = subscript.value.as_ref() else {
-        return None;
-    };
-
-    // Let's find definition for var
-    let scope = semantic.current_scope();
-    let bindings: Vec<&Binding> = scope
-        .get_all(name)
-        .map(|binding_id| semantic.binding(binding_id))
-        .collect();
-
-    // NOTE: Maybe it is too strict of a limitation, but it seems reasonable.
-    let [binding] = bindings.as_slice() else {
-        return None;
-    };
-
-    // It should only apply to variables that are known to be lists or dicts.
-    if binding.source.is_none()
-        || !(is_dict(semantic, binding, name) || is_list(semantic, binding, name))
-    {
-        return None;
-    }
-
-    // Name is needed for the fix suggestion.
-    Some(name)
 }

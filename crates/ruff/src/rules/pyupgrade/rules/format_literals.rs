@@ -5,9 +5,10 @@ use regex::Regex;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
@@ -205,7 +206,7 @@ fn generate_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let source_code = locator.slice(call.range());
+    let source_code = locator.slice(call);
 
     let output = transform_expression_text(source_code, |source_code| {
         let mut expression = match_expression(&source_code)?;

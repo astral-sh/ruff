@@ -1,4 +1,5 @@
-use ruff_python_ast::{ExprIpyEscapeCommand, Ranged};
+use ruff_python_ast::ExprIpyEscapeCommand;
+use ruff_text_size::Ranged;
 
 use crate::prelude::*;
 

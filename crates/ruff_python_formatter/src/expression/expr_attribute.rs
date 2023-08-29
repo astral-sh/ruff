@@ -1,8 +1,8 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant, Ranged};
+use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{

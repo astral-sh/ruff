@@ -4,11 +4,11 @@ use bitflags::bitflags;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, TabWidth};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, ExprConstant, ExprFString, Ranged};
+use ruff_python_ast::{self as ast, ExprConstant, ExprFString};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::{
@@ -788,12 +788,12 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
     let locator = f.context().locator();
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline
-    if locator.slice(string_part.range()).contains("\\\n") {
+    if locator.slice(string_part).contains("\\\n") {
         return string_part.fmt(f);
     }
 
     let (normalized, _) = normalize_string(
-        locator.slice(string_part.range()),
+        locator.slice(string_part),
         string_part.preferred_quotes,
         string_part.is_raw_string,
     );

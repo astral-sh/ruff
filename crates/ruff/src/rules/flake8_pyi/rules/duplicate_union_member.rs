@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
@@ -8,6 +8,7 @@ use crate::rules::flake8_pyi::helpers::traverse_union;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_text_size::Ranged;
 
 #[violation]
 pub struct DuplicateUnionMember {
@@ -54,7 +55,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
                     // Replace the parent with its non-duplicate child.
                     let child = if expr == left.as_ref() { right } else { left };
                     diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        checker.locator().slice(child.range()).to_string(),
+                        checker.locator().slice(child.as_ref()).to_string(),
                         parent.range(),
                     )));
                 }

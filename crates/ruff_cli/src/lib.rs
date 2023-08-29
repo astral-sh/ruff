@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::CommandFactory;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
@@ -15,7 +15,7 @@ use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
 use ruff_python_formatter::{format_module, PyFormatOptions};
 
-use crate::args::{Args, CheckArgs, Command};
+use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::commands::run_stdin::read_from_stdin;
 use crate::printer::{Flags as PrinterFlags, Printer};
 
@@ -145,44 +145,39 @@ quoting the executed command, along with the relevant file contents and `pyproje
         Command::Linter { format } => commands::linter::linter(format)?,
         Command::Clean => commands::clean::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
-            shell.generate(&mut Args::command(), &mut io::stdout());
+            shell.generate(&mut Args::command(), &mut stdout());
         }
         Command::Check(args) => return check(args, log_level),
-        Command::Format { files } => return format(&files),
+        Command::Format(args) => return format(args, log_level),
     }
 
     Ok(ExitStatus::Success)
 }
 
-fn format(files: &[PathBuf]) -> Result<ExitStatus> {
+fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
     warn_user_once!(
-        "`ruff format` is a work-in-progress, subject to change at any time, and intended for \
-        internal use only."
+        "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
+        experimentation."
     );
 
-    match &files {
-        // Check if we should read from stdin
-        [path] if path == Path::new("-") => {
-            let unformatted = read_from_stdin()?;
-            let options = PyFormatOptions::from_extension(Path::new("stdin.py"));
-            let formatted = format_module(&unformatted, options)?;
-            stdout().lock().write_all(formatted.as_code().as_bytes())?;
-        }
-        _ => {
-            for file in files {
-                let unformatted = std::fs::read_to_string(file)
-                    .with_context(|| format!("Could not read {}: ", file.display()))?;
-                let options = PyFormatOptions::from_extension(file);
-                let formatted = format_module(&unformatted, options)?;
-                std::fs::write(file, formatted.as_code().as_bytes())
-                    .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
-            }
-        }
+    let (cli, overrides) = args.partition();
+
+    if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
+        let unformatted = read_from_stdin()?;
+        let options = cli
+            .stdin_filename
+            .as_deref()
+            .map(PyFormatOptions::from_extension)
+            .unwrap_or_default();
+        let formatted = format_module(&unformatted, options)?;
+        stdout().lock().write_all(formatted.as_code().as_bytes())?;
+        Ok(ExitStatus::Success)
+    } else {
+        commands::format::format(&cli, &overrides, log_level)
     }
-    Ok(ExitStatus::Success)
 }
 
-pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
+pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`

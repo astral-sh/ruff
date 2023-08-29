@@ -1,8 +1,9 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -80,7 +81,7 @@ pub(crate) fn getattr_with_constant(
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            format!("{}.{}", checker.locator().slice(obj.range()), value),
+            format!("{}.{}", checker.locator().slice(obj), value),
             expr.range(),
         )));
     }

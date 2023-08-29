@@ -2,11 +2,12 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violat
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged,
-    Stmt, UnaryOp,
+    self as ast, Arguments, Constant, Expr, Operator, ParameterWithDefault, Parameters, Stmt,
+    UnaryOp,
 };
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -248,7 +249,7 @@ fn is_valid_default_value_with_annotation(
                     ..
                 }) = left.as_ref()
                 {
-                    return locator.slice(left.range()).len() <= 10;
+                    return locator.slice(left.as_ref()).len() <= 10;
                 } else if let Expr::UnaryOp(ast::ExprUnaryOp {
                     op: UnaryOp::USub,
                     operand,
@@ -261,7 +262,7 @@ fn is_valid_default_value_with_annotation(
                         ..
                     }) = operand.as_ref()
                     {
-                        return locator.slice(operand.range()).len() <= 10;
+                        return locator.slice(operand.as_ref()).len() <= 10;
                     }
                 }
             }

@@ -27,8 +27,7 @@ use ruff::{fs, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_macros::CacheKey;
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::PySourceType;
-use ruff_python_stdlib::path::is_project_toml;
+use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -228,36 +227,36 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    // We have to special case this here since the Python tokenizer doesn't work with TOML.
-    if is_project_toml(path) {
-        let messages = if settings
-            .lib
-            .rules
-            .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
-        {
-            let contents = match std::fs::read_to_string(path) {
-                Ok(contents) => contents,
-                Err(err) => {
-                    return Ok(Diagnostics::from_io_error(&err, path, &settings.lib));
-                }
+    let source_type = match SourceType::from(path) {
+        SourceType::Toml(TomlSourceType::Pyproject) => {
+            let messages = if settings
+                .lib
+                .rules
+                .iter_enabled()
+                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+            {
+                let contents = match std::fs::read_to_string(path) {
+                    Ok(contents) => contents,
+                    Err(err) => {
+                        return Ok(Diagnostics::from_io_error(&err, path, &settings.lib));
+                    }
+                };
+                let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+                lint_pyproject_toml(source_file, &settings.lib)
+            } else {
+                vec![]
             };
-            let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-            lint_pyproject_toml(source_file, &settings.lib)
-        } else {
-            vec![]
-        };
-        return Ok(Diagnostics {
-            messages,
-            ..Diagnostics::default()
-        });
-    }
+            return Ok(Diagnostics {
+                messages,
+                ..Diagnostics::default()
+            });
+        }
+        SourceType::Toml(_) => return Ok(Diagnostics::default()),
+        SourceType::Python(source_type) => source_type,
+    };
 
     // Extract the sources from the file.
-    let LintSources {
-        source_type,
-        source_kind,
-    } = match LintSources::try_from_path(path) {
+    let LintSource(source_kind) = match LintSource::try_from_path(path, source_type) {
         Ok(sources) => sources,
         Err(SourceExtractionError::Io(err)) => {
             return Ok(Diagnostics::from_io_error(&err, path, &settings.lib));
@@ -438,20 +437,23 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
-    // Extract the sources from the file.
-    let LintSources {
-        source_type,
-        source_kind,
-    } = match LintSources::try_from_source_code(contents, path) {
-        Ok(sources) => sources,
-        Err(SourceExtractionError::Io(err)) => {
-            // SAFETY: An `io::Error` can only occur if we're reading from a path.
-            return Ok(Diagnostics::from_io_error(&err, path.unwrap(), settings));
-        }
-        Err(SourceExtractionError::Diagnostics(diagnostics)) => {
-            return Ok(*diagnostics);
-        }
+    // TODO(charlie): Support `pyproject.toml`.
+    let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
+        return Ok(Diagnostics::default());
     };
+
+    // Extract the sources from the file.
+    let LintSource(source_kind) =
+        match LintSource::try_from_source_code(contents, path, source_type) {
+            Ok(sources) => sources,
+            Err(SourceExtractionError::Io(err)) => {
+                // SAFETY: An `io::Error` can only occur if we're reading from a path.
+                return Ok(Diagnostics::from_io_error(&err, path.unwrap(), settings));
+            }
+            Err(SourceExtractionError::Diagnostics(diagnostics)) => {
+                return Ok(*diagnostics);
+            }
+        };
 
     // Lint the inputs.
     let (
@@ -554,58 +556,40 @@ pub(crate) fn lint_stdin(
 }
 
 #[derive(Debug)]
-struct LintSources {
-    /// The "type" of source code, e.g. `.py`, `.pyi`, `.ipynb`, etc.
-    source_type: PySourceType,
-    /// The "kind" of source, e.g. Python file, Jupyter Notebook, etc.
-    source_kind: SourceKind,
-}
+struct LintSource(SourceKind);
 
-impl LintSources {
-    /// Extract the lint [`LintSources`] from the given file path.
-    fn try_from_path(path: &Path) -> Result<LintSources, SourceExtractionError> {
-        let source_type = PySourceType::from(path);
-
-        // Read the file from disk.
+impl LintSource {
+    /// Extract the lint [`LintSource`] from the given file path.
+    fn try_from_path(
+        path: &Path,
+        source_type: PySourceType,
+    ) -> Result<LintSource, SourceExtractionError> {
         if source_type.is_ipynb() {
             let notebook = notebook_from_path(path).map_err(SourceExtractionError::Diagnostics)?;
             let source_kind = SourceKind::IpyNotebook(notebook);
-            Ok(LintSources {
-                source_type,
-                source_kind,
-            })
+            Ok(LintSource(source_kind))
         } else {
             // This is tested by ruff_cli integration test `unreadable_file`
             let contents = std::fs::read_to_string(path).map_err(SourceExtractionError::Io)?;
-            Ok(LintSources {
-                source_type,
-                source_kind: SourceKind::Python(contents),
-            })
+            Ok(LintSource(SourceKind::Python(contents)))
         }
     }
 
-    /// Extract the lint [`LintSources`] from the raw string contents, optionally accompanied by a
+    /// Extract the lint [`LintSource`] from the raw string contents, optionally accompanied by a
     /// file path indicating the path to the file from which the contents were read. If provided,
     /// the file path should be used for diagnostics, but not for reading the file from disk.
     fn try_from_source_code(
         source_code: String,
         path: Option<&Path>,
-    ) -> Result<LintSources, SourceExtractionError> {
-        let source_type = path.map(PySourceType::from).unwrap_or_default();
-
+        source_type: PySourceType,
+    ) -> Result<LintSource, SourceExtractionError> {
         if source_type.is_ipynb() {
             let notebook = notebook_from_source_code(&source_code, path)
                 .map_err(SourceExtractionError::Diagnostics)?;
             let source_kind = SourceKind::IpyNotebook(notebook);
-            Ok(LintSources {
-                source_type,
-                source_kind,
-            })
+            Ok(LintSource(source_kind))
         } else {
-            Ok(LintSources {
-                source_type,
-                source_kind: SourceKind::Python(source_code),
-            })
+            Ok(LintSource(SourceKind::Python(source_code)))
         }
     }
 }

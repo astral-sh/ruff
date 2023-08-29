@@ -4,8 +4,8 @@
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
 use num_bigint::BigInt;
-use ruff_text_size::TextSize;
-use ruff_python_ast::{self as ast, Ranged, IpyEscapeKind};
+use ruff_text_size::{Ranged, TextSize};
+use ruff_python_ast::{self as ast, IpyEscapeKind};
 use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},

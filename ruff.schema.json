@@ -445,7 +445,7 @@
       "description": "Options for the `pycodestyle` plugin.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Pycodestyle"
+          "$ref": "#/definitions/PycodestyleOptions"
         },
         {
           "type": "null"
@@ -456,7 +456,7 @@
       "description": "Options for the `pydocstyle` plugin.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Pydocstyle"
+          "$ref": "#/definitions/PydocstyleOptions"
         },
         {
           "type": "null"
@@ -881,7 +881,7 @@
           }
         },
         "banned-from": {
-          "description": "A list of modules that are allowed to be imported from",
+          "description": "A list of modules that should not be imported from using the `import ... from ...` syntax.\n\nFor example, given `banned-from = [\"pandas\"]`, `from pandas import DataFrame` would be disallowed, while `import pandas` would be allowed.",
           "type": [
             "array",
             "null"
@@ -1386,10 +1386,10 @@
       "additionalProperties": false
     },
     "LineLength": {
-      "description": "The length of a line of text that is considered too long.",
+      "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=320",
       "type": "integer",
-      "format": "uint",
-      "minimum": 0.0
+      "format": "uint16",
+      "minimum": 1.0
     },
     "McCabeOptions": {
       "type": "object",
@@ -1487,7 +1487,7 @@
       },
       "additionalProperties": false
     },
-    "Pycodestyle": {
+    "PycodestyleOptions": {
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
@@ -1511,7 +1511,7 @@
       },
       "additionalProperties": false
     },
-    "Pydocstyle": {
+    "PydocstyleOptions": {
       "type": "object",
       "properties": {
         "convention": {
@@ -2044,10 +2044,7 @@
         "FLY00",
         "FLY002",
         "FURB",
-        "FURB1",
-        "FURB11",
         "FURB113",
-        "FURB13",
         "FURB131",
         "FURB132",
         "G",

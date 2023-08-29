@@ -1,9 +1,9 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 use ruff_python_semantic::Definition;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 pub(crate) mod extraction;
 pub(crate) mod google;

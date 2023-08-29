@@ -1,11 +1,11 @@
 use ruff_formatter::{write, Argument, Arguments, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{
-    ElifElseClause, ExceptHandlerExceptHandler, MatchCase, Ranged, StmtClassDef, StmtFor,
-    StmtFunctionDef, StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
+    ElifElseClause, ExceptHandlerExceptHandler, MatchCase, StmtClassDef, StmtFor, StmtFunctionDef,
+    StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
 };
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{
     leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
@@ -60,11 +60,9 @@ impl<'a> ClauseHeader<'a> {
             | ClauseHeader::With(_)
             | ClauseHeader::OrElse(_) => last_child_end,
 
-            ClauseHeader::ExceptHandler(handler) => handler
-                .name
-                .as_ref()
-                .map(ruff_python_ast::Ranged::end)
-                .or(last_child_end),
+            ClauseHeader::ExceptHandler(handler) => {
+                handler.name.as_ref().map(Ranged::end).or(last_child_end)
+            }
         };
 
         let colon = colon_range(end.unwrap_or(keyword_range.end()), source)?;

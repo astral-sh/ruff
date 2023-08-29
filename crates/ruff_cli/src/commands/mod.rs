@@ -1,6 +1,7 @@
 pub(crate) mod add_noqa;
 pub(crate) mod clean;
 pub(crate) mod config;
+pub(crate) mod format;
 pub(crate) mod linter;
 pub(crate) mod rule;
 pub(crate) mod run;

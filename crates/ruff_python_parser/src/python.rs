@@ -1,8 +1,8 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 36e9f9ff3ebd5d67d7d1da7c36eccc5d84ab98bbd3b297652afd916650498fcc
+// sha3: 775b210bb49d67488594b3367cf46ced8b5d43213ea80fa21d2d4b96b5bece3d
 use num_bigint::BigInt;
-use ruff_text_size::TextSize;
-use ruff_python_ast::{self as ast, Ranged, IpyEscapeKind};
+use ruff_text_size::{Ranged, TextSize};
+use ruff_python_ast::{self as ast, IpyEscapeKind};
 use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
@@ -24,8 +24,8 @@ extern crate alloc;
 mod __parse__Top {
 
     use num_bigint::BigInt;
-    use ruff_text_size::TextSize;
-    use ruff_python_ast::{self as ast, Ranged, IpyEscapeKind};
+    use ruff_text_size::{Ranged, TextSize};
+    use ruff_python_ast::{self as ast, IpyEscapeKind};
     use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},

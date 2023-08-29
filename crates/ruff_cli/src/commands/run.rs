@@ -11,16 +11,16 @@ use itertools::Itertools;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff_text_size::{TextRange, TextSize};
 
 use ruff::message::Message;
 use ruff::registry::Rule;
-use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 use ruff::settings::{flags, AllSettings};
-use ruff::{fs, packaging, resolver, warn_user_once, IOError};
+use ruff::{fs, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
+use ruff_text_size::{TextRange, TextSize};
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, PyprojectDiscoveryStrategy};
 
 use crate::args::Overrides;
 use crate::cache::{self, Cache};
@@ -38,7 +38,7 @@ pub(crate) fn run(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -60,7 +60,9 @@ pub(crate) fn run(
                 init_cache(&pyproject_config.settings.cli.cache_dir);
             }
             PyprojectDiscoveryStrategy::Hierarchical => {
-                for settings in std::iter::once(&pyproject_config.settings).chain(resolver.iter()) {
+                for settings in
+                    std::iter::once(&pyproject_config.settings).chain(resolver.settings())
+                {
                     init_cache(&settings.cli.cache_dir);
                 }
             }
@@ -68,13 +70,12 @@ pub(crate) fn run(
     };
 
     // Discover the package root for each Python file.
-    let package_roots = packaging::detect_package_roots(
+    let package_roots = resolver.package_roots(
         &paths
             .iter()
             .flatten()
             .map(ignore::DirEntry::path)
             .collect::<Vec<_>>(),
-        &resolver,
         pyproject_config,
     );
 
@@ -230,17 +231,21 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 #[cfg(test)]
 #[cfg(unix)]
 mod test {
-    use super::run;
-    use crate::args::Overrides;
-    use anyhow::Result;
-    use ruff::message::{Emitter, EmitterContext, TextEmitter};
-    use ruff::registry::Rule;
-    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
-    use ruff::settings::{flags, AllSettings, CliSettings, Settings};
-    use rustc_hash::FxHashMap;
     use std::fs;
     use std::os::unix::fs::OpenOptionsExt;
+
+    use anyhow::Result;
+    use rustc_hash::FxHashMap;
     use tempfile::TempDir;
+
+    use ruff::message::{Emitter, EmitterContext, TextEmitter};
+    use ruff::registry::Rule;
+    use ruff::settings::{flags, AllSettings, CliSettings, Settings};
+    use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+
+    use crate::args::Overrides;
+
+    use super::run;
 
     /// We check that regular python files, pyproject.toml and jupyter notebooks all handle io
     /// errors gracefully

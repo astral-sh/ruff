@@ -1,8 +1,9 @@
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments, FormatContext, FormatOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{ExpressionRef, Ranged};
+use ruff_python_ast::ExpressionRef;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::Ranged;
 
 use crate::comments::{
     dangling_comments, dangling_open_parenthesis_comments, trailing_comments, SourceComment,

@@ -1,19 +1,22 @@
-use ast::{comparable::ComparableExpr, helpers::contains_effect, CmpOp, Ranged};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::{self as ast, CmpOp, Expr, Stmt};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::{Binding, SemanticModel};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::snippet::SourceCodeSnippet;
-use crate::{checkers::ast::Checker, rules::refurb::helpers::is_set};
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+use crate::rules::refurb::helpers::is_set;
 
 /// ## What it does
-/// Checks for check and `remove` pattern that can be replaced via `discard`.
+/// Checks for uses of `set#remove` that can be replaced with `set#discard`.
 ///
 /// ## Why is this bad?
-/// It is more succinct and idiomatic to use `discard`.
+/// If an element should be removed from a set if it is present, it is more
+/// succinct and idiomatic to use `discard`.
 ///
 /// ## Example
 /// ```python
@@ -31,7 +34,7 @@ use crate::{checkers::ast::Checker, rules::refurb::helpers::is_set};
 /// ```
 ///
 /// ## References
-/// - [Python documentation: set.discard()](https://docs.python.org/3/library/stdtypes.html?highlight=list#frozenset.discard)
+/// - [Python documentation: `set.discard()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#frozenset.discard)
 #[violation]
 pub struct CheckAndRemoveFromSet {
     element: SourceCodeSnippet,
@@ -59,56 +62,60 @@ impl AlwaysAutofixableViolation for CheckAndRemoveFromSet {
     }
 }
 
-// FURB132
+/// FURB132
 pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::StmtIf) {
     // In order to fit the profile, we need if without else clauses and with only one statement in its body.
     if if_stmt.body.len() != 1 || !if_stmt.elif_else_clauses.is_empty() {
         return;
     }
 
-    // if test should be `element in set`
+    // The `if` test should be `element in set`.
     let Some((check_element, check_set)) = match_check(if_stmt) else {
         return;
     };
 
-    // if body should be `set.remove(element)`
+    // The `if` body should be `set.remove(element)`.
     let Some((remove_element, remove_set)) = match_remove(if_stmt) else {
         return;
     };
 
-    // `element` in the check should be the same as `element` in the body
-    if !compare(&check_element.into(), &remove_element.into())
+    // `
     // `set` in the check should be the same as `set` in the body
-        || check_set.id != remove_set.id
-    // `element` shouldn't have a side effect, otherwise we might change the samntic of the program
+    if check_set.id != remove_set.id
+        // `element` in the check should be the same as `element` in the body
+        || !compare(&check_element.into(), &remove_element.into())
+        // `element` shouldn't have a side effect, otherwise we might change the semantics of the program.
         || contains_effect(check_element, |id| checker.semantic().is_builtin(id))
     {
         return;
     }
 
     // Check if what we assume is set is indeed a set.
-    if !find_binding(checker.semantic(), &check_set.id).map_or(false, |binding| {
-        is_set(checker.semantic(), binding, &check_set.id)
-    }) {
+    if !checker
+        .semantic()
+        .resolve_name(&check_set)
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .map_or(false, |binding| {
+            is_set(binding, &check_set.id, checker.semantic())
+        })
+    {
         return;
     };
 
-    let replacement = make_suggestion(check_set, check_element, checker.generator());
-    let element_str = checker.generator().expr(check_element);
-
     let mut diagnostic = Diagnostic::new(
         CheckAndRemoveFromSet {
-            element: SourceCodeSnippet::new(element_str),
+            element: SourceCodeSnippet::from_str(checker.locator().slice(check_element)),
             set: check_set.id.to_string(),
         },
         if_stmt.range(),
     );
-    diagnostic.set_fix(Fix::suggested(Edit::replacement(
-        replacement,
-        if_stmt.start(),
-        if_stmt.end(),
-    )));
-
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Fix::suggested(Edit::replacement(
+            make_suggestion(check_set, check_element, checker.generator()),
+            if_stmt.start(),
+            if_stmt.end(),
+        )));
+    }
     checker.diagnostics.push(diagnostic);
 }
 
@@ -116,7 +123,60 @@ fn compare(lhs: &ComparableExpr, rhs: &ComparableExpr) -> bool {
     lhs == rhs
 }
 
-/// Construct the fix suggesstion, ie `set.discard(element)`.
+/// Match `if` condition to be `expr in name`, returns a tuple of (`expr`, `name`) on success.
+fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
+    let ast::ExprCompare {
+        ops,
+        left,
+        comparators,
+        ..
+    } = if_stmt.test.as_compare_expr()?;
+
+    if ops.as_slice() != [CmpOp::In] {
+        return None;
+    }
+
+    let [Expr::Name(right @ ast::ExprName { .. })] = comparators.as_slice() else {
+        return None;
+    };
+
+    Some((left.as_ref(), right))
+}
+
+/// Match `if` body to be `name.remove(expr)`, returns a tuple of (`expr`, `name`) on success.
+fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
+    let [Stmt::Expr(ast::StmtExpr { value: expr, .. })] = if_stmt.body.as_slice() else {
+        return None;
+    };
+
+    let ast::ExprCall {
+        func: attr,
+        arguments: ast::Arguments { args, keywords, .. },
+        ..
+    } = expr.as_call_expr()?;
+
+    let ast::ExprAttribute {
+        value: receiver,
+        attr: func_name,
+        ..
+    } = attr.as_attribute_expr()?;
+
+    let Expr::Name(ref set @ ast::ExprName { .. }) = receiver.as_ref() else {
+        return None;
+    };
+
+    let [arg] = args.as_slice() else {
+        return None;
+    };
+
+    if func_name != "remove" || !keywords.is_empty() {
+        return None;
+    }
+
+    Some((arg, set))
+}
+
+/// Construct the fix suggestion, ie `set.discard(element)`.
 fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) -> String {
     // Here we construct `set.discard(element)`
     //
@@ -143,85 +203,4 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
         range: TextRange::default(),
     };
     generator.stmt(&stmt.into())
-}
-
-/// Find the binding associated with the given name in the current scope.
-fn find_binding<'a>(semantic: &'a SemanticModel, name: &str) -> Option<&'a Binding<'a>> {
-    // Let's find definition for var
-    let scope = semantic.current_scope();
-    let bindings: Vec<&Binding> = scope
-        .get_all(name)
-        .map(|binding_id| semantic.binding(binding_id))
-        .collect();
-
-    let [binding @ Binding {
-        source: Some(..), ..
-    }] = bindings.as_slice()
-    else {
-        return None;
-    };
-
-    Some(binding)
-}
-
-/// Match `if` condition to be `expr in name`, returns a tuple of (`expr`, `name`) on success.
-fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
-    let Expr::Compare(ast::ExprCompare {
-        ops,
-        left,
-        comparators,
-        ..
-    }) = if_stmt.test.as_ref()
-    else {
-        return None;
-    };
-
-    if ops.as_slice() != [CmpOp::In] {
-        return None;
-    }
-
-    let [Expr::Name(right @ ast::ExprName { .. })] = comparators.as_slice() else {
-        return None;
-    };
-
-    Some((left.as_ref(), right))
-}
-
-/// Match `if` body to be `name.remove(expr)`, returns a tuple of (`expr`, `name`) on success.
-fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
-    let [Stmt::Expr(ast::StmtExpr { value: expr, .. })] = if_stmt.body.as_slice() else {
-        return None;
-    };
-
-    let Expr::Call(ast::ExprCall {
-        func: attr,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    }) = expr.as_ref()
-    else {
-        return None;
-    };
-
-    let Expr::Attribute(ast::ExprAttribute {
-        value: receiver,
-        attr: func_name,
-        ..
-    }) = attr.as_ref()
-    else {
-        return None;
-    };
-
-    let Expr::Name(ref set @ ast::ExprName { .. }) = receiver.as_ref() else {
-        return None;
-    };
-
-    let [arg] = args.as_slice() else {
-        return None;
-    };
-
-    if func_name != "remove" || !keywords.is_empty() {
-        return None;
-    }
-
-    Some((arg, set))
 }

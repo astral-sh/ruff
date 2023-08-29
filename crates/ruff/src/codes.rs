@@ -866,9 +866,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Slots, "002") => (RuleGroup::Unspecified, rules::flake8_slots::rules::NoSlotsInNamedtupleSubclass),
 
         // refurb
-        (Refurb, "113") => (RuleGroup::Unspecified, rules::refurb::rules::RepeatedAppend),
-        (Refurb, "131") => (RuleGroup::Unspecified, rules::refurb::rules::DeleteFullSlice),
-        (Refurb, "132") => (RuleGroup::Unspecified, rules::refurb::rules::CheckAndRemoveFromSet),
+        (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
+        (Refurb, "131") => (RuleGroup::Nursery, rules::refurb::rules::DeleteFullSlice),
+        (Refurb, "132") => (RuleGroup::Nursery, rules::refurb::rules::CheckAndRemoveFromSet),
 
         _ => return None,
     })

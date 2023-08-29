@@ -3,9 +3,9 @@ use std::fmt;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::Ranged;
 use ruff_python_ast::{Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -103,7 +103,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
             if checker.patch(diagnostic.kind.rule()) {
                 let replace_attribute = Edit::range_replacement("values".to_string(), attr.range());
                 let replace_target = Edit::range_replacement(
-                    checker.locator().slice(value.range()).to_string(),
+                    checker.locator().slice(value).to_string(),
                     stmt_for.target.range(),
                 );
                 diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
@@ -121,7 +121,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
             if checker.patch(diagnostic.kind.rule()) {
                 let replace_attribute = Edit::range_replacement("keys".to_string(), attr.range());
                 let replace_target = Edit::range_replacement(
-                    checker.locator().slice(key.range()).to_string(),
+                    checker.locator().slice(key).to_string(),
                     stmt_for.target.range(),
                 );
                 diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));

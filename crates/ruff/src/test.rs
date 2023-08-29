@@ -17,6 +17,7 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
+use ruff_text_size::Ranged;
 
 use crate::autofix::{fix_file, FixResult};
 use crate::directives;
