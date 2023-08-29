@@ -61,19 +61,23 @@ pub(crate) fn format(
     let start = Instant::now();
     let (results, errors): (Vec<_>, Vec<_>) = paths
         .into_par_iter()
-        .map(|entry| {
-            let entry = entry?;
-            let path = entry.path();
-            if let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
-                SourceType::from(path)
-            {
+        .filter_map(|entry| match entry {
+            Ok(entry) => {
+                let path = entry.path();
+
+                let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
+                    SourceType::from(path)
+                else {
+                    // Ignore any non-Python files.
+                    return None;
+                };
+
                 let line_length = resolver.resolve(path, &pyproject_config).line_length;
                 let options = PyFormatOptions::from_source_type(source_type)
                     .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
-                format_path(path, options, mode)
-            } else {
-                Ok(FormatResult::Skipped)
+                Some(format_path(path, options, mode))
             }
+            Err(err) => Some(Err(FormatCommandError::Ignore(err))),
         })
         .partition_map(|result| match result {
             Ok(diagnostic) => Left(diagnostic),
@@ -127,40 +131,39 @@ pub(crate) fn format(
     }
 }
 
+/// Format the file at the given [`Path`].
 #[tracing::instrument(skip_all, fields(path = %path.display()))]
 fn format_path(
     path: &Path,
     options: PyFormatOptions,
     mode: FormatMode,
-) -> Result<FormatResult, FormatterIterationError> {
+) -> Result<FormatCommandResult, FormatCommandError> {
     let unformatted = std::fs::read_to_string(path)
-        .map_err(|err| FormatterIterationError::Read(path.to_path_buf(), err))?;
+        .map_err(|err| FormatCommandError::Read(Some(path.to_path_buf()), err))?;
     let formatted = {
         let span = span!(Level::TRACE, "format_path_without_io", path = %path.display());
         let _enter = span.enter();
         format_module(&unformatted, options)
-            .map_err(|err| FormatterIterationError::FormatModule(path.to_path_buf(), err))?
+            .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?
     };
     let formatted = formatted.as_code();
     if formatted.len() == unformatted.len() && formatted == unformatted {
-        Ok(FormatResult::Unchanged)
+        Ok(FormatCommandResult::Unchanged)
     } else {
         if mode.is_write() {
             std::fs::write(path, formatted.as_bytes())
-                .map_err(|err| FormatterIterationError::Write(path.to_path_buf(), err))?;
+                .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
         }
-        Ok(FormatResult::Formatted)
+        Ok(FormatCommandResult::Formatted)
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum FormatResult {
+#[derive(Debug, Clone, Copy, is_macro::Is)]
+pub(crate) enum FormatCommandResult {
     /// The file was formatted.
     Formatted,
     /// The file was unchanged, as the formatted contents matched the existing contents.
     Unchanged,
-    /// The file was skipped, as it was not a Python file.
-    Skipped,
 }
 
 #[derive(Debug)]
@@ -171,23 +174,19 @@ struct FormatResultSummary {
     formatted: usize,
     /// The number of files that were unchanged.
     unchanged: usize,
-    /// The number of files that were skipped.
-    skipped: usize,
 }
 
 impl FormatResultSummary {
-    fn new(diagnostics: Vec<FormatResult>, mode: FormatMode) -> Self {
+    fn new(diagnostics: Vec<FormatCommandResult>, mode: FormatMode) -> Self {
         let mut summary = Self {
             mode,
             formatted: 0,
             unchanged: 0,
-            skipped: 0,
         };
         for diagnostic in diagnostics {
             match diagnostic {
-                FormatResult::Formatted => summary.formatted += 1,
-                FormatResult::Unchanged => summary.unchanged += 1,
-                FormatResult::Skipped => summary.skipped += 1,
+                FormatCommandResult::Formatted => summary.formatted += 1,
+                FormatCommandResult::Unchanged => summary.unchanged += 1,
             }
         }
         summary
@@ -235,14 +234,14 @@ impl Display for FormatResultSummary {
 
 /// An error that can occur while formatting a set of files.
 #[derive(Error, Debug)]
-enum FormatterIterationError {
+pub(crate) enum FormatCommandError {
     Ignore(#[from] ignore::Error),
-    Read(PathBuf, io::Error),
-    Write(PathBuf, io::Error),
-    FormatModule(PathBuf, FormatModuleError),
+    Read(Option<PathBuf>, io::Error),
+    Write(Option<PathBuf>, io::Error),
+    FormatModule(Option<PathBuf>, FormatModuleError),
 }
 
-impl Display for FormatterIterationError {
+impl Display for FormatCommandError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Ignore(err) => {
@@ -267,31 +266,43 @@ impl Display for FormatterIterationError {
                 }
             }
             Self::Read(path, err) => {
-                write!(
-                    f,
-                    "{}{}{} {err}",
-                    "Failed to read ".bold(),
-                    fs::relativize_path(path).bold(),
-                    ":".bold()
-                )
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{}{}{} {err}",
+                        "Failed to read ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    )
+                } else {
+                    write!(f, "{}{} {err}", "Failed to read".bold(), ":".bold())
+                }
             }
             Self::Write(path, err) => {
-                write!(
-                    f,
-                    "{}{}{} {err}",
-                    "Failed to write ".bold(),
-                    fs::relativize_path(path).bold(),
-                    ":".bold()
-                )
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{}{}{} {err}",
+                        "Failed to write ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    )
+                } else {
+                    write!(f, "{}{} {err}", "Failed to write".bold(), ":".bold())
+                }
             }
             Self::FormatModule(path, err) => {
-                write!(
-                    f,
-                    "{}{}{} {err}",
-                    "Failed to format ".bold(),
-                    fs::relativize_path(path).bold(),
-                    ":".bold()
-                )
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{}{}{} {err}",
+                        "Failed to format ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    )
+                } else {
+                    write!(f, "{}{} {err}", "Failed to format".bold(), ":".bold())
+                }
             }
         }
     }
