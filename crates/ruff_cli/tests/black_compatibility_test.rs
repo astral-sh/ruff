@@ -192,8 +192,8 @@ fn test_ruff_black_compatibility() -> Result<()> {
         // Exclude ruff codes, specifically RUF100, because it causes differences that are not a
         // problem. Ruff would add a `# noqa: W292`  after the first run, black introduces a
         // newline, and ruff removes the `# noqa: W292` again.
-        // "--ignore",
-        // "RUF",
+        "--ignore",
+        "RUF",
     ];
 
     let mut results = vec![];
