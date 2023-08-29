@@ -149,6 +149,14 @@ impl BuiltinTypeChecker for DictChecker {
     const EXPR_TYPE: PythonType = PythonType::Dict;
 }
 
+struct SetChecker;
+
+impl BuiltinTypeChecker for SetChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "set";
+    const TYPING_NAME: &'static str = "Set";
+    const EXPR_TYPE: PythonType = PythonType::Set;
+}
+
 /// Test whether the given binding (and the given name) can be considered a list.
 /// For this, we check what value might be associated with it through it's initialization and
 /// what annotation it has (we consider `list` and `typing.List`).
@@ -161,6 +169,13 @@ pub(super) fn is_list<'a>(binding: &'a Binding, name: &str, semantic: &'a Semant
 /// what annotation it has (we consider `dict` and `typing.Dict`).
 pub(super) fn is_dict<'a>(binding: &'a Binding, name: &str, semantic: &'a SemanticModel) -> bool {
     check_type::<DictChecker>(binding, name, semantic)
+}
+
+/// Test whether the given binding (and the given name) can be considered a set.
+/// For this, we check what value might be associated with it through it's initialization and
+/// what annotation it has (we consider `set` and `typing.Set`).
+pub(super) fn is_set<'a>(binding: &'a Binding, name: &str, semantic: &'a SemanticModel) -> bool {
+    check_type::<SetChecker>(binding, name, semantic)
 }
 
 #[inline]

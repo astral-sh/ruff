@@ -1056,6 +1056,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.enabled(Rule::CheckAndRemoveFromSet) {
+                refurb::rules::check_and_remove_from_set(checker, if_);
+            }
             if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnrecognizedVersionInfoCheck,
