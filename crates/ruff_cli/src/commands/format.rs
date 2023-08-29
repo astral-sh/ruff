@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
@@ -81,13 +82,13 @@ pub(crate) fn format(
     let duration = start.elapsed();
     debug!("Formatted files in: {:?}", duration);
 
-    let summary = FormatResultSummary::from(results);
+    let summary = FormatResultSummary::new(results, mode);
 
     // Report on any errors.
     if !errors.is_empty() {
         warn!("Encountered {} errors while formatting:", errors.len());
         for error in &errors {
-            error.show_user();
+            warn!("{error}");
         }
     }
 
@@ -101,7 +102,7 @@ pub(crate) fn format(
             }
             _ => Box::new(BufWriter::new(io::stdout())),
         };
-        summary.show_user(&mut writer, mode)?;
+        writeln!(writer, "{summary}")?;
     }
 
     match mode {
@@ -162,8 +163,10 @@ enum FormatResult {
     Skipped,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct FormatResultSummary {
+    /// The format mode that was used.
+    mode: FormatMode,
     /// The number of files that were formatted.
     formatted: usize,
     /// The number of files that were unchanged.
@@ -172,30 +175,34 @@ struct FormatResultSummary {
     skipped: usize,
 }
 
-impl From<Vec<FormatResult>> for FormatResultSummary {
-    fn from(diagnostics: Vec<FormatResult>) -> Self {
-        let mut path_diagnostics = Self::default();
+impl FormatResultSummary {
+    fn new(diagnostics: Vec<FormatResult>, mode: FormatMode) -> Self {
+        let mut summary = Self {
+            mode,
+            formatted: 0,
+            unchanged: 0,
+            skipped: 0,
+        };
         for diagnostic in diagnostics {
             match diagnostic {
-                FormatResult::Formatted => path_diagnostics.formatted += 1,
-                FormatResult::Unchanged => path_diagnostics.unchanged += 1,
-                FormatResult::Skipped => path_diagnostics.skipped += 1,
+                FormatResult::Formatted => summary.formatted += 1,
+                FormatResult::Unchanged => summary.unchanged += 1,
+                FormatResult::Skipped => summary.skipped += 1,
             }
         }
-        path_diagnostics
+        summary
     }
 }
 
-impl FormatResultSummary {
-    /// Pretty-print a [`FormatResultSummary`] for user-facing display.
-    fn show_user(&self, writer: &mut dyn Write, mode: FormatMode) -> Result<(), io::Error> {
+impl Display for FormatResultSummary {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.formatted > 0 && self.unchanged > 0 {
-            writeln!(
-                writer,
+            write!(
+                f,
                 "{} file{} {}, {} file{} left unchanged",
                 self.formatted,
                 if self.formatted == 1 { "" } else { "s" },
-                match mode {
+                match self.mode {
                     FormatMode::Write => "reformatted",
                     FormatMode::Check => "would be reformatted",
                 },
@@ -203,19 +210,19 @@ impl FormatResultSummary {
                 if self.unchanged == 1 { "" } else { "s" },
             )
         } else if self.formatted > 0 {
-            writeln!(
-                writer,
+            write!(
+                f,
                 "{} file{} {}",
                 self.formatted,
                 if self.formatted == 1 { "" } else { "s" },
-                match mode {
+                match self.mode {
                     FormatMode::Write => "reformatted",
                     FormatMode::Check => "would be reformatted",
                 }
             )
         } else if self.unchanged > 0 {
-            writeln!(
-                writer,
+            write!(
+                f,
                 "{} file{} left unchanged",
                 self.unchanged,
                 if self.unchanged == 1 { "" } else { "s" },
@@ -229,62 +236,62 @@ impl FormatResultSummary {
 /// An error that can occur while formatting a set of files.
 #[derive(Error, Debug)]
 enum FormatterIterationError {
-    #[error("Failed to traverse: {0}")]
     Ignore(#[from] ignore::Error),
-    #[error("Failed to read {0}: {1}")]
     Read(PathBuf, io::Error),
-    #[error("Failed to write {0}: {1}")]
     Write(PathBuf, io::Error),
-    #[error("Failed to format {0}: {1}")]
     FormatModule(PathBuf, FormatModuleError),
 }
 
-impl FormatterIterationError {
-    /// Pretty-print a [`FormatterIterationError`] for user-facing display.
-    fn show_user(&self) {
+impl Display for FormatterIterationError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Ignore(err) => {
                 if let ignore::Error::WithPath { path, .. } = err {
-                    warn!(
+                    write!(
+                        f,
                         "{}{}{} {}",
                         "Failed to format ".bold(),
                         fs::relativize_path(path).bold(),
                         ":".bold(),
                         err.io_error()
                             .map_or_else(|| err.to_string(), std::string::ToString::to_string)
-                    );
+                    )
                 } else {
-                    warn!(
+                    write!(
+                        f,
                         "{} {}",
                         "Encountered error:".bold(),
                         err.io_error()
                             .map_or_else(|| err.to_string(), std::string::ToString::to_string)
-                    );
+                    )
                 }
             }
             Self::Read(path, err) => {
-                warn!(
+                write!(
+                    f,
                     "{}{}{} {err}",
                     "Failed to read ".bold(),
                     fs::relativize_path(path).bold(),
                     ":".bold()
-                );
+                )
             }
             Self::Write(path, err) => {
-                warn!(
+                write!(
+                    f,
                     "{}{}{} {err}",
                     "Failed to write ".bold(),
                     fs::relativize_path(path).bold(),
                     ":".bold()
-                );
+                )
             }
             Self::FormatModule(path, err) => {
-                warn!(
+                write!(
+                    f,
                     "{}{}{} {err}",
                     "Failed to format ".bold(),
                     fs::relativize_path(path).bold(),
                     ":".bold()
-                );
+                )
             }
         }
     }
