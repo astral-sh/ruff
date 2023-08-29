@@ -2,6 +2,8 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_semantic::analyze::typing::is_list;
+use ruff_python_semantic::Binding;
 
 use crate::checkers::ast::Checker;
 
@@ -87,6 +89,24 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
+
+    // Avoid non-list values.
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+        return;
+    };
+    let scope = checker.semantic().current_scope();
+    let bindings: Vec<&Binding> = scope
+        .get_all(id)
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .collect();
+
+    let [binding] = bindings.as_slice() else {
+        return;
+    };
+
+    if !is_list(binding, checker.semantic()) {
+        return
+    }
 
     if !matches!(attr.as_str(), "append" | "insert") {
         return;

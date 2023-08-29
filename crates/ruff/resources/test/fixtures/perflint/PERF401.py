@@ -60,3 +60,15 @@ def f():
     for i in range(20):
         foo.fibonacci.append(sum(foo.fibonacci[-2:]))  # OK
     print(foo.fibonacci)
+
+
+class Foo:
+    def append(self, x):
+        pass
+
+
+def f():
+    items = [1, 2, 3, 4]
+    result = Foo()
+    for i in items:
+        result.append(i)  # Ok
