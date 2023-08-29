@@ -17,10 +17,26 @@ class Foo:
     def foo(self) -> int:
         ...
 
-# RUF018
 class Bar:
     @contextmanager
     @staticmethod
+    def bar() -> Iterator[None]:
+        yield None
+
+    def bar_main(self):
+        with self.bar():
+            ...
+
+# OK
+class FooSafe:
+    @property
+    @abstractmethod
+    def foo(self) -> int:
+        ...
+
+class BarSafe:
+    @staticmethod
+    @contextmanager
     def bar() -> Iterator[None]:
         yield None
 

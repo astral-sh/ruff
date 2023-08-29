@@ -802,7 +802,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Numpy, "003") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyDeprecatedFunction),
 
         // ruff
-        #[cfg(feature = "unreachable-code")] // When removing this feature gate, also update rules_selector.rs
+        // #[cfg(feature = "unreachable-code")] // When removing this feature gate, also update rules_selector.rs
         (Ruff, "001") => (RuleGroup::Unspecified, rules::ruff::rules::AmbiguousUnicodeCharacterString),
         (Ruff, "002") => (RuleGroup::Unspecified, rules::ruff::rules::AmbiguousUnicodeCharacterDocstring),
         (Ruff, "003") => (RuleGroup::Unspecified, rules::ruff::rules::AmbiguousUnicodeCharacterComment),

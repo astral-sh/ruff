@@ -338,6 +338,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
+            if checker.enabled(Rule::InvalidDecoratorPermutation) {
+                ruff::rules::invalid_decorator_permutation(checker, decorator_list);
+            }
             if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
                 if checker.enabled(Rule::BuiltinAttributeShadowing) {
                     flake8_builtins::rules::builtin_method_shadowing(

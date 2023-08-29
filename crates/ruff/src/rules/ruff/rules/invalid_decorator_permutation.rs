@@ -1,27 +1,60 @@
+use ast::call_path::CallPath;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use ruff_text_size::TextRange;
+use ruff_python_semantic::SemanticModel;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::convert::From;
+use std::option::Option;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Decorator, Expr};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
+/// Ensures that function decorators are in the proper order. This rule currently only supports
+/// the following built-in decorators:
+/// 1. `@abc.abstractmethod`
+/// 1. `@classmethod`
+/// 1. `@contextlib.asynccontextmanager`
+/// 1. `@contextlib.contextmanager`
+/// 1. `@functools.cache`
+/// 1. `@functools.cached_property`
+/// 1. `@functools.lru_cache`
+/// 1. `@functools.wraps`
+/// 1. `@property`
+/// 1. `@property.setter`
 ///
 /// ## Why is this bad?
+/// If function decorators are improperly ordered, builds will fail.
 ///
 /// ## Example
 /// ```python
+/// from abc import abstractmethod
+/// class Foo:
+///     @abstractmethod
+///     @property
+///     def foo(self):
+///         ...
 /// ```
+/// In this case, the `abstractmethod` decorator requires that the object it wraps has a writable
+/// `__isabstractmethod__` attribute. The `property` object's `__isabstractmethod__` attribute is
+/// *not* writable, so running this code will fail.
 ///
 /// Use instead:
 /// ```python
+/// from abc import abstractmethod
+/// class Foo:
+///     @property
+///     @abstractmethod
+///     def foo(self):
+///         ...
 /// ```
+/// `abstractmethod` no longer wraps `property`, so we avoid the error!
 #[violation]
-pub struct InvalidDecoratorPermutation {
+pub(crate) struct InvalidDecoratorPermutation {
     dec1_name: String,
     dec2_name: String,
 }
@@ -36,55 +69,27 @@ impl Violation for InvalidDecoratorPermutation {
     }
 }
 
-/// Map containing the initializations for decorators checked by RUF018.
-static DECORATOR_PROPERTY_MAP: Lazy<FxHashMap<&str, &CheckableDecorator>> = Lazy::new(|| {
-    // @abc.abstractmethod
-    let abstract_method = CheckableDecorator::new(
-        "abstractmethod",
-        &[],
-        &[DecoratorProperties::ReturnsWritableAbstractMethod(true)],
-    );
-
-    // @classmethod
-    // @contextlib.asyncontextmanager
-    // @contextlib.contextmanager
-    // @functools.cache
-    // @functools.cached_property
-    // @functools.lru_cache
-    // @functools.wrap
-    // @property
-    let property = CheckableDecorator::new(
-        "property",
-        &[DecoratorProperties::ReturnsWritableAbstractMethod(false)],
-        &[],
-    );
-
-    // property.setter
-
-    let decorators = [property, abstract_method]
-        .into_iter()
-        .map(|d| (d.name, &d));
-
-    FxHashMap::from_iter(decorators)
-});
-
 /// RUF018
 pub(crate) fn invalid_decorator_permutation(checker: &mut Checker, decorators: &Vec<Decorator>) {
-    let Some((dec1, dec2)) = invalid_decorators(decorators) else {
+    let Some(OrderedDecorators {
+        preceding: dec1,
+        following: dec2,
+    }) = invalid_decorators(decorators, checker)
+    else {
         return;
     };
 
-    let Some(dec1_name) = get_decorator_name(dec1) else {
+    let Some(name1) = get_decorator_name(dec1) else {
         return;
     };
-    let Some(dec2_name) = get_decorator_name(dec2) else {
+    let Some(name2) = get_decorator_name(dec2) else {
         return;
     };
 
     let diagnostic = Diagnostic::new(
         InvalidDecoratorPermutation {
-            dec1_name,
-            dec2_name,
+            dec1_name: name1.to_string(),
+            dec2_name: name2.to_string(),
         },
         TextRange::new(dec1.range.start(), dec2.range.end()),
     );
@@ -92,60 +97,156 @@ pub(crate) fn invalid_decorator_permutation(checker: &mut Checker, decorators: &
     checker.diagnostics.push(diagnostic);
 }
 
-/// Check a list of decorators to ensure that the permutation is valid.  It returns an pair
-/// comprised of decorators whose ordering is invalid. This function will short-circuit; it will
-/// only pick up the first pair of incorrectly-ordered decorators.
-fn invalid_decorators(decorators: &[Decorator]) -> Option<(&Decorator, &Decorator)> {
-    for (curr, next) in decorators.iter().tuple_windows() {
-        let curr_name = get_decorator_name(curr);
-        let next_name = get_decorator_name(next);
+/// Check a list of decorators to ensure that the permutation is valid. If the permutation is
+/// valid, this function will return `None`. This function will short-circuit; it will only pick up
+/// the first pair of incorrectly-ordered decorators.
+fn invalid_decorators<'a>(
+    decorators: &'a [Decorator],
+    checker: &mut Checker,
+) -> Option<OrderedDecorators<'a>> {
+    if decorators.is_empty() {
+        return None;
+    };
 
-        return Some((curr, next));
+    for (curr_decorator, next_decorator) in decorators.iter().tuple_windows() {
+        let Some(curr) = BuiltinDecorator::try_from_decorator(curr_decorator, checker.semantic())
+        else {
+            continue;
+        };
+        let Some(next) = BuiltinDecorator::try_from_decorator(next_decorator, checker.semantic())
+        else {
+            continue;
+        };
+
+        if next.cannot_follow(&curr) {
+            return Some(OrderedDecorators {
+                preceding: curr_decorator,
+                following: next_decorator,
+            });
+        }
     }
 
     None
 }
 
-fn get_decorator_name(decorator: &Decorator) -> Option<String> {
+struct OrderedDecorators<'a> {
+    preceding: &'a Decorator,
+    following: &'a Decorator,
+}
+
+fn get_decorator_name(decorator: &Decorator) -> Option<&str> {
     match &decorator.expression {
-        Expr::Name(ast::ExprName { id, .. }) => Some(id.clone()),
+        Expr::Name(ast::ExprName { id, .. }) => Some(id),
         _ => None,
     }
 }
 
-/// A list of properties related to the decorators supported by RUF018. This is **INTENTIONALLY INCOMPLETE**
-/// and should not be used outside of this rule.
-#[derive(Eq, Hash, PartialEq)]
-enum DecoratorProperties {
-    ReturnsWritableAbstractMethod(bool), // __isabstractmethod__ of returned object is writable
+/// Singleton map containing the relationships between decorators supported by RUF018. We use
+/// `CAN_NOT_FOLLOW` to make it easier to support future decorators in the future. It is of the
+/// form: { key_variant: { variants that key_variant cannot follow } }
+static CAN_NOT_FOLLOW_MAP: Lazy<FxHashMap<BuiltinDecorator, FxHashSet<&BuiltinDecorator>>> =
+    Lazy::new(|| {
+        FxHashMap::from_iter([
+            (
+                BuiltinDecorator::AbstractMethod,
+                FxHashSet::from_iter([&BuiltinDecorator::FunctoolsCachedProperty]),
+            ),
+            (
+                BuiltinDecorator::AsyncContextManager,
+                FxHashSet::from_iter([]),
+            ),
+            (
+                BuiltinDecorator::ClassMethod,
+                FxHashSet::from_iter([&BuiltinDecorator::FunctoolsLruCache]),
+            ),
+            (BuiltinDecorator::ContextManager, FxHashSet::from_iter([])),
+            (BuiltinDecorator::FunctoolsCache, FxHashSet::from_iter([])),
+            (
+                BuiltinDecorator::FunctoolsCachedProperty,
+                FxHashSet::from_iter([
+                    &BuiltinDecorator::ClassMethod,
+                    &BuiltinDecorator::FunctoolsCache,
+                    &BuiltinDecorator::FunctoolsLruCache,
+                ]),
+            ),
+            (
+                BuiltinDecorator::FunctoolsLruCache,
+                FxHashSet::from_iter([]),
+            ),
+            (
+                BuiltinDecorator::FunctoolsWraps,
+                FxHashSet::from_iter([&BuiltinDecorator::ClassMethod]),
+            ),
+            (
+                // Not callable
+                BuiltinDecorator::Property,
+                FxHashSet::from_iter([
+                    &BuiltinDecorator::AbstractMethod,
+                    &BuiltinDecorator::FunctoolsCache,
+                    &BuiltinDecorator::FunctoolsLruCache,
+                ]),
+            ),
+            (BuiltinDecorator::PropertySetter, FxHashSet::from_iter([])),
+            (
+                BuiltinDecorator::StaticMethod,
+                FxHashSet::from_iter([
+                    &BuiltinDecorator::AbstractMethod,
+                    &BuiltinDecorator::ContextManager,
+                ]),
+            ),
+        ])
+    });
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+enum BuiltinDecorator {
+    AbstractMethod,
+    AsyncContextManager,
+    ClassMethod,
+    ContextManager,
+    FunctoolsCache,
+    FunctoolsCachedProperty,
+    FunctoolsLruCache,
+    FunctoolsWraps,
+    Property,
+    PropertySetter,
+    StaticMethod,
 }
 
-struct CheckableDecorator<'a> {
-    // The name of the decorator, e.g. `@<name>`.
-    name: &'a str,
-    // Properties of the object returned by the decorator function.
-    returned_properties: FxHashSet<&'a DecoratorProperties>,
-    // Properties that the decorator's parameters must possess.
-    requires: FxHashSet<&'a DecoratorProperties>,
-}
-
-impl<'a> CheckableDecorator<'a> {
-    fn new(
-        name: &'a str,
-        returned_properties: &'a [DecoratorProperties],
-        requires: &'a [DecoratorProperties],
-    ) -> Self {
-        Self {
-            name,
-            returned_properties: FxHashSet::from_iter(returned_properties.iter()),
-            requires: FxHashSet::from_iter(requires.iter()),
+impl BuiltinDecorator {
+    /// Create a `BuiltinDecorator` from its fully-qualified name.
+    fn try_from_call_path(qualified_name: CallPath) -> Option<Self> {
+        match qualified_name.as_slice() {
+            &["abc", "abstractmethod"] => Some(Self::AbstractMethod),
+            &["contextlib", "asynccontextmanager"] => Some(Self::AsyncContextManager),
+            &["", "classmethod"] => Some(Self::ClassMethod),
+            &["contextlib", "contextmanager"] => Some(Self::ContextManager),
+            &["functools", "cache"] => Some(Self::FunctoolsCache),
+            &["functools", "cached_property"] => Some(Self::FunctoolsCachedProperty),
+            &["functools", "lru_cache"] => Some(Self::FunctoolsLruCache),
+            &["functools", "wraps"] => Some(Self::FunctoolsWraps),
+            &["", "property"] => Some(Self::Property),
+            &["property", "setter"] => Some(Self::PropertySetter),
+            &["", "staticmethod"] => Some(Self::StaticMethod),
+            _ => None,
         }
     }
 
-    fn can_wrap(&self, other: &CheckableDecorator) -> bool {
-        self.requires.is_subset(other.returned_properties.as_ref())
+    /// We can't implement TryFrom<Decorator> since `Decorator` isn't defined in this crate, so let's
+    /// re-implement it. If the underlying `Decorator` isn't supported by RUF018, or the decorator
+    /// is invalid (i.e., `@abstractmethod` is used but `from abc import abstractmethod` is
+    /// absent), this will return `None`.
+    fn try_from_decorator(decorator: &Decorator, semantic: &SemanticModel) -> Option<Self> {
+        let Some(qualified_name) = semantic.resolve_call_path(&decorator.expression) else {
+            return None;
+        };
+
+        Self::try_from_call_path(qualified_name)
+    }
+
+    /// If this `BuiltinDecorator` variant can follow another variant.
+    fn cannot_follow(&self, other: &Self) -> bool {
+        CAN_NOT_FOLLOW_MAP
+            .get(self)
+            .map_or(false, |entry| entry.contains(other))
     }
 }
-
-// property can't follow  abstractmethod
-// contextmanager can't follow staticmethod
