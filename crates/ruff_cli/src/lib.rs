@@ -13,10 +13,8 @@ use ruff::logging::{set_up_logging, LogLevel};
 use ruff::settings::types::SerializationFormat;
 use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
-use ruff_python_formatter::{format_module, PyFormatOptions};
 
 use crate::args::{Args, CheckCommand, Command, FormatCommand};
-use crate::commands::check_stdin::read_from_stdin;
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -26,6 +24,7 @@ mod diagnostics;
 mod panic;
 mod printer;
 pub mod resolve;
+mod stdin;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -77,7 +76,7 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
     None
 }
 
-/// Returns true if the linter should read from standard input.
+/// Returns true if the command should read from standard input.
 fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     // If the user provided a `--stdin-filename`, always read from standard input.
     if stdin_filename.is_some() {
@@ -163,15 +162,7 @@ fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        let unformatted = read_from_stdin()?;
-        let options = cli
-            .stdin_filename
-            .as_deref()
-            .map(PyFormatOptions::from_extension)
-            .unwrap_or_default();
-        let formatted = format_module(&unformatted, options)?;
-        stdout().lock().write_all(formatted.as_code().as_bytes())?;
-        Ok(ExitStatus::Success)
+        commands::format_stdin::format_stdin(&cli, &overrides)
     } else {
         commands::format::format(&cli, &overrides, log_level)
     }
