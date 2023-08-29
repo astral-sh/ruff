@@ -2,12 +2,12 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
+use ruff_python_semantic::analyze::typing::{is_dict, is_list};
 use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::refurb::helpers::{is_dict, is_list};
 
 /// ## What it does
 /// Checks for `del` statements that delete the entire slice of a list or
