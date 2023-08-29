@@ -39,3 +39,11 @@ d1 = [
     ("b") else # 2
     ("c")
 ]
+
+e1 = (
+    a
+    if True # 1
+    else b
+    if False # 2
+    else c
+)
