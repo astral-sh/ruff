@@ -2,6 +2,8 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::analyze::typing::is_dict;
+use ruff_python_semantic::Binding;
 
 use crate::checkers::ast::Checker;
 
@@ -55,6 +57,7 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     };
 
+
     let names = elts
         .iter()
         .filter_map(|elt| {
@@ -70,8 +73,12 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     }
 
-    if let Stmt::If(ast::StmtIf { body: if_body, .. }) = stmt {
+    if let Stmt::If(ast::StmtIf { body: if_body, elif_else_clauses, .. }) = stmt {
         // Key-value assignment within an if-statement (e.g., `if condition: result[key] = value`).
+        // Exclude if/elif/else statements as they cannot easily be replaced by a dict comprehension
+        if elif_else_clauses.len() > 1 {
+            return;
+        }
         for stmt in if_body {
             check_for_slow_dict_creation(checker, &names, stmt);
         }
@@ -92,9 +99,28 @@ fn check_for_slow_dict_creation(checker: &mut Checker, names: &[&str], stmt: &St
         return;
     };
 
-    let [Expr::Subscript(ast::ExprSubscript { slice, .. })] = targets.as_slice() else {
+    let [Expr::Subscript(ast::ExprSubscript { value: subscript_value, slice, .. })] = targets.as_slice() else {
         return;
     };
+
+    // Exclude non dictionary values from the check
+    let Expr::Name(ast::ExprName { id: subscript_name, .. }) = subscript_value.as_ref() else {
+        return;
+    };
+    let scope = checker.semantic().current_scope();
+    let bindings: Vec<&Binding> = scope
+        .get_all(subscript_name)
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .collect();
+
+    let [binding] = bindings.as_slice() else {
+        return;
+    };
+
+    // It should only apply to variables that are known to be lists or dicts.
+    if !is_dict(binding, checker.semantic()) {
+        return
+    }
 
     let Expr::Name(ast::ExprName { id: key, .. }) = slice.as_ref() else {
         return;

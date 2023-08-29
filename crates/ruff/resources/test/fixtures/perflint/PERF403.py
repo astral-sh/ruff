@@ -18,7 +18,7 @@ def foo():
     fruit = ["apple", "pear", "orange"]
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # PERF403
+            result[idx] = name  # Ok because if/elif/else not replaceable by dict comprehension
         elif idx % 3:
             result[idx] = name
         else:
@@ -33,3 +33,14 @@ def foo():
             result[idx] = name  # PERF403
         else:
             result[idx] = name
+
+
+def foo():
+    result = []
+    fruit = ["apple", "pear", "orange"]
+    for idx, name in enumerate(fruit):
+        if idx % 2:
+            result[idx] = name  # Ok because result is not a dictionary
+        else:
+            result[idx] = name
+
