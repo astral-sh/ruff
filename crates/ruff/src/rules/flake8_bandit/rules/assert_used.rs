@@ -23,7 +23,7 @@ use ruff_text_size::Ranged;
 ///
 /// Use instead:
 /// ```python
-/// if x not > 0:
+/// if not x > 0:
 ///     raise ValueError("Expected positive value.")
 /// # or even better:
 /// if x <= 0:
