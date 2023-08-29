@@ -1,7 +1,7 @@
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Constant, ExprConstant, Ranged};
-use ruff_text_size::{TextLen, TextRange};
+use ruff_python_ast::{Constant, ExprConstant};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::SourceComment;
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};

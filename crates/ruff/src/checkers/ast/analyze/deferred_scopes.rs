@@ -1,7 +1,7 @@
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::Ranged;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;

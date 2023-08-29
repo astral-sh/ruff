@@ -139,6 +139,13 @@ export default function Editor() {
             };
             break;
 
+          case "Comments":
+            secondary = {
+              status: "ok",
+              content: workspace.comments(pythonSource),
+            };
+            break;
+
           case "Tokens":
             secondary = {
               status: "ok",

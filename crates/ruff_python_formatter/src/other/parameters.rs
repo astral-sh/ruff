@@ -2,9 +2,9 @@ use std::usize;
 
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_ast::{Parameters, Ranged};
+use ruff_python_ast::Parameters;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{
     dangling_comments, dangling_open_parenthesis_comments, leading_comments, leading_node_comments,

@@ -87,12 +87,12 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use ruff_python_ast::{Mod, Ranged};
+use ruff_python_ast::Mod;
 
 pub(crate) use format::{
     dangling_comments, dangling_node_comments, dangling_open_parenthesis_comments,

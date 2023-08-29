@@ -5,8 +5,8 @@ use std::fmt::Debug;
 use std::ops::Deref;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::{self as ast, Ranged, Stmt};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::analyze::visibility::{
     class_visibility, function_visibility, method_visibility, ModuleSource, Visibility,
@@ -117,7 +117,7 @@ impl Ranged for Member<'_> {
 }
 
 /// A definition within a Python program.
-#[derive(Debug)]
+#[derive(Debug, is_macro::Is)]
 pub enum Definition<'a> {
     Module(Module<'a>),
     Member(Member<'a>),

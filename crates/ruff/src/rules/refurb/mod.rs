@@ -1,4 +1,5 @@
 //! Rules from [refurb](https://pypi.org/project/refurb/)/
+
 mod helpers;
 pub(crate) mod rules;
 

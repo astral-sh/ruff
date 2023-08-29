@@ -3,9 +3,9 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use ruff::resolver::PyprojectConfig;
+use ruff::packaging;
 use ruff::settings::flags;
-use ruff::{packaging, resolver};
+use ruff_workspace::resolver::{python_file_at_path, PyprojectConfig};
 
 use crate::args::Overrides;
 use crate::diagnostics::{lint_stdin, Diagnostics};
@@ -26,7 +26,7 @@ pub(crate) fn run_stdin(
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     if let Some(filename) = filename {
-        if !resolver::python_file_at_path(filename, pyproject_config, overrides)? {
+        if !python_file_at_path(filename, pyproject_config, overrides)? {
             return Ok(Diagnostics::default());
         }
     }

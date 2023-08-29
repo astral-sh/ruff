@@ -17,6 +17,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 
 use ruff_source_file::{Locator, SourceFileBuilder};
+use ruff_text_size::Ranged;
 
 use crate::autofix::{fix_file, FixResult};
 use crate::checkers::ast::check_ast;
@@ -267,9 +268,12 @@ pub fn check_path(
 const MAX_ITERATIONS: usize = 100;
 
 /// Add any missing `# noqa` pragmas to the source code at the given `Path`.
-pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings) -> Result<usize> {
-    let source_type = PySourceType::from(path);
-
+pub fn add_noqa_to_path(
+    path: &Path,
+    package: Option<&Path>,
+    source_type: PySourceType,
+    settings: &Settings,
+) -> Result<usize> {
     // Read the file from disk.
     let contents = std::fs::read_to_string(path)?;
 

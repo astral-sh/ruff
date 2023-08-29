@@ -17,7 +17,7 @@ pub trait MemoizeFormat<Context> {
     /// use std::cell::Cell;
     /// use ruff_formatter::{format, write};
     /// use ruff_formatter::prelude::*;
-    /// use ruff_text_size::TextSize;
+    /// use ruff_text_size::{Ranged, TextSize};
     ///
     /// struct MyFormat {
     ///   value: Cell<u64>
@@ -98,7 +98,7 @@ where
     /// use std::cell::Cell;
     /// use ruff_formatter::{format, write};
     /// use ruff_formatter::prelude::*;
-    /// use ruff_text_size::TextSize;
+    /// use ruff_text_size::{Ranged, TextSize};
     ///
     /// #[derive(Default)]
     /// struct Counter {

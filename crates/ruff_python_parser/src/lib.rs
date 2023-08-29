@@ -113,8 +113,8 @@ pub use parser::{
     parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
     parse_suite, parse_tokens, ParseError, ParseErrorType,
 };
-use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Ranged, Suite};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Suite};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok, TokenKind};
 

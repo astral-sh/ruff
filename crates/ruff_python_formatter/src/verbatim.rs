@@ -5,12 +5,12 @@ use unicode_width::UnicodeWidthStr;
 
 use ruff_formatter::{write, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_python_parser::lexer::{lex_starts_at, LexResult};
 use ruff_python_parser::{Mode, Tok};
 use ruff_python_trivia::lines_before;
 use ruff_source_file::Locator;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::format::{empty_lines, format_comment};
 use crate::comments::{leading_comments, trailing_comments, SourceComment};

@@ -7,10 +7,10 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};

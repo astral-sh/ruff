@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
-use ast::{traversal, Ranged};
+use ast::traversal;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, ExprName, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::{Binding, BindingId, Definition, DefinitionId, SemanticModel};
-use ruff_text_size::TextRange;
+use ruff_python_semantic::{Binding, BindingId, DefinitionId, SemanticModel};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
@@ -17,8 +17,9 @@ use crate::rules::refurb::helpers::is_list;
 /// Checks for consecutive calls to `append`.
 ///
 /// ## Why is this bad?
-/// Consecutive calls to `append` can be less efficient than using `extend` because each
-/// `append` re-sizes the list individually, whereas `extend` re-sizes it once for all elements.
+/// Consecutive calls to `append` can be less efficient than batching them into
+/// a single `extend`. Each `append` resizes the list individually, whereas an
+/// `extend` can resize the list once for all elements.
 ///
 /// ## Example
 /// ```python
@@ -47,10 +48,9 @@ pub struct RepeatedAppend {
 impl RepeatedAppend {
     fn suggestion(&self) -> String {
         let name = &self.name;
-        self.replacement.full_display().map_or(
-            format!("{name}.extend(...)"),
-            std::string::ToString::to_string,
-        )
+        self.replacement
+            .full_display()
+            .map_or(format!("{name}.extend(...)"), ToString::to_string)
     }
 }
 
@@ -70,54 +70,57 @@ impl Violation for RepeatedAppend {
     }
 }
 
+/// FURB113
 pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
-    let appends = match_consecutive_appends(checker.semantic(), stmt);
+    let Some(appends) = match_consecutive_appends(checker.semantic(), stmt) else {
+        return;
+    };
 
-    // No need to proceed if we have less than 1 append to work with.
+    // No need to proceed if we have less than 1 `append` to work with.
     if appends.len() <= 1 {
         return;
     }
 
-    let groups = group_appends(&appends);
-
     // group borrows from checker, so we can't directly push into checker.diagnostics
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-    diagnostics.reserve_exact(groups.len());
+    let diagnostics: Vec<Diagnostic> = group_appends(appends)
+        .iter()
+        .filter_map(|group| {
+            // Groups with just one element are fine, and shouldn't be replaced by `extend`.
+            if group.appends.len() <= 1 {
+                return None;
+            }
 
-    for group in groups {
-        // Groups with just one element are fine, and shouldn't be replaced by `extend`.
-        if group.appends.len() <= 1 {
-            continue;
-        }
+            let replacement = make_suggestion(group, checker.generator());
 
-        let replacement = make_suggestion(&group, checker.generator());
+            let mut diagnostic = Diagnostic::new(
+                RepeatedAppend {
+                    name: group.name().to_string(),
+                    replacement: SourceCodeSnippet::new(replacement.clone()),
+                },
+                group.range(),
+            );
 
-        let mut diagnostic = Diagnostic::new(
-            RepeatedAppend {
-                name: group.name().to_string(),
-                replacement: SourceCodeSnippet::new(replacement.to_string()),
-            },
-            group.range(),
-        );
+            // We only suggest a fix when all appends in a group are clumped together. If they're
+            // non-consecutive, fixing them is much more difficult.
+            if checker.patch(diagnostic.kind.rule()) && group.is_consecutive {
+                diagnostic.set_fix(Fix::suggested(Edit::replacement(
+                    replacement,
+                    group.start(),
+                    group.end(),
+                )));
+            }
 
-        // We only suggest fix when all appends in a group are clumped together.
-        if checker.patch(diagnostic.kind.rule()) && group.is_consecutive {
-            diagnostic.set_fix(Fix::suggested(Edit::replacement(
-                replacement,
-                group.start(),
-                group.end(),
-            )));
-        }
+            Some(diagnostic)
+        })
+        .collect();
 
-        diagnostics.push(diagnostic);
-    }
     checker.diagnostics.extend(diagnostics);
 }
 
 #[derive(Debug, Clone)]
 struct Append<'a> {
     /// Receiver of the `append` call (aka `self` argument).
-    receiver: &'a ExprName,
+    receiver: &'a ast::ExprName,
     /// [`BindingId`] that the receiver references.
     binding_id: BindingId,
     /// [`Binding`] that the receiver references.
@@ -137,14 +140,14 @@ struct AppendGroup<'a> {
     is_consecutive: bool,
 }
 
-impl<'a> AppendGroup<'a> {
-    fn name(&self) -> &'a str {
+impl AppendGroup<'_> {
+    fn name(&self) -> &str {
         assert!(!self.appends.is_empty());
         &self.appends.first().unwrap().receiver.id
     }
 }
 
-impl<'a> Ranged for AppendGroup<'a> {
+impl Ranged for AppendGroup<'_> {
     fn range(&self) -> TextRange {
         assert!(!self.appends.is_empty());
         TextRange::new(
@@ -155,71 +158,64 @@ impl<'a> Ranged for AppendGroup<'a> {
 }
 
 /// Match consecutive calls to `append` on list variables starting from the given statement.
-fn match_consecutive_appends<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Vec<Append<'a>> {
+fn match_consecutive_appends<'a>(
+    semantic: &'a SemanticModel,
+    stmt: &'a Stmt,
+) -> Option<Vec<Append<'a>>> {
+    // Match the current statement, to see if it's an append.
+    let append = match_append(semantic, stmt)?;
+
     // In order to match consecutive statements, we need to go to the tree ancestor of the
     // given statement, find its position there, and match all 'appends' from there.
-    let empty: Vec<Append<'a>> = vec![];
-
-    let siblings: &'a [Stmt] = if semantic.at_top_level() {
+    let siblings: &[Stmt] = if semantic.at_top_level() {
         // If the statement is at the top level, we should go to the parent module.
         // Module is available in the definitions list.
-        let Definition::Module(ref module_def) = semantic.definitions[DefinitionId::module()]
-        else {
-            return empty;
-        };
-        module_def.python_ast
+        let module = semantic.definitions[DefinitionId::module()].as_module()?;
+        module.python_ast
     } else {
         // Otherwise, go to the parent, and take its body as a sequence of siblings.
-        let Some(suite) = semantic
+        semantic
             .current_statement_parent()
-            .and_then(|parent| traversal::suite(stmt, parent))
-        else {
-            return empty;
-        };
-        suite
+            .and_then(|parent| traversal::suite(stmt, parent))?
     };
 
-    let Some(stmt_index) = siblings.iter().position(|x| x == stmt) else {
-        return empty;
-    };
-
-    // Match the current statement, to see if it's an append.
-    let Some(append) = match_append(semantic, stmt) else {
-        return empty;
-    };
+    let stmt_index = siblings.iter().position(|sibling| sibling == stmt)?;
 
     // We shouldn't repeat the same work for many 'appends' that go in a row. Let's check
     // that this statement is at the beginning of such a group.
     if stmt_index != 0 && match_append(semantic, &siblings[stmt_index - 1]).is_some() {
-        return empty;
+        return None;
     }
 
     // Starting from the next statement, let's match all appends and make a vector.
-    std::iter::once(append)
-        .chain(
-            siblings
-                .iter()
-                // Skip the current statement, since we already tested it...
-                .skip(stmt_index + 1)
-                .map_while(|next| match_append(semantic, next)),
-        )
-        .collect()
+    Some(
+        std::iter::once(append)
+            .chain(
+                siblings
+                    .iter()
+                    .skip(stmt_index + 1)
+                    .map_while(|sibling| match_append(semantic, sibling)),
+            )
+            .collect(),
+    )
 }
 
 /// Group the given appends by the associated bindings.
-fn group_appends<'a>(appends: &[Append<'a>]) -> Vec<AppendGroup<'a>> {
+fn group_appends(appends: Vec<Append<'_>>) -> Vec<AppendGroup<'_>> {
     // We want to go over the given list of appends and group the by receivers.
-    let mut map: HashMap<BindingId, AppendGroup<'a>> = HashMap::new();
-    let mut iter = appends.iter();
+    let mut map: FxHashMap<BindingId, AppendGroup> = FxHashMap::default();
+    let mut iter = appends.into_iter();
     let mut last_binding = {
         let first_append = iter.next().unwrap();
+        let binding_id = first_append.binding_id;
         let _ = get_or_add(&mut map, first_append);
-        first_append.binding_id
+        binding_id
     };
 
     for append in iter {
+        let binding_id = append.binding_id;
         let group = get_or_add(&mut map, append);
-        if append.binding_id != last_binding {
+        if binding_id != last_binding {
             // If the group is not brand new, and the previous group was different,
             // we should mark it as "non-consecutive".
             //
@@ -238,7 +234,7 @@ fn group_appends<'a>(appends: &[Append<'a>]) -> Vec<AppendGroup<'a>> {
                 group.is_consecutive = false;
             }
 
-            last_binding = append.binding_id;
+            last_binding = binding_id;
         }
     }
 
@@ -247,15 +243,73 @@ fn group_appends<'a>(appends: &[Append<'a>]) -> Vec<AppendGroup<'a>> {
 
 #[inline]
 fn get_or_add<'a, 'b>(
-    map: &'b mut HashMap<BindingId, AppendGroup<'a>>,
-    append: &Append<'a>,
+    map: &'b mut FxHashMap<BindingId, AppendGroup<'a>>,
+    append: Append<'a>,
 ) -> &'b mut AppendGroup<'a> {
     let group = map.entry(append.binding_id).or_insert(AppendGroup {
         appends: vec![],
         is_consecutive: true,
     });
-    group.appends.push(append.clone());
+    group.appends.push(append);
     group
+}
+
+/// Matches that the given statement is a call to `append` on a list variable.
+fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Append<'a>> {
+    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        return None;
+    };
+
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = value.as_ref()
+    else {
+        return None;
+    };
+
+    // `append` should have just one argument, an element to be added.
+    let [argument] = arguments.args.as_slice() else {
+        return None;
+    };
+
+    // The called function should be an attribute, ie `value.attr`.
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+        return None;
+    };
+
+    // `attr` should be `append` and it shouldn't have any keyword arguments.
+    if attr != "append" || !arguments.keywords.is_empty() {
+        return None;
+    }
+
+    // We match only variable references, i.e. `value` should be a name expression.
+    let Expr::Name(receiver @ ast::ExprName { id: name, .. }) = value.as_ref() else {
+        return None;
+    };
+
+    // Now we need to find what is this variable bound to...
+    let scope = semantic.current_scope();
+    let bindings: Vec<BindingId> = scope.get_all(name).collect();
+
+    // Maybe it is too strict of a limitation, but it seems reasonable.
+    let [binding_id] = bindings.as_slice() else {
+        return None;
+    };
+
+    let binding = semantic.binding(*binding_id);
+
+    // ...and whether this something is a list.
+    if binding.source.is_none() || !is_list(binding, name, semantic) {
+        return None;
+    }
+
+    Some(Append {
+        receiver,
+        binding_id: *binding_id,
+        binding,
+        stmt,
+        argument,
+    })
 }
 
 /// Make fix suggestion for the given group of appends.
@@ -272,7 +326,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     // Here we construct `var.extend((elt1, elt2, ..., eltN))
     //
     // Each eltK comes from an individual `var.append(eltK)`.
-    let elts: Vec<ast::Expr> = appends
+    let elts: Vec<Expr> = appends
         .iter()
         .map(|append| append.argument.clone())
         .collect();
@@ -306,62 +360,4 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         range: TextRange::default(),
     };
     generator.stmt(&stmt.into())
-}
-
-/// Matches that the given statement is a call to `append` on a list variable.
-fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Append<'a>> {
-    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
-        return None;
-    };
-
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
-        return None;
-    };
-
-    // append should have just one argument, an element to be added
-    let [argument] = arguments.args.as_slice() else {
-        return None;
-    };
-
-    // The called function should be an attribute, ie `value.attr`
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
-        return None;
-    };
-
-    // `attr` should be `append` and it shouldn't have any keyword arguments
-    if attr != "append" || !arguments.keywords.is_empty() {
-        return None;
-    }
-
-    // We match only variable references, i.e. `value` should be a name expression.
-    let Expr::Name(receiver @ ast::ExprName { id: name, .. }) = value.as_ref() else {
-        return None;
-    };
-
-    // Now we need to find what is this variable bound to...
-    let scope = semantic.current_scope();
-    let bindings: Vec<BindingId> = scope.get_all(name).collect();
-
-    // Maybe it is too strict of a limitation, but it seems reasonable.
-    let [binding_id] = bindings.as_slice() else {
-        return None;
-    };
-
-    let binding = semantic.binding(*binding_id);
-
-    // ...and whether this something is a list.
-    if binding.source.is_none() || !is_list(semantic, binding, name) {
-        return None;
-    }
-
-    Some(Append {
-        receiver,
-        binding_id: *binding_id,
-        binding,
-        stmt,
-        argument,
-    })
 }

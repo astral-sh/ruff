@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 
-use ruff_python_ast::{Mod, Ranged, Stmt};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_ast::{Mod, Stmt};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;

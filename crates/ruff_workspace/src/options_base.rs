@@ -35,7 +35,7 @@ impl OptionGroup {
     /// ### Find a direct child
     ///
     /// ```rust
-    /// # use ruff::settings::options_base::{OptionGroup, OptionEntry, OptionField};
+    /// # use ruff_workspace::options_base::{OptionGroup, OptionEntry, OptionField};
     ///
     /// const options: [(&'static str, OptionEntry); 2] = [
     ///     ("ignore_names", OptionEntry::Field(OptionField {
@@ -71,7 +71,7 @@ impl OptionGroup {
     /// ### Find a nested options
     ///
     /// ```rust
-    /// # use ruff::settings::options_base::{OptionGroup, OptionEntry, OptionField};
+    /// # use ruff_workspace::options_base::{OptionGroup, OptionEntry, OptionField};
     ///
     /// const ignore_options: [(&'static str, OptionEntry); 2] = [
     ///     ("names", OptionEntry::Field(OptionField {

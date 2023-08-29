@@ -1,5 +1,5 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Ranged, UnaryOp};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, UnaryOp};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -155,7 +155,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
     if checker.patch(diagnostic.kind.rule()) {
         if test.is_compare_expr() {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.locator().slice(test.range()).to_string(),
+                checker.locator().slice(test).to_string(),
                 expr.range(),
             )));
         } else if checker.semantic().is_builtin("bool") {

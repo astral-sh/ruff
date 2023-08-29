@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -102,7 +103,7 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
 
     let mut diagnostic = Diagnostic::new(YieldInForLoop, stmt_for.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let contents = checker.locator().slice(iter.range());
+        let contents = checker.locator().slice(iter.as_ref());
         let contents = format!("yield from {contents}");
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents,

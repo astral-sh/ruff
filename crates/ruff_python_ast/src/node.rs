@@ -2,10 +2,10 @@ use crate::visitor::preorder::PreorderVisitor;
 use crate::{
     self as ast, Alias, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
     MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments,
-    PatternKeyword, Ranged, Stmt, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
-    TypeParamTypeVarTuple, TypeParams, WithItem,
+    PatternKeyword, Stmt, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    TypeParams, WithItem,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use std::ptr::NonNull;
 
 pub trait AstNode: Ranged {

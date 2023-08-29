@@ -1,13 +1,14 @@
 use anyhow::{bail, Result};
 use libcst_native::{CompoundStatement, Statement, Suite, With};
-use ruff_python_ast::{self as ast, Ranged};
 
-use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
+use ruff_python_ast as ast;
 use ruff_python_ast::whitespace;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
+use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement, match_with};
 
 /// (SIM117) Convert `with a: with b:` to `with a, b:`.

@@ -1,6 +1,6 @@
+use ruff_python_ast::ConversionFlag;
 use ruff_python_ast::{self as ast, BytesConstant, Constant, Expr, StringConstant};
-use ruff_python_ast::{ConversionFlag, Ranged};
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 // Contains the logic for parsing string literals (mostly concerned with f-strings.)
 //
@@ -717,10 +717,6 @@ impl From<FStringError> for LexicalError {
 pub enum FStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
-    /// Expected a left brace after an ending right brace.
-    UnopenedRbrace,
-    /// Expected a right brace after a conversion flag.
-    ExpectedRbrace,
     /// An error occurred while parsing an f-string expression.
     InvalidExpression(Box<ParseErrorType>),
     /// An invalid conversion flag was encountered.
@@ -745,14 +741,12 @@ pub enum FStringErrorType {
 impl std::fmt::Display for FStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use FStringErrorType::{
-            EmptyExpression, ExpectedRbrace, ExpressionCannotInclude, ExpressionNestedTooDeeply,
+            EmptyExpression, ExpressionCannotInclude, ExpressionNestedTooDeeply,
             InvalidConversionFlag, InvalidExpression, MismatchedDelimiter, SingleRbrace,
-            UnclosedLbrace, Unmatched, UnopenedRbrace, UnterminatedString,
+            UnclosedLbrace, Unmatched, UnterminatedString,
         };
         match self {
             UnclosedLbrace => write!(f, "expecting '}}'"),
-            UnopenedRbrace => write!(f, "Unopened '}}'"),
-            ExpectedRbrace => write!(f, "Expected '}}' after conversion flag."),
             InvalidExpression(error) => {
                 write!(f, "{error}")
             }

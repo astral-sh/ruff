@@ -3,7 +3,9 @@ use crate::jupyter::Notebook;
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum SourceKind {
+    /// The source contains Python source code.
     Python(String),
+    /// The source contains a Jupyter notebook.
     IpyNotebook(Notebook),
 }
 

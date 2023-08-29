@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use wsl;
 
 use ruff_diagnostics::{Diagnostic, Violation};
