@@ -18,11 +18,11 @@ def f():
     result = []
     for i in items:
         if i % 2:
-            result.append(i)  # PERF401
+            result.append(i)  # Ok
         elif i % 2:
-            result.append(i)  # PERF401
+            result.append(i)
         else:
-            result.append(i)  # PERF401
+            result.append(i)
 
 
 def f():
