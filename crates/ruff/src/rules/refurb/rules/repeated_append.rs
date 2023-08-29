@@ -1,18 +1,17 @@
 use rustc_hash::FxHashMap;
 
-use ast::{traversal, ParameterWithDefault, Parameters};
+use ast::traversal;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
-use ruff_python_semantic::{Binding, BindingId, BindingKind, DefinitionId, SemanticModel};
+use ruff_python_semantic::{Binding, BindingId, DefinitionId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::rules::refurb::helpers::is_list;
 
 /// ## What it does
 /// Checks for consecutive calls to `append`.
@@ -255,6 +254,64 @@ fn get_or_add<'a, 'b>(
     group
 }
 
+/// Matches that the given statement is a call to `append` on a list variable.
+fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Append<'a>> {
+    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        return None;
+    };
+
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = value.as_ref()
+    else {
+        return None;
+    };
+
+    // `append` should have just one argument, an element to be added.
+    let [argument] = arguments.args.as_slice() else {
+        return None;
+    };
+
+    // The called function should be an attribute, ie `value.attr`.
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+        return None;
+    };
+
+    // `attr` should be `append` and it shouldn't have any keyword arguments.
+    if attr != "append" || !arguments.keywords.is_empty() {
+        return None;
+    }
+
+    // We match only variable references, i.e. `value` should be a name expression.
+    let Expr::Name(receiver @ ast::ExprName { id: name, .. }) = value.as_ref() else {
+        return None;
+    };
+
+    // Now we need to find what is this variable bound to...
+    let scope = semantic.current_scope();
+    let bindings: Vec<BindingId> = scope.get_all(name).collect();
+
+    // Maybe it is too strict of a limitation, but it seems reasonable.
+    let [binding_id] = bindings.as_slice() else {
+        return None;
+    };
+
+    let binding = semantic.binding(*binding_id);
+
+    // ...and whether this something is a list.
+    if binding.source.is_none() || !is_list(binding, name, semantic) {
+        return None;
+    }
+
+    Some(Append {
+        receiver,
+        binding_id: *binding_id,
+        binding,
+        stmt,
+        argument,
+    })
+}
+
 /// Make fix suggestion for the given group of appends.
 fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     let appends = &group.appends;
@@ -303,140 +360,4 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         range: TextRange::default(),
     };
     generator.stmt(&stmt.into())
-}
-
-/// Matches that the given statement is a call to `append` on a list variable.
-fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Append<'a>> {
-    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
-        return None;
-    };
-
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
-        return None;
-    };
-
-    // `append` should have just one argument, an element to be added.
-    let [argument] = arguments.args.as_slice() else {
-        return None;
-    };
-
-    // The called function should be an attribute, ie `value.attr`.
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
-        return None;
-    };
-
-    // `attr` should be `append` and it shouldn't have any keyword arguments.
-    if attr != "append" || !arguments.keywords.is_empty() {
-        return None;
-    }
-
-    // We match only variable references, i.e. `value` should be a name expression.
-    let Expr::Name(receiver @ ast::ExprName { id: name, .. }) = value.as_ref() else {
-        return None;
-    };
-
-    // Now we need to find what is this variable bound to...
-    let scope = semantic.current_scope();
-    let bindings: Vec<BindingId> = scope.get_all(name).collect();
-
-    // Maybe it is too strict of a limitation, but it seems reasonable.
-    let [binding_id] = bindings.as_slice() else {
-        return None;
-    };
-
-    let binding = semantic.binding(*binding_id);
-
-    // ...and whether this something is a list.
-    if binding.source.is_none() || !is_list(semantic, binding, name) {
-        return None;
-    }
-
-    Some(Append {
-        receiver,
-        binding_id: *binding_id,
-        binding,
-        stmt,
-        argument,
-    })
-}
-
-/// Test whether the given binding (and the given name) can be considered a list.
-/// For this, we check what value might be associated with it through it's initialization and
-/// what annotation it has (we consider `list` and `typing.List`).
-///
-/// NOTE: this function doesn't perform more serious type inference, so it won't be able
-///       to understand if the value gets initialized from a call to a function always returning
-///       lists. This also implies no interfile analysis.
-fn is_list<'a>(semantic: &'a SemanticModel, binding: &'a Binding, name: &str) -> bool {
-    match binding.kind {
-        BindingKind::Assignment => match binding.statement(semantic) {
-            Some(Stmt::Assign(ast::StmtAssign { value, .. })) => {
-                let value_type: ResolvedPythonType = value.as_ref().into();
-                let ResolvedPythonType::Atom(candidate) = value_type else {
-                    return false;
-                };
-                matches!(candidate, PythonType::List)
-            }
-            Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
-                is_list_annotation(semantic, annotation.as_ref())
-            }
-            _ => false,
-        },
-        BindingKind::Argument => match binding.statement(semantic) {
-            Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) => {
-                let Some(parameter) = find_parameter_by_name(parameters.as_ref(), name) else {
-                    return false;
-                };
-                let Some(ref annotation) = parameter.parameter.annotation else {
-                    return false;
-                };
-                is_list_annotation(semantic, annotation.as_ref())
-            }
-            _ => false,
-        },
-        BindingKind::Annotation => match binding.statement(semantic) {
-            Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
-                is_list_annotation(semantic, annotation.as_ref())
-            }
-            _ => false,
-        },
-        _ => false,
-    }
-}
-
-#[inline]
-fn is_list_annotation(semantic: &SemanticModel, annotation: &Expr) -> bool {
-    let value = map_subscript(annotation);
-    match_builtin_list_type(semantic, value) || semantic.match_typing_expr(value, "List")
-}
-
-#[inline]
-fn match_builtin_list_type(semantic: &SemanticModel, type_expr: &Expr) -> bool {
-    let Expr::Name(ast::ExprName { id, .. }) = type_expr else {
-        return false;
-    };
-    id == "list" && semantic.is_builtin("list")
-}
-
-#[inline]
-fn find_parameter_by_name<'a>(
-    parameters: &'a Parameters,
-    name: &'a str,
-) -> Option<&'a ParameterWithDefault> {
-    find_parameter_by_name_impl(&parameters.args, name)
-        .or_else(|| find_parameter_by_name_impl(&parameters.posonlyargs, name))
-        .or_else(|| find_parameter_by_name_impl(&parameters.kwonlyargs, name))
-}
-
-#[inline]
-fn find_parameter_by_name_impl<'a>(
-    parameters: &'a [ParameterWithDefault],
-    name: &'a str,
-) -> Option<&'a ParameterWithDefault> {
-    parameters
-        .iter()
-        .find(|arg| arg.parameter.name.as_str() == name)
 }

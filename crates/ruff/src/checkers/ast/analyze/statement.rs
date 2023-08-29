@@ -1459,13 +1459,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+        Stmt::Delete(delete @ ast::StmtDelete { targets, range: _ }) => {
             if checker.enabled(Rule::GlobalStatement) {
                 for target in targets {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
                         pylint::rules::global_statement(checker, id);
                     }
                 }
+            }
+            if checker.enabled(Rule::DeleteFullSlice) {
+                refurb::rules::delete_full_slice(checker, delete);
             }
         }
         Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
