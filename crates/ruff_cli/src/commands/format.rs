@@ -25,6 +25,14 @@ use crate::args::{FormatArguments, Overrides};
 use crate::resolve::resolve;
 use crate::ExitStatus;
 
+#[derive(Debug, Copy, Clone, is_macro::Is)]
+pub(crate) enum FormatMode {
+    /// Write the formatted contents back to the file.
+    Write,
+    /// Check if the file is formatted, but do not write the formatted contents back.
+    Check,
+}
+
 /// Format a set of files, and return the exit status.
 pub(crate) fn format(
     cli: &FormatArguments,
@@ -37,6 +45,11 @@ pub(crate) fn format(
         overrides,
         cli.stdin_filename.as_deref(),
     )?;
+    let mode = if cli.check {
+        FormatMode::Check
+    } else {
+        FormatMode::Write
+    };
     let (paths, resolver) = python_files_in_path(&cli.files, &pyproject_config, overrides)?;
 
     if paths.is_empty() {
@@ -56,7 +69,7 @@ pub(crate) fn format(
                 let line_length = resolver.resolve(path, &pyproject_config).line_length;
                 let options = PyFormatOptions::from_source_type(source_type)
                     .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
-                format_path(path, options)
+                format_path(path, options, mode)
             } else {
                 Ok(FormatResult::Skipped)
             }
@@ -67,6 +80,8 @@ pub(crate) fn format(
         });
     let duration = start.elapsed();
     debug!("Formatted files in: {:?}", duration);
+
+    let summary = FormatResultSummary::from(results);
 
     // Report on any errors.
     if !errors.is_empty() {
@@ -86,14 +101,28 @@ pub(crate) fn format(
             }
             _ => Box::new(BufWriter::new(io::stdout())),
         };
-        let summary = FormatResultSummary::from(results);
-        summary.show_user(&mut writer)?;
+        summary.show_user(&mut writer, mode)?;
     }
 
-    if errors.is_empty() {
-        Ok(ExitStatus::Success)
-    } else {
-        Ok(ExitStatus::Error)
+    match mode {
+        FormatMode::Write => {
+            if errors.is_empty() {
+                Ok(ExitStatus::Success)
+            } else {
+                Ok(ExitStatus::Error)
+            }
+        }
+        FormatMode::Check => {
+            if errors.is_empty() {
+                if summary.formatted > 0 {
+                    Ok(ExitStatus::Failure)
+                } else {
+                    Ok(ExitStatus::Success)
+                }
+            } else {
+                Ok(ExitStatus::Error)
+            }
+        }
     }
 }
 
@@ -101,6 +130,7 @@ pub(crate) fn format(
 fn format_path(
     path: &Path,
     options: PyFormatOptions,
+    mode: FormatMode,
 ) -> Result<FormatResult, FormatterIterationError> {
     let unformatted = std::fs::read_to_string(path)
         .map_err(|err| FormatterIterationError::Read(path.to_path_buf(), err))?;
@@ -114,8 +144,10 @@ fn format_path(
     if formatted.len() == unformatted.len() && formatted == unformatted {
         Ok(FormatResult::Unchanged)
     } else {
-        std::fs::write(path, formatted.as_bytes())
-            .map_err(|err| FormatterIterationError::Write(path.to_path_buf(), err))?;
+        if mode.is_write() {
+            std::fs::write(path, formatted.as_bytes())
+                .map_err(|err| FormatterIterationError::Write(path.to_path_buf(), err))?;
+        }
         Ok(FormatResult::Formatted)
     }
 }
@@ -156,22 +188,30 @@ impl From<Vec<FormatResult>> for FormatResultSummary {
 
 impl FormatResultSummary {
     /// Pretty-print a [`FormatResultSummary`] for user-facing display.
-    fn show_user(&self, writer: &mut dyn Write) -> Result<(), io::Error> {
+    fn show_user(&self, writer: &mut dyn Write, mode: FormatMode) -> Result<(), io::Error> {
         if self.formatted > 0 && self.unchanged > 0 {
             writeln!(
                 writer,
-                "{} file{} reformatted, {} file{} left unchanged",
+                "{} file{} {}, {} file{} left unchanged",
                 self.formatted,
                 if self.formatted == 1 { "" } else { "s" },
+                match mode {
+                    FormatMode::Write => "reformatted",
+                    FormatMode::Check => "would be reformatted",
+                },
                 self.unchanged,
                 if self.unchanged == 1 { "" } else { "s" },
             )
         } else if self.formatted > 0 {
             writeln!(
                 writer,
-                "{} file{} reformatted",
+                "{} file{} {}",
                 self.formatted,
                 if self.formatted == 1 { "" } else { "s" },
+                match mode {
+                    FormatMode::Write => "reformatted",
+                    FormatMode::Check => "would be reformatted",
+                }
             )
         } else if self.unchanged > 0 {
             writeln!(
