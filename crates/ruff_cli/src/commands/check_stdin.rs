@@ -1,4 +1,3 @@
-use std::io::{self, Read};
 use std::path::Path;
 
 use anyhow::Result;
@@ -9,13 +8,7 @@ use ruff_workspace::resolver::{python_file_at_path, PyprojectConfig};
 
 use crate::args::Overrides;
 use crate::diagnostics::{lint_stdin, Diagnostics};
-
-/// Read a `String` from `stdin`.
-pub(crate) fn read_from_stdin() -> Result<String> {
-    let mut buffer = String::new();
-    io::stdin().lock().read_to_string(&mut buffer)?;
-    Ok(buffer)
-}
+use crate::stdin::read_from_stdin;
 
 /// Run the linter over a single file, read from `stdin`.
 pub(crate) fn check_stdin(
