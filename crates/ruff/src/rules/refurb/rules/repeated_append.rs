@@ -299,7 +299,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
     let binding = semantic.binding(*binding_id);
 
     // ...and whether this something is a list.
-    if binding.source.is_none() || !is_list(binding, name, semantic) {
+    if !is_list(binding, semantic) {
         return None;
     }
 
