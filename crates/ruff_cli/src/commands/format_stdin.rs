@@ -1,12 +1,14 @@
 use std::io::{stdout, Write};
+use std::path::Path;
 
 use anyhow::Result;
+use log::warn;
 
 use ruff_python_formatter::{format_module, PyFormatOptions};
 use ruff_workspace::resolver::python_file_at_path;
 
 use crate::args::{FormatArguments, Overrides};
-use crate::commands::format::FormatMode;
+use crate::commands::format::{FormatCommandError, FormatCommandResult, FormatMode};
 use crate::resolve::resolve;
 use crate::stdin::read_from_stdin;
 use crate::ExitStatus;
@@ -32,26 +34,48 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &Overrides) -> Resu
     }
 
     // Format the file.
-    let unformatted = read_from_stdin()?;
-    let options = cli
-        .stdin_filename
-        .as_deref()
+    let path = cli.stdin_filename.as_deref();
+    let options = path
         .map(PyFormatOptions::from_extension)
         .unwrap_or_default();
-    let formatted = format_module(&unformatted, options)?;
-
-    match mode {
-        FormatMode::Write => {
-            stdout().lock().write_all(formatted.as_code().as_bytes())?;
-            Ok(ExitStatus::Success)
-        }
-        FormatMode::Check => {
-            if formatted.as_code().len() == unformatted.len() && formatted.as_code() == unformatted
-            {
-                Ok(ExitStatus::Success)
-            } else {
-                Ok(ExitStatus::Failure)
+    match format_source(path, options, mode) {
+        Ok(result) => match mode {
+            FormatMode::Write => Ok(ExitStatus::Success),
+            FormatMode::Check => {
+                if result.is_formatted() {
+                    Ok(ExitStatus::Failure)
+                } else {
+                    Ok(ExitStatus::Success)
+                }
             }
+        },
+        Err(err) => {
+            warn!("{err}");
+            Ok(ExitStatus::Error)
         }
+    }
+}
+
+/// Format source code read from `stdin`.
+fn format_source(
+    path: Option<&Path>,
+    options: PyFormatOptions,
+    mode: FormatMode,
+) -> Result<FormatCommandResult, FormatCommandError> {
+    let unformatted = read_from_stdin()
+        .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err))?;
+    let formatted = format_module(&unformatted, options)
+        .map_err(|err| FormatCommandError::FormatModule(path.map(Path::to_path_buf), err))?;
+    let formatted = formatted.as_code();
+    if formatted.len() == unformatted.len() && formatted == unformatted {
+        Ok(FormatCommandResult::Unchanged)
+    } else {
+        if mode.is_write() {
+            stdout()
+                .lock()
+                .write_all(formatted.as_bytes())
+                .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
+        }
+        Ok(FormatCommandResult::Formatted)
     }
 }
