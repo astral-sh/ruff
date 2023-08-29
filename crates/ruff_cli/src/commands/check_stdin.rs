@@ -18,7 +18,7 @@ pub(crate) fn read_from_stdin() -> Result<String> {
 }
 
 /// Run the linter over a single file, read from `stdin`.
-pub(crate) fn run_stdin(
+pub(crate) fn check_stdin(
     filename: Option<&Path>,
     pyproject_config: &PyprojectConfig,
     overrides: &Overrides,

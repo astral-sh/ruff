@@ -16,7 +16,7 @@ use ruff::{fs, warn_user_once};
 use ruff_python_formatter::{format_module, PyFormatOptions};
 
 use crate::args::{Args, CheckCommand, Command, FormatCommand};
-use crate::commands::run_stdin::read_from_stdin;
+use crate::commands::check_stdin::read_from_stdin;
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -300,7 +300,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::run::run(
+        let messages = commands::check::check(
             &cli.files,
             &pyproject_config,
             &overrides,
@@ -332,7 +332,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
 
-                    let messages = commands::run::run(
+                    let messages = commands::check::check(
                         &cli.files,
                         &pyproject_config,
                         &overrides,
@@ -350,7 +350,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
         // Generate lint violations.
         let diagnostics = if is_stdin {
-            commands::run_stdin::run_stdin(
+            commands::check_stdin::check_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_config,
                 &overrides,
@@ -358,7 +358,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 autofix,
             )?
         } else {
-            commands::run::run(
+            commands::check::check(
                 &cli.files,
                 &pyproject_config,
                 &overrides,
