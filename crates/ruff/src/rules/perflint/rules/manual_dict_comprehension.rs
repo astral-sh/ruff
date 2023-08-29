@@ -117,7 +117,6 @@ fn check_for_slow_dict_creation(checker: &mut Checker, names: &[&str], stmt: &St
         return;
     };
 
-    // It should only apply to variables that are known to be lists or dicts.
     if !is_dict(binding, checker.semantic()) {
         return
     }
