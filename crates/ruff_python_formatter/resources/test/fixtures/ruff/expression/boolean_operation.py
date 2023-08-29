@@ -94,3 +94,11 @@ if not (
     isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) and (xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy) or isinstance(ccccccccccc, dddddd)
 ):
     pass
+
+
+def test():
+    return (
+        isinstance(other, Mapping)
+        and {k.lower(): v for k, v in self.items()}
+        == {k.lower(): v for k, v in other.items()}
+    )
