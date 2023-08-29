@@ -334,7 +334,8 @@ impl<Context> Format<Context> for SourcePosition {
     }
 }
 
-/// Creates a text from a dynamic string with its optional start-position in the source document
+/// Creates a text from a dynamic string with its optional start-position in the source document.
+/// This is done by allocating a new string internally.
 pub fn dynamic_text(text: &str, position: Option<TextSize>) -> DynamicText {
     debug_assert_no_newlines(text);
 
