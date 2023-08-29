@@ -36,6 +36,16 @@ def foo():
 
 
 def foo():
+    result = {1: "banana"}
+    fruit = ["apple", "pear", "orange"]
+    for idx, name in enumerate(fruit):
+        if idx % 2:
+            result[idx] = name  # Ok because dict was not empty before loop
+        else:
+            result[idx] = name
+
+
+def foo():
     result = []
     fruit = ["apple", "pear", "orange"]
     for idx, name in enumerate(fruit):
