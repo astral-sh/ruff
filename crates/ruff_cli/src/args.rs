@@ -329,6 +329,10 @@ pub struct CheckCommand {
 pub struct FormatCommand {
     /// List of files or directories to format.
     pub files: Vec<PathBuf>,
+    /// Avoid writing any formatted files back; instead, exit with a non-zero status code if any
+    /// files would have been modified, and zero otherwise.
+    #[arg(long)]
+    pub check: bool,
     /// Specify file to write the linter output to (default: stdout).
     #[arg(short, long)]
     pub output_file: Option<PathBuf>,
@@ -480,6 +484,7 @@ impl FormatCommand {
     pub fn partition(self) -> (FormatArguments, Overrides) {
         (
             FormatArguments {
+                check: self.check,
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
@@ -541,6 +546,7 @@ pub struct CheckArguments {
 /// etc.).
 #[allow(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
+    pub check: bool,
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
