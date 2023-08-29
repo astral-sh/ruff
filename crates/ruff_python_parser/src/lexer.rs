@@ -515,13 +515,7 @@ impl<'source> Lexer<'source> {
 
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close
-        let triple_quoted = if self.cursor.first() == quote && self.cursor.second() == quote {
-            self.cursor.bump();
-            self.cursor.bump();
-            true
-        } else {
-            false
-        };
+        let triple_quoted = self.cursor.eat_char2(quote, quote);
 
         let value_start = self.offset();
 
@@ -544,9 +538,7 @@ impl<'source> Lexer<'source> {
                 }
                 Some(c) if c == quote => {
                     if triple_quoted {
-                        if self.cursor.first() == quote && self.cursor.second() == quote {
-                            self.cursor.bump();
-                            self.cursor.bump();
+                        if self.cursor.eat_char2(quote, quote) {
                             break self.offset() - TextSize::new(3);
                         }
                     } else {
@@ -918,9 +910,7 @@ impl<'source> Lexer<'source> {
             '.' => {
                 if self.cursor.first().is_ascii_digit() {
                     self.lex_decimal_number('.')?
-                } else if self.cursor.first() == '.' && self.cursor.second() == '.' {
-                    self.cursor.bump();
-                    self.cursor.bump();
+                } else if self.cursor.eat_char2('.', '.') {
                     Tok::Ellipsis
                 } else {
                     Tok::Dot
