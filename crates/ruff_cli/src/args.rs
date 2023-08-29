@@ -333,7 +333,7 @@ pub struct FormatCommand {
     /// files would have been modified, and zero otherwise.
     #[arg(long)]
     pub check: bool,
-    /// Specify file to write the linter output to (default: stdout).
+    /// Specify file to write the formatter output to (default: stdout).
     #[arg(short, long)]
     pub output_file: Option<PathBuf>,
     /// The minimum Python version that should be supported.
