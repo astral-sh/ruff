@@ -40,7 +40,7 @@ RUF100_5.py:11:13: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Fix
+ℹ Suggested fix
 8  8  | }
 9  9  | 
 10 10 | 
