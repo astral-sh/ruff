@@ -4,12 +4,12 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, Expr, Stmt};
 use ruff_python_codegen::Generator;
+use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::refurb::helpers::is_set;
 
 /// ## What it does
 /// Checks for uses of `set#remove` that can be replaced with `set#discard`.

@@ -5,13 +5,13 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
+use ruff_python_semantic::analyze::typing::is_list;
 use ruff_python_semantic::{Binding, BindingId, DefinitionId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::refurb::helpers::is_list;
 
 /// ## What it does
 /// Checks for consecutive calls to `append`.
