@@ -111,9 +111,7 @@ fn match_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a 
     };
 
     // It should only apply to variables that are known to be lists or dicts.
-    if binding.source.is_none()
-        || !(is_dict(binding, name, semantic) || is_list(binding, name, semantic))
-    {
+    if !(is_dict(binding, semantic) || is_list(binding, semantic)) {
         return None;
     }
 

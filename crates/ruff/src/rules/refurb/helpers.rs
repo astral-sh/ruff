@@ -3,6 +3,7 @@ use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::{Binding, BindingKind, SemanticModel};
+use ruff_text_size::Ranged;
 
 /// Abstraction for a type checker, conservatively checks for the intended type(s).
 trait TypeChecker {
@@ -17,7 +18,7 @@ trait TypeChecker {
 /// NOTE: this function doesn't perform more serious type inference, so it won't be able
 ///       to understand if the value gets initialized from a call to a function always returning
 ///       lists. This also implies no interfile analysis.
-fn check_type<T: TypeChecker>(binding: &Binding, name: &str, semantic: &SemanticModel) -> bool {
+fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bool {
     match binding.kind {
         BindingKind::Assignment => match binding.statement(semantic) {
             // ```python
@@ -48,8 +49,7 @@ fn check_type<T: TypeChecker>(binding: &Binding, name: &str, semantic: &Semantic
             //
             // We trust the annotation and see if the type checker matches the annotation.
             Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) => {
-                // TODO(charlie): Store a pointer to the argument in the binding.
-                let Some(parameter) = find_parameter_by_name(parameters.as_ref(), name) else {
+                let Some(parameter) = find_parameter(parameters.as_ref(), binding) else {
                     return false;
                 };
                 let Some(ref annotation) = parameter.parameter.annotation else {
@@ -160,40 +160,34 @@ impl BuiltinTypeChecker for SetChecker {
 /// Test whether the given binding (and the given name) can be considered a list.
 /// For this, we check what value might be associated with it through it's initialization and
 /// what annotation it has (we consider `list` and `typing.List`).
-pub(super) fn is_list<'a>(binding: &'a Binding, name: &str, semantic: &'a SemanticModel) -> bool {
-    check_type::<ListChecker>(binding, name, semantic)
+pub(super) fn is_list(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<ListChecker>(binding, semantic)
 }
 
 /// Test whether the given binding (and the given name) can be considered a dictionary.
 /// For this, we check what value might be associated with it through it's initialization and
 /// what annotation it has (we consider `dict` and `typing.Dict`).
-pub(super) fn is_dict<'a>(binding: &'a Binding, name: &str, semantic: &'a SemanticModel) -> bool {
-    check_type::<DictChecker>(binding, name, semantic)
+pub(super) fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<DictChecker>(binding, semantic)
 }
 
 /// Test whether the given binding (and the given name) can be considered a set.
 /// For this, we check what value might be associated with it through it's initialization and
 /// what annotation it has (we consider `set` and `typing.Set`).
-pub(super) fn is_set<'a>(binding: &'a Binding, name: &str, semantic: &'a SemanticModel) -> bool {
-    check_type::<SetChecker>(binding, name, semantic)
+pub(super) fn is_set(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<SetChecker>(binding, semantic)
 }
 
+/// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
 #[inline]
-fn find_parameter_by_name<'a>(
+fn find_parameter<'a>(
     parameters: &'a Parameters,
-    name: &'a str,
-) -> Option<&'a ParameterWithDefault> {
-    find_parameter_by_name_impl(&parameters.args, name)
-        .or_else(|| find_parameter_by_name_impl(&parameters.posonlyargs, name))
-        .or_else(|| find_parameter_by_name_impl(&parameters.kwonlyargs, name))
-}
-
-#[inline]
-fn find_parameter_by_name_impl<'a>(
-    parameters: &'a [ParameterWithDefault],
-    name: &'a str,
+    binding: &Binding,
 ) -> Option<&'a ParameterWithDefault> {
     parameters
+        .args
         .iter()
-        .find(|arg| arg.parameter.name.as_str() == name)
+        .chain(parameters.posonlyargs.iter())
+        .chain(parameters.kwonlyargs.iter())
+        .find(|arg| arg.parameter.name.range() == binding.range())
 }

@@ -95,9 +95,7 @@ pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::St
         .semantic()
         .resolve_name(check_set)
         .map(|binding_id| checker.semantic().binding(binding_id))
-        .map_or(false, |binding| {
-            is_set(binding, &check_set.id, checker.semantic())
-        })
+        .map_or(false, |binding| is_set(binding, checker.semantic()))
     {
         return;
     };
