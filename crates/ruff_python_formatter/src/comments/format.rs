@@ -452,7 +452,7 @@ fn normalize_comment<'a>(
 
         // Black adds a space before the non-breaking space if part of a type pragma.
         if trimmed.trim_start().starts_with("type:") {
-            return Ok(Cow::Borrowed(comment_text));
+            return Ok(Cow::Owned(std::format!("# \u{A0}{trimmed}")));
         }
 
         // Black replaces the non-breaking space with a space if followed by a space.
