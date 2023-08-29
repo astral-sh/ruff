@@ -8,9 +8,10 @@ use std::thread::sleep;
 use std::time::Duration;
 use std::{fs, process, str};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assert_cmd::Command;
 use log::info;
+use similar::TextDiff;
 use walkdir::WalkDir;
 
 use ruff::logging::{set_up_logging, LogLevel};
@@ -133,12 +134,17 @@ fn run_test(path: &Path, blackd: &Blackd, ruff_args: &[&str]) -> Result<()> {
     }
     let step_3_output = step_3.get_output().stdout.clone();
 
-    assert_eq!(
-        str::from_utf8(&step_2_output),
-        str::from_utf8(&step_3_output),
-        "Mismatch found for {}",
-        path.display()
-    );
+    let step_2_output_str = str::from_utf8(&step_2_output)?;
+    let step_3_output_str = str::from_utf8(&step_3_output)?;
+
+    if step_2_output_str != step_3_output_str {
+        let text_diff = TextDiff::from_lines(step_2_output_str, step_3_output_str);
+        let unified_diff = text_diff.unified_diff();
+        println!("Mismatch found for {}", path.display());
+        println!("---------- FIRST ----------\n{}\n", step_2_output_str);
+        println!("---------- SECOND ----------\n{}\n", step_3_output_str);
+        println!("---------- DIFF ----------\n{}\n", unified_diff);
+    };
 
     Ok(())
 }
@@ -151,6 +157,10 @@ fn test_ruff_black_compatibility() -> Result<()> {
     let blackd = Blackd::new()?;
 
     let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        // Get the workspace directory https://github.com/rust-lang/cargo/issues/3946
+        .parent()
+        .expect("parent should be available for crate")
+        .join("ruff")
         .join("resources")
         .join("test")
         .join("fixtures");
@@ -177,16 +187,25 @@ fn test_ruff_black_compatibility() -> Result<()> {
         "--fix",
         "--line-length",
         "88",
-        "--select ALL",
+        "--select",
+        "ALL",
         // Exclude ruff codes, specifically RUF100, because it causes differences that are not a
         // problem. Ruff would add a `# noqa: W292`  after the first run, black introduces a
         // newline, and ruff removes the `# noqa: W292` again.
-        "--ignore RUF",
+        // "--ignore",
+        // "RUF",
     ];
 
+    let mut results = vec![];
     for entry in paths {
         let path = entry.path();
-        run_test(path, &blackd, &ruff_args).context(format!("Testing {}", path.display()))?;
+        results.push(
+            run_test(path, &blackd, &ruff_args).context(format!("Testing {}", path.display())),
+        );
+    }
+    let errors = results.iter().filter(|result| result.is_err()).count();
+    if errors > 0 {
+        bail!("{} mismatches found", errors);
     }
 
     Ok(())
