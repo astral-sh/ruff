@@ -105,8 +105,9 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
     let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
         return;
     };
-    let scope = checker.semantic().current_scope();
-    let bindings: Vec<&Binding> = scope
+    let bindings: Vec<&Binding> = checker
+        .semantic()
+        .current_scope()
         .get_all(id)
         .map(|binding_id| checker.semantic().binding(binding_id))
         .collect();

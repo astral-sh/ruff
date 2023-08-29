@@ -413,7 +413,6 @@ trait BuiltinTypeChecker {
     /// Check if the type can be inferred from the given expression.
     fn match_expr_type(initializer: &Expr) -> bool {
         let init_type: ResolvedPythonType = initializer.into();
-        println!("init_type: {:?}", init_type);
         match init_type {
             ResolvedPythonType::Atom(atom) => atom == Self::EXPR_TYPE,
             _ => false,
