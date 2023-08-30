@@ -850,6 +850,7 @@ mod tests {
         Rule::DeleteFullSlice,
         Rule::CheckAndRemoveFromSet,
         Rule::QuadraticListSummation,
+        Rule::ReimplementedStarmap,
     ];
 
     const PREVIEW_RULES: &[Rule] = &[
