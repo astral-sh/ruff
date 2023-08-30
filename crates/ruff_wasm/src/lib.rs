@@ -128,6 +128,7 @@ impl Workspace {
             external: Some(Vec::default()),
             ignore: Some(Vec::default()),
             line_length: Some(LineLength::default()),
+            preview_mode: Some(false),
             select: Some(defaults::PREFIXES.to_vec()),
             tab_size: Some(TabSize::default()),
             target_version: Some(PythonVersion::default()),

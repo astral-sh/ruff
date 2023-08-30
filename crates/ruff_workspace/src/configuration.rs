@@ -67,6 +67,7 @@ pub struct Configuration {
     pub line_length: Option<LineLength>,
     pub logger_objects: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
+    pub preview_mode: Option<bool>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
     pub show_fixes: Option<bool>,
@@ -174,6 +175,7 @@ impl Configuration {
                     .collect()
             }),
             logger_objects: self.logger_objects.unwrap_or_default(),
+            preview_mode: self.preview_mode.unwrap_or_default(),
             typing_modules: self.typing_modules.unwrap_or_default(),
             // Plugins
             flake8_annotations: self
@@ -387,6 +389,7 @@ impl Configuration {
                 .namespace_packages
                 .map(|namespace_package| resolve_src(&namespace_package, project_root))
                 .transpose()?,
+            preview_mode: options.preview_mode,
             per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
                     .into_iter()
@@ -676,6 +679,7 @@ impl Configuration {
             show_fixes: self.show_fixes.or(config.show_fixes),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
+            preview_mode: self.preview_mode.or(config.preview_mode),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
             // Plugins
