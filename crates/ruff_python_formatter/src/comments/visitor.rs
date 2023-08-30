@@ -1,17 +1,16 @@
 use std::iter::Peekable;
 
-use ruff_python_ast::{Mod, Stmt};
-use ruff_text_size::{Ranged, TextRange, TextSize};
-
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_index::CommentRanges;
-use ruff_source_file::Locator;
+use ruff_python_ast::{Mod, Stmt};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
+use ruff_python_index::CommentRanges;
 use ruff_python_trivia::is_python_whitespace;
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
@@ -210,11 +209,6 @@ impl<'a> DecoratedComment<'a> {
     /// Returns the parent of the enclosing node, if any
     pub(super) fn enclosing_parent(&self) -> Option<AnyNodeRef<'a>> {
         self.parent
-    }
-
-    /// Returns the slice into the source code.
-    pub(super) fn slice(&self) -> &SourceCodeSlice {
-        &self.slice
     }
 
     /// Returns the comment's preceding node.

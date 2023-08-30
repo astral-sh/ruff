@@ -223,7 +223,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // the leading comment. This is why the suite handling counts the lines before the
                 // start of the next statement or before the first leading comments for compound statements.
                 let start = if let Some(first_leading) = comments.leading(following).first() {
-                    first_leading.slice().start()
+                    first_leading.start()
                 } else {
                     following.start()
                 };
