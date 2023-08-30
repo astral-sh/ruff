@@ -119,7 +119,7 @@ fn format_case<'a>(
 
     Ok(if let Some(last) = body.last() {
         let case_comments_start =
-            dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
+            dangling_comments.partition_point(|comment| comment.end() <= last.end());
         let (case_comments, rest) = dangling_comments.split_at(case_comments_start);
         let partition_point =
             case_comments.partition_point(|comment| comment.line_position().is_own_line());

@@ -42,7 +42,7 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
         let dangling_comments = comments.dangling(item);
         let body_start = body.first().map_or(iter.end(), Stmt::start);
         let or_else_comments_start =
-            dangling_comments.partition_point(|comment| comment.slice().end() < body_start);
+            dangling_comments.partition_point(|comment| comment.end() < body_start);
 
         let (trailing_condition_comments, or_else_comments) =
             dangling_comments.split_at(or_else_comments_start);
