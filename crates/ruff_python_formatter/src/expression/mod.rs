@@ -8,7 +8,7 @@ use ruff_formatter::{
 use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
-use ruff_python_ast::{Expr, ExpressionRef, Operator};
+use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::leading_comments;
@@ -437,14 +437,15 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
     // Visits a subexpression, ignoring whether it is parenthesized or not
     fn visit_subexpression(&mut self, expr: &'input Expr) {
         match expr {
-            Expr::Dict(_) | Expr::List(_) | Expr::Tuple(_) | Expr::Set(_) => {
+            Expr::Dict(_)
+            | Expr::List(_)
+            | Expr::Tuple(_)
+            | Expr::Set(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::DictComp(_) => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
-                return;
-            }
-            Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) => {
-                self.any_parenthesized_expressions = true;
-                self.update_max_priority(OperatorPriority::Comprehension);
                 return;
             }
             // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
@@ -522,6 +523,25 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 }
                 self.last = Some(expr);
                 return;
+            }
+
+            Expr::Constant(ast::ExprConstant {
+                value:
+                    Constant::Str(ast::StringConstant {
+                        implicit_concatenated: true,
+                        ..
+                    })
+                    | Constant::Bytes(ast::BytesConstant {
+                        implicit_concatenated: true,
+                        ..
+                    }),
+                ..
+            })
+            | Expr::FString(ast::ExprFString {
+                implicit_concatenated: true,
+                ..
+            }) => {
+                self.update_max_priority(OperatorPriority::String);
             }
 
             Expr::NamedExpr(_)
@@ -770,12 +790,9 @@ enum OperatorPriority {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
-    // TODO(micha)
-    #[allow(unused)]
     String,
     BooleanOperation,
     Conditional,
-    Comprehension,
 }
 
 impl From<ast::Operator> for OperatorPriority {

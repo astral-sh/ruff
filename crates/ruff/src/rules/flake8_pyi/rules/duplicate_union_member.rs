@@ -55,7 +55,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
                     // Replace the parent with its non-duplicate child.
                     let child = if expr == left.as_ref() { right } else { left };
                     diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        checker.locator().slice(child.range()).to_string(),
+                        checker.locator().slice(child.as_ref()).to_string(),
                         parent.range(),
                     )));
                 }

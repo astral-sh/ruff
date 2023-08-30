@@ -204,7 +204,7 @@ fn create_remove_param_fix<T: Ranged>(
     mode_param: &Expr,
     source_type: PySourceType,
 ) -> Result<Edit> {
-    let content = locator.slice(expr.range());
+    let content = locator.slice(expr);
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
     let mut fix_start: Option<TextSize> = None;

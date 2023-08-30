@@ -206,7 +206,7 @@ fn generate_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let source_code = locator.slice(call.range());
+    let source_code = locator.slice(call);
 
     let output = transform_expression_text(source_code, |source_code| {
         let mut expression = match_expression(&source_code)?;

@@ -163,9 +163,9 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 continue;
             };
 
-            let contents = checker.locator.slice(expr.range());
+            let contents = checker.locator().slice(expr);
 
-            let indentation = checker.locator.slice(TextRange::new(
+            let indentation = checker.locator().slice(TextRange::new(
                 checker.locator.line_start(expr.start()),
                 expr.start(),
             ));

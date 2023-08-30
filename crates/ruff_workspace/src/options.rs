@@ -999,7 +999,11 @@ pub struct Flake8ImportConventionsOptions {
             banned-from = ["typing"]
     "#
     )]
-    /// A list of modules that are allowed to be imported from
+    /// A list of modules that should not be imported from using the
+    /// `from ... import ...` syntax.
+    ///
+    /// For example, given `banned-from = ["pandas"]`, `from pandas import DataFrame`
+    /// would be disallowed, while `import pandas` would be allowed.
     pub banned_from: Option<FxHashSet<String>>,
 }
 

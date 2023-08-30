@@ -31,6 +31,20 @@ pub enum TupleParentheses {
     /// ```
     Preserve,
 
+    /// The same as [`Self::Default`] except that it uses [`optional_parentheses`] rather than
+    /// [`parenthesize_if_expands`]. This avoids adding parentheses if breaking any containing parenthesized
+    /// expression makes the tuple fit.
+    ///
+    /// Avoids adding parentheses around the tuple because breaking the `sum` call expression is sufficient
+    /// to make it fit.
+    ///
+    /// ```python
+    /// return len(self.nodeseeeeeeeee), sum(
+    //     len(node.parents) for node in self.node_map.values()
+    // )
+    /// ```
+    OptionalParentheses,
+
     /// Handle the special cases where we don't include parentheses at all.
     ///
     /// Black never formats tuple targets of for loops with parentheses if inside a comprehension.
@@ -158,7 +172,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                         .finish()
                 }
                 TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
-                TupleParentheses::NeverPreserve => {
+                TupleParentheses::NeverPreserve | TupleParentheses::OptionalParentheses => {
                     optional_parentheses(&ExprSequence::new(item)).fmt(f)
                 }
                 TupleParentheses::Default => {

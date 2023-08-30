@@ -46,8 +46,10 @@ impl Violation for NestedMinMax {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
+
     fn message(&self) -> String {
-        format!("Nested `{}` calls can be flattened", self.func)
+        let NestedMinMax { func } = self;
+        format!("Nested `{func}` calls can be flattened")
     }
 
     fn autofix_title(&self) -> Option<String> {

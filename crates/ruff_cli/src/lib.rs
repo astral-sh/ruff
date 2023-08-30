@@ -6,7 +6,6 @@ use std::sync::mpsc::channel;
 
 use anyhow::Result;
 use clap::CommandFactory;
-use clap::FromArgMatches;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
@@ -14,10 +13,8 @@ use ruff::logging::{set_up_logging, LogLevel};
 use ruff::settings::types::SerializationFormat;
 use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
-use ruff_python_formatter::{format_module, PyFormatOptions};
 
-use crate::args::{Args, CheckArgs, Command};
-use crate::commands::run_stdin::read_from_stdin;
+use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -27,6 +24,7 @@ mod diagnostics;
 mod panic;
 mod printer;
 pub mod resolve;
+mod stdin;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -78,7 +76,7 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
     None
 }
 
-/// Returns true if the linter should read from standard input.
+/// Returns true if the command should read from standard input.
 fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     // If the user provided a `--stdin-filename`, always read from standard input.
     if stdin_filename.is_some() {
@@ -149,44 +147,28 @@ quoting the executed command, along with the relevant file contents and `pyproje
             shell.generate(&mut Args::command(), &mut stdout());
         }
         Command::Check(args) => return check(args, log_level),
-        Command::Format { files } => return format(&files),
+        Command::Format(args) => return format(args, log_level),
     }
 
     Ok(ExitStatus::Success)
 }
 
-fn format(paths: &[PathBuf]) -> Result<ExitStatus> {
+fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
     warn_user_once!(
         "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
         experimentation."
     );
 
-    // We want to use the same as `ruff check <files>`, but we don't actually want to allow
-    // any of the linter settings.
-    // TODO(konstin): Refactor this to allow getting config and resolver without going
-    // though clap.
-    let args_matches = CheckArgs::command()
-        .no_binary_name(true)
-        .get_matches_from(paths);
-    let check_args: CheckArgs = CheckArgs::from_arg_matches(&args_matches)?;
-    let (cli, overrides) = check_args.partition();
+    let (cli, overrides) = args.partition();
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        let unformatted = read_from_stdin()?;
-        let options = cli
-            .stdin_filename
-            .as_deref()
-            .map(PyFormatOptions::from_extension)
-            .unwrap_or_default();
-        let formatted = format_module(&unformatted, options)?;
-        stdout().lock().write_all(formatted.as_code().as_bytes())?;
-        Ok(ExitStatus::Success)
+        commands::format_stdin::format_stdin(&cli, &overrides)
     } else {
-        commands::format::format(&cli, &overrides)
+        commands::format::format(&cli, &overrides, log_level)
     }
 }
 
-pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
+pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -309,7 +291,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::run::run(
+        let messages = commands::check::check(
             &cli.files,
             &pyproject_config,
             &overrides,
@@ -341,7 +323,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
 
-                    let messages = commands::run::run(
+                    let messages = commands::check::check(
                         &cli.files,
                         &pyproject_config,
                         &overrides,
@@ -359,7 +341,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
         // Generate lint violations.
         let diagnostics = if is_stdin {
-            commands::run_stdin::run_stdin(
+            commands::check_stdin::check_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_config,
                 &overrides,
@@ -367,7 +349,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                 autofix,
             )?
         } else {
-            commands::run::run(
+            commands::check::check(
                 &cli.files,
                 &pyproject_config,
                 &overrides,

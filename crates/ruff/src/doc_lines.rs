@@ -76,7 +76,7 @@ impl StatementVisitor<'_> for StringLinesVisitor<'_> {
             }) = value.as_ref()
             {
                 for line in UniversalNewlineIterator::with_offset(
-                    self.locator.slice(value.range()),
+                    self.locator.slice(value.as_ref()),
                     value.start(),
                 ) {
                     self.string_lines.push(line.start());

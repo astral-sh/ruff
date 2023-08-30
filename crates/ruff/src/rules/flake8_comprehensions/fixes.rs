@@ -31,7 +31,7 @@ pub(crate) fn fix_unnecessary_generator_list(
     expr: &Expr,
 ) -> Result<Edit> {
     // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -63,7 +63,7 @@ pub(crate) fn fix_unnecessary_generator_set(checker: &Checker, expr: &Expr) -> R
     let stylist = checker.stylist();
 
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -97,7 +97,7 @@ pub(crate) fn fix_unnecessary_generator_dict(checker: &Checker, expr: &Expr) -> 
     let locator = checker.locator();
     let stylist = checker.stylist();
 
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -141,7 +141,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
     let stylist = checker.stylist();
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -176,7 +176,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     let locator = checker.locator();
     let stylist = checker.stylist();
 
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -261,7 +261,7 @@ pub(crate) fn fix_unnecessary_literal_set(checker: &Checker, expr: &Expr) -> Res
     let stylist = checker.stylist();
 
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -302,7 +302,7 @@ pub(crate) fn fix_unnecessary_literal_dict(checker: &Checker, expr: &Expr) -> Re
     let stylist = checker.stylist();
 
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -371,7 +371,7 @@ pub(crate) fn fix_unnecessary_collection_call(checker: &Checker, expr: &Expr) ->
     let stylist = checker.stylist();
 
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call(&tree)?;
     let name = match_name(&call.func)?;
@@ -522,7 +522,7 @@ pub(crate) fn fix_unnecessary_literal_within_tuple_call(
     stylist: &Stylist,
     expr: &Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -572,7 +572,7 @@ pub(crate) fn fix_unnecessary_literal_within_list_call(
     stylist: &Stylist,
     expr: &Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -625,7 +625,7 @@ pub(crate) fn fix_unnecessary_list_call(
     expr: &Expr,
 ) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -646,7 +646,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
     stylist: &Stylist,
     expr: &Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let outer_call = match_call_mut(&mut tree)?;
     let inner_call = match &outer_call.args[..] {
@@ -758,7 +758,7 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
     stylist: &Stylist,
     expr: &Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let outer_call = match_call_mut(&mut tree)?;
 
@@ -789,7 +789,7 @@ pub(crate) fn fix_unnecessary_comprehension(
     stylist: &Stylist,
     expr: &Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
 
     match &tree {
@@ -878,7 +878,7 @@ pub(crate) fn fix_unnecessary_map(
     parent: Option<&Expr>,
     object_type: ObjectType,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -1021,7 +1021,7 @@ pub(crate) fn fix_unnecessary_literal_within_dict_call(
     stylist: &Stylist,
     expr: &Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
@@ -1041,7 +1041,7 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
     expr: &Expr,
 ) -> Result<Fix> {
     // Expr(ListComp) -> Expr(GeneratorExp)
-    let module_text = locator.slice(expr.range());
+    let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
 

@@ -89,7 +89,7 @@ pub(crate) fn unnecessary_map(
         ObjectType::Generator => {
             // Exclude the parent if already matched by other arms.
             if parent
-                .and_then(ruff_python_ast::Expr::as_call_expr)
+                .and_then(Expr::as_call_expr)
                 .and_then(|call| call.func.as_name_expr())
                 .is_some_and(|name| matches!(name.id.as_str(), "list" | "set" | "dict"))
             {
@@ -122,7 +122,7 @@ pub(crate) fn unnecessary_map(
             // Only flag, e.g., `list(map(lambda x: x + 1, iterable))`.
             let [Expr::Call(ast::ExprCall {
                 func,
-                arguments: Arguments { args, .. },
+                arguments: Arguments { args, keywords, .. },
                 ..
             })] = args
             else {
@@ -130,6 +130,10 @@ pub(crate) fn unnecessary_map(
             };
 
             if args.len() != 2 {
+                return;
+            }
+
+            if !keywords.is_empty() {
                 return;
             }
 
@@ -163,12 +167,20 @@ pub(crate) fn unnecessary_map(
             // Only flag, e.g., `dict(map(lambda v: (v, v ** 2), values))`.
             let [Expr::Call(ast::ExprCall {
                 func,
-                arguments: Arguments { args, .. },
+                arguments: Arguments { args, keywords, .. },
                 ..
             })] = args
             else {
                 return;
             };
+
+            if args.len() != 2 {
+                return;
+            }
+
+            if !keywords.is_empty() {
+                return;
+            }
 
             let Some(argument) = helpers::first_argument_with_matching_function("map", func, args)
             else {

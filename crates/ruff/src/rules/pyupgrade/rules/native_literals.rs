@@ -211,7 +211,7 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            let arg_code = checker.locator().slice(arg.range());
+            let arg_code = checker.locator().slice(arg);
 
             // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
             // Ex) `(7).denominator` is valid but `7.denominator` is not

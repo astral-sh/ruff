@@ -94,12 +94,8 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
 pub(crate) fn percent(checker: &mut Checker, expr: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<TextRange> = vec![];
-    for (tok, range) in lexer::lex_starts_at(
-        checker.locator().slice(expr.range()),
-        Mode::Module,
-        expr.start(),
-    )
-    .flatten()
+    for (tok, range) in
+        lexer::lex_starts_at(checker.locator().slice(expr), Mode::Module, expr.start()).flatten()
     {
         if tok.is_string() {
             strings.push(range);

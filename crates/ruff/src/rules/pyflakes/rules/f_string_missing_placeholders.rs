@@ -53,7 +53,7 @@ fn find_useless_f_strings<'a>(
     locator: &'a Locator,
     source_type: PySourceType,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
-    let contents = locator.slice(expr.range());
+    let contents = locator.slice(expr);
     lexer::lex_starts_at(contents, source_type.as_mode(), expr.start())
         .flatten()
         .filter_map(|(tok, range)| match tok {

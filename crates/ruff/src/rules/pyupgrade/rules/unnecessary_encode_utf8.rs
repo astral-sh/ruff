@@ -125,7 +125,7 @@ fn replace_with_bytes_literal(
     source_type: PySourceType,
 ) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
-    let contents = locator.slice(call.range());
+    let contents = locator.slice(call);
     let mut replacement = String::with_capacity(contents.len() + 1);
     let mut prev = call.start();
     for (tok, range) in

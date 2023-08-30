@@ -139,7 +139,7 @@ fn convert_call_to_conversion_flag(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let source_code = locator.slice(expr.range());
+    let source_code = locator.slice(expr);
     transform_expression(source_code, stylist, |mut expression| {
         // Replace the formatted call expression at `index` with a conversion flag.
         let formatted_string_expression = match_part(index, &mut expression)?;

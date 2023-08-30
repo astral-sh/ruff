@@ -2210,6 +2210,7 @@ dependencies = [
  "glob",
  "ignore",
  "insta",
+ "is-macro",
  "itertools",
  "itoa",
  "log",

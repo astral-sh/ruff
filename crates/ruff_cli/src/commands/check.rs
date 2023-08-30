@@ -28,7 +28,7 @@ use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
-pub(crate) fn run(
+pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     overrides: &Overrides,
@@ -245,7 +245,7 @@ mod test {
 
     use crate::args::Overrides;
 
-    use super::run;
+    use super::check;
 
     /// We check that regular python files, pyproject.toml and jupyter notebooks all handle io
     /// errors gracefully
@@ -278,7 +278,7 @@ mod test {
             PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
 
         // Run
-        let diagnostics = run(
+        let diagnostics = check(
             // Notebooks are not included by default
             &[tempdir.path().to_path_buf(), notebook],
             &pyproject_config,
