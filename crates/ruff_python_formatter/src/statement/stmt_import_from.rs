@@ -4,6 +4,7 @@ use ruff_python_ast::StmtImportFrom;
 use ruff_text_size::Ranged;
 
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
+use crate::comments::format::empty_lines_before_trailing_comments;
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
@@ -62,12 +63,29 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         let parenthesized_comments = comments.dangling(item.as_any_node_ref());
 
         if parenthesized_comments.is_empty() {
-            parenthesize_if_expands(&names).fmt(f)
+            parenthesize_if_expands(&names).fmt(f)?;
         } else {
             parenthesized("(", &names, ")")
                 .with_dangling_comments(parenthesized_comments)
-                .fmt(f)
+                .fmt(f)?;
         }
+
+        // If the import contains trailing comments, insert a newline before them.
+        // For example, given:
+        // ```python
+        // import module
+        // # comment
+        // ```
+        //
+        // At the top-level, reformat as:
+        // ```python
+        // import module
+        //
+        // # comment
+        // ```
+        empty_lines_before_trailing_comments(comments.trailing(item), 1).fmt(f)?;
+
+        Ok(())
     }
 
     fn fmt_dangling_comments(

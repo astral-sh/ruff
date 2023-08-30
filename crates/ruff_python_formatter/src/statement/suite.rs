@@ -2,7 +2,7 @@ use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWi
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, Stmt, Suite};
-use ruff_python_trivia::{lines_after_ignoring_trivia, lines_before};
+use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments, Comments};
@@ -143,7 +143,11 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         };
 
         while let Some(following) = iter.next() {
-            if is_class_or_function_definition(preceding)
+            // Add empty lines before and after a function or class definition. If the preceding
+            // node is a function or class, and contains trailing comments, then the statement
+            // itself will add the requisite empty lines when formatting its comments.
+            if (is_class_or_function_definition(preceding)
+                && !comments.has_trailing_own_line(preceding))
                 || is_class_or_function_definition(following)
             {
                 match self.kind {
@@ -191,7 +195,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         empty_line().fmt(f)?;
                     }
                 }
-            } else if is_import_definition(preceding) && !is_import_definition(following) {
+            } else if (is_import_definition(preceding)
+                && !comments.has_trailing_own_line(preceding))
+                && (!is_import_definition(following) || comments.has_leading(following))
+            {
                 // Enforce _at least_ one empty line after an import statement (but allow up to
                 // two at the top-level).
                 match self.kind {
@@ -274,16 +281,21 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     // it then counts the lines between the statement and the trailing comment, which is
                     // always 0. This is why it skips any trailing trivia (trivia that's on the same line)
                     // and counts the lines after.
-                    lines_after_ignoring_trivia(offset, source)
+                    lines_after(offset, source)
                 };
 
+                let end = comments
+                    .trailing(preceding)
+                    .last()
+                    .map_or(preceding.end(), |comment| comment.slice().end());
+
                 match node_level {
-                    NodeLevel::TopLevel => match count_lines(preceding.end()) {
+                    NodeLevel::TopLevel => match count_lines(end) {
                         0 | 1 => hard_line_break().fmt(f)?,
                         2 => empty_line().fmt(f)?,
                         _ => write!(f, [empty_line(), empty_line()])?,
                     },
-                    NodeLevel::CompoundStatement => match count_lines(preceding.end()) {
+                    NodeLevel::CompoundStatement => match count_lines(end) {
                         0 | 1 => hard_line_break().fmt(f)?,
                         _ => empty_line().fmt(f)?,
                     },

@@ -425,7 +425,7 @@ fn handle_own_line_comment_around_body<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    // If there's any non-trivia token between the preceding node and the comment, than it means
+    // If there's any non-trivia token between the preceding node and the comment, then it means
     // we're past the case of the alternate branch, defer to the default rules
     // ```python
     // if a:
@@ -446,11 +446,78 @@ fn handle_own_line_comment_around_body<'a>(
     }
 
     // Check if we're between bodies and should attach to the following body.
-    handle_own_line_comment_between_branches(comment, preceding, locator).or_else(|comment| {
-        // Otherwise, there's no following branch or the indentation is too deep, so attach to the
-        // recursively last statement in the preceding body with the matching indentation.
-        handle_own_line_comment_after_branch(comment, preceding, locator)
-    })
+    handle_own_line_comment_between_branches(comment, preceding, locator)
+        .or_else(|comment| {
+            // Otherwise, there's no following branch or the indentation is too deep, so attach to the
+            // recursively last statement in the preceding body with the matching indentation.
+            handle_own_line_comment_after_branch(comment, preceding, locator)
+        })
+        .or_else(|comment| handle_own_line_comment_between_statements(comment, locator))
+}
+
+/// Handles own-line comments between statements. If an own-line comment is between two statements,
+/// it's treated as a leading comment of the following statement _if_ there are no empty lines
+/// separating the comment and the statement; otherwise, it's treated as a trailing comment of the
+/// preceding statement.
+///
+/// For example, this comment would be a trailing comment of `x = 1`:
+/// ```python
+/// x = 1
+/// # comment
+///
+/// y = 2
+/// ```
+///
+/// However, this comment would be a leading comment of `y = 2`:
+/// ```python
+/// x = 1
+///
+/// # comment
+/// y = 2
+/// ```
+fn handle_own_line_comment_between_statements<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let Some(preceding) = comment.preceding_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let Some(following) = comment.following_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // We're looking for comments between two statements, like:
+    // ```python
+    // x = 1
+    // # comment
+    // y = 2
+    // ```
+    if !preceding.is_statement() || !following.is_statement() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // If the comment is directly attached to the following statement; make it a leading
+    // comment:
+    // ```python
+    // x = 1
+    //
+    // # leading comment
+    // y = 2
+    // ```
+    //
+    // Otherwise, if there's at least one empty line, make it a trailing comment:
+    // ```python
+    // x = 1
+    // # trailing comment
+    //
+    // y = 2
+    // ```
+    if max_empty_lines(locator.slice(TextRange::new(comment.end(), following.start()))) == 0 {
+        CommentPlacement::leading(following, comment)
+    } else {
+        CommentPlacement::trailing(preceding, comment)
+    }
 }
 
 /// Handles own line comments between two branches of a node.
@@ -1837,6 +1904,7 @@ fn max_empty_lines(contents: &str) -> u32 {
         }
     }
 
+    max_new_lines = newlines.max(max_new_lines);
     max_new_lines.saturating_sub(1)
 }
 

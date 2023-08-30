@@ -3,7 +3,9 @@ use ruff_python_ast::{Decorator, StmtClassDef};
 use ruff_python_trivia::lines_after_ignoring_trivia;
 use ruff_text_size::Ranged;
 
+use crate::comments::format::empty_lines_before_trailing_comments;
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::suite::SuiteKind;
@@ -108,7 +110,35 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                 ),
                 clause_body(body, trailing_definition_comments).with_kind(SuiteKind::Class),
             ]
+        )?;
+
+        // If the class contains trailing comments, insert newlines before them.
+        // For example, given:
+        // ```python
+        // class Class:
+        //     ...
+        // # comment
+        // ```
+        //
+        // At the top-level, reformat as:
+        // ```python
+        // class Class:
+        //     ...
+        //
+        //
+        // # comment
+        // ```
+        empty_lines_before_trailing_comments(
+            comments.trailing(item),
+            if f.context().node_level() == NodeLevel::TopLevel {
+                2
+            } else {
+                1
+            },
         )
+        .fmt(f)?;
+
+        Ok(())
     }
 
     fn fmt_dangling_comments(

@@ -110,6 +110,7 @@ from a import (
     bar,
     bar,
 )
+
 # comment
 
 from a import (  # comment

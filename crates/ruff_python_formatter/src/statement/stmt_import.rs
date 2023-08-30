@@ -1,6 +1,7 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtImport;
 
+use crate::comments::format::empty_lines_before_trailing_comments;
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::prelude::*;
 
@@ -15,7 +16,26 @@ impl FormatNodeRule<StmtImport> for FormatStmtImport {
                 .entries(names.iter().formatted())
                 .finish()
         });
-        write!(f, [text("import"), space(), names])
+        write!(f, [text("import"), space(), names])?;
+
+        let comments = f.context().comments().clone();
+
+        // If the import contains trailing comments, insert a newline before them.
+        // For example, given:
+        // ```python
+        // import module
+        // # comment
+        // ```
+        //
+        // At the top-level, reformat as:
+        // ```python
+        // import module
+        //
+        // # comment
+        // ```
+        empty_lines_before_trailing_comments(comments.trailing(item), 1).fmt(f)?;
+
+        Ok(())
     }
 
     fn is_suppressed(

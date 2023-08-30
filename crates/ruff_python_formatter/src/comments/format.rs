@@ -299,10 +299,10 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
     }
 }
 
-// Helper that inserts the appropriate number of empty lines before a comment, depending on the node level.
-// Top level: Up to two empty lines
-// parenthesized: A single empty line
-// other: Up to a single empty line
+/// Helper that inserts the appropriate number of empty lines before a comment, depending on the node level:
+/// - Top-level: Up to two empty lines.
+/// - Parenthesized: A single empty line.
+/// - Otherwise: Up to a single empty line.
 pub(crate) const fn empty_lines(lines: u32) -> FormatEmptyLines {
     FormatEmptyLines { lines }
 }
@@ -474,4 +474,46 @@ fn normalize_comment<'a>(
     }
 
     Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
+}
+
+/// Format the empty lines between a node and its trailing comments.
+///
+/// For example, given:
+/// ```python
+/// def func():
+///     ...
+/// # comment
+/// ```
+///
+/// This builder will insert two empty lines before the comment.
+/// ```
+pub(crate) const fn empty_lines_before_trailing_comments(
+    comments: &[SourceComment],
+    expected: u32,
+) -> FormatEmptyLinesBeforeTrailingComments {
+    FormatEmptyLinesBeforeTrailingComments { comments, expected }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct FormatEmptyLinesBeforeTrailingComments<'a> {
+    /// The trailing comments of the node.
+    comments: &'a [SourceComment],
+    /// The expected number of empty lines before the trailing comments.
+    expected: u32,
+}
+
+impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        if let Some(comment) = self
+            .comments
+            .iter()
+            .find(|comment| comment.line_position().is_own_line())
+        {
+            let actual = lines_before(comment.start(), f.context().source()).saturating_sub(1);
+            for _ in actual..self.expected {
+                write!(f, [empty_line()])?;
+            }
+        }
+        Ok(())
+    }
 }
