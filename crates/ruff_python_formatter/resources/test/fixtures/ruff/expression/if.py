@@ -47,3 +47,64 @@ e1 = (
     if False # 2
     else c
 )
+
+
+# Flattening nested if-expressions.
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        (NamedValuesListIterable
+        if named
+        else FlatValuesListIterable)
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else (FlatValuesListIterable
+        if flat
+        else ValuesListIterable)
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable(1,)
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else (FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable
+        if flat
+        else ValuesListIterable)
+    )
