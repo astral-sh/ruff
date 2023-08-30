@@ -127,7 +127,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                     let assignment = assign_argument_separator_comment_placement(
                         slash.as_ref(),
                         star.as_ref(),
-                        comment.slice().range(),
+                        comment.range(),
                         comment.line_position(),
                     )
                     .expect("Unexpected dangling comment type in function parameters");

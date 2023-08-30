@@ -26,7 +26,7 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
 
         let body_start = body.first().map_or(test.end(), Stmt::start);
         let or_else_comments_start =
-            dangling_comments.partition_point(|comment| comment.slice().end() < body_start);
+            dangling_comments.partition_point(|comment| comment.end() < body_start);
 
         let (trailing_condition_comments, or_else_comments) =
             dangling_comments.split_at(or_else_comments_start);
