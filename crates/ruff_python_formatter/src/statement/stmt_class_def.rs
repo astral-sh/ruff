@@ -136,9 +136,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                 1
             },
         )
-        .fmt(f)?;
-
-        Ok(())
+        .fmt(f)
     }
 
     fn fmt_dangling_comments(

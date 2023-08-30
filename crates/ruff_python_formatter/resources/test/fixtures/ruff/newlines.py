@@ -135,3 +135,27 @@ def f():
     # comment
 
     import y
+
+
+def f():
+    import x  # comment
+    # comment
+
+    import y
+
+
+def f(): pass  # comment
+# comment
+
+x = 1
+
+
+def f():
+    pass
+
+
+
+
+# comment
+
+x = 1

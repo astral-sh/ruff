@@ -141,9 +141,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                             Ok(())
                         });
 
-                        group(&format_inner).fmt(f)?;
-
-                        Ok(())
+                        group(&format_inner).fmt(f)
                     }),
                 ),
                 clause_body(body, trailing_definition_comments).with_kind(SuiteKind::Function),
@@ -174,9 +172,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                 1
             },
         )
-        .fmt(f)?;
-
-        Ok(())
+        .fmt(f)
     }
 
     fn fmt_dangling_comments(
