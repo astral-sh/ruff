@@ -115,7 +115,7 @@ pub struct CheckCommand {
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
-    /// Enable preview mode
+    /// Enable preview mode; checks will include unstable rules and fixes.
     #[arg(long, overrides_with("no_preview"), hide = true)]
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
@@ -463,7 +463,7 @@ impl CheckCommand {
                 ignore: self.ignore,
                 line_length: self.line_length,
                 per_file_ignores: self.per_file_ignores,
-                preview_mode: resolve_bool_arg(self.preview, self.no_preview),
+                preview: resolve_bool_arg(self.preview, self.no_preview),
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,
@@ -575,7 +575,7 @@ pub struct Overrides {
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
-    pub preview_mode: Option<bool>,
+    pub preview: Option<bool>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
     pub show_source: Option<bool>,
@@ -639,8 +639,8 @@ impl ConfigProcessor for Overrides {
         if let Some(line_length) = &self.line_length {
             config.line_length = Some(*line_length);
         }
-        if let Some(preview_mode) = &self.preview_mode {
-            config.preview_mode = Some(*preview_mode);
+        if let Some(preview) = &self.preview {
+            config.preview = Some(*preview);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));

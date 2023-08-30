@@ -55,7 +55,7 @@ pub struct Settings {
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 
     pub target_version: PythonVersion,
-    pub preview_mode: bool,
+    pub preview: bool,
 
     // Resolver settings
     pub exclude: FilePatternSet,

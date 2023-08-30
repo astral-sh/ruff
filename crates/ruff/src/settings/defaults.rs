@@ -84,7 +84,7 @@ impl Default for Settings {
             line_length: LineLength::default(),
             logger_objects: vec![],
             namespace_packages: vec![],
-            preview_mode: false,
+            preview: false,
             per_file_ignores: vec![],
             project_root: path_dedot::CWD.clone(),
             respect_gitignore: true,

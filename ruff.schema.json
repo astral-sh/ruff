@@ -441,7 +441,7 @@
         }
       }
     },
-    "preview-mode": {
+    "preview": {
       "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will use unstable rules and fixes.",
       "type": [
         "boolean",
