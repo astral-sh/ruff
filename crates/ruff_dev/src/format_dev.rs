@@ -94,6 +94,8 @@ pub(crate) struct Statistics {
     ruff_output: u32,
     /// The number of matching identical lines
     intersection: u32,
+    /// Files that have differences
+    files_with_differences: u32,
 }
 
 impl Statistics {
@@ -104,6 +106,7 @@ impl Statistics {
                 black_input: 0,
                 ruff_output: 0,
                 intersection,
+                files_with_differences: 0,
             }
         } else {
             // `similar` was too slow (for some files >90% diffing instead of formatting)
@@ -117,6 +120,7 @@ impl Statistics {
                 black_input: changes.removals,
                 ruff_output: changes.insertions,
                 intersection: u32::try_from(input.before.len()).unwrap() - changes.removals,
+                files_with_differences: 1,
             }
         }
     }
@@ -141,6 +145,7 @@ impl Add<Statistics> for Statistics {
             black_input: self.black_input + rhs.black_input,
             ruff_output: self.ruff_output + rhs.ruff_output,
             intersection: self.intersection + rhs.intersection,
+            files_with_differences: self.files_with_differences + rhs.files_with_differences,
         }
     }
 }
@@ -231,10 +236,11 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         }
         info!(
             parent: None,
-            "Done: {} stability errors, {} files, similarity index {:.5}), took {:.2}s, {} input files contained syntax errors ",
+            "Done: {} stability errors, {} files, similarity index {:.5}), files with differences: {} took {:.2}s, {} input files contained syntax errors ",
             error_count,
             result.file_count,
             result.statistics.similarity_index(),
+            result.statistics.files_with_differences,
             result.duration.as_secs_f32(),
             result.syntax_error_in_input,
         );
@@ -336,11 +342,12 @@ fn format_dev_multi_project(
 
                 info!(
                     parent: None,
-                    "Finished {}: {} stability errors, {} files, similarity index {:.5}), took {:.2}s, {} input files contained syntax errors ",
+                    "Finished {}: {} stability errors, {} files, similarity index {:.5}), files with differences {}, took {:.2}s, {} input files contained syntax errors ",
                     project_path.display(),
                     result.error_count(),
                     result.file_count,
                     result.statistics.similarity_index(),
+                    result.statistics.files_with_differences,
                     result.duration.as_secs_f32(),
                     result.syntax_error_in_input,
                 );
@@ -387,20 +394,22 @@ fn format_dev_multi_project(
         let mut stats_file = BufWriter::new(File::create(stats_file)?);
         writeln!(
             stats_file,
-            "| {:<project_col_len$} | similarity index |",
+            "| {:<project_col_len$} | similarity index  | total files       | changed files     |",
             "project"
         )?;
         writeln!(
             stats_file,
-            "|-{:-<project_col_len$}-|------------------|",
+            "|-{:-<project_col_len$}-|------------------:|------------------:|------------------:|",
             ""
         )?;
         for result in results {
             writeln!(
                 stats_file,
-                "| {:<project_col_len$} | {:.5}          |",
+                "| {:<project_col_len$} |           {:.5} |             {:5} |             {:5} |",
                 result.name,
-                result.statistics.similarity_index()
+                result.statistics.similarity_index(),
+                result.file_count,
+                result.statistics.files_with_differences
             )?;
         }
     }
