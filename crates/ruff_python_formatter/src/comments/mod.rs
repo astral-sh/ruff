@@ -330,6 +330,17 @@ impl<'a> Comments<'a> {
         Self::new(map)
     }
 
+    /// Returns `true` if the given `node` has any comments.
+    #[inline]
+    pub(crate) fn has<T>(&self, node: T) -> bool
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
+        self.data
+            .comments
+            .has(&NodeRefEqualityKey::from_ref(node.into()))
+    }
+
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).
     #[inline]
     pub(crate) fn has_leading<T>(&self, node: T) -> bool

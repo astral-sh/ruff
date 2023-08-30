@@ -10,7 +10,8 @@ use ruff_python_ast::{
 };
 
 use crate::comments::{trailing_comments, trailing_node_comments, SourceComment};
-use crate::expression::expr_constant::ExprConstantLayout;
+use crate::expression::expr_constant::{is_multiline_string, ExprConstantLayout};
+use crate::expression::has_parentheses;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break,
     in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized, parenthesized,
@@ -263,10 +264,23 @@ impl NeedsParentheses for ExprBinOp {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
         if parent.is_expr_await() && !self.op.is_pow() {
             OptionalParentheses::Always
+        } else if let Expr::Constant(constant) = self.left.as_ref() {
+            // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
+            if !constant.value.is_implicit_concatenated()
+                && is_multiline_string(constant, context.source())
+                && has_parentheses(&self.right, context).is_some()
+                && !context.comments().has_dangling(self)
+                && !context.comments().has(self.left.as_ref())
+                && !context.comments().has(self.right.as_ref())
+            {
+                OptionalParentheses::Never
+            } else {
+                OptionalParentheses::Multiline
+            }
         } else {
             OptionalParentheses::Multiline
         }
