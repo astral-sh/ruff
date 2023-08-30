@@ -5,7 +5,9 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
+use ruff_python_trivia::{
+    lines_after, lines_after_ignoring_trivia, lines_before, PythonWhitespace,
+};
 
 use crate::comments::{CommentLinePosition, SourceComment};
 use crate::context::NodeLevel;
@@ -357,17 +359,30 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
-        // Start with 2 because of the two leading spaces.
-        let mut reserved_width = 2;
+        // Trim the normalized comment to detect excluded pragmas (don't handle NBSP).
+        let trimmed = strip_comment_prefix(&normalized_comment)?.trim_whitespace_start();
 
-        // SAFE: The formatted file is <= 4GB, and each comment should as well.
-        #[allow(clippy::cast_possible_truncation)]
-        for c in normalized_comment.chars() {
-            reserved_width += match c {
-                '\t' => f.options().tab_width().value(),
-                c => c.width().unwrap_or(0) as u32,
+        // Don't reserve width for excluded pragma comments.
+        let reserved_width = if ["noqa", "type:", "pyright:", "pylint"]
+            .iter()
+            .any(|prefix| trimmed.starts_with(prefix))
+        {
+            0
+        } else {
+            // Start with 2 because of the two leading spaces.
+            let mut width = 2;
+
+            // SAFETY: The formatted file is <= 4GB, and each comment should as well.
+            #[allow(clippy::cast_possible_truncation)]
+            for c in normalized_comment.chars() {
+                width += match c {
+                    '\t' => f.options().tab_width().value(),
+                    c => c.width().unwrap_or(0) as u32,
+                }
             }
-        }
+
+            width
+        };
 
         write!(
             f,
@@ -442,11 +457,7 @@ fn normalize_comment<'a>(
 
     let trimmed = comment_text.trim_end();
 
-    let Some(content) = trimmed.strip_prefix('#') else {
-        return Err(FormatError::syntax_error(
-            "Didn't find expected comment token `#`",
-        ));
-    };
+    let content = strip_comment_prefix(trimmed)?;
 
     if content.is_empty() {
         return Ok(Cow::Borrowed("#"));
@@ -474,4 +485,15 @@ fn normalize_comment<'a>(
     }
 
     Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
+}
+
+/// A helper for stripping '#' from comments.
+fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
+    let Some(content) = comment_text.strip_prefix('#') else {
+        return Err(FormatError::syntax_error(
+            "Didn't find expected comment token `#`",
+        ));
+    };
+
+    Ok(content)
 }
