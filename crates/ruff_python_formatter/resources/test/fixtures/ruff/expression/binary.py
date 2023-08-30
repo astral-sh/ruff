@@ -285,3 +285,31 @@ expected_content = """<?xml version="1.0" encoding="UTF-8"?>
 call(arg1, arg2, """
 short
 """, arg3=True)
+
+expected_content = (
+    """<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>%s/simple/sitemap-simple.xml</loc><lastmod>%s</lastmod>
+</sitemap>
+</sitemapindex>
+"""
+    %
+    (
+        self.base_url
+    )
+)
+
+
+expected_content = (
+    """<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>%s/simple/sitemap-simple.xml</loc><lastmod>%s</lastmod>
+</sitemap>
+</sitemapindex>
+"""
+    %
+    (
+        # Needs parentheses
+        self.base_url
+    )
+)

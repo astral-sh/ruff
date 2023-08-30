@@ -11,7 +11,7 @@ use ruff_python_ast::{
 
 use crate::comments::{trailing_comments, trailing_node_comments, SourceComment};
 use crate::expression::expr_constant::{is_multiline_string, ExprConstantLayout};
-use crate::expression::has_own_parentheses;
+use crate::expression::has_parentheses;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break,
     in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized, parenthesized,
@@ -272,7 +272,7 @@ impl NeedsParentheses for ExprBinOp {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
             if !constant.value.is_implicit_concatenated()
                 && is_multiline_string(constant, context.source())
-                && has_own_parentheses(&self.right, context).is_some()
+                && has_parentheses(&self.right, context).is_some()
                 && !context.comments().has_dangling(self)
                 && !context.comments().has(self.left.as_ref())
                 && !context.comments().has(self.right.as_ref())
