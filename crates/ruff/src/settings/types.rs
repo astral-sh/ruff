@@ -101,9 +101,10 @@ pub enum PreviewMode {
 
 impl From<bool> for PreviewMode {
     fn from(version: bool) -> Self {
-        match version {
-            true => PreviewMode::Enabled,
-            false => PreviewMode::Disabled,
+        if version {
+            PreviewMode::Enabled
+        } else {
+            PreviewMode::Disabled
         }
     }
 }
