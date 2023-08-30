@@ -116,7 +116,7 @@ pub struct CheckCommand {
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
     /// Enable preview mode
-    #[arg(long, overrides_with("no_preview"))]
+    #[arg(long, overrides_with("no_preview"), hide = true)]
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
