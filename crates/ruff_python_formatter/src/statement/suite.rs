@@ -255,7 +255,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 //     ...
                 // ```
                 empty_line().fmt(f)?;
-                after_class_docstring = false;
             } else {
                 // Insert the appropriate number of empty lines based on the node level, e.g.:
                 // * [`NodeLevel::Module`]: Up to two empty lines
@@ -320,6 +319,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 following.format().fmt(f)?;
                 preceding = following;
             }
+            after_class_docstring = false;
         }
 
         Ok(())
