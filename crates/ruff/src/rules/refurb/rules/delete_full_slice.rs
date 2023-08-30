@@ -1,13 +1,13 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::{is_dict, is_list};
 use ruff_python_semantic::{Binding, SemanticModel};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::rules::refurb::helpers::make_name_method_call_suggestion;
 
 /// ## What it does
 /// Checks for `del` statements that delete the entire slice of a list or
@@ -65,7 +65,7 @@ pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete)
 
         // Fix is only supported for single-target deletions.
         if checker.patch(diagnostic.kind.rule()) && delete.targets.len() == 1 {
-            let replacement = make_suggestion(name, checker.generator());
+            let replacement = make_name_method_call_suggestion(name, "clear", checker.generator());
             diagnostic.set_fix(Fix::suggested(Edit::replacement(
                 replacement,
                 delete.start(),
@@ -117,39 +117,4 @@ fn match_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a 
 
     // Name is needed for the fix suggestion.
     Some(name)
-}
-
-/// Make fix suggestion for the given name, ie `name.clear()`.
-fn make_suggestion(name: &str, generator: Generator) -> String {
-    // Here we construct `var.clear()`
-    //
-    // And start with construction of `var`
-    let var = ast::ExprName {
-        id: name.to_string(),
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-    };
-    // Make `var.clear`.
-    let attr = ast::ExprAttribute {
-        value: Box::new(var.into()),
-        attr: ast::Identifier::new("clear".to_string(), TextRange::default()),
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-    };
-    // Make it into a call `var.clear()`
-    let call = ast::ExprCall {
-        func: Box::new(attr.into()),
-        arguments: ast::Arguments {
-            args: vec![],
-            keywords: vec![],
-            range: TextRange::default(),
-        },
-        range: TextRange::default(),
-    };
-    // And finally, turn it into a statement.
-    let stmt = ast::StmtExpr {
-        value: Box::new(call.into()),
-        range: TextRange::default(),
-    };
-    generator.stmt(&stmt.into())
 }
