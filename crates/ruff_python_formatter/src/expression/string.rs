@@ -212,7 +212,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                     // )
                     // ```
                     let leading_comments_end = dangling_comments
-                        .partition_point(|comment| comment.slice().start() <= token_range.start());
+                        .partition_point(|comment| comment.start() <= token_range.start());
 
                     let (leading_part_comments, rest) =
                         dangling_comments.split_at(leading_comments_end);
@@ -227,7 +227,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                         comment.line_position().is_end_of_line()
                             && !locator.contains_line_break(TextRange::new(
                                 token_range.end(),
-                                comment.slice().start(),
+                                comment.start(),
                             ))
                     });
 

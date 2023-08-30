@@ -40,9 +40,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
             .iter()
             .filter(|comment| comment.is_unformatted())
         {
-            let slice = comment.slice();
-
-            let lines_after_comment = lines_after(slice.end(), f.context().source());
+            let lines_after_comment = lines_after(comment.end(), f.context().source());
             write!(
                 f,
                 [format_comment(comment), empty_lines(lines_after_comment)]
@@ -83,7 +81,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
         if let Some(first_leading) = self.comments.first() {
             // Leading comments only preserves the lines after the comment but not before.
             // Insert the necessary lines.
-            if lines_before(first_leading.slice().start(), f.context().source()) > 1 {
+            if lines_before(first_leading.start(), f.context().source()) > 1 {
                 write!(f, [empty_line()])?;
             }
 
@@ -133,12 +131,10 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
             .iter()
             .filter(|comment| comment.is_unformatted())
         {
-            let slice = trailing.slice();
-
             has_trailing_own_line_comment |= trailing.line_position().is_own_line();
 
             if has_trailing_own_line_comment {
-                let lines_before_comment = lines_before(slice.start(), f.context().source());
+                let lines_before_comment = lines_before(trailing.start(), f.context().source());
 
                 // A trailing comment at the end of a body or list
                 // ```python
@@ -223,7 +219,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
                 f,
                 [
                     format_comment(comment),
-                    empty_lines(lines_after(comment.slice().end(), f.context().source()))
+                    empty_lines(lines_after(comment.end(), f.context().source()))
                 ]
             )?;
 

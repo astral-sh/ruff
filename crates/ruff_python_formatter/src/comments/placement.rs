@@ -647,11 +647,10 @@ fn handle_parameters_separator_comment<'a>(
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     let (slash, star) = find_parameter_separators(locator.contents(), parameters);
-    let comment_range = comment.slice().range();
     let placement = assign_argument_separator_comment_placement(
         slash.as_ref(),
         star.as_ref(),
-        comment_range,
+        comment.range(),
         comment.line_position(),
     );
     if placement.is_some() {
@@ -695,9 +694,7 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
         .expect("Expected a token for the operator")
         .start();
 
-    let comment_range = comment.slice().range();
-
-    if comment_range.end() < operator_offset {
+    if comment.end() < operator_offset {
         // ```python
         // a = (
         //      5
@@ -816,8 +813,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     }
 
     // Make the comment a leading comment if there's no empty line between the comment and the function / class header
-    if max_empty_lines(locator.slice(TextRange::new(comment.slice().end(), following.start()))) == 0
-    {
+    if max_empty_lines(locator.slice(TextRange::new(comment.end(), following.start()))) == 0 {
         CommentPlacement::leading(following, comment)
     } else {
         // Otherwise attach the comment as trailing comment to the previous statement
@@ -872,8 +868,7 @@ fn handle_slice_comments<'a>(
         return CommentPlacement::dangling(comment.enclosing_node(), comment);
     }
 
-    let assignment =
-        assign_comment_in_slice(comment.slice().range(), locator.contents(), expr_slice);
+    let assignment = assign_comment_in_slice(comment.range(), locator.contents(), expr_slice);
     let node = match assignment {
         ExprSliceCommentSection::Lower => lower,
         ExprSliceCommentSection::Upper => upper,
@@ -1558,7 +1553,7 @@ fn handle_comprehension_comment<'a>(
     //      b in c
     //  ]
     // ```
-    if comment.slice().end() < comprehension.target.start() {
+    if comment.end() < comprehension.target.start() {
         return if is_own_line {
             // own line comments are correctly assigned as leading the target
             CommentPlacement::Default(comment)
