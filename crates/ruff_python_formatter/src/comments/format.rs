@@ -5,9 +5,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_trivia::{
-    lines_after, lines_after_ignoring_trivia, lines_before, PythonWhitespace,
-};
+use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 
 use crate::comments::{CommentLinePosition, SourceComment};
 use crate::context::NodeLevel;
@@ -360,7 +358,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
         let normalized_comment = normalize_comment(self.comment, source)?;
 
         // Trim the normalized comment to detect excluded pragmas (don't handle NBSP).
-        let trimmed = strip_comment_prefix(&normalized_comment)?.trim_whitespace_start();
+        let trimmed = strip_comment_prefix(&normalized_comment)?.trim_start();
 
         // Don't reserve width for excluded pragma comments.
         let reserved_width = if ["noqa", "type:", "pyright:", "pylint"]
