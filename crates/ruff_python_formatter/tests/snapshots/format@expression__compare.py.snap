@@ -231,7 +231,6 @@ def f():
         == unicodedata.normalize("NFKC", s2).casefold()
     )
 
-
 # Call expressions with trailing attributes.
 
 ct_match = (

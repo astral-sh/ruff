@@ -45,8 +45,6 @@ not_fixed
     	 more
     else:
     	   other
-
-
 # fmt: on
 ```
 
@@ -74,8 +72,6 @@ not_fixed
   	 more
   else:
   	   other
-
-
 # fmt: on
 ```
 
@@ -103,8 +99,6 @@ not_fixed
 		 more
 	else:
 		   other
-
-
 # fmt: on
 ```
 

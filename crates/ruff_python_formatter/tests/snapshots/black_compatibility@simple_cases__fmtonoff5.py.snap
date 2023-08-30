@@ -110,7 +110,15 @@ elif   unformatted:
      },
  )
  
-@@ -82,6 +81,6 @@
+@@ -74,7 +73,6 @@
+ class Factory(t.Protocol):
+     def this_will_be_formatted(self, **kwargs) -> Named:
+         ...
+-
+     # fmt: on
+ 
+ 
+@@ -82,6 +80,6 @@
  if x:
      return x
  # fmt: off
@@ -198,7 +206,6 @@ class Named(t.Protocol):
 class Factory(t.Protocol):
     def this_will_be_formatted(self, **kwargs) -> Named:
         ...
-
     # fmt: on
 
 

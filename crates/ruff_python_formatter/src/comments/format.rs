@@ -1,11 +1,11 @@
 use std::borrow::Cow;
-use unicode_width::UnicodeWidthChar;
 
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use unicode_width::UnicodeWidthChar;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::{CommentLinePosition, SourceComment};
 use crate::context::NodeLevel;
@@ -474,46 +474,4 @@ fn normalize_comment<'a>(
     }
 
     Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
-}
-
-/// Format the empty lines between a node and its trailing comments.
-///
-/// For example, given:
-/// ```python
-/// def func():
-///     ...
-/// # comment
-/// ```
-///
-/// This builder will insert two empty lines before the comment.
-/// ```
-pub(crate) const fn empty_lines_before_trailing_comments(
-    comments: &[SourceComment],
-    expected: u32,
-) -> FormatEmptyLinesBeforeTrailingComments {
-    FormatEmptyLinesBeforeTrailingComments { comments, expected }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub(crate) struct FormatEmptyLinesBeforeTrailingComments<'a> {
-    /// The trailing comments of the node.
-    comments: &'a [SourceComment],
-    /// The expected number of empty lines before the trailing comments.
-    expected: u32,
-}
-
-impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
-        if let Some(comment) = self
-            .comments
-            .iter()
-            .find(|comment| comment.line_position().is_own_line())
-        {
-            let actual = lines_before(comment.start(), f.context().source()).saturating_sub(1);
-            for _ in actual..self.expected {
-                write!(f, [empty_line()])?;
-            }
-        }
-        Ok(())
-    }
 }

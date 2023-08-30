@@ -3,9 +3,7 @@ use ruff_python_ast::{Parameters, StmtFunctionDef};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
-use crate::comments::format::empty_lines_before_trailing_comments;
 use crate::comments::SourceComment;
-use crate::context::NodeLevel;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
@@ -146,33 +144,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                 ),
                 clause_body(body, trailing_definition_comments).with_kind(SuiteKind::Function),
             ]
-        )?;
-
-        // If the function contains trailing comments, insert newlines before them.
-        // For example, given:
-        // ```python
-        // def func():
-        //     ...
-        // # comment
-        // ```
-        //
-        // At the top-level, reformat as:
-        // ```python
-        // def func():
-        //     ...
-        //
-        //
-        // # comment
-        // ```
-        empty_lines_before_trailing_comments(
-            comments.trailing(item),
-            if f.context().node_level() == NodeLevel::TopLevel {
-                2
-            } else {
-                1
-            },
         )
-        .fmt(f)
     }
 
     fn fmt_dangling_comments(

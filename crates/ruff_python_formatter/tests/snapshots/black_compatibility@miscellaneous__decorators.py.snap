@@ -162,7 +162,7 @@ def f():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,29 +1,205 @@
+@@ -1,29 +1,182 @@
 +# This file doesn't use the standard decomposition.
 +# Decorator syntax test cases are separated by double # comments.
 +# Those before the 'output' comment are valid under the old syntax.
@@ -176,14 +176,12 @@ def f():
 +def f():
 +    ...
 +
-+
 +##
 +
 +
 +@decorator()
 +def f():
 +    ...
-+
 +
 +##
 +
@@ -192,14 +190,12 @@ def f():
 +def f():
 +    ...
 +
-+
 +##
 +
 +
 +@decorator(kwarg=0)
 +def f():
 +    ...
-+
 +
 +##
 +
@@ -208,49 +204,48 @@ def f():
 +def f():
 +    ...
 +
-+
-+##
-+
+ ##
+ 
+-@decorator()()
 +
 +@decorator(**kwargs)
-+def f():
-+    ...
-+
-+
-+##
-+
+ def f():
+     ...
+ 
+ ##
+ 
+-@(decorator)
 +
 +@decorator(*args, **kwargs)
-+def f():
-+    ...
-+
-+
-+##
-+
+ def f():
+     ...
+ 
+ ##
+ 
+-@sequence["decorator"]
 +
 +@decorator(
 +    *args,
 +    **kwargs,
 +)
-+def f():
-+    ...
-+
-+
-+##
-+
+ def f():
+     ...
+ 
+ ##
+ 
+-@decorator[List[str]]
 +
 +@dotted.decorator
-+def f():
-+    ...
-+
-+
-+##
-+
+ def f():
+     ...
+ 
+ ##
+ 
+-@var := decorator
 +
 +@dotted.decorator(arg)
 +def f():
 +    ...
-+
 +
 +##
 +
@@ -259,54 +254,43 @@ def f():
 +def f():
 +    ...
 +
++##
 +
- ##
- 
--@decorator()()
 +
 +@dotted.decorator(*args)
- def f():
-     ...
- 
++def f():
++    ...
 +
- ##
- 
--@(decorator)
++##
++
 +
 +@dotted.decorator(**kwargs)
- def f():
-     ...
- 
++def f():
++    ...
 +
- ##
- 
--@sequence["decorator"]
++##
++
 +
 +@dotted.decorator(*args, **kwargs)
- def f():
-     ...
- 
++def f():
++    ...
 +
- ##
- 
--@decorator[List[str]]
++##
++
 +
 +@dotted.decorator(
 +    *args,
 +    **kwargs,
 +)
- def f():
-     ...
- 
++def f():
++    ...
 +
- ##
- 
--@var := decorator
++##
++
 +
 +@double.dotted.decorator
 +def f():
 +    ...
-+
 +
 +##
 +
@@ -315,14 +299,12 @@ def f():
 +def f():
 +    ...
 +
-+
 +##
 +
 +
 +@double.dotted.decorator(kwarg=0)
 +def f():
 +    ...
-+
 +
 +##
 +
@@ -331,7 +313,6 @@ def f():
 +def f():
 +    ...
 +
-+
 +##
 +
 +
@@ -339,14 +320,12 @@ def f():
 +def f():
 +    ...
 +
-+
 +##
 +
 +
 +@double.dotted.decorator(*args, **kwargs)
 +def f():
 +    ...
-+
 +
 +##
 +
@@ -358,14 +337,12 @@ def f():
 +def f():
 +    ...
 +
-+
 +##
 +
 +
 +@_(sequence["decorator"])
 +def f():
 +    ...
-+
 +
 +##
 +
@@ -391,14 +368,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @decorator()
 def f():
     ...
-
 
 ##
 
@@ -407,14 +382,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @decorator(kwarg=0)
 def f():
     ...
-
 
 ##
 
@@ -423,7 +396,6 @@ def f():
 def f():
     ...
 
-
 ##
 
 
@@ -431,14 +403,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @decorator(*args, **kwargs)
 def f():
     ...
-
 
 ##
 
@@ -450,14 +420,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @dotted.decorator
 def f():
     ...
-
 
 ##
 
@@ -466,14 +434,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @dotted.decorator(kwarg=0)
 def f():
     ...
-
 
 ##
 
@@ -482,7 +448,6 @@ def f():
 def f():
     ...
 
-
 ##
 
 
@@ -490,14 +455,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @dotted.decorator(*args, **kwargs)
 def f():
     ...
-
 
 ##
 
@@ -509,14 +472,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @double.dotted.decorator
 def f():
     ...
-
 
 ##
 
@@ -525,14 +486,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @double.dotted.decorator(kwarg=0)
 def f():
     ...
-
 
 ##
 
@@ -541,7 +500,6 @@ def f():
 def f():
     ...
 
-
 ##
 
 
@@ -549,14 +507,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @double.dotted.decorator(*args, **kwargs)
 def f():
     ...
-
 
 ##
 
@@ -568,14 +524,12 @@ def f():
 def f():
     ...
 
-
 ##
 
 
 @_(sequence["decorator"])
 def f():
     ...
-
 
 ##
 
