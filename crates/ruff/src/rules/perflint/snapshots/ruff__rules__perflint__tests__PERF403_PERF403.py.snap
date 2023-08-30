@@ -17,14 +17,4 @@ PERF403.py:13:13: PERF403 Use a dictionary comprehension instead of a for-loop
    |             ^^^^^^^^^^^^^^^^^^ PERF403
    |
 
-PERF403.py:33:13: PERF403 Use a dictionary comprehension instead of a for-loop
-   |
-31 |     for idx, name in enumerate(fruit):
-32 |         if idx % 2:
-33 |             result[idx] = name  # PERF403
-   |             ^^^^^^^^^^^^^^^^^^ PERF403
-34 |         else:
-35 |             result[idx] = name
-   |
-
 

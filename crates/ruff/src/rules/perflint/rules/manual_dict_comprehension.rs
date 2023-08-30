@@ -47,64 +47,83 @@ impl Violation for ManualDictComprehension {
 
 /// PERF403
 pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
-    let [stmt] = body else {
-        return;
-    };
-
     // For a dictionary comprehension to be appropriate, the loop needs both an index
     // and a value, so the target must be a tuple.
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
         return;
     };
 
-
-    let names = elts
-        .iter()
-        .filter_map(|elt| {
-            if let Expr::Name(ast::ExprName { id, .. }) = elt {
-                Some(id.as_str())
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-
-    if names.is_empty() {
+    let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
+        id: target_value, ..
+    })] = elts.as_slice()
+    else {
         return;
-    }
+    };
 
-    if let Stmt::If(ast::StmtIf { body: if_body, elif_else_clauses, .. }) = stmt {
-        // Key-value assignment within an if-statement (e.g., `if condition: result[key] = value`).
-        // Exclude if/elif/else statements as they cannot easily be replaced by a dict comprehension
-        if elif_else_clauses.len() > 1 {
-            return;
+    let stmt = match body {
+        // ```python
+        // for idx, name in enumerate(names):
+        //     if idx % 2 == 0:
+        //         result[name] = idx
+        // ```
+        [Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        })] => {
+            // TODO(charlie): If there's an `else` clause, verify that the `else` has the
+            // same structure.
+            if !elif_else_clauses.is_empty() {
+                return;
+            }
+            let [stmt] = body.as_slice() else {
+                return;
+            };
+            stmt
         }
-        for stmt in if_body {
-            check_for_slow_dict_creation(checker, &names, stmt);
-        }
-    } else {
-        // Direct key-value assignment (e.g., `result[key] = value`).
-        check_for_slow_dict_creation(checker, &names, stmt);
-    }
-}
+        // ```python
+        // for idx, name in enumerate(names):
+        //     result[name] = idx
+        // ```
+        [stmt] => stmt,
+        _ => return,
+    };
 
-fn check_for_slow_dict_creation(checker: &mut Checker, names: &[&str], stmt: &Stmt) {
     let Stmt::Assign(ast::StmtAssign {
         targets,
         value,
         range,
-        ..
     }) = stmt
     else {
         return;
     };
 
-    let [Expr::Subscript(ast::ExprSubscript { value: subscript_value, slice, .. })] = targets.as_slice() else {
+    let [Expr::Subscript(ast::ExprSubscript {
+        value: subscript_value,
+        slice,
+        ..
+    })] = targets.as_slice()
+    else {
         return;
     };
 
-    // Exclude non dictionary values from the check
-    let Expr::Name(ast::ExprName { id: subscript_name, .. }) = subscript_value.as_ref() else {
+    let Expr::Name(ast::ExprName { id: key, .. }) = slice.as_ref() else {
+        return;
+    };
+
+    let Expr::Name(ast::ExprName { id: value, .. }) = value.as_ref() else {
+        return;
+    };
+
+    if key != target_key || value != target_value {
+        return;
+    }
+
+    // Exclude non-dictionary value.
+    let Expr::Name(ast::ExprName {
+        id: subscript_name, ..
+    }) = subscript_value.as_ref()
+    else {
         return;
     };
     let scope = checker.semantic().current_scope();
@@ -118,20 +137,10 @@ fn check_for_slow_dict_creation(checker: &mut Checker, names: &[&str], stmt: &St
     };
 
     if !is_dict(binding, checker.semantic()) {
-        return
+        return;
     }
 
-    let Expr::Name(ast::ExprName { id: key, .. }) = slice.as_ref() else {
-        return;
-    };
-
-    let Expr::Name(ast::ExprName { id: value, .. }) = value.as_ref() else {
-        return;
-    };
-
-    if names.contains(&value.as_str()) && names.contains(&key.as_str()) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ManualDictComprehension, *range));
-    }
+    checker
+        .diagnostics
+        .push(Diagnostic::new(ManualDictComprehension, *range));
 }

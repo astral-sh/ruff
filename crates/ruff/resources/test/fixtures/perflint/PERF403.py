@@ -14,11 +14,21 @@ def foo():
 
 
 def foo():
+    result = []
+    fruit = ["apple", "pear", "orange"]
+    for idx, name in enumerate(fruit):
+        if idx % 2:
+            result[idx] = name  # OK because result is not a dictionary
+        else:
+            result[idx] = name
+
+
+def foo():
     result = {}
     fruit = ["apple", "pear", "orange"]
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # Ok because if/elif/else not replaceable by dict comprehension
+            result[idx] = name  # OK (if/elif/else isn't replaceable)
         elif idx % 3:
             result[idx] = name
         else:
@@ -30,7 +40,7 @@ def foo():
     fruit = ["apple", "pear", "orange"]
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # PERF403
+            result[idx] = name  # OK (false negative)
         else:
             result[idx] = name
 
@@ -40,17 +50,6 @@ def foo():
     fruit = ["apple", "pear", "orange"]
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # Ok because dict was not empty before loop
+            result[idx] = name  # PERF403 (false positive)
         else:
             result[idx] = name
-
-
-def foo():
-    result = []
-    fruit = ["apple", "pear", "orange"]
-    for idx, name in enumerate(fruit):
-        if idx % 2:
-            result[idx] = name  # Ok because result is not a dictionary
-        else:
-            result[idx] = name
-
