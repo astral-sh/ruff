@@ -1,8 +1,9 @@
 use std::borrow::Cow;
+use unicode_width::UnicodeWidthChar;
 
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
-use ruff_formatter::{format_args, write, FormatError, SourceCode};
+use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 
@@ -294,7 +295,7 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
-        format_normalized_comment(normalized_comment, slice.start()).fmt(f)
+        format_normalized_comment(normalized_comment, slice.range()).fmt(f)
     }
 }
 
@@ -355,7 +356,18 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
         let source = SourceCode::new(f.context().source());
 
         let normalized_comment = normalize_comment(self.comment, source)?;
-        let reserved_width = normalized_comment.text_len().to_u32() + 2; // Account for two added spaces
+
+        // Start with 2 because of the two leading spaces.
+        let mut reserved_width = 2;
+
+        // SAFE: The formatted file is <= 4GB, and each comment should as well.
+        #[allow(clippy::cast_possible_truncation)]
+        for c in normalized_comment.chars() {
+            reserved_width += match c {
+                '\t' => f.options().tab_width().value(),
+                c => c.width().unwrap_or(0) as u32,
+            }
+        }
 
         write!(
             f,
@@ -364,7 +376,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
                     &format_args![
                         space(),
                         space(),
-                        format_normalized_comment(normalized_comment, slice.start())
+                        format_normalized_comment(normalized_comment, slice.range())
                     ],
                     reserved_width
                 ),
@@ -383,29 +395,34 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 ///   a dynamic text element at the original slice's start position.
 pub(crate) const fn format_normalized_comment(
     comment: Cow<'_, str>,
-    start_position: TextSize,
+    range: TextRange,
 ) -> FormatNormalizedComment<'_> {
-    FormatNormalizedComment {
-        comment,
-        start_position,
-    }
+    FormatNormalizedComment { comment, range }
 }
 
 pub(crate) struct FormatNormalizedComment<'a> {
     comment: Cow<'a, str>,
-    start_position: TextSize,
+    range: TextRange,
 }
 
 impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         match self.comment {
             Cow::Borrowed(borrowed) => source_text_slice(
-                TextRange::at(self.start_position, borrowed.text_len()),
+                TextRange::at(self.range.start(), borrowed.text_len()),
                 ContainsNewlines::No,
             )
             .fmt(f),
 
-            Cow::Owned(ref owned) => dynamic_text(owned, Some(self.start_position)).fmt(f),
+            Cow::Owned(ref owned) => {
+                write!(
+                    f,
+                    [
+                        dynamic_text(owned, Some(self.range.start())),
+                        source_position(self.range.end())
+                    ]
+                )
+            }
         }
     }
 }
@@ -424,7 +441,6 @@ fn normalize_comment<'a>(
     let comment_text = slice.text(source);
 
     let trimmed = comment_text.trim_end();
-    let trailing_whitespace_len = comment_text.text_len() - trimmed.text_len();
 
     let Some(content) = trimmed.strip_prefix('#') else {
         return Err(FormatError::syntax_error(
@@ -439,8 +455,8 @@ fn normalize_comment<'a>(
     // Fast path for correctly formatted comments:
     // * Start with a `# '.
     // * Have no trailing whitespace.
-    if trailing_whitespace_len == TextSize::new(0) && content.starts_with(' ') {
-        return Ok(Cow::Borrowed(comment_text));
+    if content.starts_with([' ', '!', ':', '#', '\'']) {
+        return Ok(Cow::Borrowed(trimmed));
     }
 
     if content.starts_with('\u{A0}') {
@@ -457,10 +473,5 @@ fn normalize_comment<'a>(
         }
     }
 
-    // We normalize the leading space if we can.
-    if !content.starts_with([' ', '!', ':', '#', '\'']) {
-        return Ok(Cow::Owned(std::format!("# {}", content.trim_start())));
-    }
-
-    Ok(Cow::Owned(std::format!("#{content}")))
+    Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
 }
