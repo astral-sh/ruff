@@ -268,7 +268,9 @@ d13 = (
 )
 
 # Doesn't fit, default
-d2 = x.e().esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkfsdddd()  #
+d2 = (
+    x.e().esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkfsdddd()  #
+)
 
 # Doesn't fit, fluent style
 d3 = (

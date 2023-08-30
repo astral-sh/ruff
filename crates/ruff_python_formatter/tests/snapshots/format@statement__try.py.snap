@@ -324,7 +324,9 @@ finally:
 
 try:  # 1 preceding: any, following: first in body, enclosing: try
     print(1)  # 2 preceding: last in body, following: fist in alt body, enclosing: try
-except ZeroDivisionError:  # 3 preceding: test, following: fist in alt body, enclosing: try
+except (
+    ZeroDivisionError
+):  # 3 preceding: test, following: fist in alt body, enclosing: try
     print(2)  # 4 preceding: last in body, following: fist in alt body, enclosing: exc
 except:  # 5 preceding: last in body, following: fist in alt body, enclosing: try
     print(2)  # 6 preceding: last in body, following: fist in alt body, enclosing: exc
