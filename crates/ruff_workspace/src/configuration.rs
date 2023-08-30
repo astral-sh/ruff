@@ -23,7 +23,8 @@ use ruff::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff::rule_selector::Specificity;
 use ruff::settings::rule_table::RuleTable;
 use ruff::settings::types::{
-    FilePattern, FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat, Version,
+    FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
+    Version,
 };
 use ruff::settings::{defaults, resolve_per_file_ignores, AllSettings, CliSettings, Settings};
 use ruff::{fs, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION};
@@ -67,7 +68,7 @@ pub struct Configuration {
     pub line_length: Option<LineLength>,
     pub logger_objects: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
-    pub preview: Option<bool>,
+    pub preview: Option<PreviewMode>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
     pub show_fixes: Option<bool>,
@@ -389,7 +390,7 @@ impl Configuration {
                 .namespace_packages
                 .map(|namespace_package| resolve_src(&namespace_package, project_root))
                 .transpose()?,
-            preview: options.preview,
+            preview: options.preview.map(PreviewMode::from),
             per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
                     .into_iter()

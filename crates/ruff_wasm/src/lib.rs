@@ -8,7 +8,7 @@ use ruff::directives;
 use ruff::line_width::{LineLength, TabSize};
 use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
-use ruff::settings::types::PythonVersion;
+use ruff::settings::types::{PythonVersion};
 use ruff::settings::{defaults, flags, Settings};
 use ruff_formatter::{FormatResult, Formatted};
 use ruff_python_ast::{Mod, PySourceType};

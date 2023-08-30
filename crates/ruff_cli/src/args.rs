@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::settings::types::{
-    FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
+    FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
 };
 use ruff::RuleSelector;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -463,7 +463,7 @@ impl CheckCommand {
                 ignore: self.ignore,
                 line_length: self.line_length,
                 per_file_ignores: self.per_file_ignores,
-                preview: resolve_bool_arg(self.preview, self.no_preview),
+                preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,
@@ -575,7 +575,7 @@ pub struct Overrides {
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
-    pub preview: Option<bool>,
+    pub preview: Option<PreviewMode>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
     pub show_source: Option<bool>,

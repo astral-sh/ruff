@@ -4,7 +4,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
-use super::types::{FilePattern, PythonVersion};
+use super::types::{FilePattern, PreviewMode, PythonVersion};
 use super::Settings;
 use crate::codes::{self, RuleCodePrefix};
 use crate::line_width::{LineLength, TabSize};
@@ -84,7 +84,7 @@ impl Default for Settings {
             line_length: LineLength::default(),
             logger_objects: vec![],
             namespace_packages: vec![],
-            preview: false,
+            preview: PreviewMode::default(),
             per_file_ignores: vec![],
             project_root: path_dedot::CWD.clone(),
             respect_gitignore: true,

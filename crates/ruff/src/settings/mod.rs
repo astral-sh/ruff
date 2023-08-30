@@ -24,6 +24,7 @@ use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, Seria
 use super::line_width::{LineLength, TabSize};
 
 use self::rule_table::RuleTable;
+use self::types::PreviewMode;
 
 pub mod defaults;
 pub mod flags;
@@ -55,7 +56,7 @@ pub struct Settings {
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 
     pub target_version: PythonVersion,
-    pub preview: bool,
+    pub preview: PreviewMode,
 
     // Resolver settings
     pub exclude: FilePatternSet,
