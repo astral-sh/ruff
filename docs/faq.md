@@ -382,13 +382,13 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 By default, no `convention` is set, and so the enabled rules are determined by the `select` setting
 alone.
 
-## What is the "nursery"?
+## What is preview mode?
 
-The "nursery" is a collection of newer rules that are considered experimental or unstable.
+Preview mode enables a collection of newer rules and fixes that are considered experimental or unstable.
 
-If a rule is marked as part of the "nursery", it can only be enabled via direct selection. For
-example, consider a hypothetical rule, `HYP001`. If `HYP001` were included in the "nursery", it
-could be enabled by adding the following to your `pyproject.toml`:
+If a rule is marked as preview, it can only be enabled via direct selection or the `--preview` flag. For
+example, consider a hypothetical rule, `HYP001`. If `HYP001` were in preview, it could be enabled by adding the 
+following to your `pyproject.toml`:
 
 ```toml
 [tool.ruff]
@@ -409,10 +409,15 @@ Similarly, it would _not_ be enabled via the `ALL` selector:
 select = ["ALL"]
 ```
 
-(The "nursery" terminology comes from [Clippy](https://doc.rust-lang.org/nightly/clippy/), a similar
-tool for linting Rust code.)
+Unless you also enabled `preview`:
 
-To see which rules are currently in the "nursery", visit the [rules reference](https://beta.ruff.rs/docs/rules/).
+```toml
+[tool.ruff]
+select = ["ALL"]
+preview = true
+```
+
+To see which rules are currently in preview, visit the [rules reference](https://beta.ruff.rs/docs/rules/).
 
 ## How can I tell what settings Ruff is using to check my code?
 

@@ -19,7 +19,7 @@ struct Explanation<'a> {
     message_formats: &'a [&'a str],
     autofix: String,
     explanation: Option<&'a str>,
-    nursery: bool,
+    preview: bool,
 }
 
 impl<'a> Explanation<'a> {
@@ -35,7 +35,7 @@ impl<'a> Explanation<'a> {
             message_formats: rule.message_formats(),
             autofix,
             explanation: rule.explanation(),
-            nursery: rule.is_nursery(),
+            preview: rule.is_preview(),
         }
     }
 }
@@ -58,11 +58,10 @@ fn format_rule_text(rule: Rule) -> String {
         output.push('\n');
     }
 
-    if rule.is_nursery() {
+    if rule.is_preview() {
         output.push_str(&format!(
-            r#"This rule is part of the **nursery**, a collection of newer lints that are
-still under development. As such, it must be enabled by explicitly selecting
-{}."#,
+            r#"This rule is in preview and is not stable. It may be enabled by explicitly selecting {}"
+" or providing the `--preview` flag."#,
             rule.noqa_code()
         ));
         output.push('\n');

@@ -43,11 +43,10 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            if rule.is_nursery() {
+            if rule.is_preview() {
                 output.push_str(&format!(
-                    r#"This rule is part of the **nursery**, a collection of newer lints that are
-still under development. As such, it must be enabled by explicitly selecting
-{}."#,
+                    r#"This rule is in preview and is not stable. It may be enabled by explicitly selecting {}"
+" or providing the `--preview` flag."#,
                     rule.noqa_code()
                 ));
                 output.push('\n');

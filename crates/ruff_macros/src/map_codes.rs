@@ -8,7 +8,7 @@ use syn::{
     Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
 };
 
-use crate::rule_code_prefix::{get_prefix_ident, if_all_same, is_nursery};
+use crate::rule_code_prefix::{get_prefix_ident, if_all_same, is_preview};
 
 /// A rule entry in the big match statement such a
 /// `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
@@ -199,7 +199,7 @@ fn rules_by_prefix(
         // Nursery rules have to be explicitly selected, so we ignore them when looking at
         // prefix-level selectors (e.g., `--select SIM10`), but add the rule itself under
         // its fully-qualified code (e.g., `--select SIM101`).
-        if is_nursery(&rule.group) {
+        if is_preview(&rule.group) {
             rules_by_prefix.insert(code.clone(), vec![(rule.path.clone(), rule.attrs.clone())]);
             continue;
         }
@@ -211,7 +211,7 @@ fn rules_by_prefix(
                 .filter_map(|(code, rule)| {
                     // Nursery rules have to be explicitly selected, so we ignore them when
                     // looking at prefixes.
-                    if is_nursery(&rule.group) {
+                    if is_preview(&rule.group) {
                         return None;
                     }
 
@@ -311,8 +311,8 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 }
             }
 
-            pub fn is_nursery(&self) -> bool {
-                matches!(self.group(), RuleGroup::Nursery)
+            pub fn is_preview(&self) -> bool {
+                matches!(self.group(), RuleGroup::Preview)
             }
         }
 
@@ -336,7 +336,7 @@ fn generate_iter_impl(
     let mut linter_rules_match_arms = quote!();
     let mut linter_all_rules_match_arms = quote!();
     for (linter, map) in linter_to_rules {
-        let rule_paths = map.values().filter(|rule| !is_nursery(&rule.group)).map(
+        let rule_paths = map.values().filter(|rule| !is_preview(&rule.group)).map(
             |Rule { attrs, path, .. }| {
                 let rule_name = path.segments.last().unwrap();
                 quote!(#(#attrs)* Rule::#rule_name)
