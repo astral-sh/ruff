@@ -398,6 +398,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
 - [Reflex](https://github.com/reflex-dev/reflex)
+- [Rippling](https://rippling.com)
 - [Robyn](https://github.com/sansyrox/robyn)
 - Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
 - Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
@@ -418,7 +419,6 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [meson-python](https://github.com/mesonbuild/meson-python)
 - [nox](https://github.com/wntrblm/nox)
 - [pip](https://github.com/pypa/pip)
-- [Rippling](https://rippling.com)
 
 ### Show Your Support
 
