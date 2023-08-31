@@ -14,8 +14,8 @@ use crate::rule_redirects::get_redirect;
 pub enum RuleSelector {
     /// Select all stable rules.
     All,
-    /// Legacy category to select all preview rules, previously known as the nursery
-    Nursery,
+    /// Category to select all preview rules, previously known as the nursery
+    Preview,
     /// Legacy category to select both the `mccabe` and `flake8-comprehensions` linters
     /// via a single selector.
     C,
@@ -43,7 +43,9 @@ impl FromStr for RuleSelector {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "ALL" => Ok(Self::All),
-            "NURSERY" => Ok(Self::Nursery),
+            // Legacy support for selecting preview rules as "nursery"
+            "NURSERY" => Ok(Self::Preview),
+            "PREVIEW" => Ok(Self::Preview),
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
@@ -81,7 +83,7 @@ impl RuleSelector {
     pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
             RuleSelector::All => ("", "ALL"),
-            RuleSelector::Nursery => ("", "NURSERY"),
+            RuleSelector::Preview => ("", "PREVIEW"),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
             RuleSelector::Prefix { prefix, .. } => {
@@ -151,7 +153,7 @@ impl IntoIterator for &RuleSelector {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
-            RuleSelector::Nursery => {
+            RuleSelector::Preview => {
                 RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_preview))
             }
             RuleSelector::C => RuleSelectorIter::Chain(
@@ -264,7 +266,7 @@ impl RuleSelector {
     pub fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
-            RuleSelector::Nursery => Specificity::All,
+            RuleSelector::Preview => Specificity::All,
             RuleSelector::T => Specificity::LinterGroup,
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
