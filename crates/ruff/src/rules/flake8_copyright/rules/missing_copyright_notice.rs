@@ -36,7 +36,14 @@ pub(crate) fn missing_copyright_notice(
     let contents = if locator.len() < 1024 {
         locator.contents()
     } else {
-        locator.up_to(TextSize::from(1024))
+        let char_boundary: u32 = (0..1024)
+            .rev()
+            .find(|&byte_idx| locator.contents().is_char_boundary(byte_idx))
+            .unwrap_or(0) // Default to 0 if no valid boundary is found
+            .try_into() // SAFETY: usize -> u32, 0 <= char_boundary <= 1024
+            .unwrap_or(0);
+
+        locator.up_to(TextSize::from(char_boundary))
     };
 
     // Locate the copyright notice.
