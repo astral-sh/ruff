@@ -95,6 +95,12 @@ impl PyFormatOptions {
     }
 
     #[must_use]
+    pub fn with_tab_width(mut self, tab_width: TabWidth) -> Self {
+        self.tab_width = tab_width;
+        self
+    }
+
+    #[must_use]
     pub fn with_quote_style(mut self, style: QuoteStyle) -> Self {
         self.quote_style = style;
         self
