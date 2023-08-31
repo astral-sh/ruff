@@ -247,6 +247,7 @@ PERF102.py:105:20: PERF102 [*] When using only the keys of a dict use the `keys(
     105 |+_ = [k for k in some_dict.keys()]
 106 106 | _ = {k for k, _ in some_dict.items()}
 107 107 | _ = {k: "v" for k, _ in some_dict.items()}
+108 108 | _ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
 
 PERF102.py:106:20: PERF102 [*] When using only the keys of a dict use the `keys()` method
     |
@@ -255,6 +256,7 @@ PERF102.py:106:20: PERF102 [*] When using only the keys of a dict use the `keys(
 106 | _ = {k for k, _ in some_dict.items()}
     |                    ^^^^^^^^^^^^^^^ PERF102
 107 | _ = {k: "v" for k, _ in some_dict.items()}
+108 | _ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
     |
     = help: Replace `.items()` with `.keys()`
 
@@ -265,6 +267,8 @@ PERF102.py:106:20: PERF102 [*] When using only the keys of a dict use the `keys(
 106     |-_ = {k for k, _ in some_dict.items()}
     106 |+_ = {k for k in some_dict.keys()}
 107 107 | _ = {k: "v" for k, _ in some_dict.items()}
+108 108 | _ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+109 109 | _ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
 
 PERF102.py:107:25: PERF102 [*] When using only the keys of a dict use the `keys()` method
     |
@@ -272,6 +276,8 @@ PERF102.py:107:25: PERF102 [*] When using only the keys of a dict use the `keys(
 106 | _ = {k for k, _ in some_dict.items()}
 107 | _ = {k: "v" for k, _ in some_dict.items()}
     |                         ^^^^^^^^^^^^^^^ PERF102
+108 | _ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+109 | _ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
     |
     = help: Replace `.items()` with `.keys()`
 
@@ -281,5 +287,59 @@ PERF102.py:107:25: PERF102 [*] When using only the keys of a dict use the `keys(
 106 106 | _ = {k for k, _ in some_dict.items()}
 107     |-_ = {k: "v" for k, _ in some_dict.items()}
     107 |+_ = {k: "v" for k in some_dict.keys()}
+108 108 | _ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+109 109 | _ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
+
+PERF102.py:108:28: PERF102 [*] When using only the keys of a dict use the `keys()` method
+    |
+106 | _ = {k for k, _ in some_dict.items()}
+107 | _ = {k: "v" for k, _ in some_dict.items()}
+108 | _ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+    |                            ^^^^^^^^^^^^^^^ PERF102
+109 | _ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
+    |
+    = help: Replace `.items()` with `.keys()`
+
+ℹ Suggested fix
+105 105 | _ = [k for k, _ in some_dict.items()]
+106 106 | _ = {k for k, _ in some_dict.items()}
+107 107 | _ = {k: "v" for k, _ in some_dict.items()}
+108     |-_ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+    108 |+_ = ((k1, k2) for k1 in some_dict.keys() for k2, _ in some_dict.items())
+109 109 | _ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
+
+PERF102.py:108:59: PERF102 [*] When using only the keys of a dict use the `keys()` method
+    |
+106 | _ = {k for k, _ in some_dict.items()}
+107 | _ = {k: "v" for k, _ in some_dict.items()}
+108 | _ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+    |                                                           ^^^^^^^^^^^^^^^ PERF102
+109 | _ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
+    |
+    = help: Replace `.items()` with `.keys()`
+
+ℹ Suggested fix
+105 105 | _ = [k for k, _ in some_dict.items()]
+106 106 | _ = {k for k, _ in some_dict.items()}
+107 107 | _ = {k: "v" for k, _ in some_dict.items()}
+108     |-_ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+    108 |+_ = ((k1, k2) for k1, _ in some_dict.items() for k2 in some_dict.keys())
+109 109 | _ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
+
+PERF102.py:109:59: PERF102 [*] When using only the keys of a dict use the `keys()` method
+    |
+107 | _ = {k: "v" for k, _ in some_dict.items()}
+108 | _ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+109 | _ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
+    |                                                           ^^^^^^^ PERF102
+    |
+    = help: Replace `.items()` with `.keys()`
+
+ℹ Suggested fix
+106 106 | _ = {k for k, _ in some_dict.items()}
+107 107 | _ = {k: "v" for k, _ in some_dict.items()}
+108 108 | _ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+109     |-_ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
+    109 |+_ = ((k1, k2) for k1, v in some_dict.items() for k2 in v.keys())
 
 

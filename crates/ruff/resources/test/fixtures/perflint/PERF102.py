@@ -102,8 +102,8 @@ def f():
 
 
 _ = (k for k, _ in some_dict.items())
-_ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
-_ = (k for k, v in some_dict.items() for k, _ in v.items())
 _ = [k for k, _ in some_dict.items()]
 _ = {k for k, _ in some_dict.items()}
 _ = {k: "v" for k, _ in some_dict.items()}
+_ = ((k1, k2) for k1, _ in some_dict.items() for k2, _ in some_dict.items())
+_ = ((k1, k2) for k1, v in some_dict.items() for k2, _ in v.items())
