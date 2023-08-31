@@ -1,0 +1,30 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/parentheses/best_fit.py
+---
+## Input
+```py
+UNUSABLE_PASSWORD_SUFFIX_LENGTH = 40  # number of random chars to add after UNUSABLE_PASSWORD_PREFIX
+
+
+UNUSABLE_PASSWORD_SUFFIX_LENGTH = (
+    40
+)  # number of random chars to add after UNUSABLE_PASSWORD_PREFIX
+
+
+```
+
+## Output
+```py
+UNUSABLE_PASSWORD_SUFFIX_LENGTH = (
+    40
+)  # number of random chars to add after UNUSABLE_PASSWORD_PREFIX
+
+
+UNUSABLE_PASSWORD_SUFFIX_LENGTH = (
+    40
+)  # number of random chars to add after UNUSABLE_PASSWORD_PREFIX
+```
+
+
+
