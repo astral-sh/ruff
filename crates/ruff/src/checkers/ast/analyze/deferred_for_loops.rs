@@ -19,7 +19,7 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
                 flake8_bugbear::rules::unused_loop_control_variable(checker, stmt_for);
             }
             if checker.enabled(Rule::IncorrectDictIterator) {
-                perflint::rules::incorrect_dict_iterator(checker, stmt_for);
+                perflint::rules::incorrect_dict_iterator_for(checker, stmt_for);
             }
             if checker.enabled(Rule::YieldInForLoop) {
                 pyupgrade::rules::yield_in_for_loop(checker, stmt_for);

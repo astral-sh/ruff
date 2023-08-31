@@ -15,8 +15,8 @@ use crate::rules::{
     flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging_format,
     flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self, flake8_simplify,
-    flake8_tidy_imports, flake8_use_pathlib, flynt, numpy, pandas_vet, pep8_naming, pycodestyle,
-    pyflakes, pygrep_hooks, pylint, pyupgrade, ruff,
+    flake8_tidy_imports, flake8_use_pathlib, flynt, numpy, pandas_vet, pep8_naming, perflint,
+    pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -1281,6 +1281,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     checker, expr, elt, generators,
                 );
             }
+            if checker.enabled(Rule::IncorrectDictIterator) {
+                perflint::rules::incorrect_dict_iterator_seq(checker, elt, generators);
+            }
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
             }
@@ -1304,6 +1307,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
             }
+            if checker.enabled(Rule::IncorrectDictIterator) {
+                perflint::rules::incorrect_dict_iterator_dict(checker, key, value, generators);
+            }
             if checker.enabled(Rule::IterationOverSet) {
                 for generator in generators {
                     pylint::rules::iteration_over_set(checker, &generator.iter);
@@ -1315,11 +1321,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }
         Expr::GeneratorExp(ast::ExprGeneratorExp {
             generators,
-            elt: _,
+            elt,
             range: _,
         }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
+            }
+            if checker.enabled(Rule::IncorrectDictIterator) {
+                perflint::rules::incorrect_dict_iterator_seq(checker, elt, generators);
             }
             if checker.enabled(Rule::IterationOverSet) {
                 for generator in generators {

@@ -1,8 +1,11 @@
 use std::fmt;
 
+use ast::{ExprContext, Identifier};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -56,36 +59,47 @@ impl AlwaysAutofixableViolation for IncorrectDictIterator {
     }
 }
 
-/// PERF102
-pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::StmtFor) {
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
-        return;
+fn unpacked_items<'a>(
+    target: &'a Expr,
+    iter: &'a Expr,
+) -> Option<(&'a Expr, &'a Identifier, &'a Expr, &'a Expr)> {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
+        return None;
     };
     let [key, value] = elts.as_slice() else {
-        return;
+        return None;
     };
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, .. },
         ..
-    }) = stmt_for.iter.as_ref()
+    }) = iter
     else {
-        return;
+        return None;
     };
     if !args.is_empty() {
-        return;
+        return None;
     }
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
-        return;
+        return None;
     };
     if attr != "items" {
-        return;
+        return None;
     }
+    Some((func, attr, key, value))
+}
 
-    match (
-        is_unused(key, checker.semantic()),
-        is_unused(value, checker.semantic()),
-    ) {
+pub(crate) fn incorrect_dict_iterator(
+    checker: &mut Checker,
+    target: &Expr,
+    func: &Expr,
+    attr: &Identifier,
+    key: &Expr,
+    value: &Expr,
+    key_unused: bool,
+    value_unused: bool,
+) {
+    match (key_unused, value_unused) {
         (true, true) => {
             // Both the key and the value are unused.
         }
@@ -103,8 +117,8 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
             if checker.patch(diagnostic.kind.rule()) {
                 let replace_attribute = Edit::range_replacement("values".to_string(), attr.range());
                 let replace_target = Edit::range_replacement(
-                    checker.locator().slice(value).to_string(),
-                    stmt_for.target.range(),
+                    checker.locator().slice(value.range()).to_string(),
+                    target.range(),
                 );
                 diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
             }
@@ -121,13 +135,124 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
             if checker.patch(diagnostic.kind.rule()) {
                 let replace_attribute = Edit::range_replacement("keys".to_string(), attr.range());
                 let replace_target = Edit::range_replacement(
-                    checker.locator().slice(key).to_string(),
-                    stmt_for.target.range(),
+                    checker.locator().slice(key.range()).to_string(),
+                    target.range(),
                 );
                 diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
             }
             checker.diagnostics.push(diagnostic);
         }
+    }
+}
+
+/// PERF102
+pub(crate) fn incorrect_dict_iterator_for(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+    let ast::StmtFor { target, iter, .. } = stmt_for;
+    let Some((func, attr, key, value)) = unpacked_items(target, iter) else {
+        return;
+    };
+    incorrect_dict_iterator(
+        checker,
+        target,
+        func,
+        attr,
+        key,
+        value,
+        is_unused(key, checker.semantic()),
+        is_unused(value, checker.semantic()),
+    );
+}
+
+#[derive(Default)]
+struct LoadedNamesVisitor<'a> {
+    loaded: Vec<&'a ast::ExprName>,
+    stored: Vec<&'a ast::ExprName>,
+}
+
+/// `Visitor` to collect all used identifiers in a statement.
+impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Name(name) => match &name.ctx {
+                ExprContext::Load => self.loaded.push(name),
+                ExprContext::Store => self.stored.push(name),
+                ExprContext::Del => {}
+            },
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
+}
+
+pub(crate) fn incorrect_dict_iterator_seq(
+    checker: &mut Checker,
+    elt: &Expr,
+    generators: &[ast::Comprehension],
+) {
+    let mut visitor = LoadedNamesVisitor::default();
+    visitor.visit_expr(elt);
+    for generator in generators.iter().rev() {
+        let ast::Comprehension { target, iter, .. } = generator;
+        let Some((func, attr, key, value)) = unpacked_items(target, iter) else {
+            visitor.visit_expr(iter);
+            continue;
+        };
+        let key_unused = match key {
+            Expr::Name(name) => !visitor.loaded.iter().any(|n| n.id == name.id),
+            _ => false,
+        };
+        let value_unused = match value {
+            Expr::Name(name) => !visitor.loaded.iter().any(|n| n.id == name.id),
+            _ => false,
+        };
+        incorrect_dict_iterator(
+            checker,
+            target,
+            func,
+            attr,
+            key,
+            value,
+            key_unused,
+            value_unused,
+        );
+        visitor.visit_expr(iter);
+    }
+}
+
+pub(crate) fn incorrect_dict_iterator_dict(
+    checker: &mut Checker,
+    key: &Expr,
+    value: &Expr,
+    generators: &[ast::Comprehension],
+) {
+    let mut visitor = LoadedNamesVisitor::default();
+    visitor.visit_expr(key);
+    visitor.visit_expr(value);
+    for generator in generators.iter().rev() {
+        let ast::Comprehension { target, iter, .. } = generator;
+        let Some((func, attr, key, value)) = unpacked_items(target, iter) else {
+            visitor.visit_expr(iter);
+            continue;
+        };
+
+        let key_unused = match key {
+            Expr::Name(name) => !visitor.loaded.iter().any(|n| n.id == name.id),
+            _ => false,
+        };
+        let value_unused = match value {
+            Expr::Name(name) => !visitor.loaded.iter().any(|n| n.id == name.id),
+            _ => false,
+        };
+        incorrect_dict_iterator(
+            checker,
+            target,
+            func,
+            attr,
+            key,
+            value,
+            key_unused,
+            value_unused,
+        );
+        visitor.visit_expr(iter);
     }
 }
 
