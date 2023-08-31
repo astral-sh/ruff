@@ -406,6 +406,7 @@ def test(
 
 ### Different function argument wrappings
 
+
 def single_line(aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc):
     pass
 
@@ -510,6 +511,7 @@ def type_param_comments[  # trailing bracket comment
 
 
 # Different type parameter wrappings
+
 
 def single_line[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbbbb, Ccccccccccccccccc]():
     pass

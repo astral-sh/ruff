@@ -2716,7 +2716,7 @@ impl Ranged for crate::nodes::StmtContinue {
         self.range
     }
 }
-impl Ranged for StmtIpyEscapeCommand {
+impl Ranged for crate::nodes::StmtIpyEscapeCommand {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2888,7 +2888,7 @@ impl Ranged for crate::nodes::ExprSlice {
         self.range
     }
 }
-impl Ranged for ExprIpyEscapeCommand {
+impl Ranged for crate::nodes::ExprIpyEscapeCommand {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2927,7 +2927,6 @@ impl Ranged for crate::Expr {
         }
     }
 }
-
 impl Ranged for crate::nodes::Comprehension {
     fn range(&self) -> TextRange {
         self.range
@@ -2945,7 +2944,6 @@ impl Ranged for crate::ExceptHandler {
         }
     }
 }
-
 impl Ranged for crate::nodes::Parameter {
     fn range(&self) -> TextRange {
         self.range
@@ -3083,6 +3081,173 @@ impl Ranged for crate::nodes::Parameters {
 impl Ranged for crate::nodes::ParameterWithDefault {
     fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+/// An expression that may be parenthesized.
+#[derive(Clone, Debug)]
+pub struct ParenthesizedExpr {
+    /// The range of the expression, including any parentheses.
+    pub range: TextRange,
+    /// The underlying expression.
+    pub expr: Expr,
+}
+impl Ranged for ParenthesizedExpr {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+impl From<Expr> for ParenthesizedExpr {
+    fn from(expr: Expr) -> Self {
+        ParenthesizedExpr {
+            range: expr.range(),
+            expr,
+        }
+    }
+}
+impl From<ParenthesizedExpr> for Expr {
+    fn from(parenthesized_expr: ParenthesizedExpr) -> Self {
+        parenthesized_expr.expr
+    }
+}
+impl From<ExprIpyEscapeCommand> for ParenthesizedExpr {
+    fn from(payload: ExprIpyEscapeCommand) -> Self {
+        Expr::IpyEscapeCommand(payload).into()
+    }
+}
+impl From<ExprBoolOp> for ParenthesizedExpr {
+    fn from(payload: ExprBoolOp) -> Self {
+        Expr::BoolOp(payload).into()
+    }
+}
+impl From<ExprNamedExpr> for ParenthesizedExpr {
+    fn from(payload: ExprNamedExpr) -> Self {
+        Expr::NamedExpr(payload).into()
+    }
+}
+impl From<ExprBinOp> for ParenthesizedExpr {
+    fn from(payload: ExprBinOp) -> Self {
+        Expr::BinOp(payload).into()
+    }
+}
+impl From<ExprUnaryOp> for ParenthesizedExpr {
+    fn from(payload: ExprUnaryOp) -> Self {
+        Expr::UnaryOp(payload).into()
+    }
+}
+impl From<ExprLambda> for ParenthesizedExpr {
+    fn from(payload: ExprLambda) -> Self {
+        Expr::Lambda(payload).into()
+    }
+}
+impl From<ExprIfExp> for ParenthesizedExpr {
+    fn from(payload: ExprIfExp) -> Self {
+        Expr::IfExp(payload).into()
+    }
+}
+impl From<ExprDict> for ParenthesizedExpr {
+    fn from(payload: ExprDict) -> Self {
+        Expr::Dict(payload).into()
+    }
+}
+impl From<ExprSet> for ParenthesizedExpr {
+    fn from(payload: ExprSet) -> Self {
+        Expr::Set(payload).into()
+    }
+}
+impl From<ExprListComp> for ParenthesizedExpr {
+    fn from(payload: ExprListComp) -> Self {
+        Expr::ListComp(payload).into()
+    }
+}
+impl From<ExprSetComp> for ParenthesizedExpr {
+    fn from(payload: ExprSetComp) -> Self {
+        Expr::SetComp(payload).into()
+    }
+}
+impl From<ExprDictComp> for ParenthesizedExpr {
+    fn from(payload: ExprDictComp) -> Self {
+        Expr::DictComp(payload).into()
+    }
+}
+impl From<ExprGeneratorExp> for ParenthesizedExpr {
+    fn from(payload: ExprGeneratorExp) -> Self {
+        Expr::GeneratorExp(payload).into()
+    }
+}
+impl From<ExprAwait> for ParenthesizedExpr {
+    fn from(payload: ExprAwait) -> Self {
+        Expr::Await(payload).into()
+    }
+}
+impl From<ExprYield> for ParenthesizedExpr {
+    fn from(payload: ExprYield) -> Self {
+        Expr::Yield(payload).into()
+    }
+}
+impl From<ExprYieldFrom> for ParenthesizedExpr {
+    fn from(payload: ExprYieldFrom) -> Self {
+        Expr::YieldFrom(payload).into()
+    }
+}
+impl From<ExprCompare> for ParenthesizedExpr {
+    fn from(payload: ExprCompare) -> Self {
+        Expr::Compare(payload).into()
+    }
+}
+impl From<ExprCall> for ParenthesizedExpr {
+    fn from(payload: ExprCall) -> Self {
+        Expr::Call(payload).into()
+    }
+}
+impl From<ExprFormattedValue> for ParenthesizedExpr {
+    fn from(payload: ExprFormattedValue) -> Self {
+        Expr::FormattedValue(payload).into()
+    }
+}
+impl From<ExprFString> for ParenthesizedExpr {
+    fn from(payload: ExprFString) -> Self {
+        Expr::FString(payload).into()
+    }
+}
+impl From<ExprConstant> for ParenthesizedExpr {
+    fn from(payload: ExprConstant) -> Self {
+        Expr::Constant(payload).into()
+    }
+}
+impl From<ExprAttribute> for ParenthesizedExpr {
+    fn from(payload: ExprAttribute) -> Self {
+        Expr::Attribute(payload).into()
+    }
+}
+impl From<ExprSubscript> for ParenthesizedExpr {
+    fn from(payload: ExprSubscript) -> Self {
+        Expr::Subscript(payload).into()
+    }
+}
+impl From<ExprStarred> for ParenthesizedExpr {
+    fn from(payload: ExprStarred) -> Self {
+        Expr::Starred(payload).into()
+    }
+}
+impl From<ExprName> for ParenthesizedExpr {
+    fn from(payload: ExprName) -> Self {
+        Expr::Name(payload).into()
+    }
+}
+impl From<ExprList> for ParenthesizedExpr {
+    fn from(payload: ExprList) -> Self {
+        Expr::List(payload).into()
+    }
+}
+impl From<ExprTuple> for ParenthesizedExpr {
+    fn from(payload: ExprTuple) -> Self {
+        Expr::Tuple(payload).into()
+    }
+}
+impl From<ExprSlice> for ParenthesizedExpr {
+    fn from(payload: ExprSlice) -> Self {
+        Expr::Slice(payload).into()
     }
 }
 
