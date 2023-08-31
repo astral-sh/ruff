@@ -205,15 +205,15 @@ def sum_even_numbers(numbers: List[int]) -> int:
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-If we want to ignore an error inside a docstring,
-the `# noqa` comment can also be placed after the second triple-quote.
+If we want to ignore a Ruff error inside a docstring,
+the `# noqa` comment can also be placed after the docstring's second triple quote.
 
 ```py
 def some_function() -> None:
     """
     Run some function.
 
-    I trigger E501 (line-too-long) because I am longer than ruff's default line-length of 88 chars.
+    I trigger E501/line-too-long because I am longer than ruff's default line-length of 88 chars.
     """  # noqa: E501
 ```
 
