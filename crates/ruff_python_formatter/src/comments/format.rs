@@ -357,13 +357,14 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
-        // Trim the normalized comment to detect excluded pragmas (don't handle NBSP).
+        // Trim the normalized comment to detect excluded pragmas (strips NBSP).
         let trimmed = strip_comment_prefix(&normalized_comment)?.trim_start();
 
         // Don't reserve width for excluded pragma comments.
-        let reserved_width = if trimmed.split_once(':').is_some_and(|(maybe_pragma, _)| {
-            matches!(maybe_pragma, "noqa" | "type" | "pyright" | "pylint")
-        }) {
+        let reserved_width = if ["noqa", "type:", "pyright:", "pylint:"]
+            .iter()
+            .any(|pragma| trimmed.starts_with(pragma))
+        {
             0
         } else {
             // Start with 2 because of the two leading spaces.
