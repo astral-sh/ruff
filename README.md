@@ -418,6 +418,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [meson-python](https://github.com/mesonbuild/meson-python)
 - [nox](https://github.com/wntrblm/nox)
 - [pip](https://github.com/pypa/pip)
+- [Rippling](https://rippling.com)
 
 ### Show Your Support
 
