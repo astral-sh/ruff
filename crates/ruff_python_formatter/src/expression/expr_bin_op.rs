@@ -18,6 +18,7 @@ use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses,
 };
 use crate::expression::string::StringLayout;
+use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -67,10 +68,13 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
             BinOpLayout::Default => {
                 let format_inner = format_with(|f: &mut PyFormatter| {
                     let source = f.context().source();
+                    let precedence = OperatorPrecedence::from(item.op);
                     let binary_chain: SmallVec<[&ExprBinOp; 4]> =
                         iter::successors(Some(item), |parent| {
                             parent.left.as_bin_op_expr().and_then(|bin_expression| {
-                                if is_expression_parenthesized(bin_expression.into(), source) {
+                                if OperatorPrecedence::from(bin_expression.op) != precedence
+                                    || is_expression_parenthesized(bin_expression.into(), source)
+                                {
                                     None
                                 } else {
                                     Some(bin_expression)
