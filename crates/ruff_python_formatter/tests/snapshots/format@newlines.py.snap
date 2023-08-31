@@ -250,11 +250,14 @@ x = 1
 
 def f():
     pass
+
+
 # comment
 
 
 def f():
     pass
+
 
 # comment
 
@@ -322,6 +325,8 @@ def f():
 
 def f():
     pass  # comment
+
+
 # comment
 
 x = 1

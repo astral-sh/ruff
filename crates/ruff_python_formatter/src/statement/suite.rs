@@ -195,12 +195,13 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         empty_line().fmt(f)?;
                     }
                 }
-            } else if (is_import_definition(preceding)
-                && !comments.has_trailing_own_line(preceding))
+            } else if is_import_definition(preceding)
                 && (!is_import_definition(following) || comments.has_leading(following))
             {
                 // Enforce _at least_ one empty line after an import statement (but allow up to
-                // two at the top-level).
+                // two at the top-level). In this context, "after an import statement" means that
+                // that the previous node is an import, and the following node is an import _or_ has
+                // a leading comment.
                 match self.kind {
                     SuiteKind::TopLevel => {
                         match lines_after_ignoring_trivia(preceding.end(), source) {

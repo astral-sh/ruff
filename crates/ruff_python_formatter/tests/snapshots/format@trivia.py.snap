@@ -55,6 +55,7 @@ class Test:
         pass
         # trailing comment
 
+
 # two lines before, one line after
 
 c = 30
