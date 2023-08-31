@@ -92,11 +92,11 @@ impl PythonVersion {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
 pub enum PreviewMode {
-    Enabled,
     #[default]
     Disabled,
+    Enabled,
 }
 
 impl From<bool> for PreviewMode {
