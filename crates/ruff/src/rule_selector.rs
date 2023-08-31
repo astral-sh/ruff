@@ -14,7 +14,7 @@ use crate::rule_redirects::get_redirect;
 pub enum RuleSelector {
     /// Select all stable rules.
     All,
-    /// Select all nursery rules.
+    /// Legacy category to select all preview rules, previously known as the nursery
     Nursery,
     /// Legacy category to select both the `mccabe` and `flake8-comprehensions` linters
     /// via a single selector.
@@ -151,10 +151,10 @@ impl IntoIterator for &RuleSelector {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             RuleSelector::All => {
-                RuleSelectorIter::All(Rule::iter().filter(|rule| !rule.is_nursery()))
+                RuleSelectorIter::All(Rule::iter().filter(|rule| !rule.is_preview()))
             }
             RuleSelector::Nursery => {
-                RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_nursery))
+                RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_preview))
             }
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions

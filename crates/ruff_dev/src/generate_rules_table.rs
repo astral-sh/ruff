@@ -11,7 +11,7 @@ use ruff_diagnostics::AutofixKind;
 use ruff_workspace::options::Options;
 
 const FIX_SYMBOL: &str = "🛠";
-const NURSERY_SYMBOL: &str = "🌅";
+const PREVIEW_SYMBOL: &str = "🌅";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
     table_out.push_str("| Code | Name | Message | |");
@@ -25,12 +25,12 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
             }
             AutofixKind::None => format!("<span style='opacity: 0.1'>{FIX_SYMBOL}</span>"),
         };
-        let nursery_token = if rule.is_nursery() {
-            format!("<span style='opacity: 1'>{NURSERY_SYMBOL}</span>")
+        let preview_token = if rule.is_preview() {
+            format!("<span style='opacity: 1'>{PREVIEW_SYMBOL}</span>")
         } else {
-            format!("<span style='opacity: 0.1'>{NURSERY_SYMBOL}</span>")
+            format!("<span style='opacity: 0.1'>{PREVIEW_SYMBOL}</span>")
         };
-        let status_token = format!("{fix_token} {nursery_token}");
+        let status_token = format!("{fix_token} {preview_token}");
 
         let rule_name = rule.as_ref();
 
@@ -61,7 +61,7 @@ pub(crate) fn generate() -> String {
     table_out.push('\n');
 
     table_out.push_str(&format!(
-        "The {NURSERY_SYMBOL} emoji indicates that a rule is part of the [\"nursery\"](../faq/#what-is-the-nursery)."
+        "The {PREVIEW_SYMBOL} emoji indicates that a rule is part of the [\"nursery\"](../faq/#what-is-the-nursery)."
     ));
     table_out.push('\n');
     table_out.push('\n');

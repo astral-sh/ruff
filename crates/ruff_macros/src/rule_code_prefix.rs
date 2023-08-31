@@ -15,7 +15,7 @@ pub(crate) fn expand<'a>(
     for (variant, group, attr) in variants {
         let code_str = variant.to_string();
         // Nursery rules have to be explicitly selected, so we ignore them when looking at prefixes.
-        if is_nursery(group) {
+        if is_preview(group) {
             prefix_to_codes
                 .entry(code_str.clone())
                 .or_default()
@@ -126,13 +126,13 @@ pub(crate) fn get_prefix_ident(prefix: &str) -> Ident {
     Ident::new(&prefix, Span::call_site())
 }
 
-/// Returns true if the given group is the "nursery" group.
-pub(crate) fn is_nursery(group: &Path) -> bool {
+/// Returns true if the given group is the "preview" group.
+pub(crate) fn is_preview(group: &Path) -> bool {
     let group = group
         .segments
         .iter()
         .map(|segment| segment.ident.to_string())
         .collect::<Vec<String>>()
         .join("::");
-    group == "RuleGroup::Nursery"
+    group == "RuleGroup::Preview"
 }
