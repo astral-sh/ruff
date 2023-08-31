@@ -361,10 +361,9 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
         let trimmed = strip_comment_prefix(&normalized_comment)?.trim_start();
 
         // Don't reserve width for excluded pragma comments.
-        let reserved_width = if ["noqa", "type:", "pyright:", "pylint"]
-            .iter()
-            .any(|prefix| trimmed.starts_with(prefix))
-        {
+        let reserved_width = if trimmed.split_once(':').is_some_and(|(maybe_pragma, _)| {
+            matches!(maybe_pragma, "noqa" | "type" | "pyright" | "pylint")
+        }) {
             0
         } else {
             // Start with 2 because of the two leading spaces.
