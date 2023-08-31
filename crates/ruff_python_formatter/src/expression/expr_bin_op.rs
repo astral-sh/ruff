@@ -10,13 +10,15 @@ use ruff_python_ast::{
 };
 
 use crate::comments::{trailing_comments, trailing_node_comments, SourceComment};
-use crate::expression::expr_constant::ExprConstantLayout;
+use crate::expression::expr_constant::{is_multiline_string, ExprConstantLayout};
+use crate::expression::has_parentheses;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break,
     in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized, parenthesized,
     NeedsParentheses, OptionalParentheses,
 };
 use crate::expression::string::StringLayout;
+use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -66,10 +68,13 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
             BinOpLayout::Default => {
                 let format_inner = format_with(|f: &mut PyFormatter| {
                     let source = f.context().source();
+                    let precedence = OperatorPrecedence::from(item.op);
                     let binary_chain: SmallVec<[&ExprBinOp; 4]> =
                         iter::successors(Some(item), |parent| {
                             parent.left.as_bin_op_expr().and_then(|bin_expression| {
-                                if is_expression_parenthesized(bin_expression.into(), source) {
+                                if OperatorPrecedence::from(bin_expression.op) != precedence
+                                    || is_expression_parenthesized(bin_expression.into(), source)
+                                {
                                     None
                                 } else {
                                     Some(bin_expression)
@@ -263,10 +268,23 @@ impl NeedsParentheses for ExprBinOp {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
         if parent.is_expr_await() && !self.op.is_pow() {
             OptionalParentheses::Always
+        } else if let Expr::Constant(constant) = self.left.as_ref() {
+            // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
+            if !constant.value.is_implicit_concatenated()
+                && is_multiline_string(constant, context.source())
+                && has_parentheses(&self.right, context).is_some()
+                && !context.comments().has_dangling(self)
+                && !context.comments().has(self.left.as_ref())
+                && !context.comments().has(self.right.as_ref())
+            {
+                OptionalParentheses::Never
+            } else {
+                OptionalParentheses::Multiline
+            }
         } else {
             OptionalParentheses::Multiline
         }

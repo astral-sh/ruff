@@ -215,8 +215,7 @@ self._assert_skipping(
 (
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    "cccccccccccccccccccccccccc"
-    % aaaaaaaaaaaa
+    "cccccccccccccccccccccccccc" % aaaaaaaaaaaa
     + x
 )
 

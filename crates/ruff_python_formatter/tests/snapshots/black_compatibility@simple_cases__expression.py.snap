@@ -300,38 +300,6 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
-@@ -328,13 +329,18 @@
- ):
-     return True
- if (
--    ~aaaa.a + aaaa.b - aaaa.c * aaaa.d / aaaa.e
-+    ~aaaa.a
-+    + aaaa.b
-+    - aaaa.c * aaaa.d / aaaa.e
-     | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
- ):
-     return True
- if (
--    ~aaaaaaaa.a + aaaaaaaa.b - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
--    | aaaaaaaa.f & aaaaaaaa.g % aaaaaaaa.h
-+    ~aaaaaaaa.a
-+    + aaaaaaaa.b
-+    - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
-+    | aaaaaaaa.f
-+    & aaaaaaaa.g % aaaaaaaa.h
-     ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
- ):
-     return True
-@@ -342,7 +348,8 @@
-     ~aaaaaaaaaaaaaaaa.a
-     + aaaaaaaaaaaaaaaa.b
-     - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
--    | aaaaaaaaaaaaaaaa.f & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
-+    | aaaaaaaaaaaaaaaa.f
-+    & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
-     ^ aaaaaaaaaaaaaaaa.i
-     << aaaaaaaaaaaaaaaa.k
-     >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
 ```
 
 ## Ruff Output
@@ -668,18 +636,13 @@ if (
 ):
     return True
 if (
-    ~aaaa.a
-    + aaaa.b
-    - aaaa.c * aaaa.d / aaaa.e
+    ~aaaa.a + aaaa.b - aaaa.c * aaaa.d / aaaa.e
     | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
 ):
     return True
 if (
-    ~aaaaaaaa.a
-    + aaaaaaaa.b
-    - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
-    | aaaaaaaa.f
-    & aaaaaaaa.g % aaaaaaaa.h
+    ~aaaaaaaa.a + aaaaaaaa.b - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
+    | aaaaaaaa.f & aaaaaaaa.g % aaaaaaaa.h
     ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
 ):
     return True
@@ -687,8 +650,7 @@ if (
     ~aaaaaaaaaaaaaaaa.a
     + aaaaaaaaaaaaaaaa.b
     - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
-    | aaaaaaaaaaaaaaaa.f
-    & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
+    | aaaaaaaaaaaaaaaa.f & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
     ^ aaaaaaaaaaaaaaaa.i
     << aaaaaaaaaaaaaaaa.k
     >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
