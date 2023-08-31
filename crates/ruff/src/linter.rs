@@ -81,7 +81,7 @@ pub fn check_path(
     directives: &Directives,
     settings: &Settings,
     noqa: flags::Noqa,
-    source_kind: Option<&SourceKind>,
+    source_kind: &SourceKind,
     source_type: PySourceType,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
@@ -270,17 +270,18 @@ const MAX_ITERATIONS: usize = 100;
 pub fn add_noqa_to_path(
     path: &Path,
     package: Option<&Path>,
+    source_kind: &SourceKind,
     source_type: PySourceType,
     settings: &Settings,
 ) -> Result<usize> {
     // Read the file from disk.
-    let contents = std::fs::read_to_string(path)?;
+    let contents = source_kind.source_code();
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
     // Map row and column locations to byte slices (lazily).
-    let locator = Locator::new(&contents);
+    let locator = Locator::new(contents);
 
     // Detect the current code style (lazily).
     let stylist = Stylist::from_tokens(&tokens, &locator);
@@ -310,21 +311,20 @@ pub fn add_noqa_to_path(
         &directives,
         settings,
         flags::Noqa::Disabled,
-        None,
+        source_kind,
         source_type,
     );
 
     // Log any parse errors.
     if let Some(err) = error {
-        // TODO(dhruvmanila): This should use `SourceKind`, update when
-        // `--add-noqa` is supported for Jupyter notebooks.
         error!(
             "{}",
-            DisplayParseError::new(err, locator.to_source_code(), None)
+            DisplayParseError::new(err, locator.to_source_code(), source_kind)
         );
     }
 
     // Add any missing `# noqa` pragmas.
+    // TODO(dhruvmanila): Add support for Jupyter Notebooks
     add_noqa(
         path,
         &diagnostics.0,
@@ -377,7 +377,7 @@ pub fn lint_only(
         &directives,
         settings,
         noqa,
-        Some(source_kind),
+        source_kind,
         source_type,
     );
 
@@ -471,7 +471,7 @@ pub fn lint_fix<'a>(
             &directives,
             settings,
             noqa,
-            Some(source_kind),
+            source_kind,
             source_type,
         );
 
