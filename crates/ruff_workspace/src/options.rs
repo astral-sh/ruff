@@ -483,6 +483,17 @@ pub struct Options {
     /// `ruff.toml` or `.ruff.toml`, no such inference will be performed.
     pub target_version: Option<PythonVersion>,
     #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features
+            preview = true
+        "#
+    )]
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will
+    /// use unstable rules and fixes.
+    pub preview: Option<bool>,
+    #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,
         value_type = "list[str]",
         example = r#"task-tags = ["HACK"]"#
