@@ -21,13 +21,13 @@ impl FormatNodeRule<ExprFString> for FormatExprFString {
 impl NeedsParentheses for ExprFString {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         if self.implicit_concatenated {
             OptionalParentheses::Multiline
         } else if memchr2(b'\n', b'\r', context.source()[self.range].as_bytes()).is_none()
-            && should_use_best_fit(self, context)
+            && should_use_best_fit(self, parent, context)
         {
             OptionalParentheses::BestFit
         } else {

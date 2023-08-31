@@ -37,10 +37,10 @@ impl FormatNodeRule<ExprName> for FormatExprName {
 impl NeedsParentheses for ExprName {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if should_use_best_fit(self, context) {
+        if should_use_best_fit(self, parent, context) {
             OptionalParentheses::BestFit
         } else {
             OptionalParentheses::Never

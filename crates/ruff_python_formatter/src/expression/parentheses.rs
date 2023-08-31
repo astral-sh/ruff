@@ -4,6 +4,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExpressionRef;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
+use ruff_text_size::TextSize;
 
 use crate::comments::{
     dangling_comments, dangling_open_parenthesis_comments, trailing_comments, SourceComment,
@@ -29,11 +30,18 @@ pub(crate) enum OptionalParentheses {
     Never,
 }
 
-pub(super) fn should_use_best_fit<T>(value: T, context: &PyFormatContext) -> bool
+pub(super) fn should_use_best_fit<'a, T, U>(value: T, parent: U, context: &PyFormatContext) -> bool
 where
     T: Ranged,
+    U: Into<AnyNodeRef<'a>>,
 {
     let text_len = context.source()[value.range()].len();
+    let trailing_comments = context.comments().trailing(parent.into());
+    let eol_comment_length: TextSize = trailing_comments
+        .iter()
+        .filter(|c| c.line_position().is_end_of_line())
+        .map(|c| c.range().len())
+        .sum();
 
     // Only use best fits if:
     // * The text is longer than 5 characters:
@@ -44,7 +52,7 @@ where
     //   of 5 characters to avoid it exceeding the line width by 1 reduces the readability.
     // * The text is know to never fit: The text can never fit even when parenthesizing if it is longer
     //   than the configured line width (minus indent).
-    text_len > 5
+    text_len + Into::<usize>::into(eol_comment_length) > 5
         && text_len
             <= context.options().line_width().value() as usize
                 - context.options().indent_width() as usize

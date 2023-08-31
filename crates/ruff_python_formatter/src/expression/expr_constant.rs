@@ -75,7 +75,7 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
 impl NeedsParentheses for ExprConstant {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
@@ -86,7 +86,7 @@ impl NeedsParentheses for ExprConstant {
             || self.value.is_ellipsis()
         {
             OptionalParentheses::Never
-        } else if should_use_best_fit(self, context) {
+        } else if should_use_best_fit(self, parent, context) {
             OptionalParentheses::BestFit
         } else {
             OptionalParentheses::Never
