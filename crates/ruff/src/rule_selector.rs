@@ -150,9 +150,7 @@ impl IntoIterator for &RuleSelector {
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            RuleSelector::All => {
-                RuleSelectorIter::All(Rule::iter().filter(|rule| !rule.is_preview()))
-            }
+            RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
             RuleSelector::Nursery => {
                 RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_preview))
             }
@@ -173,7 +171,7 @@ impl IntoIterator for &RuleSelector {
 }
 
 pub enum RuleSelectorIter {
-    All(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
+    All(RuleIter),
     Nursery(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
     Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),

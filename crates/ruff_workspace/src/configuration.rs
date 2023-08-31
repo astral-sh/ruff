@@ -474,6 +474,9 @@ impl Configuration {
             let carriedover_unfixables = carryover_unfixables.take();
 
             for spec in Specificity::iter() {
+                let include_preview_rules = spec == Specificity::All
+                    && !self.preview.is_some_and(|preview| preview.is_enabled());
+
                 // Iterate over rule selectors in order of specificity.
                 for selector in selection
                     .select
@@ -483,6 +486,9 @@ impl Configuration {
                     .filter(|s| s.specificity() == spec)
                 {
                     for rule in selector {
+                        if include_preview_rules && rule.is_preview() {
+                            continue;
+                        }
                         select_map_updates.insert(rule, true);
                     }
                 }
