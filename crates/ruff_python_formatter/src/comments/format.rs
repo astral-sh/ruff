@@ -464,13 +464,16 @@ fn normalize_comment<'a>(
 
         // Black adds a space before the non-breaking space if part of a type pragma.
         if trimmed.trim_start().starts_with("type:") {
-            return Ok(Cow::Owned(std::format!("# \u{A0}{trimmed}")));
+            return Ok(Cow::Owned(std::format!("# {content}")));
         }
 
         // Black replaces the non-breaking space with a space if followed by a space.
         if trimmed.starts_with(' ') {
             return Ok(Cow::Owned(std::format!("# {trimmed}")));
         }
+
+        // Otherwise we replace the first non-breaking space with a regular space.
+        return Ok(Cow::Owned(std::format!("# {}", &content["\u{A0}".len()..])));
     }
 
     Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
