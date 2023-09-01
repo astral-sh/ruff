@@ -1,13 +1,13 @@
-use ruff_python_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
-use ruff_text_size::{Ranged, TextRange, TextSize};
 use std::iter::Peekable;
 use std::slice;
 
+use ruff_jupyter::Notebook;
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::directives::IsortDirectives;
-use crate::jupyter::Notebook;
 use crate::rules::isort::helpers;
 use crate::source_kind::SourceKind;
 

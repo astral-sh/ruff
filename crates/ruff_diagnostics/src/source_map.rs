@@ -1,15 +1,29 @@
 use ruff_text_size::{Ranged, TextSize};
 
-use ruff_diagnostics::Edit;
+use crate::Edit;
 
 /// Lightweight sourcemap marker representing the source and destination
 /// position for an [`Edit`].
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct SourceMarker {
+pub struct SourceMarker {
     /// Position of the marker in the original source.
-    pub(crate) source: TextSize,
+    source: TextSize,
     /// Position of the marker in the transformed code.
-    pub(crate) dest: TextSize,
+    dest: TextSize,
+}
+
+impl SourceMarker {
+    pub fn new(source: TextSize, dest: TextSize) -> Self {
+        Self { source, dest }
+    }
+
+    pub const fn source(&self) -> TextSize {
+        self.source
+    }
+
+    pub const fn dest(&self) -> TextSize {
+        self.dest
+    }
 }
 
 /// A collection of [`SourceMarker`].
@@ -18,12 +32,12 @@ pub(crate) struct SourceMarker {
 /// the transformed code. Here, only the boundaries of edits are tracked instead
 /// of every single character.
 #[derive(Default, PartialEq, Eq)]
-pub(crate) struct SourceMap(Vec<SourceMarker>);
+pub struct SourceMap(Vec<SourceMarker>);
 
 impl SourceMap {
     /// Returns a slice of all the markers in the sourcemap in the order they
     /// were added.
-    pub(crate) fn markers(&self) -> &[SourceMarker] {
+    pub fn markers(&self) -> &[SourceMarker] {
         &self.0
     }
 
@@ -31,7 +45,7 @@ impl SourceMap {
     ///
     /// The `output_length` is the length of the transformed string before the
     /// edit is applied.
-    pub(crate) fn push_start_marker(&mut self, edit: &Edit, output_length: TextSize) {
+    pub fn push_start_marker(&mut self, edit: &Edit, output_length: TextSize) {
         self.0.push(SourceMarker {
             source: edit.start(),
             dest: output_length,
@@ -42,7 +56,7 @@ impl SourceMap {
     ///
     /// The `output_length` is the length of the transformed string after the
     /// edit has been applied.
-    pub(crate) fn push_end_marker(&mut self, edit: &Edit, output_length: TextSize) {
+    pub fn push_end_marker(&mut self, edit: &Edit, output_length: TextSize) {
         if edit.is_insertion() {
             self.0.push(SourceMarker {
                 source: edit.start(),

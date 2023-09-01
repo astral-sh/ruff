@@ -21,7 +21,6 @@ use ruff_text_size::Ranged;
 
 use crate::autofix::{fix_file, FixResult};
 use crate::directives;
-use crate::jupyter::{Notebook, NotebookError};
 use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
@@ -29,6 +28,7 @@ use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
 use crate::source_kind::SourceKind;
+use ruff_jupyter::{Notebook, NotebookError};
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {

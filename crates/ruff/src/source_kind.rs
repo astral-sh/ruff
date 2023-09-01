@@ -1,5 +1,5 @@
-use crate::autofix::source_map::SourceMap;
-use crate::jupyter::Notebook;
+use ruff_diagnostics::SourceMap;
+use ruff_jupyter::Notebook;
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum SourceKind {

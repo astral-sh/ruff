@@ -12,8 +12,8 @@ use ruff_python_parser::{ParseError, ParseErrorType};
 use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
 
 use crate::fs;
-use crate::jupyter::Notebook;
 use crate::source_kind::SourceKind;
+use ruff_jupyter::Notebook;
 
 pub static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
 

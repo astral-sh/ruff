@@ -4,10 +4,10 @@ use std::num::NonZeroUsize;
 
 use colored::Colorize;
 
+use ruff_jupyter::{Notebook, NotebookIndex};
 use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
-use crate::jupyter::{Notebook, NotebookIndex};
 use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{

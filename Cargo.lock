@@ -2087,6 +2087,7 @@ dependencies = [
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_index",
+ "ruff_jupyter",
  "ruff_macros",
  "ruff_python_ast",
  "ruff_python_codegen",
@@ -2103,7 +2104,6 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "serde_with",
  "similar",
  "smallvec",
  "strum",
@@ -2115,7 +2115,6 @@ dependencies = [
  "typed-arena",
  "unicode-width",
  "unicode_names2",
- "uuid",
  "wsl",
 ]
 
@@ -2184,6 +2183,7 @@ dependencies = [
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_formatter",
+ "ruff_jupyter",
  "ruff_macros",
  "ruff_python_ast",
  "ruff_python_formatter",
@@ -2227,6 +2227,7 @@ dependencies = [
  "ruff_cli",
  "ruff_diagnostics",
  "ruff_formatter",
+ "ruff_jupyter",
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_formatter",
@@ -2279,6 +2280,25 @@ version = "0.0.0"
 dependencies = [
  "ruff_macros",
  "static_assertions",
+]
+
+[[package]]
+name = "ruff_jupyter"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "insta",
+ "itertools",
+ "once_cell",
+ "ruff_diagnostics",
+ "ruff_source_file",
+ "ruff_text_size",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "test-case",
+ "thiserror",
+ "uuid",
 ]
 
 [[package]]

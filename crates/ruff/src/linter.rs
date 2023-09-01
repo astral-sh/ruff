@@ -6,8 +6,6 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
 use log::error;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{AsMode, ParseError};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -15,7 +13,8 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::{AsMode, ParseError};
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
@@ -607,5 +606,135 @@ This indicates a bug in `{}`. If you could open an issue at:
             fs::relativize_path(path),
             codes,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use anyhow::Result;
+    use test_case::test_case;
+
+    use ruff_jupyter::{Notebook, NotebookError};
+
+    use crate::registry::Rule;
+    use crate::source_kind::SourceKind;
+    use crate::test::{test_contents, test_notebook_path, TestedNotebook};
+    use crate::{assert_messages, settings};
+
+    /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
+    fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
+        Path::new("../ruff_jupyter/resources/test/fixtures/jupyter").join(path)
+    }
+
+    #[test]
+    fn test_import_sorting() -> Result<(), NotebookError> {
+        let actual = notebook_path("isort.ipynb");
+        let expected = notebook_path("isort_expected.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
+            &actual,
+            expected,
+            &settings::Settings::for_rule(Rule::UnsortedImports),
+        )?;
+        assert_messages!(messages, actual, source_notebook);
+        Ok(())
+    }
+
+    #[test]
+    fn test_ipy_escape_command() -> Result<(), NotebookError> {
+        let actual = notebook_path("ipy_escape_command.ipynb");
+        let expected = notebook_path("ipy_escape_command_expected.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
+            &actual,
+            expected,
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        )?;
+        assert_messages!(messages, actual, source_notebook);
+        Ok(())
+    }
+
+    #[test]
+    fn test_unused_variable() -> Result<(), NotebookError> {
+        let actual = notebook_path("unused_variable.ipynb");
+        let expected = notebook_path("unused_variable_expected.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
+            &actual,
+            expected,
+            &settings::Settings::for_rule(Rule::UnusedVariable),
+        )?;
+        assert_messages!(messages, actual, source_notebook);
+        Ok(())
+    }
+
+    #[test]
+    fn test_json_consistency() -> Result<()> {
+        let actual_path = notebook_path("before_fix.ipynb");
+        let expected_path = notebook_path("after_fix.ipynb");
+
+        let TestedNotebook {
+            linted_notebook: fixed_notebook,
+            ..
+        } = test_notebook_path(
+            actual_path,
+            &expected_path,
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        )?;
+        let mut writer = Vec::new();
+        fixed_notebook.write(&mut writer)?;
+        let actual = String::from_utf8(writer)?;
+        let expected = std::fs::read_to_string(expected_path)?;
+        assert_eq!(actual, expected);
+        Ok(())
+    }
+
+    #[test_case(Path::new("before_fix.ipynb"), true; "trailing_newline")]
+    #[test_case(Path::new("no_trailing_newline.ipynb"), false; "no_trailing_newline")]
+    fn test_trailing_newline(path: &Path, trailing_newline: bool) -> Result<()> {
+        let notebook = Notebook::from_path(&notebook_path(path))?;
+        assert_eq!(notebook.trailing_newline(), trailing_newline);
+
+        let mut writer = Vec::new();
+        notebook.write(&mut writer)?;
+        let string = String::from_utf8(writer)?;
+        assert_eq!(string.ends_with('\n'), trailing_newline);
+
+        Ok(())
+    }
+
+    // Version <4.5, don't emit cell ids
+    #[test_case(Path::new("no_cell_id.ipynb"), false; "no_cell_id")]
+    // Version 4.5, cell ids are missing and need to be added
+    #[test_case(Path::new("add_missing_cell_id.ipynb"), true; "add_missing_cell_id")]
+    fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
+        let source_notebook = Notebook::from_path(&notebook_path(path))?;
+        let source_kind = SourceKind::IpyNotebook(source_notebook);
+        let (_, transformed) = test_contents(
+            &source_kind,
+            path,
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        );
+        let linted_notebook = transformed.into_owned().expect_ipy_notebook();
+        let mut writer = Vec::new();
+        linted_notebook.write(&mut writer)?;
+        let actual = String::from_utf8(writer)?;
+        if has_id {
+            assert!(actual.contains(r#""id": ""#));
+        } else {
+            assert!(!actual.contains(r#""id":"#));
+        }
+        Ok(())
     }
 }

@@ -14,11 +14,10 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use ruff_jupyter::Notebook;
 use ruff_source_file::{SourceFile, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use text::TextEmitter;
-
-use crate::jupyter::Notebook;
 
 mod azure;
 mod diff;

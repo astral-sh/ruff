@@ -1,8 +1,8 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
-use std::fs::write;
+use std::fs::{write, File};
 use std::io;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::ops::AddAssign;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -16,7 +16,6 @@ use rustc_hash::FxHashMap;
 use similar::TextDiff;
 use thiserror::Error;
 
-use ruff::jupyter::{Cell, Notebook, NotebookError};
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
 use ruff::message::Message;
@@ -26,6 +25,7 @@ use ruff::settings::{flags, AllSettings, Settings};
 use ruff::source_kind::SourceKind;
 use ruff::{fs, IOError, SyntaxError};
 use ruff_diagnostics::Diagnostic;
+use ruff_jupyter::{Cell, Notebook, NotebookError};
 use ruff_macros::CacheKey;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
@@ -243,7 +243,8 @@ pub(crate) fn lint_path(
                             write(path, transformed.as_bytes())?;
                         }
                         SourceKind::IpyNotebook(notebook) => {
-                            notebook.write(path)?;
+                            let mut writer = BufWriter::new(File::create(path)?);
+                            notebook.write(&mut writer)?;
                         }
                     },
                     flags::FixMode::Diff => {
@@ -565,8 +566,7 @@ impl From<&SourceExtractionError> for Diagnostic {
             }
             // Syntax errors.
             SourceExtractionError::Notebook(
-                NotebookError::PythonSource(_)
-                | NotebookError::InvalidJson(_)
+                NotebookError::InvalidJson(_)
                 | NotebookError::InvalidSchema(_)
                 | NotebookError::InvalidFormat(_),
             ) => Diagnostic::new(

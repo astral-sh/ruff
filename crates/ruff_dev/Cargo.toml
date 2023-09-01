@@ -18,6 +18,7 @@ ruff_formatter = { path = "../ruff_formatter" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_jupyter = { path = "../ruff_jupyter" }
 ruff_python_literal = { path = "../ruff_python_literal" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }

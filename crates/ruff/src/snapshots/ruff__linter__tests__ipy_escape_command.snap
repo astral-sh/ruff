@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/jupyter/notebook.rs
+source: crates/ruff/src/linter.rs
 ---
 ipy_escape_command.ipynb:cell 1:5:8: F401 [*] `os` imported but unused
   |
