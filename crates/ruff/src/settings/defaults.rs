@@ -70,7 +70,10 @@ pub static INCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            rules: PREFIXES.iter().flat_map(IntoIterator::into_iter).collect(),
+            rules: PREFIXES
+                .iter()
+                .flat_map(|selector| selector.rules(PreviewMode::default()))
+                .collect(),
             allowed_confusables: FxHashSet::from_iter([]),
             builtins: vec![],
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),

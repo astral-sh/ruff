@@ -9,6 +9,7 @@ use crate::codes::RuleCodePrefix;
 use crate::codes::RuleIter;
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
+use crate::settings::types::PreviewMode;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
@@ -168,11 +169,9 @@ impl Visitor<'_> for SelectorVisitor {
     }
 }
 
-impl IntoIterator for &RuleSelector {
-    type Item = Rule;
-    type IntoIter = RuleSelectorIter;
-
-    fn into_iter(self) -> Self::IntoIter {
+impl RuleSelector {
+    /// Return all matching rules, regardless of whether they're in preview.
+    pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
             RuleSelector::Preview => {
@@ -193,6 +192,13 @@ impl IntoIterator for &RuleSelector {
                 RuleSelectorIter::Vec(prefix.clone().rules())
             }
         }
+    }
+
+    /// Returns rules matching the selector, taking into account whether preview mode is enabled.
+    pub fn rules(&self, preview: PreviewMode) -> impl Iterator<Item = Rule> + '_ {
+        self.all_rules().filter(move |rule| {
+            matches!(self, RuleSelector::Rule { .. }) || preview.is_enabled() || !rule.is_preview()
+        })
     }
 }
 

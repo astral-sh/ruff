@@ -194,7 +194,7 @@ pub struct PerFileIgnore {
 
 impl PerFileIgnore {
     pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
-        let rules: RuleSet = prefixes.iter().flat_map(IntoIterator::into_iter).collect();
+        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
         let path = Path::new(&pattern);
         let absolute = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),
