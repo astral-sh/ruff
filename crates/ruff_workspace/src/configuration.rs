@@ -440,11 +440,17 @@ impl Configuration {
     }
 
     pub fn as_rule_table(&self) -> RuleTable {
+        let preview = self.preview.unwrap_or_default();
+
         // The select_set keeps track of which rules have been selected.
-        let mut select_set: RuleSet = defaults::PREFIXES.iter().flatten().collect();
+        let mut select_set: RuleSet = defaults::PREFIXES
+            .iter()
+            .map(|selector| selector.rules(preview))
+            .flatten()
+            .collect();
 
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.into_iter().collect();
+        let mut fixable_set: RuleSet = RuleSelector::All.rules(preview).collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
@@ -472,9 +478,6 @@ impl Configuration {
             let carriedover_unfixables = carryover_unfixables.take();
 
             for spec in Specificity::iter() {
-                let include_preview_rules =
-                    self.preview.is_some_and(|preview| preview.is_enabled());
-
                 // Iterate over rule selectors in order of specificity.
                 for selector in selection
                     .select
@@ -483,13 +486,7 @@ impl Configuration {
                     .chain(selection.extend_select.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector {
-                        if !matches!(spec, Specificity::Rule)
-                            && !include_preview_rules
-                            && rule.is_preview()
-                        {
-                            continue;
-                        }
+                    for rule in selector.rules(preview) {
                         select_map_updates.insert(rule, true);
                     }
                 }
@@ -499,7 +496,7 @@ impl Configuration {
                     .chain(carriedover_ignores.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector {
+                    for rule in selector.rules(preview) {
                         select_map_updates.insert(rule, false);
                     }
                 }
@@ -511,7 +508,7 @@ impl Configuration {
                     .chain(selection.extend_fixable.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector {
+                    for rule in selector.rules(preview) {
                         fixable_map_updates.insert(rule, true);
                     }
                 }
@@ -521,7 +518,7 @@ impl Configuration {
                     .chain(carriedover_unfixables.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector {
+                    for rule in selector.rules(preview) {
                         fixable_map_updates.insert(rule, false);
                     }
                 }
