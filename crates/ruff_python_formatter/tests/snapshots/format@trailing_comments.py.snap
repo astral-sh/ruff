@@ -65,11 +65,11 @@ i = ""  #          type: Add space before leading NBSP followed by spaces
 i = ""  # type: A space is added
 i = ""  #   type: Add space before leading NBSP followed by a space
 i = ""  #  type: Add space before leading NBSP
-i = ""  #  type: Add space before two leading NBSP
+i = ""  #   type: Add space before two leading NBSP
 
 
 # A noqa as `#\u{A0}\u{A0}noqa` becomes `# \u{A0}noqa`
-i = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  # noqa
+i = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  #  noqa
 ```
 
 
