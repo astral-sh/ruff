@@ -23,7 +23,8 @@ use ruff::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff::rule_selector::Specificity;
 use ruff::settings::rule_table::RuleTable;
 use ruff::settings::types::{
-    FilePattern, FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat, Version,
+    FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
+    Version,
 };
 use ruff::settings::{defaults, resolve_per_file_ignores, AllSettings, CliSettings, Settings};
 use ruff::{fs, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION};
@@ -67,6 +68,7 @@ pub struct Configuration {
     pub line_length: Option<LineLength>,
     pub logger_objects: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
+    pub preview: Option<PreviewMode>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
     pub show_fixes: Option<bool>,
@@ -174,6 +176,7 @@ impl Configuration {
                     .collect()
             }),
             logger_objects: self.logger_objects.unwrap_or_default(),
+            preview: self.preview.unwrap_or_default(),
             typing_modules: self.typing_modules.unwrap_or_default(),
             // Plugins
             flake8_annotations: self
@@ -387,6 +390,7 @@ impl Configuration {
                 .namespace_packages
                 .map(|namespace_package| resolve_src(&namespace_package, project_root))
                 .transpose()?,
+            preview: options.preview.map(PreviewMode::from),
             per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
                     .into_iter()
@@ -676,6 +680,7 @@ impl Configuration {
             show_fixes: self.show_fixes.or(config.show_fixes),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
+            preview: self.preview.or(config.preview),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
             // Plugins

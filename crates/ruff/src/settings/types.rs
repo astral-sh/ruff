@@ -92,6 +92,23 @@ impl PythonVersion {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
+pub enum PreviewMode {
+    #[default]
+    Disabled,
+    Enabled,
+}
+
+impl From<bool> for PreviewMode {
+    fn from(version: bool) -> Self {
+        if version {
+            PreviewMode::Enabled
+        } else {
+            PreviewMode::Disabled
+        }
+    }
+}
+
 #[derive(Debug, Clone, CacheKey, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),

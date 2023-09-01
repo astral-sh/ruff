@@ -1,7 +1,7 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Stmt};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -23,18 +23,35 @@ impl AlwaysAutofixableViolation for NonEmptyStubBody {
 
 /// PYI010
 pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
-    if let [Stmt::Expr(ast::StmtExpr { value, range: _ })] = body {
+    // Ignore multi-statement bodies (covered by PYI048).
+    let [stmt] = body else {
+        return;
+    };
+
+    // Ignore `pass` statements (covered by PYI009).
+    if stmt.is_pass_stmt() {
+        return;
+    }
+
+    // Ignore docstrings (covered by PYI021).
+    if is_docstring_stmt(stmt) {
+        return;
+    }
+
+    // Ignore `...` (the desired case).
+    if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
         if let Expr::Constant(ast::ExprConstant { value, .. }) = value.as_ref() {
-            if matches!(value, Constant::Ellipsis | Constant::Str(_)) {
+            if value.is_ellipsis() {
                 return;
             }
         }
     }
-    let mut diagnostic = Diagnostic::new(NonEmptyStubBody, body[0].range());
+
+    let mut diagnostic = Diagnostic::new(NonEmptyStubBody, stmt.range());
     if checker.patch(Rule::NonEmptyStubBody) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             format!("..."),
-            body[0].range(),
+            stmt.range(),
         )));
     };
     checker.diagnostics.push(diagnostic);

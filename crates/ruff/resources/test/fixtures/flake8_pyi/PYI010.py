@@ -3,16 +3,20 @@ def bar():
 
 
 def foo():
-    """foo"""  # OK
+    """foo"""  # OK, docstrings are handled by another rule
 
 
 def buzz():
-    print("buzz")  # OK, not in stub file
+    print("buzz")  # ERROR PYI010
 
 
 def foo2():
-    123  # OK, not in a stub file
+    123  # ERROR PYI010
 
 
 def bizz():
-    x = 123  # OK, not in a stub file
+    x = 123  # ERROR PYI010
+
+
+def foo3():
+    pass  # OK, pass is handled by another rule
