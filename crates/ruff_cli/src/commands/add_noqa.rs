@@ -57,10 +57,13 @@ pub(crate) fn add_noqa(
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
             let settings = resolver.resolve(path, pyproject_config);
-            let Ok(LintSource(source_kind)) = LintSource::try_from_path(path, source_type) else {
-                // TODO(dhruvmanila): Display the error to the user.
-                error!("Failed to extract source from {}", path.display());
-                return None;
+            let LintSource(source_kind) = match LintSource::try_from_path(path, source_type) {
+                Ok(Some(source)) => source,
+                Ok(None) => return None,
+                Err(e) => {
+                    error!("Failed to extract source from {}: {e}", path.display());
+                    return None;
+                }
             };
             match add_noqa_to_path(path, package, &source_kind, source_type, settings) {
                 Ok(count) => Some(count),

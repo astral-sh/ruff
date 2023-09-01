@@ -274,7 +274,6 @@ pub fn add_noqa_to_path(
     source_type: PySourceType,
     settings: &Settings,
 ) -> Result<usize> {
-    // Read the file from disk.
     let contents = source_kind.source_code();
 
     // Tokenize once.
