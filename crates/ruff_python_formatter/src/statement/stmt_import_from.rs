@@ -29,7 +29,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
             [
                 token("from"),
                 space(),
-                dynamic_text(&level_str, None),
+                text(&level_str, None),
                 module.as_ref().map(AsFormat::format),
                 space(),
                 token("import"),

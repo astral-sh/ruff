@@ -293,7 +293,7 @@ for converter in connection.ops.get_db_converters(
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [dynamic_text(word, None)])?;
+                            write!(f, [text(word, None)])?;
 
                             if is_last {
                                 write!(f, [token("\"")])?;

@@ -251,29 +251,29 @@ impl std::fmt::Debug for Line {
 /// # }
 /// ```
 #[inline]
-pub fn token(text: &'static str) -> StaticText {
+pub fn token(text: &'static str) -> Token {
     debug_assert!(text.is_ascii(), "Token must be ASCII text only");
     debug_assert!(
         !text.contains(['\n', '\r', '\t']),
         "A token should not contain any newlines or tab characters"
     );
 
-    StaticText { text }
+    Token { text }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct StaticText {
+pub struct Token {
     text: &'static str,
 }
 
-impl<Context> Format<Context> for StaticText {
+impl<Context> Format<Context> for Token {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Token { text: self.text });
         Ok(())
     }
 }
 
-impl std::fmt::Debug for StaticText {
+impl std::fmt::Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::write!(f, "StaticToken({})", self.text)
     }
@@ -336,25 +336,25 @@ impl<Context> Format<Context> for SourcePosition {
 
 /// Creates a text from a dynamic string with its optional start-position in the source document.
 /// This is done by allocating a new string internally.
-pub fn dynamic_text(text: &str, position: Option<TextSize>) -> DynamicText {
+pub fn text(text: &str, position: Option<TextSize>) -> Text {
     debug_assert_no_newlines(text);
 
-    DynamicText { text, position }
+    Text { text, position }
 }
 
 #[derive(Eq, PartialEq)]
-pub struct DynamicText<'a> {
+pub struct Text<'a> {
     text: &'a str,
     position: Option<TextSize>,
 }
 
-impl<Context> Format<Context> for DynamicText<'_> {
+impl<Context> Format<Context> for Text<'_> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         if let Some(source_position) = self.position {
             f.write_element(FormatElement::SourcePosition(source_position));
         }
 
-        f.write_element(FormatElement::DynamicText {
+        f.write_element(FormatElement::Text {
             text: self.text.to_string().into_boxed_str(),
         });
 
@@ -362,7 +362,7 @@ impl<Context> Format<Context> for DynamicText<'_> {
     }
 }
 
-impl std::fmt::Debug for DynamicText<'_> {
+impl std::fmt::Debug for Text<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::write!(f, "DynamicToken({})", self.text)
     }
@@ -2167,7 +2167,7 @@ impl<Context, T> std::fmt::Debug for FormatWith<Context, T> {
 ///                 let mut join = f.join_with(&separator);
 ///
 ///                 for item in &self.items {
-///                     join.entry(&format_with(|f| write!(f, [dynamic_text(item, None)])));
+///                     join.entry(&format_with(|f| write!(f, [text(item, None)])));
 ///                 }
 ///                 join.finish()
 ///             })),
@@ -2212,7 +2212,7 @@ where
 ///
 /// struct MyFormat;
 ///
-/// fn generate_values() -> impl Iterator<Item=StaticText> {
+/// fn generate_values() -> impl Iterator<Item=Token> {
 ///     vec![token("1"), token("2"), token("3"), token("4")].into_iter()
 /// }
 ///

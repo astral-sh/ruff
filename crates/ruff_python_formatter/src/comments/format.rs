@@ -434,7 +434,7 @@ impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
                 write!(
                     f,
                     [
-                        dynamic_text(owned, Some(self.range.start())),
+                        text(owned, Some(self.range.start())),
                         source_position(self.range.end())
                     ]
                 )

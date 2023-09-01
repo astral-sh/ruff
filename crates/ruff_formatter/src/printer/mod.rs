@@ -97,7 +97,7 @@ impl<'a> Printer<'a> {
         match element {
             FormatElement::Space => self.print_text(Text::Token(" "), None),
             FormatElement::Token { text } => self.print_text(Text::Token(text), None),
-            FormatElement::DynamicText { text } => self.print_text(Text::Text(text), None),
+            FormatElement::Text { text } => self.print_text(Text::Text(text), None),
             FormatElement::SourceCodeSlice { slice, .. } => {
                 let text = slice.text(self.source_code);
                 self.print_text(Text::Text(text), Some(slice.range()));
@@ -1087,9 +1087,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
 
             FormatElement::Token { text } => return Ok(self.fits_text(Text::Token(text), args)),
-            FormatElement::DynamicText { text, .. } => {
-                return Ok(self.fits_text(Text::Text(text), args))
-            }
+            FormatElement::Text { text, .. } => return Ok(self.fits_text(Text::Text(text), args)),
             FormatElement::SourceCodeSlice { slice, .. } => {
                 let text = slice.text(self.printer.source_code);
                 return Ok(self.fits_text(Text::Text(text), args));
@@ -1541,10 +1539,7 @@ a"#,
         let result = format_with_options(
             &format_args![
                 token("function main() {"),
-                block_indent(&dynamic_text(
-                    "let x = `This is a multiline\nstring`;",
-                    None
-                )),
+                block_indent(&text("let x = `This is a multiline\nstring`;", None)),
                 token("}"),
                 hard_line_break()
             ],
@@ -1561,7 +1556,7 @@ a"#,
     fn it_breaks_a_group_if_a_string_contains_a_newline() {
         let result = format(&FormatArrayElements {
             items: vec![
-                &dynamic_text("`This is a string spanning\ntwo lines`", None),
+                &text("`This is a string spanning\ntwo lines`", None),
                 &token("\"b\""),
             ],
         });

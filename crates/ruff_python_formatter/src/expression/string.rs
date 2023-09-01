@@ -326,7 +326,7 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
                 source_text_slice(self.range(), contains_newlines).fmt(f)?;
             }
             Cow::Owned(normalized) => {
-                dynamic_text(&normalized, Some(self.start())).fmt(f)?;
+                text(&normalized, Some(self.start())).fmt(f)?;
             }
         }
         self.preferred_quotes.fmt(f)
@@ -839,7 +839,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
         if already_normalized {
             source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
         } else {
-            dynamic_text(trim_both, Some(trimmed_line_range.start())).fmt(f)?;
+            text(trim_both, Some(trimmed_line_range.start())).fmt(f)?;
         }
     }
     offset += first.text_len();
@@ -947,7 +947,7 @@ fn format_docstring_line(
         let indent_len =
             count_indentation_like_black(trim_end, f.options().tab_width()) - stripped_indentation;
         let in_docstring_indent = " ".repeat(indent_len.to_usize()) + trim_end.trim_start();
-        dynamic_text(&in_docstring_indent, Some(offset)).fmt(f)?;
+        text(&in_docstring_indent, Some(offset)).fmt(f)?;
     } else {
         // Take the string with the trailing whitespace removed, then also skip the leading
         // whitespace
@@ -957,7 +957,7 @@ fn format_docstring_line(
             source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
         } else {
             // All indents are ascii spaces, so the slicing is correct
-            dynamic_text(
+            text(
                 &trim_end[stripped_indentation.to_usize()..],
                 Some(trimmed_line_range.start()),
             )

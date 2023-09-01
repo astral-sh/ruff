@@ -33,9 +33,8 @@ pub enum FormatElement {
     /// A ASCII only Token that contains no line breaks or tab characters.
     Token { text: &'static str },
 
-    /// Token constructed from the input source as a dynamic
-    /// string.
-    DynamicText {
+    /// An arbitrary text that can contain tabs, newlines, and unicode characters.
+    Text {
         /// There's no need for the text to be mutable, using `Box<str>` safes 8 bytes over `String`.
         text: Box<str>,
     },
@@ -73,9 +72,7 @@ impl std::fmt::Debug for FormatElement {
             FormatElement::Line(mode) => fmt.debug_tuple("Line").field(mode).finish(),
             FormatElement::ExpandParent => write!(fmt, "ExpandParent"),
             FormatElement::Token { text } => fmt.debug_tuple("Token").field(text).finish(),
-            FormatElement::DynamicText { text, .. } => {
-                fmt.debug_tuple("DynamicText").field(text).finish()
-            }
+            FormatElement::Text { text, .. } => fmt.debug_tuple("DynamicText").field(text).finish(),
             FormatElement::SourceCodeSlice {
                 slice,
                 contains_newlines,
@@ -242,7 +239,7 @@ impl FormatElement {
         matches!(
             self,
             FormatElement::SourceCodeSlice { .. }
-                | FormatElement::DynamicText { .. }
+                | FormatElement::Text { .. }
                 | FormatElement::Token { .. }
         )
     }
@@ -259,7 +256,7 @@ impl FormatElements for FormatElement {
             FormatElement::Tag(Tag::StartGroup(group)) => !group.mode().is_flat(),
             FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
 
-            FormatElement::DynamicText { text, .. } => text.contains('\n'),
+            FormatElement::Text { text, .. } => text.contains('\n'),
             FormatElement::SourceCodeSlice {
                 contains_newlines, ..
             } => *contains_newlines,
