@@ -5,27 +5,9 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
-    use anyhow::Result;
-    use test_case::test_case;
-
     use crate::registry::Rule;
-    use crate::settings::Settings;
-    use crate::test::test_path;
     use crate::test::test_snippet;
     use crate::{assert_messages, settings};
-
-    #[test_case(Rule::MissingCopyrightNotice, Path::new("CPY001.py"))]
-    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("flake8_copyright").join(path).as_path(),
-            &Settings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
 
     #[test]
     fn notice() {
@@ -167,6 +149,17 @@ import os
 # Content Content Content Content Content Content Content Content Content Content
 
 # Copyright 2023
+"#
+            .trim(),
+            &settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice]),
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
+    fn char_boundary() {
+        let diagnostics = test_snippet(
+            r#"কককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককক
 "#
             .trim(),
             &settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice]),

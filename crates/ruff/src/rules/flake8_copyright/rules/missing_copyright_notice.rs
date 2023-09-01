@@ -1,8 +1,7 @@
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::settings::Settings;
 
@@ -33,18 +32,7 @@ pub(crate) fn missing_copyright_notice(
     }
 
     // Only search the first 1024 bytes in the file.
-    let contents = if locator.len() < 1024 {
-        locator.contents()
-    } else {
-        let char_boundary: u32 = (0..1024)
-            .rev()
-            .find(|&byte_idx| locator.contents().is_char_boundary(byte_idx))
-            .unwrap_or(0) // Default to 0 if no valid boundary is found
-            .try_into() // SAFETY: usize -> u32, 0 <= char_boundary <= 1024
-            .unwrap_or(0);
-
-        locator.up_to(TextSize::from(char_boundary))
-    };
+    let contents = locator.up_to(locator.floor_char_boundary(TextSize::new(1024)));
 
     // Locate the copyright notice.
     if let Some(match_) = settings.flake8_copyright.notice_rgx.find(contents) {
