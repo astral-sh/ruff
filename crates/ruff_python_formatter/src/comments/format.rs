@@ -357,17 +357,33 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
-        // Start with 2 because of the two leading spaces.
-        let mut reserved_width = 2;
+        // Trim the normalized comment to detect excluded pragmas (strips NBSP).
+        let trimmed = strip_comment_prefix(&normalized_comment)?.trim_start();
 
-        // SAFE: The formatted file is <= 4GB, and each comment should as well.
-        #[allow(clippy::cast_possible_truncation)]
-        for c in normalized_comment.chars() {
-            reserved_width += match c {
-                '\t' => f.options().tab_width().value(),
-                c => c.width().unwrap_or(0) as u32,
+        let is_pragma = if let Some((maybe_pragma, _)) = trimmed.split_once(':') {
+            matches!(maybe_pragma, "noqa" | "type" | "pyright" | "pylint")
+        } else {
+            trimmed.starts_with("noqa")
+        };
+
+        // Don't reserve width for excluded pragma comments.
+        let reserved_width = if is_pragma {
+            0
+        } else {
+            // Start with 2 because of the two leading spaces.
+            let mut width = 2;
+
+            // SAFETY: The formatted file is <= 4GB, and each comment should as well.
+            #[allow(clippy::cast_possible_truncation)]
+            for c in normalized_comment.chars() {
+                width += match c {
+                    '\t' => f.options().tab_width().value(),
+                    c => c.width().unwrap_or(0) as u32,
+                }
             }
-        }
+
+            width
+        };
 
         write!(
             f,
@@ -442,11 +458,7 @@ fn normalize_comment<'a>(
 
     let trimmed = comment_text.trim_end();
 
-    let Some(content) = trimmed.strip_prefix('#') else {
-        return Err(FormatError::syntax_error(
-            "Didn't find expected comment token `#`",
-        ));
-    };
+    let content = strip_comment_prefix(trimmed)?;
 
     if content.is_empty() {
         return Ok(Cow::Borrowed("#"));
@@ -474,6 +486,17 @@ fn normalize_comment<'a>(
     }
 
     Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
+}
+
+/// A helper for stripping '#' from comments.
+fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
+    let Some(content) = comment_text.strip_prefix('#') else {
+        return Err(FormatError::syntax_error(
+            "Didn't find expected comment token `#`",
+        ));
+    };
+
+    Ok(content)
 }
 
 /// Format the empty lines between a node and its trailing comments.
