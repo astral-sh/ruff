@@ -147,6 +147,7 @@ pub fn check_path(
         match ruff_python_parser::parse_program_tokens(
             tokens,
             &path.to_string_lossy(),
+            source_kind.source_code(),
             source_type.is_ipynb(),
         ) {
             Ok(python_ast) => {

@@ -50,7 +50,7 @@ use ruff_python_ast::{Mod, ModModule, Suite};
 /// ```
 pub fn parse_program(source: &str, source_path: &str) -> Result<ModModule, ParseError> {
     let lexer = lex(source, Mode::Module);
-    match parse_tokens(lexer, Mode::Module, source_path)? {
+    match parse_tokens(lexer, source, Mode::Module, source_path)? {
         Mod::Module(m) => Ok(m),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
@@ -78,7 +78,7 @@ pub fn parse_suite(source: &str, source_path: &str) -> Result<Suite, ParseError>
 /// ```
 pub fn parse_expression(source: &str, source_path: &str) -> Result<ast::Expr, ParseError> {
     let lexer = lex(source, Mode::Expression);
-    match parse_tokens(lexer, Mode::Expression, source_path)? {
+    match parse_tokens(lexer, source, Mode::Expression, source_path)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
     }
@@ -107,7 +107,7 @@ pub fn parse_expression_starts_at(
     offset: TextSize,
 ) -> Result<ast::Expr, ParseError> {
     let lexer = lex_starts_at(source, Mode::Module, offset);
-    match parse_tokens(lexer, Mode::Expression, source_path)? {
+    match parse_tokens(lexer, source, Mode::Expression, source_path)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
     }
@@ -193,7 +193,7 @@ pub fn parse_starts_at(
     offset: TextSize,
 ) -> Result<ast::Mod, ParseError> {
     let lxr = lexer::lex_starts_at(source, mode, offset);
-    parse_tokens(lxr, mode, source_path)
+    parse_tokens(lxr, source, mode, source_path)
 }
 
 /// Parse an iterator of [`LexResult`]s using the specified [`Mode`].
@@ -208,11 +208,13 @@ pub fn parse_starts_at(
 /// ```
 /// use ruff_python_parser::{lexer::lex, Mode, parse_tokens};
 ///
-/// let expr = parse_tokens(lex("1 + 2", Mode::Expression), Mode::Expression, "<embedded>");
+/// let source = "1 + 2";
+/// let expr = parse_tokens(lex(source, Mode::Expression), source, Mode::Expression, "<embedded>");
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_tokens(
     lxr: impl IntoIterator<Item = LexResult>,
+    source: &str,
     mode: Mode,
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
@@ -220,6 +222,7 @@ pub fn parse_tokens(
 
     parse_filtered_tokens(
         lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline)),
+        source,
         mode,
         source_path,
     )
@@ -227,6 +230,7 @@ pub fn parse_tokens(
 
 fn parse_filtered_tokens(
     lxr: impl IntoIterator<Item = LexResult>,
+    source: &str,
     mode: Mode,
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
@@ -234,6 +238,7 @@ fn parse_filtered_tokens(
     let lexer = iter::once(Ok(marker_token)).chain(lxr);
     python::TopParser::new()
         .parse(
+            source,
             mode,
             lexer
                 .into_iter()
@@ -1237,7 +1242,7 @@ a = 1
     "#
         .trim();
         let lxr = lexer::lex_starts_at(source, Mode::Ipython, TextSize::default());
-        let parse_err = parse_tokens(lxr, Mode::Module, "<test>").unwrap_err();
+        let parse_err = parse_tokens(lxr, source, Mode::Module, "<test>").unwrap_err();
         assert_eq!(
             parse_err.to_string(),
             "IPython escape commands are only allowed in `Mode::Ipython` at byte offset 6"

@@ -16,7 +16,7 @@ use crate::{
 };
 use lalrpop_util::ParseError;
 
-grammar(mode: Mode);
+grammar(source_code: &str, mode: Mode);
 
 // This is a hack to reduce the amount of lalrpop tables generated:
 // For each public entry point, a full parse table is generated.
