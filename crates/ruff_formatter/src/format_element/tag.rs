@@ -83,6 +83,11 @@ pub enum Tag {
 
     StartFitsExpanded(FitsExpanded),
     EndFitsExpanded,
+
+    StartBestFittingEntry {
+        length: usize,
+    },
+    EndBestFittingEntry,
 }
 
 impl Tag {
@@ -103,6 +108,7 @@ impl Tag {
                 | Tag::StartVerbatim(_)
                 | Tag::StartLabelled(_)
                 | Tag::StartFitsExpanded(_)
+                | Tag::StartBestFittingEntry { .. },
         )
     }
 
@@ -129,6 +135,7 @@ impl Tag {
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
             StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,
+            StartBestFittingEntry { .. } | EndBestFittingEntry => TagKind::BestFittingEntry,
         }
     }
 }
@@ -152,6 +159,7 @@ pub enum TagKind {
     Verbatim,
     Labelled,
     FitsExpanded,
+    BestFittingEntry,
 }
 
 #[derive(Debug, Copy, Default, Clone, Eq, PartialEq)]

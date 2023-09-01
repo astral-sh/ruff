@@ -9,9 +9,7 @@ use Tag::*;
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
-use crate::{
-    format_element, write, Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize,
-};
+use crate::{write, Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize};
 use crate::{Buffer, VecBuffer};
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -2539,15 +2537,18 @@ impl<Context> Format<Context> for BestFitting<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let variants = self.variants.items();
 
-        let mut formatted_variants = Vec::with_capacity(variants.len());
+        let mut buffer = VecBuffer::with_capacity(variants.len() * 8, f.state_mut());
 
         for variant in variants {
-            let mut buffer = VecBuffer::with_capacity(8, f.state_mut());
-            buffer.write_element(FormatElement::Tag(StartEntry));
+            let start_offset = buffer.len();
+            // Write an arbitrary element. We replace it later with the start entry once we know the length.
+            buffer.write_element(FormatElement::ExpandParent);
             buffer.write_fmt(Arguments::from(variant))?;
-            buffer.write_element(FormatElement::Tag(EndEntry));
+            buffer.write_element(FormatElement::Tag(EndBestFittingEntry));
 
-            formatted_variants.push(buffer.into_vec().into_boxed_slice());
+            buffer[start_offset] = FormatElement::Tag(Tag::StartBestFittingEntry {
+                length: buffer.len() - start_offset,
+            });
         }
 
         // SAFETY: The constructor guarantees that there are always at least two variants. It's, therefore,
@@ -2555,9 +2556,7 @@ impl<Context> Format<Context> for BestFitting<'_, Context> {
         #[allow(unsafe_code)]
         let element = unsafe {
             FormatElement::BestFitting {
-                variants: format_element::BestFittingVariants::from_vec_unchecked(
-                    formatted_variants,
-                ),
+                variants: BestFittingVariants::from_vec_unchecked(buffer.into_vec()),
                 mode: self.mode,
             }
         };
