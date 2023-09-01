@@ -442,11 +442,9 @@ impl Configuration {
     pub fn as_rule_table(&self) -> RuleTable {
         // The select_set keeps track of which rules have been selected.
         let mut select_set: RuleSet = defaults::PREFIXES.iter().flatten().collect();
+
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All
-            .into_iter()
-            .chain(&RuleSelector::Preview)
-            .collect();
+        let mut fixable_set: RuleSet = RuleSelector::All.into_iter().collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
@@ -486,7 +484,10 @@ impl Configuration {
                     .filter(|s| s.specificity() == spec)
                 {
                     for rule in selector {
-                        if spec == Specificity::All && !include_preview_rules && rule.is_preview() {
+                        if !matches!(spec, Specificity::Rule)
+                            && !include_preview_rules
+                            && rule.is_preview()
+                        {
                             continue;
                         }
                         select_map_updates.insert(rule, true);

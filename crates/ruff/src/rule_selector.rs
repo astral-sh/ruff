@@ -29,6 +29,11 @@ pub enum RuleSelector {
         prefix: RuleCodePrefix,
         redirected_from: Option<&'static str>,
     },
+    /// Select an individual rule with a given prefix.
+    Rule {
+        prefix: RuleCodePrefix,
+        redirected_from: Option<&'static str>,
+    },
 }
 
 impl From<Linter> for RuleSelector {
@@ -61,14 +66,40 @@ impl FromStr for RuleSelector {
                     return Ok(Self::Linter(linter));
                 }
 
-                Ok(Self::Prefix {
-                    prefix: RuleCodePrefix::parse(&linter, code)
-                        .map_err(|_| ParseError::Unknown(s.to_string()))?,
-                    redirected_from,
-                })
+                // Does the selector select a single rule?
+                let prefix = RuleCodePrefix::parse(&linter, code)
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?;
+                if is_single_rule_selector(&prefix) {
+                    Ok(Self::Rule {
+                        prefix,
+                        redirected_from,
+                    })
+                } else {
+                    Ok(Self::Prefix {
+                        prefix,
+                        redirected_from,
+                    })
+                }
             }
         }
     }
+}
+
+/// Returns `true` if the [`RuleCodePrefix`] matches a single rule exactly
+/// (e.g., `E225`, as opposed to `E2`).
+fn is_single_rule_selector(prefix: &RuleCodePrefix) -> bool {
+    let mut rules = prefix.rules();
+
+    // The selector must match a single rule.
+    let Some(rule) = rules.next() else {
+        return false;
+    };
+    if rules.next().is_some() {
+        return false;
+    }
+
+    // The rule must match the selector exactly.
+    rule.noqa_code().suffix() == prefix.short_code()
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -86,7 +117,7 @@ impl RuleSelector {
             RuleSelector::Preview => ("", "PREVIEW"),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
-            RuleSelector::Prefix { prefix, .. } => {
+            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
@@ -137,18 +168,9 @@ impl Visitor<'_> for SelectorVisitor {
     }
 }
 
-impl From<RuleCodePrefix> for RuleSelector {
-    fn from(prefix: RuleCodePrefix) -> Self {
-        Self::Prefix {
-            prefix,
-            redirected_from: None,
-        }
-    }
-}
-
 impl IntoIterator for &RuleSelector {
-    type IntoIter = RuleSelectorIter;
     type Item = Rule;
+    type IntoIter = RuleSelectorIter;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
@@ -167,7 +189,9 @@ impl IntoIterator for &RuleSelector {
                     .chain(Linter::Flake8Print.rules()),
             ),
             RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
-            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.clone().rules()),
+            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
+                RuleSelectorIter::Vec(prefix.clone().rules())
+            }
         }
     }
 }
@@ -270,14 +294,14 @@ impl RuleSelector {
             RuleSelector::T => Specificity::LinterGroup,
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
+            RuleSelector::Rule { .. } => Specificity::Rule,
             RuleSelector::Prefix { prefix, .. } => {
                 let prefix: &'static str = prefix.short_code();
                 match prefix.len() {
-                    1 => Specificity::Code1Char,
-                    2 => Specificity::Code2Chars,
-                    3 => Specificity::Code3Chars,
-                    4 => Specificity::Code4Chars,
-                    5 => Specificity::Code5Chars,
+                    1 => Specificity::Prefix1Char,
+                    2 => Specificity::Prefix2Chars,
+                    3 => Specificity::Prefix3Chars,
+                    4 => Specificity::Prefix4Chars,
                     _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
                 }
             }
@@ -287,14 +311,22 @@ impl RuleSelector {
 
 #[derive(EnumIter, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
 pub enum Specificity {
+    /// The specificity when selecting all rules (e.g., `--select ALL`).
     All,
+    /// The specificity when selecting a linter group (e.g., `--select PL`).
     LinterGroup,
+    /// The specificity when selecting a linter (e.g., `--select PLE` or `--select UP`).
     Linter,
-    Code1Char,
-    Code2Chars,
-    Code3Chars,
-    Code4Chars,
-    Code5Chars,
+    /// The specificity when selecting via a rule prefix at one-character depth (e.g., `--select PLE1`).
+    Prefix1Char,
+    /// The specificity when selecting via a rule prefix at two-character depth (e.g., `--select PLE12`).
+    Prefix2Chars,
+    /// The specificity when selecting via a rule prefix at one-character depth (e.g., `--select PLE120`).
+    Prefix3Chars,
+    /// The specificity when selecting via a rule prefix at one-character depth (e.g., `--select PLE120`).
+    Prefix4Chars,
+    /// The specificity when selecting an individual rule (e.g., `--select PLE1205`).
+    Rule,
 }
 
 #[cfg(feature = "clap")]
