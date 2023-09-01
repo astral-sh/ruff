@@ -448,45 +448,40 @@ mod tests {
     use crate::jupyter::{Notebook, NotebookError};
     use crate::registry::Rule;
     use crate::source_kind::SourceKind;
-    use crate::test::{
-        read_jupyter_notebook, test_contents, test_notebook_path, test_resource_path,
-        TestedNotebook,
-    };
+    use crate::test::{test_contents, test_notebook_path, test_resource_path, TestedNotebook};
     use crate::{assert_messages, settings};
 
-    /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
-    fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
-        let path = test_resource_path("fixtures/jupyter/cell").join(path);
-        let source_code = std::fs::read_to_string(path)?;
-        Ok(serde_json::from_str(&source_code)?)
+    /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
+    fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
+        test_resource_path("fixtures/jupyter").join(path)
     }
 
     #[test]
-    fn test_valid() {
-        assert!(read_jupyter_notebook(Path::new("valid.ipynb")).is_ok());
+    fn test_python() -> Result<(), NotebookError> {
+        let notebook = Notebook::from_path(&notebook_path("valid.ipynb"))?;
+        assert!(notebook.is_python_notebook());
+        Ok(())
     }
 
     #[test]
-    fn test_r() {
-        // We can load this, it will be filtered out later
-        assert!(read_jupyter_notebook(Path::new("R.ipynb")).is_ok());
+    fn test_r() -> Result<(), NotebookError> {
+        let notebook = Notebook::from_path(&notebook_path("R.ipynb"))?;
+        assert!(!notebook.is_python_notebook());
+        Ok(())
     }
 
     #[test]
     fn test_invalid() {
-        let path = Path::new("resources/test/fixtures/jupyter/invalid_extension.ipynb");
         assert!(matches!(
-            Notebook::from_path(path),
+            Notebook::from_path(&notebook_path("invalid_extension.ipynb")),
             Err(NotebookError::PythonSource(_))
         ));
-        let path = Path::new("resources/test/fixtures/jupyter/not_json.ipynb");
         assert!(matches!(
-            Notebook::from_path(path),
+            Notebook::from_path(&notebook_path("not_json.ipynb")),
             Err(NotebookError::InvalidJson(_))
         ));
-        let path = Path::new("resources/test/fixtures/jupyter/wrong_schema.ipynb");
         assert!(matches!(
-            Notebook::from_path(path),
+            Notebook::from_path(&notebook_path("wrong_schema.ipynb")),
             Err(NotebookError::InvalidSchema(_))
         ));
     }
@@ -497,13 +492,20 @@ mod tests {
     #[test_case(Path::new("only_code.json"), true; "only_code")]
     #[test_case(Path::new("cell_magic.json"), false; "cell_magic")]
     fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
+        /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
+        fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
+            let path = notebook_path("cell").join(path);
+            let source_code = std::fs::read_to_string(path)?;
+            Ok(serde_json::from_str(&source_code)?)
+        }
+
         assert_eq!(read_jupyter_cell(path)?.is_valid_code_cell(), expected);
         Ok(())
     }
 
     #[test]
-    fn test_concat_notebook() -> Result<()> {
-        let notebook = read_jupyter_notebook(Path::new("valid.ipynb"))?;
+    fn test_concat_notebook() -> Result<(), NotebookError> {
+        let notebook = Notebook::from_path(&notebook_path("valid.ipynb"))?;
         assert_eq!(
             notebook.source_code,
             r#"def unused_variable():
@@ -545,69 +547,73 @@ print("after empty cells")
     }
 
     #[test]
-    fn test_import_sorting() -> Result<()> {
-        let path = "isort.ipynb".to_string();
+    fn test_import_sorting() -> Result<(), NotebookError> {
+        let actual = notebook_path("isort.ipynb");
+        let expected = notebook_path("isort_expected.ipynb");
         let TestedNotebook {
             messages,
             source_notebook,
             ..
         } = test_notebook_path(
-            &path,
-            Path::new("isort_expected.ipynb"),
+            &actual,
+            expected,
             &settings::Settings::for_rule(Rule::UnsortedImports),
         )?;
-        assert_messages!(messages, path, source_notebook);
+        assert_messages!(messages, actual, source_notebook);
         Ok(())
     }
 
     #[test]
-    fn test_ipy_escape_command() -> Result<()> {
-        let path = "ipy_escape_command.ipynb".to_string();
+    fn test_ipy_escape_command() -> Result<(), NotebookError> {
+        let actual = notebook_path("ipy_escape_command.ipynb");
+        let expected = notebook_path("ipy_escape_command_expected.ipynb");
         let TestedNotebook {
             messages,
             source_notebook,
             ..
         } = test_notebook_path(
-            &path,
-            Path::new("ipy_escape_command_expected.ipynb"),
+            &actual,
+            expected,
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
-        assert_messages!(messages, path, source_notebook);
+        assert_messages!(messages, actual, source_notebook);
         Ok(())
     }
 
     #[test]
-    fn test_unused_variable() -> Result<()> {
-        let path = "unused_variable.ipynb".to_string();
+    fn test_unused_variable() -> Result<(), NotebookError> {
+        let actual = notebook_path("unused_variable.ipynb");
+        let expected = notebook_path("unused_variable_expected.ipynb");
         let TestedNotebook {
             messages,
             source_notebook,
             ..
         } = test_notebook_path(
-            &path,
-            Path::new("unused_variable_expected.ipynb"),
+            &actual,
+            expected,
             &settings::Settings::for_rule(Rule::UnusedVariable),
         )?;
-        assert_messages!(messages, path, source_notebook);
+        assert_messages!(messages, actual, source_notebook);
         Ok(())
     }
 
     #[test]
     fn test_json_consistency() -> Result<()> {
-        let path = "before_fix.ipynb".to_string();
+        let actual_path = notebook_path("before_fix.ipynb");
+        let expected_path = notebook_path("after_fix.ipynb");
+
         let TestedNotebook {
             linted_notebook: fixed_notebook,
             ..
         } = test_notebook_path(
-            path,
-            Path::new("after_fix.ipynb"),
+            actual_path,
+            &expected_path,
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
         let mut writer = Vec::new();
         fixed_notebook.write_inner(&mut writer)?;
         let actual = String::from_utf8(writer)?;
-        let expected =
-            std::fs::read_to_string(test_resource_path("fixtures/jupyter/after_fix.ipynb"))?;
+        let expected = std::fs::read_to_string(expected_path)?;
         assert_eq!(actual, expected);
         Ok(())
     }
@@ -615,7 +621,7 @@ print("after empty cells")
     #[test_case(Path::new("before_fix.ipynb"), true; "trailing_newline")]
     #[test_case(Path::new("no_trailing_newline.ipynb"), false; "no_trailing_newline")]
     fn test_trailing_newline(path: &Path, trailing_newline: bool) -> Result<()> {
-        let notebook = read_jupyter_notebook(path)?;
+        let notebook = Notebook::from_path(&notebook_path(path))?;
         assert_eq!(notebook.trailing_newline, trailing_newline);
 
         let mut writer = Vec::new();
@@ -631,7 +637,7 @@ print("after empty cells")
     // Version 4.5, cell ids are missing and need to be added
     #[test_case(Path::new("add_missing_cell_id.ipynb"), true; "add_missing_cell_id")]
     fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
-        let source_notebook = read_jupyter_notebook(path)?;
+        let source_notebook = Notebook::from_path(&notebook_path(path))?;
         let source_kind = SourceKind::IpyNotebook(source_notebook);
         let (_, transformed) = test_contents(
             &source_kind,

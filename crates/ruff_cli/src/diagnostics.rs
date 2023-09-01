@@ -134,45 +134,6 @@ impl AddAssign for Diagnostics {
     }
 }
 
-/// Read a Jupyter Notebook from disk.
-///
-/// Returns either an indexed Python Jupyter Notebook or a diagnostic (which is empty if we skip).
-fn notebook_from_path(path: &Path) -> Result<Option<Notebook>, NotebookError> {
-    let notebook = Notebook::from_path(path)?;
-    if notebook.is_python_notebook() {
-        Ok(Some(notebook))
-    } else {
-        // Not a Python notebook. This could be, e.g., an R notebook, which we should skip.
-        debug!(
-            "Skipping {} because it's not a Python notebook",
-            path.display()
-        );
-        Ok(None)
-    }
-}
-
-/// Parse a Jupyter Notebook from a JSON string.
-///
-/// Returns either an indexed Python Jupyter Notebook or a diagnostic (which is empty if we skip).
-fn notebook_from_source_code(
-    source_code: &str,
-    path: Option<&Path>,
-) -> Result<Option<Notebook>, NotebookError> {
-    let notebook = Notebook::from_source_code(source_code)?;
-    if notebook.is_python_notebook() {
-        Ok(Some(notebook))
-    } else {
-        // Not a Python notebook. This could be, e.g., an R notebook, which we should skip.
-        if let Some(path) = path {
-            debug!(
-                "Skipping {} because it's not a Python notebook",
-                path.display()
-            );
-        }
-        Ok(None)
-    }
-}
-
 /// Lint the source code at the given `Path`.
 pub(crate) fn lint_path(
     path: &Path,
@@ -432,14 +393,13 @@ pub(crate) fn lint_stdin(
     };
 
     // Extract the sources from the file.
-    let LintSource(source_kind) =
-        match LintSource::try_from_source_code(contents, path, source_type) {
-            Ok(Some(sources)) => sources,
-            Ok(None) => return Ok(Diagnostics::default()),
-            Err(err) => {
-                return Ok(Diagnostics::from_source_error(&err, path, settings));
-            }
-        };
+    let LintSource(source_kind) = match LintSource::try_from_source_code(contents, source_type) {
+        Ok(Some(sources)) => sources,
+        Ok(None) => return Ok(Diagnostics::default()),
+        Err(err) => {
+            return Ok(Diagnostics::from_source_error(&err, path, settings));
+        }
+    };
 
     // Lint the inputs.
     let (
@@ -551,8 +511,10 @@ impl LintSource {
         source_type: PySourceType,
     ) -> Result<Option<LintSource>, SourceExtractionError> {
         if source_type.is_ipynb() {
-            let notebook = notebook_from_path(path)?;
-            Ok(notebook.map(|notebook| LintSource(SourceKind::IpyNotebook(notebook))))
+            let notebook = Notebook::from_path(path)?;
+            Ok(notebook
+                .is_python_notebook()
+                .then_some(LintSource(SourceKind::IpyNotebook(notebook))))
         } else {
             // This is tested by ruff_cli integration test `unreadable_file`
             let contents = std::fs::read_to_string(path)?;
@@ -565,12 +527,13 @@ impl LintSource {
     /// the file path should be used for diagnostics, but not for reading the file from disk.
     fn try_from_source_code(
         source_code: String,
-        path: Option<&Path>,
         source_type: PySourceType,
     ) -> Result<Option<LintSource>, SourceExtractionError> {
         if source_type.is_ipynb() {
-            let notebook = notebook_from_source_code(&source_code, path)?;
-            Ok(notebook.map(|notebook| LintSource(SourceKind::IpyNotebook(notebook))))
+            let notebook = Notebook::from_source_code(&source_code)?;
+            Ok(notebook
+                .is_python_notebook()
+                .then_some(LintSource(SourceKind::IpyNotebook(notebook))))
         } else {
             Ok(Some(LintSource(SourceKind::Python(source_code))))
         }
@@ -613,24 +576,5 @@ impl From<&SourceExtractionError> for Diagnostic {
                 TextRange::default(),
             ),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use crate::diagnostics::{notebook_from_path, notebook_from_source_code};
-
-    #[test]
-    fn test_r() {
-        let path = Path::new("../ruff/resources/test/fixtures/jupyter/R.ipynb");
-        assert!(matches!(notebook_from_path(path), Ok(None)));
-
-        let contents = std::fs::read_to_string(path).unwrap();
-        assert!(matches!(
-            notebook_from_source_code(&contents, Some(path)),
-            Ok(None)
-        ));
     }
 }
