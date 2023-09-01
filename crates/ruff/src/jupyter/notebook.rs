@@ -2,28 +2,24 @@ use std::cmp::Ordering;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write};
-use std::iter;
 use std::path::Path;
+use std::{io, iter};
 
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use serde::Serialize;
 use serde_json::error::Category;
+use thiserror::Error;
 use uuid::Uuid;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_python_parser::lexer::lex;
 use ruff_python_parser::Mode;
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextSize;
 
 use crate::autofix::source_map::{SourceMap, SourceMarker};
 use crate::jupyter::index::NotebookIndex;
 use crate::jupyter::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
-use crate::rules::pycodestyle::rules::SyntaxError;
-use crate::IOError;
-
-pub const JUPYTER_NOTEBOOK_EXT: &str = "ipynb";
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -96,6 +92,23 @@ impl Cell {
     }
 }
 
+/// An error that can occur while deserializing a Jupyter Notebook.
+#[derive(Error, Debug)]
+pub enum NotebookError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Json(serde_json::Error),
+    #[error("Expected a Jupyter Notebook, which must be internally stored as JSON, but found a Python source file: {0}")]
+    PythonSource(serde_json::Error),
+    #[error("Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}")]
+    InvalidJson(serde_json::Error),
+    #[error("This file does not match the schema expected of Jupyter Notebooks: {0}")]
+    InvalidSchema(serde_json::Error),
+    #[error("Expected Jupyter Notebook format 4, found: {0}")]
+    InvalidFormat(i64),
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Notebook {
     /// Python source code of the notebook.
@@ -121,19 +134,12 @@ pub struct Notebook {
 
 impl Notebook {
     /// Read the Jupyter Notebook from the given [`Path`].
-    pub fn from_path(path: &Path) -> Result<Self, Box<Diagnostic>> {
-        Self::from_reader(BufReader::new(File::open(path).map_err(|err| {
-            Diagnostic::new(
-                IOError {
-                    message: format!("{err}"),
-                },
-                TextRange::default(),
-            )
-        })?))
+    pub fn from_path(path: &Path) -> Result<Self, NotebookError> {
+        Self::from_reader(BufReader::new(File::open(path)?))
     }
 
     /// Read the Jupyter Notebook from its JSON string.
-    pub fn from_source_code(source_code: &str) -> Result<Self, Box<Diagnostic>> {
+    pub fn from_source_code(source_code: &str) -> Result<Self, NotebookError> {
         Self::from_reader(Cursor::new(source_code))
     }
 
@@ -141,7 +147,7 @@ impl Notebook {
     ///
     /// See also the black implementation
     /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
-    fn from_reader<R>(mut reader: R) -> Result<Self, Box<Diagnostic>>
+    fn from_reader<R>(mut reader: R) -> Result<Self, NotebookError>
     where
         R: Read + Seek,
     {
@@ -149,95 +155,41 @@ impl Notebook {
             let mut buf = [0; 1];
             reader.read_exact(&mut buf).is_ok_and(|_| buf[0] == b'\n')
         });
-        reader.rewind().map_err(|err| {
-            Diagnostic::new(
-                IOError {
-                    message: format!("{err}"),
-                },
-                TextRange::default(),
-            )
-        })?;
+        reader.rewind()?;
         let mut raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
-                return Err(Box::new({
-                    match err.classify() {
-                        Category::Io => Diagnostic::new(
-                            IOError {
-                                message: format!("{err}"),
-                            },
-                            TextRange::default(),
-                        ),
-                        Category::Syntax | Category::Eof => {
-                            // Maybe someone saved the python sources (those with the `# %%` separator)
-                            // as jupyter notebook instead. Let's help them.
-                            let mut contents = String::new();
-                            reader
-                                .rewind()
-                                .and_then(|_| reader.read_to_string(&mut contents))
-                                .map_err(|err| {
-                                    Diagnostic::new(
-                                        IOError {
-                                            message: format!("{err}"),
-                                        },
-                                        TextRange::default(),
-                                    )
-                                })?;
+                return Err(match err.classify() {
+                    Category::Io => NotebookError::Json(err),
+                    Category::Syntax | Category::Eof => {
+                        // Maybe someone saved the python sources (those with the `# %%` separator)
+                        // as jupyter notebook instead. Let's help them.
+                        let mut contents = String::new();
+                        reader
+                            .rewind()
+                            .and_then(|_| reader.read_to_string(&mut contents))?;
 
-                            // Check if tokenizing was successful and the file is non-empty
-                            if lex(&contents, Mode::Module).any(|result| result.is_err()) {
-                                Diagnostic::new(
-                                    SyntaxError {
-                                        message: format!(
-                                            "A Jupyter Notebook (.{JUPYTER_NOTEBOOK_EXT}) must internally be JSON, \
-                                but this file isn't valid JSON: {err}"
-                                        ),
-                                    },
-                                    TextRange::default(),
-                                )
-                            } else {
-                                Diagnostic::new(
-                                    SyntaxError {
-                                        message: format!(
-                                            "Expected a Jupyter Notebook (.{JUPYTER_NOTEBOOK_EXT}), \
-                                    which must be internally stored as JSON, \
-                                    but found a Python source file: {err}"
-                                        ),
-                                    },
-                                    TextRange::default(),
-                                )
-                            }
-                        }
-                        Category::Data => {
-                            // We could try to read the schema version here but if this fails it's
-                            // a bug anyway
-                            Diagnostic::new(
-                                SyntaxError {
-                                    message: format!(
-                                        "This file does not match the schema expected of Jupyter Notebooks: {err}"
-                                    ),
-                                },
-                                TextRange::default(),
-                            )
+                        // Check if tokenizing was successful and the file is non-empty
+                        if lex(&contents, Mode::Module).any(|result| result.is_err()) {
+                            NotebookError::InvalidJson(err)
+                        } else {
+                            NotebookError::PythonSource(err)
                         }
                     }
-                }));
+                    Category::Data => {
+                        // We could try to read the schema version here but if this fails it's
+                        // a bug anyway
+                        NotebookError::InvalidSchema(err)
+                    }
+                });
             }
         };
 
         // v4 is what everybody uses
         if raw_notebook.nbformat != 4 {
             // bail because we should have already failed at the json schema stage
-            return Err(Box::new(Diagnostic::new(
-                SyntaxError {
-                    message: format!(
-                        "Expected Jupyter Notebook format 4, found {}",
-                        raw_notebook.nbformat
-                    ),
-                },
-                TextRange::default(),
-            )));
+            return Err(NotebookError::InvalidFormat(raw_notebook.nbformat));
         }
 
         let valid_code_cells = raw_notebook
@@ -493,56 +445,45 @@ mod tests {
 
     use crate::jupyter::index::NotebookIndex;
     use crate::jupyter::schema::Cell;
-    use crate::jupyter::Notebook;
+    use crate::jupyter::{Notebook, NotebookError};
     use crate::registry::Rule;
     use crate::source_kind::SourceKind;
-    use crate::test::{
-        read_jupyter_notebook, test_contents, test_notebook_path, test_resource_path,
-        TestedNotebook,
-    };
+    use crate::test::{test_contents, test_notebook_path, test_resource_path, TestedNotebook};
     use crate::{assert_messages, settings};
 
-    /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
-    fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
-        let path = test_resource_path("fixtures/jupyter/cell").join(path);
-        let source_code = std::fs::read_to_string(path)?;
-        Ok(serde_json::from_str(&source_code)?)
+    /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
+    fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
+        test_resource_path("fixtures/jupyter").join(path)
     }
 
     #[test]
-    fn test_valid() {
-        assert!(read_jupyter_notebook(Path::new("valid.ipynb")).is_ok());
+    fn test_python() -> Result<(), NotebookError> {
+        let notebook = Notebook::from_path(&notebook_path("valid.ipynb"))?;
+        assert!(notebook.is_python_notebook());
+        Ok(())
     }
 
     #[test]
-    fn test_r() {
-        // We can load this, it will be filtered out later
-        assert!(read_jupyter_notebook(Path::new("R.ipynb")).is_ok());
+    fn test_r() -> Result<(), NotebookError> {
+        let notebook = Notebook::from_path(&notebook_path("R.ipynb"))?;
+        assert!(!notebook.is_python_notebook());
+        Ok(())
     }
 
     #[test]
     fn test_invalid() {
-        let path = Path::new("resources/test/fixtures/jupyter/invalid_extension.ipynb");
-        assert_eq!(
-            Notebook::from_path(path).unwrap_err().kind.body,
-            "SyntaxError: Expected a Jupyter Notebook (.ipynb), \
-            which must be internally stored as JSON, \
-            but found a Python source file: \
-            expected value at line 1 column 1"
-        );
-        let path = Path::new("resources/test/fixtures/jupyter/not_json.ipynb");
-        assert_eq!(
-            Notebook::from_path(path).unwrap_err().kind.body,
-            "SyntaxError: A Jupyter Notebook (.ipynb) must internally be JSON, \
-            but this file isn't valid JSON: \
-            expected value at line 1 column 1"
-        );
-        let path = Path::new("resources/test/fixtures/jupyter/wrong_schema.ipynb");
-        assert_eq!(
-            Notebook::from_path(path).unwrap_err().kind.body,
-            "SyntaxError: This file does not match the schema expected of Jupyter Notebooks: \
-            missing field `cells` at line 1 column 2"
-        );
+        assert!(matches!(
+            Notebook::from_path(&notebook_path("invalid_extension.ipynb")),
+            Err(NotebookError::PythonSource(_))
+        ));
+        assert!(matches!(
+            Notebook::from_path(&notebook_path("not_json.ipynb")),
+            Err(NotebookError::InvalidJson(_))
+        ));
+        assert!(matches!(
+            Notebook::from_path(&notebook_path("wrong_schema.ipynb")),
+            Err(NotebookError::InvalidSchema(_))
+        ));
     }
 
     #[test_case(Path::new("markdown.json"), false; "markdown")]
@@ -551,13 +492,20 @@ mod tests {
     #[test_case(Path::new("only_code.json"), true; "only_code")]
     #[test_case(Path::new("cell_magic.json"), false; "cell_magic")]
     fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
+        /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
+        fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
+            let path = notebook_path("cell").join(path);
+            let source_code = std::fs::read_to_string(path)?;
+            Ok(serde_json::from_str(&source_code)?)
+        }
+
         assert_eq!(read_jupyter_cell(path)?.is_valid_code_cell(), expected);
         Ok(())
     }
 
     #[test]
-    fn test_concat_notebook() -> Result<()> {
-        let notebook = read_jupyter_notebook(Path::new("valid.ipynb"))?;
+    fn test_concat_notebook() -> Result<(), NotebookError> {
+        let notebook = Notebook::from_path(&notebook_path("valid.ipynb"))?;
         assert_eq!(
             notebook.source_code,
             r#"def unused_variable():
@@ -599,69 +547,73 @@ print("after empty cells")
     }
 
     #[test]
-    fn test_import_sorting() -> Result<()> {
-        let path = "isort.ipynb".to_string();
+    fn test_import_sorting() -> Result<(), NotebookError> {
+        let actual = notebook_path("isort.ipynb");
+        let expected = notebook_path("isort_expected.ipynb");
         let TestedNotebook {
             messages,
             source_notebook,
             ..
         } = test_notebook_path(
-            &path,
-            Path::new("isort_expected.ipynb"),
+            &actual,
+            expected,
             &settings::Settings::for_rule(Rule::UnsortedImports),
         )?;
-        assert_messages!(messages, path, source_notebook);
+        assert_messages!(messages, actual, source_notebook);
         Ok(())
     }
 
     #[test]
-    fn test_ipy_escape_command() -> Result<()> {
-        let path = "ipy_escape_command.ipynb".to_string();
+    fn test_ipy_escape_command() -> Result<(), NotebookError> {
+        let actual = notebook_path("ipy_escape_command.ipynb");
+        let expected = notebook_path("ipy_escape_command_expected.ipynb");
         let TestedNotebook {
             messages,
             source_notebook,
             ..
         } = test_notebook_path(
-            &path,
-            Path::new("ipy_escape_command_expected.ipynb"),
+            &actual,
+            expected,
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
-        assert_messages!(messages, path, source_notebook);
+        assert_messages!(messages, actual, source_notebook);
         Ok(())
     }
 
     #[test]
-    fn test_unused_variable() -> Result<()> {
-        let path = "unused_variable.ipynb".to_string();
+    fn test_unused_variable() -> Result<(), NotebookError> {
+        let actual = notebook_path("unused_variable.ipynb");
+        let expected = notebook_path("unused_variable_expected.ipynb");
         let TestedNotebook {
             messages,
             source_notebook,
             ..
         } = test_notebook_path(
-            &path,
-            Path::new("unused_variable_expected.ipynb"),
+            &actual,
+            expected,
             &settings::Settings::for_rule(Rule::UnusedVariable),
         )?;
-        assert_messages!(messages, path, source_notebook);
+        assert_messages!(messages, actual, source_notebook);
         Ok(())
     }
 
     #[test]
     fn test_json_consistency() -> Result<()> {
-        let path = "before_fix.ipynb".to_string();
+        let actual_path = notebook_path("before_fix.ipynb");
+        let expected_path = notebook_path("after_fix.ipynb");
+
         let TestedNotebook {
             linted_notebook: fixed_notebook,
             ..
         } = test_notebook_path(
-            path,
-            Path::new("after_fix.ipynb"),
+            actual_path,
+            &expected_path,
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
         let mut writer = Vec::new();
         fixed_notebook.write_inner(&mut writer)?;
         let actual = String::from_utf8(writer)?;
-        let expected =
-            std::fs::read_to_string(test_resource_path("fixtures/jupyter/after_fix.ipynb"))?;
+        let expected = std::fs::read_to_string(expected_path)?;
         assert_eq!(actual, expected);
         Ok(())
     }
@@ -669,7 +621,7 @@ print("after empty cells")
     #[test_case(Path::new("before_fix.ipynb"), true; "trailing_newline")]
     #[test_case(Path::new("no_trailing_newline.ipynb"), false; "no_trailing_newline")]
     fn test_trailing_newline(path: &Path, trailing_newline: bool) -> Result<()> {
-        let notebook = read_jupyter_notebook(path)?;
+        let notebook = Notebook::from_path(&notebook_path(path))?;
         assert_eq!(notebook.trailing_newline, trailing_newline);
 
         let mut writer = Vec::new();
@@ -685,7 +637,7 @@ print("after empty cells")
     // Version 4.5, cell ids are missing and need to be added
     #[test_case(Path::new("add_missing_cell_id.ipynb"), true; "add_missing_cell_id")]
     fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
-        let source_notebook = read_jupyter_notebook(path)?;
+        let source_notebook = Notebook::from_path(&notebook_path(path))?;
         let source_kind = SourceKind::IpyNotebook(source_notebook);
         let (_, transformed) = test_contents(
             &source_kind,

@@ -6,7 +6,7 @@
 //! [Ruff]: https://github.com/astral-sh/ruff
 
 pub use rule_selector::RuleSelector;
-pub use rules::pycodestyle::rules::IOError;
+pub use rules::pycodestyle::rules::{IOError, SyntaxError};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
