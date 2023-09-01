@@ -4,14 +4,15 @@
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
 use num_bigint::BigInt;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use ruff_python_ast::{self as ast, IpyEscapeKind};
 use crate::{
+    FStringErrorType,
     Mode,
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::parse_strings,
+    string::{concatenate_strings, parse_fstring_middle, parse_string_literal},
     token::{self, StringKind},
 };
 use lalrpop_util::ParseError;
@@ -668,8 +669,8 @@ LiteralPattern: ast::Pattern = {
         value: Box::new(value.into()),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <s:(@L string @R)+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
-        value: Box::new(parse_strings(s)?),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
+        value: Box::new(concatenate_strings(strings, (location..end_location).into())?.into()),
         range: (location..end_location).into()
     }.into()),
 }
@@ -726,7 +727,7 @@ MappingKey: ast::Expr = {
         value: false.into(),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
 }
 
 MatchMappingEntry: (ast::Expr, ast::Pattern) = {
@@ -1573,8 +1574,86 @@ SliceOp: Option<ast::ParenthesizedExpr> = {
     <location:@L> ":" <e:Test<"all">?> => e,
 }
 
+StringLiteralOrFString: ast::ParenthesizedExpr = {
+    StringLiteral,
+    FStringExpr,
+};
+
+StringLiteral: ast::ParenthesizedExpr = {
+    <location:@L> <s:string> =>? Ok(parse_string_literal(<>)?.into()),
+};
+
+FStringExpr: ast::ParenthesizedExpr = {
+    <location:@L> FStringStart <values:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
+        ast::ExprFString {
+            values,
+            implicit_concatenated: false,
+            range: (location..end_location).into()
+        }.into()
+    }
+};
+
+FStringMiddlePattern: ast::Expr = {
+    FStringReplacementField,
+    <location:@L> <s:fstring_middle> =>? Ok(parse_fstring_middle(<>)?),
+};
+
+FStringReplacementField: ast::Expr = {
+    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <c:FStringConversion?> <format_spec:FStringFormatSpec?> "}" <end_location:@R> => {
+        let mut conversion = ast::ConversionFlag::None;
+        let debug_text = if debug.is_some() {
+            let start_offset = location + TextSize::from(1);
+            let format_spec_ref = format_spec.as_ref();
+            let end_offset = c.map_or_else(|| {
+                format_spec_ref.map_or(end_location, |f| f.range().start()) - TextSize::from(1)
+            }, |(offset, flag)| {
+                conversion = flag;
+                offset
+            });
+            Some(ast::DebugText {
+                leading: source_code[TextRange::new(start_offset, value.range().start())].to_string(),
+                trailing: source_code[TextRange::new(value.range().end(), end_offset)].to_string(),
+            })
+        } else {
+            None
+        };
+        ast::ExprFormattedValue {
+            value: Box::new(value.into()),
+            debug_text,
+            conversion,
+            format_spec: format_spec.map(Box::new),
+            range: (location..end_location).into(),
+        }.into()
+    }
+};
+
+FStringFormatSpec: ast::Expr = {
+    ":" <location:@L> <values:FStringMiddlePattern*> <end_location:@R> => {
+        ast::ExprFString {
+            values,
+            implicit_concatenated: false,
+            range: (location..end_location).into()
+        }.into()
+    },
+};
+
+FStringConversion: (TextSize, ast::ConversionFlag) = {
+    <location:@L> "!" <s:name> =>? {
+        let conversion = match s.as_str() {
+            "s" => ast::ConversionFlag::Str,
+            "r" => ast::ConversionFlag::Repr,
+            "a" => ast::ConversionFlag::Ascii,
+            _ => Err(LexicalError {
+                error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                location,
+            })?
+        };
+        Ok((location, conversion))
+    }
+};
+
 Atom<Goal>: ast::ParenthesizedExpr = {
-    <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?.into()),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@L> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
     <location:@L> <value:Constant> <end_location:@R> => ast::ExprConstant {
         value,
         range: (location..end_location).into(),
@@ -1843,6 +1922,9 @@ extern {
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
+        FStringStart => token::Tok::FStringStart,
+        FStringEnd => token::Tok::FStringEnd,
+        "!" => token::Tok::Exclamation,
         "?" => token::Tok::Question,
         "+" => token::Tok::Plus,
         "-" => token::Tok::Minus,
@@ -1935,6 +2017,10 @@ extern {
             value: <String>,
             kind: <StringKind>,
             triple_quoted: <bool>
+        },
+        fstring_middle => token::Tok::FStringMiddle {
+            value: <String>,
+            is_raw: <bool>
         },
         name => token::Tok::Name { name: <String> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {

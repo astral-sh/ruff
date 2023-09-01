@@ -3,6 +3,7 @@ source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
 [
+<<<<<<< HEAD
     FormattedValue(
         ExprFormattedValue {
             range: 2..5,
@@ -40,6 +41,58 @@ expression: parse_ast
                 StringConstant {
                     value: "{foo}",
                     unicode: false,
+=======
+    Expr(
+        StmtExpr {
+            range: 0..18,
+            value: FString(
+                ExprFString {
+                    range: 0..18,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 2..5,
+                                value: Name(
+                                    ExprName {
+                                        range: 3..4,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 5..10,
+                                value: Name(
+                                    ExprName {
+                                        range: 7..8,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 10..17,
+                                value: Str(
+                                    StringConstant {
+                                        value: "{foo}",
+                                        implicit_concatenated: false,
+                                    },
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    ],
+>>>>>>> d34b4d3b9 (Add support for parsing f-strings as per PEP 701)
                     implicit_concatenated: false,
                 },
             ),

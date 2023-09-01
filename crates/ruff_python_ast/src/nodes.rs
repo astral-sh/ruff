@@ -2620,6 +2620,15 @@ impl Constant {
             _ => false,
         }
     }
+
+    /// Returns `true` if the constant is a string constant that's a unicode
+    /// string (i.e., `u"..."`).
+    pub fn is_unicode_string(&self) -> bool {
+        match self {
+            Constant::Str(value) => value.unicode,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
