@@ -12,22 +12,14 @@ pub(crate) fn expand<'a>(
     let mut prefix_to_codes: BTreeMap<String, BTreeSet<String>> = BTreeMap::default();
     let mut code_to_attributes: BTreeMap<String, &[Attribute]> = BTreeMap::default();
 
-    for (variant, group, attr) in variants {
+    for (variant, .., attr) in variants {
         let code_str = variant.to_string();
-        // Nursery rules have to be explicitly selected, so we ignore them when looking at prefixes.
-        if is_preview(group) {
+        for i in 1..=code_str.len() {
+            let prefix = code_str[..i].to_string();
             prefix_to_codes
-                .entry(code_str.clone())
+                .entry(prefix)
                 .or_default()
                 .insert(code_str.clone());
-        } else {
-            for i in 1..=code_str.len() {
-                let prefix = code_str[..i].to_string();
-                prefix_to_codes
-                    .entry(prefix)
-                    .or_default()
-                    .insert(code_str.clone());
-            }
         }
 
         code_to_attributes.insert(code_str, attr);
@@ -124,15 +116,4 @@ pub(crate) fn get_prefix_ident(prefix: &str) -> Ident {
         prefix.to_string()
     };
     Ident::new(&prefix, Span::call_site())
-}
-
-/// Returns true if the given group is the "preview" group.
-pub(crate) fn is_preview(group: &Path) -> bool {
-    let group = group
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect::<Vec<String>>()
-        .join("::");
-    group == "RuleGroup::Preview"
 }
