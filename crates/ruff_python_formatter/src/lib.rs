@@ -1,4 +1,5 @@
 use thiserror::Error;
+use tracing::Level;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
@@ -119,6 +120,7 @@ impl From<ParseError> for FormatModuleError {
     }
 }
 
+#[tracing::instrument(level=Level::TRACE, skip_all, err)]
 pub fn format_module(
     contents: &str,
     options: PyFormatOptions,

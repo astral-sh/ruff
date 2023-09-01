@@ -2370,6 +2370,7 @@ dependencies = [
  "similar",
  "smallvec",
  "thiserror",
+ "tracing",
  "unicode-width",
 ]
 
