@@ -7,7 +7,7 @@ use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, Sou
 use bitflags::bitflags;
 use colored::Colorize;
 
-use ruff_jupyter::{Notebook, NotebookIndex};
+use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 

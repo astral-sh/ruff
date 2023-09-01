@@ -1,5 +1,5 @@
 use ruff_diagnostics::SourceMap;
-use ruff_jupyter::Notebook;
+use ruff_notebook::Notebook;
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum SourceKind {

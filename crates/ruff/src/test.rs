@@ -28,7 +28,7 @@ use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
 use crate::source_kind::SourceKind;
-use ruff_jupyter::{Notebook, NotebookError};
+use ruff_notebook::{Notebook, NotebookError};
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {

@@ -18,7 +18,7 @@ name = "ruff"
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
 ruff_index = { path = "../ruff_index" }
-ruff_jupyter = { path = "../ruff_jupyter" }
+ruff_notebook = { path = "../ruff_notebook" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
 ruff_python_codegen = { path = "../ruff_python_codegen" }

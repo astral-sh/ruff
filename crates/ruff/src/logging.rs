@@ -13,7 +13,7 @@ use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
 
 use crate::fs;
 use crate::source_kind::SourceKind;
-use ruff_jupyter::Notebook;
+use ruff_notebook::Notebook;
 
 pub static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
 

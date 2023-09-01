@@ -1,5 +1,5 @@
 [package]
-name = "ruff_jupyter"
+name = "ruff_notebook"
 version = "0.0.0"
 publish = false
 authors = { workspace = true }
@@ -29,4 +29,3 @@ uuid = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true }
 test-case = { workspace = true }
-

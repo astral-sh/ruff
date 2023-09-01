@@ -2087,8 +2087,8 @@ dependencies = [
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_index",
- "ruff_jupyter",
  "ruff_macros",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_index",
@@ -2183,8 +2183,8 @@ dependencies = [
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_formatter",
- "ruff_jupyter",
  "ruff_macros",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_stdlib",
@@ -2227,7 +2227,7 @@ dependencies = [
  "ruff_cli",
  "ruff_diagnostics",
  "ruff_formatter",
- "ruff_jupyter",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_formatter",
@@ -2283,7 +2283,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff_jupyter"
+name = "ruff_macros"
+version = "0.0.0"
+dependencies = [
+ "itertools",
+ "proc-macro2",
+ "quote",
+ "ruff_python_trivia",
+ "syn 2.0.29",
+]
+
+[[package]]
+name = "ruff_notebook"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -2299,17 +2310,6 @@ dependencies = [
  "test-case",
  "thiserror",
  "uuid",
-]
-
-[[package]]
-name = "ruff_macros"
-version = "0.0.0"
-dependencies = [
- "itertools",
- "proc-macro2",
- "quote",
- "ruff_python_trivia",
- "syn 2.0.29",
 ]
 
 [[package]]

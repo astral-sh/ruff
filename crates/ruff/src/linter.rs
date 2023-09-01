@@ -616,7 +616,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use ruff_jupyter::{Notebook, NotebookError};
+    use ruff_notebook::{Notebook, NotebookError};
 
     use crate::registry::Rule;
     use crate::source_kind::SourceKind;
@@ -625,7 +625,7 @@ mod tests {
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
     fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
-        Path::new("../ruff_jupyter/resources/test/fixtures/jupyter").join(path)
+        Path::new("../ruff_notebook/resources/test/fixtures/jupyter").join(path)
     }
 
     #[test]

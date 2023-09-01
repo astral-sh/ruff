@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 use std::slice;
 
-use ruff_jupyter::Notebook;
+use ruff_notebook::Notebook;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
 use ruff_source_file::Locator;

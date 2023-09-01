@@ -25,7 +25,7 @@ ruff = { path = "../ruff", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_formatter = { path = "../ruff_formatter" }
-ruff_jupyter = { path = "../ruff_jupyter" }
+ruff_notebook = { path = "../ruff_notebook" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
