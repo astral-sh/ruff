@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::{io, iter};
 
@@ -12,14 +12,12 @@ use serde_json::error::Category;
 use thiserror::Error;
 use uuid::Uuid;
 
-use ruff_python_parser::lexer::lex;
-use ruff_python_parser::Mode;
+use ruff_diagnostics::{SourceMap, SourceMarker};
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::TextSize;
 
-use crate::autofix::source_map::{SourceMap, SourceMarker};
-use crate::jupyter::index::NotebookIndex;
-use crate::jupyter::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
+use crate::index::NotebookIndex;
+use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -33,7 +31,7 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     let code = notebook.source_code().to_string();
     notebook.update_cell_content(&code);
     let mut writer = Vec::new();
-    notebook.write_inner(&mut writer)?;
+    notebook.write(&mut writer)?;
     Ok(String::from_utf8(writer)?)
 }
 
@@ -99,8 +97,6 @@ pub enum NotebookError {
     Io(#[from] io::Error),
     #[error(transparent)]
     Json(serde_json::Error),
-    #[error("Expected a Jupyter Notebook, which must be internally stored as JSON, but found a Python source file: {0}")]
-    PythonSource(serde_json::Error),
     #[error("Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}")]
     InvalidJson(serde_json::Error),
     #[error("This file does not match the schema expected of Jupyter Notebooks: {0}")]
@@ -162,24 +158,10 @@ impl Notebook {
                 // Translate the error into a diagnostic
                 return Err(match err.classify() {
                     Category::Io => NotebookError::Json(err),
-                    Category::Syntax | Category::Eof => {
-                        // Maybe someone saved the python sources (those with the `# %%` separator)
-                        // as jupyter notebook instead. Let's help them.
-                        let mut contents = String::new();
-                        reader
-                            .rewind()
-                            .and_then(|_| reader.read_to_string(&mut contents))?;
-
-                        // Check if tokenizing was successful and the file is non-empty
-                        if lex(&contents, Mode::Module).any(|result| result.is_err()) {
-                            NotebookError::InvalidJson(err)
-                        } else {
-                            NotebookError::PythonSource(err)
-                        }
-                    }
+                    Category::Syntax | Category::Eof => NotebookError::InvalidJson(err),
                     Category::Data => {
                         // We could try to read the schema version here but if this fails it's
-                        // a bug anyway
+                        // a bug anyway.
                         NotebookError::InvalidSchema(err)
                     }
                 });
@@ -256,13 +238,13 @@ impl Notebook {
         // The first offset is always going to be at 0, so skip it.
         for offset in self.cell_offsets.iter_mut().skip(1).rev() {
             let closest_marker = match last_marker {
-                Some(marker) if marker.source <= *offset => marker,
+                Some(marker) if marker.source() <= *offset => marker,
                 _ => {
                     let Some(marker) = source_map
                         .markers()
                         .iter()
                         .rev()
-                        .find(|m| m.source <= *offset)
+                        .find(|marker| marker.source() <= *offset)
                     else {
                         // There are no markers above the current offset, so we can
                         // stop here.
@@ -273,9 +255,9 @@ impl Notebook {
                 }
             };
 
-            match closest_marker.source.cmp(&closest_marker.dest) {
-                Ordering::Less => *offset += closest_marker.dest - closest_marker.source,
-                Ordering::Greater => *offset -= closest_marker.source - closest_marker.dest,
+            match closest_marker.source().cmp(&closest_marker.dest()) {
+                Ordering::Less => *offset += closest_marker.dest() - closest_marker.source(),
+                Ordering::Greater => *offset -= closest_marker.source() - closest_marker.dest(),
                 Ordering::Equal => (),
             }
         }
@@ -383,18 +365,23 @@ impl Notebook {
     /// The index is built only once when required. This is only used to
     /// report diagnostics, so by that time all of the autofixes must have
     /// been applied if `--fix` was passed.
-    pub(crate) fn index(&self) -> &NotebookIndex {
+    pub fn index(&self) -> &NotebookIndex {
         self.index.get_or_init(|| self.build_index())
     }
 
     /// Return the cell offsets for the concatenated source code corresponding
     /// the Jupyter notebook.
-    pub(crate) fn cell_offsets(&self) -> &[TextSize] {
+    pub fn cell_offsets(&self) -> &[TextSize] {
         &self.cell_offsets
     }
 
+    /// Return `true` if the notebook has a trailing newline, `false` otherwise.
+    pub fn trailing_newline(&self) -> bool {
+        self.trailing_newline
+    }
+
     /// Update the notebook with the given sourcemap and transformed content.
-    pub(crate) fn update(&mut self, source_map: &SourceMap, transformed: String) {
+    pub fn update(&mut self, source_map: &SourceMap, transformed: String) {
         // Cell offsets must be updated before updating the cell content as
         // it depends on the offsets to extract the cell content.
         self.index.take();
@@ -417,7 +404,8 @@ impl Notebook {
             .map_or(true, |language| language.name == "python")
     }
 
-    fn write_inner(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+    /// Write the notebook back to the given [`Write`] implementor.
+    pub fn write(&self, writer: &mut dyn Write) -> anyhow::Result<()> {
         // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
         let mut serializer = serde_json::Serializer::with_formatter(writer, formatter);
@@ -425,13 +413,6 @@ impl Notebook {
         if self.trailing_newline {
             writeln!(serializer.into_inner())?;
         }
-        Ok(())
-    }
-
-    /// Write back with an indent of 1, just like black
-    pub fn write(&self, path: &Path) -> anyhow::Result<()> {
-        let mut writer = BufWriter::new(File::create(path)?);
-        self.write_inner(&mut writer)?;
         Ok(())
     }
 }
@@ -443,17 +424,11 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::jupyter::index::NotebookIndex;
-    use crate::jupyter::schema::Cell;
-    use crate::jupyter::{Notebook, NotebookError};
-    use crate::registry::Rule;
-    use crate::source_kind::SourceKind;
-    use crate::test::{test_contents, test_notebook_path, test_resource_path, TestedNotebook};
-    use crate::{assert_messages, settings};
+    use crate::{Cell, Notebook, NotebookError, NotebookIndex};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
     fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
-        test_resource_path("fixtures/jupyter").join(path)
+        Path::new("./resources/test/fixtures/jupyter").join(path)
     }
 
     #[test]
@@ -474,7 +449,7 @@ mod tests {
     fn test_invalid() {
         assert!(matches!(
             Notebook::from_path(&notebook_path("invalid_extension.ipynb")),
-            Err(NotebookError::PythonSource(_))
+            Err(NotebookError::InvalidJson(_))
         ));
         assert!(matches!(
             Notebook::from_path(&notebook_path("not_json.ipynb")),
@@ -543,116 +518,6 @@ print("after empty cells")
                 198.into()
             ]
         );
-        Ok(())
-    }
-
-    #[test]
-    fn test_import_sorting() -> Result<(), NotebookError> {
-        let actual = notebook_path("isort.ipynb");
-        let expected = notebook_path("isort_expected.ipynb");
-        let TestedNotebook {
-            messages,
-            source_notebook,
-            ..
-        } = test_notebook_path(
-            &actual,
-            expected,
-            &settings::Settings::for_rule(Rule::UnsortedImports),
-        )?;
-        assert_messages!(messages, actual, source_notebook);
-        Ok(())
-    }
-
-    #[test]
-    fn test_ipy_escape_command() -> Result<(), NotebookError> {
-        let actual = notebook_path("ipy_escape_command.ipynb");
-        let expected = notebook_path("ipy_escape_command_expected.ipynb");
-        let TestedNotebook {
-            messages,
-            source_notebook,
-            ..
-        } = test_notebook_path(
-            &actual,
-            expected,
-            &settings::Settings::for_rule(Rule::UnusedImport),
-        )?;
-        assert_messages!(messages, actual, source_notebook);
-        Ok(())
-    }
-
-    #[test]
-    fn test_unused_variable() -> Result<(), NotebookError> {
-        let actual = notebook_path("unused_variable.ipynb");
-        let expected = notebook_path("unused_variable_expected.ipynb");
-        let TestedNotebook {
-            messages,
-            source_notebook,
-            ..
-        } = test_notebook_path(
-            &actual,
-            expected,
-            &settings::Settings::for_rule(Rule::UnusedVariable),
-        )?;
-        assert_messages!(messages, actual, source_notebook);
-        Ok(())
-    }
-
-    #[test]
-    fn test_json_consistency() -> Result<()> {
-        let actual_path = notebook_path("before_fix.ipynb");
-        let expected_path = notebook_path("after_fix.ipynb");
-
-        let TestedNotebook {
-            linted_notebook: fixed_notebook,
-            ..
-        } = test_notebook_path(
-            actual_path,
-            &expected_path,
-            &settings::Settings::for_rule(Rule::UnusedImport),
-        )?;
-        let mut writer = Vec::new();
-        fixed_notebook.write_inner(&mut writer)?;
-        let actual = String::from_utf8(writer)?;
-        let expected = std::fs::read_to_string(expected_path)?;
-        assert_eq!(actual, expected);
-        Ok(())
-    }
-
-    #[test_case(Path::new("before_fix.ipynb"), true; "trailing_newline")]
-    #[test_case(Path::new("no_trailing_newline.ipynb"), false; "no_trailing_newline")]
-    fn test_trailing_newline(path: &Path, trailing_newline: bool) -> Result<()> {
-        let notebook = Notebook::from_path(&notebook_path(path))?;
-        assert_eq!(notebook.trailing_newline, trailing_newline);
-
-        let mut writer = Vec::new();
-        notebook.write_inner(&mut writer)?;
-        let string = String::from_utf8(writer)?;
-        assert_eq!(string.ends_with('\n'), trailing_newline);
-
-        Ok(())
-    }
-
-    // Version <4.5, don't emit cell ids
-    #[test_case(Path::new("no_cell_id.ipynb"), false; "no_cell_id")]
-    // Version 4.5, cell ids are missing and need to be added
-    #[test_case(Path::new("add_missing_cell_id.ipynb"), true; "add_missing_cell_id")]
-    fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
-        let source_notebook = Notebook::from_path(&notebook_path(path))?;
-        let source_kind = SourceKind::IpyNotebook(source_notebook);
-        let (_, transformed) = test_contents(
-            &source_kind,
-            path,
-            &settings::Settings::for_rule(Rule::UnusedImport),
-        );
-        let linted_notebook = transformed.into_owned().expect_ipy_notebook();
-        let mut writer = Vec::new();
-        linted_notebook.write_inner(&mut writer)?;
-        let actual = String::from_utf8(writer)?;
-        if has_id {
-            assert!(actual.contains(r#""id": ""#));
-        } else {
-            assert!(!actual.contains(r#""id":"#));
-        }
         Ok(())
     }
 }

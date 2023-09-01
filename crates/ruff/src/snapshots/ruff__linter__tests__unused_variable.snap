@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/jupyter/notebook.rs
+source: crates/ruff/src/linter.rs
 ---
 unused_variable.ipynb:cell 1:2:5: F841 [*] Local variable `foo1` is assigned to but never used
   |

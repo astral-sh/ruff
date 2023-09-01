@@ -20,7 +20,6 @@ mod doc_lines;
 mod docstrings;
 pub mod fs;
 mod importer;
-pub mod jupyter;
 mod lex;
 pub mod line_width;
 pub mod linter;

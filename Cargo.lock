@@ -2088,6 +2088,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_index",
  "ruff_macros",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_index",
@@ -2103,7 +2104,6 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "serde_with",
  "similar",
  "smallvec",
  "strum",
@@ -2115,7 +2115,6 @@ dependencies = [
  "typed-arena",
  "unicode-width",
  "unicode_names2",
- "uuid",
  "wsl",
 ]
 
@@ -2185,6 +2184,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_formatter",
  "ruff_macros",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_stdlib",
@@ -2227,6 +2227,7 @@ dependencies = [
  "ruff_cli",
  "ruff_diagnostics",
  "ruff_formatter",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_formatter",
@@ -2290,6 +2291,25 @@ dependencies = [
  "quote",
  "ruff_python_trivia",
  "syn 2.0.29",
+]
+
+[[package]]
+name = "ruff_notebook"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "insta",
+ "itertools",
+ "once_cell",
+ "ruff_diagnostics",
+ "ruff_source_file",
+ "ruff_text_size",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "test-case",
+ "thiserror",
+ "uuid",
 ]
 
 [[package]]

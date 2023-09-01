@@ -46,7 +46,7 @@ fn sort_alphabetically<T: Serialize, S: serde::Serializer>(
 ///
 /// use serde::Serialize;
 ///
-/// use ruff::jupyter::SortAlphabetically;
+/// use ruff_notebook::SortAlphabetically;
 ///
 /// #[derive(Serialize)]
 /// struct MyStruct {
