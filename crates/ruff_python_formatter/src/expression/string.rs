@@ -386,17 +386,17 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
         // Retain the casing for the raw prefix:
         // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
         if self.contains(StringPrefix::RAW) {
-            text("r").fmt(f)?;
+            token("r").fmt(f)?;
         } else if self.contains(StringPrefix::RAW_UPPER) {
-            text("R").fmt(f)?;
+            token("R").fmt(f)?;
         }
 
         if self.contains(StringPrefix::BYTE) {
-            text("b").fmt(f)?;
+            token("b").fmt(f)?;
         }
 
         if self.contains(StringPrefix::F_STRING) {
-            text("f").fmt(f)?;
+            token("f").fmt(f)?;
         }
 
         // Remove the unicode prefix `u` if any because it is meaningless in Python 3+.
@@ -596,7 +596,7 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
             (QuoteStyle::Double, true) => "\"\"\"",
         };
 
-        text(quotes).fmt(f)
+        token(quotes).fmt(f)
     }
 }
 

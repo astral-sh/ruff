@@ -27,12 +27,12 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         write!(
             f,
             [
-                text("from"),
+                token("from"),
                 space(),
                 dynamic_text(&level_str, None),
                 module.as_ref().map(AsFormat::format),
                 space(),
-                text("import"),
+                token("import"),
                 space(),
             ]
         )?;
@@ -40,7 +40,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         if let [name] = names.as_slice() {
             // star can't be surrounded by parentheses
             if name.name.as_str() == "*" {
-                return text("*").fmt(f);
+                return token("*").fmt(f);
             }
         }
 

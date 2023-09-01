@@ -8,7 +8,7 @@ pub struct FormatStmtContinue;
 
 impl FormatNodeRule<StmtContinue> for FormatStmtContinue {
     fn fmt_fields(&self, _item: &StmtContinue, f: &mut PyFormatter) -> FormatResult<()> {
-        text("continue").fmt(f)
+        token("continue").fmt(f)
     }
 
     fn is_suppressed(

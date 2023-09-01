@@ -12,6 +12,6 @@ impl FormatNodeRule<PatternKeyword> for FormatPatternKeyword {
             attr,
             pattern,
         } = item;
-        write!(f, [attr.format(), text("="), pattern.format()])
+        write!(f, [attr.format(), token("="), pattern.format()])
     }
 }

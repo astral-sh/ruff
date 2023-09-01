@@ -14,7 +14,7 @@ impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
     fn fmt_fields(&self, item: &StmtReturn, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtReturn { range: _, value } = item;
 
-        text("return").fmt(f)?;
+        token("return").fmt(f)?;
 
         match value.as_deref() {
             Some(Expr::Tuple(tuple)) if !f.context().comments().has_leading(tuple) => {

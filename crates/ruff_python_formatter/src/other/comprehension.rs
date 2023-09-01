@@ -32,7 +32,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
         } = item;
 
         if *is_async {
-            write!(f, [text("async"), space()])?;
+            write!(f, [token("async"), space()])?;
         }
 
         let comments = f.context().comments().clone();
@@ -54,14 +54,14 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
         write!(
             f,
             [
-                text("for"),
+                token("for"),
                 trailing_comments(before_target_comments),
                 group(&format_args!(
                     Spacer(target),
                     ExprTupleWithoutParentheses(target),
                     in_spacer,
                     leading_comments(before_in_comments),
-                    text("in"),
+                    token("in"),
                     trailing_comments(trailing_in_comments),
                     Spacer(iter),
                     iter.format(),
@@ -81,7 +81,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                         );
                     joiner.entry(&group(&format_args!(
                         leading_comments(own_line_if_comments),
-                        text("if"),
+                        token("if"),
                         trailing_comments(end_of_line_if_comments),
                         Spacer(if_case),
                         if_case.format(),

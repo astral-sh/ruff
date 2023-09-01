@@ -21,7 +21,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        write!(f, [text("lambda")])?;
+        write!(f, [token("lambda")])?;
 
         if let Some(parameters) = parameters {
             write!(
@@ -35,7 +35,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             )?;
         }
 
-        write!(f, [text(":")])?;
+        write!(f, [token(":")])?;
 
         if dangling.is_empty() {
             write!(f, [space()])?;

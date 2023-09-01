@@ -52,8 +52,8 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                             f,
                             [
                                 item.is_async
-                                    .then_some(format_args![text("async"), space()]),
-                                text("with"),
+                                    .then_some(format_args![token("async"), space()]),
+                                token("with"),
                                 space()
                             ]
                         )?;
@@ -92,7 +92,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                                 item.format().fmt(f)?;
                             }
                         } else {
-                            f.join_with(format_args![text(","), space()])
+                            f.join_with(format_args![token(","), space()])
                                 .entries(item.items.iter().formatted())
                                 .finish()?;
                         }

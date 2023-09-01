@@ -260,7 +260,7 @@ impl FormatRule<Operator, PyFormatContext<'_>> for FormatOperator {
             Operator::FloorDiv => "//",
         };
 
-        text(operator).fmt(f)
+        token(operator).fmt(f)
     }
 }
 

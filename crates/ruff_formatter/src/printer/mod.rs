@@ -95,31 +95,31 @@ impl<'a> Printer<'a> {
         let args = stack.top();
 
         match element {
-            FormatElement::Space => self.print_text(" ", None),
-            FormatElement::StaticText { text } => self.print_text(text, None),
-            FormatElement::DynamicText { text } => self.print_text(text, None),
+            FormatElement::Space => self.print_text(Text::Token(" "), None),
+            FormatElement::Token { text } => self.print_text(Text::Token(text), None),
+            FormatElement::DynamicText { text } => self.print_text(Text::Text(text), None),
             FormatElement::SourceCodeSlice { slice, .. } => {
                 let text = slice.text(self.source_code);
-                self.print_text(text, Some(slice.range()));
+                self.print_text(Text::Text(text), Some(slice.range()));
             }
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
                     && matches!(line_mode, LineMode::Soft | LineMode::SoftOrSpace)
                 {
                     if line_mode == &LineMode::SoftOrSpace {
-                        self.print_text(" ", None);
+                        self.print_text(Text::Token(" "), None);
                     }
                 } else if self.state.line_suffixes.has_pending() {
                     self.flush_line_suffixes(queue, stack, Some(element));
                 } else {
                     // Only print a newline if the current line isn't already empty
                     if self.state.line_width > 0 {
-                        self.print_str("\n");
+                        self.print_char('\n');
                     }
 
                     // Print a second line break if this is an empty line
                     if line_mode == &LineMode::Empty {
-                        self.print_str("\n");
+                        self.print_char('\n');
                     }
 
                     self.state.pending_indent = args.indention();
@@ -352,7 +352,7 @@ impl<'a> Printer<'a> {
         Ok(print_mode)
     }
 
-    fn print_text(&mut self, text: &str, source_range: Option<TextRange>) {
+    fn print_text(&mut self, text: Text, source_range: Option<TextRange>) {
         if !self.state.pending_indent.is_empty() {
             let (indent_char, repeat_count) = match self.options.indent_style() {
                 IndentStyle::Tab => ('\t', 1),
@@ -390,7 +390,18 @@ impl<'a> Printer<'a> {
 
         self.push_marker();
 
-        self.print_str(text);
+        match text {
+            #[allow(clippy::cast_possible_truncation)]
+            Text::Token(token) => {
+                self.state.buffer.push_str(token);
+                self.state.line_width += token.len() as u32;
+            }
+            Text::Text(text) => {
+                for char in text.chars() {
+                    self.print_char(char);
+                }
+            }
+        }
 
         if let Some(range) = source_range {
             self.state.source_position = range.end();
@@ -718,12 +729,6 @@ impl<'a> Printer<'a> {
         invalid_end_tag(TagKind::Entry, stack.top_kind())
     }
 
-    fn print_str(&mut self, content: &str) {
-        for char in content.chars() {
-            self.print_char(char);
-        }
-    }
-
     fn print_char(&mut self, char: char) {
         if char == '\n' {
             self.state
@@ -1047,12 +1052,12 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         let args = self.stack.top();
 
         match element {
-            FormatElement::Space => return Ok(self.fits_text(" ", args)),
+            FormatElement::Space => return Ok(self.fits_text(Text::Token(" "), args)),
 
             FormatElement::Line(line_mode) => {
                 match args.mode() {
                     PrintMode::Flat => match line_mode {
-                        LineMode::SoftOrSpace => return Ok(self.fits_text(" ", args)),
+                        LineMode::SoftOrSpace => return Ok(self.fits_text(Text::Token(" "), args)),
                         LineMode::Soft => {}
                         LineMode::Hard | LineMode::Empty => {
                             return Ok(if self.must_be_flat {
@@ -1081,11 +1086,13 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
-            FormatElement::StaticText { text } => return Ok(self.fits_text(text, args)),
-            FormatElement::DynamicText { text, .. } => return Ok(self.fits_text(text, args)),
+            FormatElement::Token { text } => return Ok(self.fits_text(Text::Token(text), args)),
+            FormatElement::DynamicText { text, .. } => {
+                return Ok(self.fits_text(Text::Text(text), args))
+            }
             FormatElement::SourceCodeSlice { slice, .. } => {
                 let text = slice.text(self.printer.source_code);
-                return Ok(self.fits_text(text, args));
+                return Ok(self.fits_text(Text::Text(text), args));
             }
             FormatElement::LineSuffixBoundary => {
                 if self.state.has_line_suffix {
@@ -1293,31 +1300,39 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         Fits::Maybe
     }
 
-    fn fits_text(&mut self, text: &str, args: PrintElementArgs) -> Fits {
+    fn fits_text(&mut self, text: Text, args: PrintElementArgs) -> Fits {
         let indent = std::mem::take(&mut self.state.pending_indent);
         self.state.line_width +=
             u32::from(indent.level()) * self.options().indent_width() + u32::from(indent.align());
 
-        for c in text.chars() {
-            let char_width = match c {
-                '\t' => self.options().tab_width.value(),
-                '\n' => {
-                    if self.must_be_flat {
-                        return Fits::No;
-                    }
-                    match args.measure_mode() {
-                        MeasureMode::FirstLine => return Fits::Yes,
-                        MeasureMode::AllLines => {
-                            self.state.line_width = 0;
-                            continue;
+        match text {
+            #[allow(clippy::cast_possible_truncation)]
+            Text::Token(token) => {
+                self.state.line_width += token.len() as u32;
+            }
+            Text::Text(text) => {
+                for c in text.chars() {
+                    let char_width = match c {
+                        '\t' => self.options().tab_width.value(),
+                        '\n' => {
+                            if self.must_be_flat {
+                                return Fits::No;
+                            }
+                            match args.measure_mode() {
+                                MeasureMode::FirstLine => return Fits::Yes,
+                                MeasureMode::AllLines => {
+                                    self.state.line_width = 0;
+                                    continue;
+                                }
+                            }
                         }
-                    }
+                        // SAFETY: A u32 is sufficient to format files <= 4GB
+                        #[allow(clippy::cast_possible_truncation)]
+                        c => c.width().unwrap_or(0) as u32,
+                    };
+                    self.state.line_width += char_width;
                 }
-                // SAFETY: A u32 is sufficient to format files <= 4GB
-                #[allow(clippy::cast_possible_truncation)]
-                c => c.width().unwrap_or(0) as u32,
-            };
-            self.state.line_width += char_width;
+            }
         }
 
         if self.state.line_width > self.options().line_width.into() {
@@ -1434,6 +1449,14 @@ impl From<BestFittingMode> for MeasureMode {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+enum Text<'a> {
+    /// ASCII only text that contains no line breaks or tab characters.
+    Token(&'a str),
+    /// Arbitrary text. May contain `\n` line breaks, tab characters, or unicode characters.
+    Text(&'a str),
+}
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
@@ -1469,10 +1492,10 @@ mod tests {
     fn it_prints_a_group_on_a_single_line_if_it_fits() {
         let result = format(&FormatArrayElements {
             items: vec![
-                &text("\"a\""),
-                &text("\"b\""),
-                &text("\"c\""),
-                &text("\"d\""),
+                &token("\"a\""),
+                &token("\"b\""),
+                &token("\"c\""),
+                &token("\"d\""),
             ],
         });
 
@@ -1482,17 +1505,17 @@ mod tests {
     #[test]
     fn it_tracks_the_indent_for_each_token() {
         let formatted = format(&format_args!(
-            text("a"),
+            token("a"),
             soft_block_indent(&format_args!(
-                text("b"),
+                token("b"),
                 soft_block_indent(&format_args!(
-                    text("c"),
-                    soft_block_indent(&format_args!(text("d"), soft_line_break(), text("d"),)),
-                    text("c"),
+                    token("c"),
+                    soft_block_indent(&format_args!(token("d"), soft_line_break(), token("d"),)),
+                    token("c"),
                 )),
-                text("b"),
+                token("b"),
             )),
-            text("a")
+            token("a")
         ));
 
         assert_eq!(
@@ -1517,9 +1540,12 @@ a"#,
 
         let result = format_with_options(
             &format_args![
-                text("function main() {"),
-                block_indent(&text("let x = `This is a multiline\nstring`;")),
-                text("}"),
+                token("function main() {"),
+                block_indent(&dynamic_text(
+                    "let x = `This is a multiline\nstring`;",
+                    None
+                )),
+                token("}"),
                 hard_line_break()
             ],
             options,
@@ -1535,8 +1561,8 @@ a"#,
     fn it_breaks_a_group_if_a_string_contains_a_newline() {
         let result = format(&FormatArrayElements {
             items: vec![
-                &text("`This is a string spanning\ntwo lines`"),
-                &text("\"b\""),
+                &dynamic_text("`This is a string spanning\ntwo lines`", None),
+                &token("\"b\""),
             ],
         });
 
@@ -1551,7 +1577,7 @@ two lines`,
     }
     #[test]
     fn it_breaks_a_group_if_it_contains_a_hard_line_break() {
-        let result = format(&group(&format_args![text("a"), block_indent(&text("b"))]));
+        let result = format(&group(&format_args![token("a"), block_indent(&token("b"))]));
 
         assert_eq!("a\n  b\n", result.as_code());
     }
@@ -1560,17 +1586,17 @@ two lines`,
     fn it_breaks_parent_groups_if_they_dont_fit_on_a_single_line() {
         let result = format(&FormatArrayElements {
             items: vec![
-                &text("\"a\""),
-                &text("\"b\""),
-                &text("\"c\""),
-                &text("\"d\""),
+                &token("\"a\""),
+                &token("\"b\""),
+                &token("\"c\""),
+                &token("\"d\""),
                 &FormatArrayElements {
                     items: vec![
-                        &text("\"0123456789\""),
-                        &text("\"0123456789\""),
-                        &text("\"0123456789\""),
-                        &text("\"0123456789\""),
-                        &text("\"0123456789\""),
+                        &token("\"0123456789\""),
+                        &token("\"0123456789\""),
+                        &token("\"0123456789\""),
+                        &token("\"0123456789\""),
+                        &token("\"0123456789\""),
                     ],
                 },
             ],
@@ -1599,7 +1625,7 @@ two lines`,
 
         let result = format_with_options(
             &FormatArrayElements {
-                items: vec![&text("'a'"), &text("'b'"), &text("'c'"), &text("'d'")],
+                items: vec![&token("'a'"), &token("'b'"), &token("'c'"), &token("'d'")],
             },
             options,
         );
@@ -1610,11 +1636,11 @@ two lines`,
     #[test]
     fn it_prints_consecutive_hard_lines_as_one() {
         let result = format(&format_args![
-            text("a"),
+            token("a"),
             hard_line_break(),
             hard_line_break(),
             hard_line_break(),
-            text("b"),
+            token("b"),
         ]);
 
         assert_eq!("a\nb", result.as_code());
@@ -1623,11 +1649,11 @@ two lines`,
     #[test]
     fn it_prints_consecutive_empty_lines_as_many() {
         let result = format(&format_args![
-            text("a"),
+            token("a"),
             empty_line(),
             empty_line(),
             empty_line(),
-            text("b"),
+            token("b"),
         ]);
 
         assert_eq!("a\n\n\n\nb", result.as_code());
@@ -1636,12 +1662,12 @@ two lines`,
     #[test]
     fn it_prints_consecutive_mixed_lines_as_many() {
         let result = format(&format_args![
-            text("a"),
+            token("a"),
             empty_line(),
             hard_line_break(),
             empty_line(),
             hard_line_break(),
-            text("b"),
+            token("b"),
         ]);
 
         assert_eq!("a\n\n\nb", result.as_code());
@@ -1658,37 +1684,37 @@ two lines`,
             // These all fit on the same line together
             .entry(
                 &soft_line_break_or_space(),
-                &format_args!(text("1"), text(",")),
+                &format_args!(token("1"), token(",")),
             )
             .entry(
                 &soft_line_break_or_space(),
-                &format_args!(text("2"), text(",")),
+                &format_args!(token("2"), token(",")),
             )
             .entry(
                 &soft_line_break_or_space(),
-                &format_args!(text("3"), text(",")),
+                &format_args!(token("3"), token(",")),
             )
             // This one fits on a line by itself,
             .entry(
                 &soft_line_break_or_space(),
-                &format_args!(text("723493294"), text(",")),
+                &format_args!(token("723493294"), token(",")),
             )
             // fits without breaking
             .entry(
                 &soft_line_break_or_space(),
                 &group(&format_args!(
-                    text("["),
-                    soft_block_indent(&text("5")),
-                    text("],")
+                    token("["),
+                    soft_block_indent(&token("5")),
+                    token("],")
                 )),
             )
             // this one must be printed in expanded mode to fit
             .entry(
                 &soft_line_break_or_space(),
                 &group(&format_args!(
-                    text("["),
-                    soft_block_indent(&text("123456789")),
-                    text("]"),
+                    token("["),
+                    soft_block_indent(&token("123456789")),
+                    token("]"),
                 )),
             )
             .finish()
@@ -1713,27 +1739,27 @@ two lines`,
     fn line_suffix_printed_at_end() {
         let printed = format(&format_args![
             group(&format_args![
-                text("["),
+                token("["),
                 soft_block_indent(&format_with(|f| {
                     f.fill()
                         .entry(
                             &soft_line_break_or_space(),
-                            &format_args!(text("1"), text(",")),
+                            &format_args!(token("1"), token(",")),
                         )
                         .entry(
                             &soft_line_break_or_space(),
-                            &format_args!(text("2"), text(",")),
+                            &format_args!(token("2"), token(",")),
                         )
                         .entry(
                             &soft_line_break_or_space(),
-                            &format_args!(text("3"), if_group_breaks(&text(","))),
+                            &format_args!(token("3"), if_group_breaks(&token(","))),
                         )
                         .finish()
                 })),
-                text("]")
+                token("]")
             ]),
-            text(";"),
-            line_suffix(&format_args![space(), text("// trailing")], 0)
+            token(";"),
+            line_suffix(&format_args![space(), token("// trailing")], 0)
         ]);
 
         assert_eq!(printed.as_code(), "[1, 2, 3]; // trailing");
@@ -1743,27 +1769,27 @@ two lines`,
     fn line_suffix_with_reserved_width() {
         let printed = format(&format_args![
             group(&format_args![
-                text("["),
+                token("["),
                 soft_block_indent(&format_with(|f| {
                     f.fill()
                         .entry(
                             &soft_line_break_or_space(),
-                            &format_args!(text("1"), text(",")),
+                            &format_args!(token("1"), token(",")),
                         )
                         .entry(
                             &soft_line_break_or_space(),
-                            &format_args!(text("2"), text(",")),
+                            &format_args!(token("2"), token(",")),
                         )
                         .entry(
                             &soft_line_break_or_space(),
-                            &format_args!(text("3"), if_group_breaks(&text(","))),
+                            &format_args!(token("3"), if_group_breaks(&token(","))),
                         )
                         .finish()
                 })),
-                text("]")
+                token("]")
             ]),
-            text(";"),
-            line_suffix(&format_args![space(), text("// Using reserved width causes this content to not fit even though it's a line suffix element")], 93)
+            token(";"),
+            line_suffix(&format_args![space(), token("// Using reserved width causes this content to not fit even though it's a line suffix element")], 93)
         ]);
 
         assert_eq!(printed.as_code(), "[\n  1, 2, 3\n]; // Using reserved width causes this content to not fit even though it's a line suffix element");
@@ -1777,15 +1803,15 @@ two lines`,
                 f,
                 [
                     group(&format_args![
-                        text("The referenced group breaks."),
+                        token("The referenced group breaks."),
                         hard_line_break()
                     ])
                     .with_group_id(Some(group_id)),
                     group(&format_args![
-                        text("This group breaks because:"),
+                        token("This group breaks because:"),
                         soft_line_break_or_space(),
-                        if_group_fits_on_line(&text("This content fits but should not be printed.")).with_group_id(Some(group_id)),
-                        if_group_breaks(&text("It measures with the 'if_group_breaks' variant because the referenced group breaks and that's just way too much text.")).with_group_id(Some(group_id)),
+                        if_group_fits_on_line(&token("This content fits but should not be printed.")).with_group_id(Some(group_id)),
+                        if_group_breaks(&token("It measures with the 'if_group_breaks' variant because the referenced group breaks and that's just way too much text.")).with_group_id(Some(group_id)),
                     ])
                 ]
             )
@@ -1805,7 +1831,7 @@ two lines`,
             write!(
                 f,
                 [
-                    group(&text("Group with id-2")).with_group_id(Some(id_2)),
+                    group(&token("Group with id-2")).with_group_id(Some(id_2)),
                     hard_line_break()
                 ]
             )?;
@@ -1813,7 +1839,7 @@ two lines`,
             write!(
                 f,
                 [
-                    group(&text("Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by")).with_group_id(Some(id_1)),
+                    group(&token("Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by")).with_group_id(Some(id_1)),
                     hard_line_break()
                 ]
             )?;
@@ -1821,9 +1847,9 @@ two lines`,
             write!(
                 f,
                 [
-                    if_group_fits_on_line(&text("Group 2 fits")).with_group_id(Some(id_2)),
+                    if_group_fits_on_line(&token("Group 2 fits")).with_group_id(Some(id_2)),
                     hard_line_break(),
-                    if_group_breaks(&text("Group 1 breaks")).with_group_id(Some(id_1))
+                    if_group_breaks(&token("Group 1 breaks")).with_group_id(Some(id_1))
                 ]
             )
         });
@@ -1848,15 +1874,15 @@ Group 1 breaks"#
             write!(
                 f,
                 [group(&format_args!(
-                    text("["),
+                    token("["),
                     soft_block_indent(&format_args!(
                         format_with(|f| f
-                            .join_with(format_args!(text(","), soft_line_break_or_space()))
+                            .join_with(format_args!(token(","), soft_line_break_or_space()))
                             .entries(&self.items)
                             .finish()),
-                        if_group_breaks(&text(",")),
+                        if_group_breaks(&token(",")),
                     )),
-                    text("]")
+                    token("]")
                 ))]
             )
         }

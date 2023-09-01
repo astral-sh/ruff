@@ -34,7 +34,7 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
                 f,
                 [group(&format_args![
                     key.format(),
-                    text(":"),
+                    token(":"),
                     space(),
                     self.value.format()
                 ])]
@@ -49,7 +49,7 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
                 [
                     // make sure the leading comments are hoisted past the `**`
                     leading_comments(leading_value_comments),
-                    group(&format_args![text("**"), self.value.format()])
+                    group(&format_args![token("**"), self.value.format()])
                 ]
             )
         }

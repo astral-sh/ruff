@@ -113,7 +113,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 f,
                 [
                     dangling_comments(before_dot),
-                    text("."),
+                    token("."),
                     dangling_comments(after_dot),
                     attr.format()
                 ]

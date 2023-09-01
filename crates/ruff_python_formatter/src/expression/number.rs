@@ -82,7 +82,7 @@ impl Format<PyFormatContext<'_>> for FormatComplex<'_> {
             }
         }
 
-        text("j").fmt(f)
+        token("j").fmt(f)
     }
 }
 

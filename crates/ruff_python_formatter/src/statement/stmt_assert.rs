@@ -1,4 +1,4 @@
-use ruff_formatter::prelude::{space, text};
+use ruff_formatter::prelude::{space, token};
 use ruff_formatter::write;
 use ruff_python_ast::StmtAssert;
 
@@ -22,7 +22,7 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
         write!(
             f,
             [
-                text("assert"),
+                token("assert"),
                 space(),
                 maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks)
             ]
@@ -32,7 +32,7 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
             write!(
                 f,
                 [
-                    text(","),
+                    token(","),
                     space(),
                     maybe_parenthesize_expression(msg, item, Parenthesize::IfBreaks),
                 ]

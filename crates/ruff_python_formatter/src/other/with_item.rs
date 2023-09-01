@@ -30,7 +30,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         )?;
 
         if let Some(optional_vars) = optional_vars {
-            write!(f, [space(), text("as"), space()])?;
+            write!(f, [space(), token("as"), space()])?;
 
             if trailing_as_comments.is_empty() {
                 write!(f, [optional_vars.format()])?;

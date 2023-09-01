@@ -130,7 +130,7 @@ impl Format<PyFormatContext<'_>> for RestPattern<'_> {
             f,
             [
                 leading_comments(self.comments),
-                text("**"),
+                token("**"),
                 self.identifier.format()
             ]
         )
@@ -156,7 +156,7 @@ impl Format<PyFormatContext<'_>> for KeyPatternPair<'_> {
             f,
             [group(&format_args![
                 self.key.format(),
-                text(":"),
+                token(":"),
                 space(),
                 self.pattern.format()
             ])]

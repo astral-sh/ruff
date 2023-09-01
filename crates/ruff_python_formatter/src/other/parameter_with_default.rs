@@ -18,7 +18,7 @@ impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
 
         if let Some(default) = default {
             let space = parameter.annotation.is_some().then_some(space());
-            write!(f, [space, text("="), space, group(&default.format())])?;
+            write!(f, [space, token("="), space, group(&default.format())])?;
         }
 
         Ok(())
