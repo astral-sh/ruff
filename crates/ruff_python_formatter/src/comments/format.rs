@@ -474,18 +474,19 @@ fn normalize_comment<'a>(
     if content.starts_with('\u{A0}') {
         let trimmed = content.trim_start_matches('\u{A0}');
 
-        // Black adds a space before the non-breaking space if part of a type pragma.
         if trimmed.trim_start().starts_with("type:") {
-            return Ok(Cow::Owned(std::format!("# \u{A0}{trimmed}")));
+            // Black adds a space before the non-breaking space if part of a type pragma.
+            Ok(Cow::Owned(std::format!("# {content}")))
+        } else if trimmed.starts_with(' ') {
+            // Black replaces the non-breaking space with a space if followed by a space.
+            Ok(Cow::Owned(std::format!("# {trimmed}")))
+        } else {
+            // Otherwise we replace the first non-breaking space with a regular space.
+            Ok(Cow::Owned(std::format!("# {}", &content["\u{A0}".len()..])))
         }
-
-        // Black replaces the non-breaking space with a space if followed by a space.
-        if trimmed.starts_with(' ') {
-            return Ok(Cow::Owned(std::format!("# {trimmed}")));
-        }
+    } else {
+        Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
     }
-
-    Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
 }
 
 /// A helper for stripping '#' from comments.
