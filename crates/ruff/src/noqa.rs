@@ -84,7 +84,9 @@ impl<'a> Directive<'a> {
                     let mut codes = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
-                    while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
+                    while let Some(code) =
+                        Self::lex_code_or_name(&text[codes_end + leading_space..])
+                    {
                         codes.push(code);
                         codes_end += leading_space;
                         codes_end += code.len();
@@ -145,18 +147,15 @@ impl<'a> Directive<'a> {
         Ok(None)
     }
 
-    /// Lex an individual rule code (e.g., `F401`).
+    /// Lex an individual rule code or human-readable name (e.g., `F401` or `unused-import`).
     #[inline]
-    fn lex_code(line: &str) -> Option<&str> {
-        // Extract, e.g., the `F` in `F401`.
-        let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
-        // Extract, e.g., the `401` in `F401`.
-        let suffix = line[prefix..]
+    fn lex_code_or_name(line: &str) -> Option<&str> {
+        let length = line
             .chars()
-            .take_while(char::is_ascii_digit)
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
             .count();
-        if prefix > 0 && suffix > 0 {
-            Some(&line[..prefix + suffix])
+        if length > 0 {
+            Some(&line[..length])
         } else {
             None
         }
@@ -198,10 +197,12 @@ impl Ranged for Codes<'_> {
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
 pub(crate) fn includes(needle: Rule, haystack: &[&str]) -> bool {
+    // Get the human-readable name
+    let needle_str: &str = needle.as_ref();
     let needle = needle.noqa_code();
-    haystack
-        .iter()
-        .any(|candidate| needle == get_redirect_target(candidate).unwrap_or(candidate))
+    haystack.iter().any(|candidate| {
+        needle == get_redirect_target(candidate).unwrap_or(candidate) || needle_str == *candidate
+    })
 }
 
 /// Returns `true` if the given [`Rule`] is ignored at the specified `lineno`.
@@ -336,7 +337,7 @@ impl<'a> ParsedFileExemption<'a> {
             // Extract the codes from the line (e.g., `F401, F841`).
             let mut codes = vec![];
             let mut line = line;
-            while let Some(code) = Self::lex_code(line) {
+            while let Some(code) = Self::lex_code_or_name(line) {
                 codes.push(code);
                 line = &line[code.len()..];
 
@@ -411,18 +412,15 @@ impl<'a> ParsedFileExemption<'a> {
         }
     }
 
-    /// Lex an individual rule code (e.g., `F401`).
+    /// Lex an individual rule code or human-readable name (e.g., `F401` or `unused-import`).
     #[inline]
-    fn lex_code(line: &str) -> Option<&str> {
-        // Extract, e.g., the `F` in `F401`.
-        let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
-        // Extract, e.g., the `401` in `F401`.
-        let suffix = line[prefix..]
+    fn lex_code_or_name(line: &str) -> Option<&str> {
+        let length = line
             .chars()
-            .take_while(char::is_ascii_digit)
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
             .count();
-        if prefix > 0 && suffix > 0 {
-            Some(&line[..prefix + suffix])
+        if length > 0 {
+            Some(&line[..length])
         } else {
             None
         }
@@ -928,7 +926,7 @@ mod tests {
 
     #[test]
     fn noqa_invalid_codes() {
-        let source = "# noqa: unused-import, F401, some other code";
+        let source = "# noqa: unused-import-invalid, F401, some other code";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 

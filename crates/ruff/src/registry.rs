@@ -1,6 +1,7 @@
 //! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
 //! with some helper symbols
 
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -21,6 +22,12 @@ impl Rule {
         linter
             .all_rules()
             .find(|rule| rule.noqa_code().suffix() == code)
+            .ok_or(FromCodeError::Unknown)
+    }
+
+    pub fn from_name(name: &str) -> Result<Self, FromCodeError> {
+        Self::iter()
+            .find(|rule| rule.as_ref() == name)
             .ok_or(FromCodeError::Unknown)
     }
 }

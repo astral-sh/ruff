@@ -2,6 +2,19 @@
 source: crates/ruff/src/noqa.rs
 expression: "Directive::try_extract(source, TextSize::default())"
 ---
-Err(
-    MissingCodes,
+Ok(
+    Some(
+        Codes(
+            Codes {
+                range: 0..52,
+                codes: [
+                    "unused-import-invalid",
+                    "F401",
+                    "some",
+                    "other",
+                    "code",
+                ],
+            },
+        ),
+    ),
 )

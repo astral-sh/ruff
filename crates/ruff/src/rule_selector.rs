@@ -52,8 +52,17 @@ impl FromStr for RuleSelector {
                     None => (s, None),
                 };
 
+                let mut s = String::from(s);
+                // If a human-readable name is provided, convert it back to a structude code
+                if let Ok(rule) = Rule::from_name(&s) {
+                    s.clear();
+                    let noqa_code = rule.noqa_code();
+                    s.push_str(noqa_code.prefix());
+                    s.push_str(noqa_code.suffix());
+                }
+
                 let (linter, code) =
-                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+                    Linter::parse_code(&s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
 
                 if code.is_empty() {
                     return Ok(Self::Linter(linter));
