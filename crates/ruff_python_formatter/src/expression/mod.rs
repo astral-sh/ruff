@@ -784,7 +784,7 @@ pub(crate) fn has_own_parentheses(
 }
 
 /// The precedence of [python operators](https://docs.python.org/3/reference/expressions.html#operator-precedence) from
-/// lowest to highest priority.
+/// highest to lowest priority.
 ///
 /// Ruff uses the operator precedence to decide in which order to split operators:
 /// Operators with a lower precedence split before higher-precedence operators.

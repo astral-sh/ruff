@@ -217,11 +217,15 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-for converter in connection.ops.get_db_converters(
-    expression
-) + expression.get_db_converters(connection):
-    ...
-"#;
+if (
+    aaaaaaaaaaaaaaaaaa +
+    # has the child process finished?
+    bbbbbbbbbbbbbbb +
+    # the child process has finished, but the
+    # transport hasn't been notified yet?
+    ccccccccccc
+):
+    pass"#;
         // Tokenize once
         let mut tokens = Vec::new();
         let mut comment_ranges = CommentRangesBuilder::default();
@@ -243,10 +247,10 @@ for converter in connection.ops.get_db_converters(
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
-        // use ruff_formatter::FormatContext;
-        // formatted
-        //     .document()
-        //     .display(formatted.context().source_code());
+        use ruff_formatter::FormatContext;
+        dbg!(formatted
+            .document()
+            .display(formatted.context().source_code()));
         //
         // dbg!(formatted
         //     .context()
