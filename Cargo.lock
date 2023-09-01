@@ -2383,6 +2383,7 @@ dependencies = [
  "serde_json",
  "similar",
  "smallvec",
+ "static_assertions",
  "thiserror",
  "tracing",
  "unicode-width",

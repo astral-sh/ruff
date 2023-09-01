@@ -240,8 +240,7 @@ String \"\"\"
 )
 
 if (
-    a
-    + "Let's"
+    a + "Let's"
     "start"
     "with"
     "a"
@@ -410,8 +409,7 @@ String \"\"\"
 )
 
 if (
-    a
-    + "Let's"
+    a + "Let's"
     'start'
     'with'
     'a'

@@ -252,9 +252,7 @@ impl Workspace {
 
     pub fn comments(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
-        let formatted = parsed.format().map_err(into_error)?;
-        let comments = pretty_comments(&formatted, contents);
-
+        let comments = pretty_comments(&parsed.module, &parsed.comment_ranges, contents);
         Ok(comments)
     }
 

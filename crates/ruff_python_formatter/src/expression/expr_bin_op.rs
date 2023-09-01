@@ -1,13 +1,13 @@
 use std::num::NonZeroUsize;
-use std::ops::Deref;
+use std::ops::{Deref, Index};
 
 use smallvec::SmallVec;
 
-use ruff_formatter::{format_args, write, FormatOwnedWithRule, FormatRefWithRule};
+use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{
-    Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, StringConstant,
-    UnaryOp,
+    BytesConstant, Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp,
+    StringConstant, UnaryOp,
 };
 
 use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
@@ -15,7 +15,8 @@ use crate::expression::expr_constant::{is_multiline_string, ExprConstantLayout};
 use crate::expression::has_parentheses;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break,
-    in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized, parenthesized,
+    in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized,
+    write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
     NeedsParentheses, OptionalParentheses,
 };
 use crate::expression::string::StringLayout;
@@ -28,52 +29,189 @@ pub struct FormatExprBinOp;
 impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
     fn fmt_fields(&self, item: &ExprBinOp, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
+        let flat_binary =
+            FlatBinaryExpression::from_binary_expression(item, &comments, f.context().source());
 
-        match Self::layout(item, f.context()) {
-            BinOpLayout::LeftString(expression) => {
-                let right_has_leading_comment = comments.has_leading(item.right.as_ref());
-
-                let format_right_and_op = format_with(|f| {
-                    if right_has_leading_comment {
-                        space().fmt(f)?;
+        let source = f.context().source();
+        let mut string_operands = flat_binary
+            .operands()
+            .filter_map(|(index, operand)| {
+                if let Expr::Constant(
+                    constant @ ExprConstant {
+                        value:
+                            Constant::Str(StringConstant {
+                                implicit_concatenated: true,
+                                ..
+                            })
+                            | Constant::Bytes(BytesConstant {
+                                implicit_concatenated: true,
+                                ..
+                            }),
+                        ..
+                    },
+                ) = operand.expression()
+                {
+                    if is_expression_parenthesized(constant.into(), source) {
+                        None
                     } else {
-                        soft_line_break_or_space().fmt(f)?;
+                        Some((index, constant, operand))
                     }
+                } else {
+                    None
+                }
+            })
+            .peekable();
 
-                    item.op.format().fmt(f)?;
+        // Split the binary expressions by implicit concatenated strings first by creating:
+        // * One group that encloses the whole binary expression and ensures that all implicit concatenated strings
+        //   break together or fit on the same line
+        // * Group the left operand and left operator as well as the right operator and right operand
+        //   to give them a lower precedence than the implicit concatenated string parts (the implicit strings should break first)
+        if let Some((first_index, _, _)) = string_operands.peek() {
+            // Group all strings in a single group so that they all break together or none of them.
+            write_in_parentheses_only_group_start_tag(f);
 
-                    if right_has_leading_comment {
-                        hard_line_break().fmt(f)?;
-                    } else {
-                        space().fmt(f)?;
-                    }
-
-                    group(&item.right.format()).fmt(f)
-                });
-
-                let format_left = format_with(|f: &mut PyFormatter| {
-                    let format_string =
-                        expression.format().with_options(ExprConstantLayout::String(
-                            StringLayout::ImplicitConcatenatedBinaryLeftSide,
-                        ));
-
-                    if is_expression_parenthesized(expression.into(), f.context().source()) {
-                        parenthesized("(", &format_string, ")").fmt(f)
-                    } else {
-                        format_string.fmt(f)
-                    }
-                });
-
-                group(&format_args![format_left, group(&format_right_and_op)]).fmt(f)
+            // Start the group for the left side coming before an implicit concatenated string if it isn't the first
+            // ```python
+            // a + "b" "c"
+            // ^^^- start this group
+            // ```
+            if *first_index != OperandIndex::new(0) {
+                write_in_parentheses_only_group_start_tag(f);
             }
-            BinOpLayout::Default => {
-                let comments = f.context().comments().clone();
-                let chain =
-                    BinaryChain::from_binary_expression(item, &comments, f.context().source());
 
-                in_parentheses_only_group(&chain.deref()).fmt(f)
+            // The index of the last formatted operator
+            let mut last_operator_index = None;
+
+            loop {
+                if let Some((index, string_constant, operand)) = string_operands.next() {
+                    // An implicit concatenated string that isn't the first operand in a binary expression
+                    // ```python
+                    // a + "b" "c" + ddddddd + "e" "d"
+                    //     ^^^^^^ this part or ^^^^^^^ this part
+                    // ```
+                    if let Some(left_operator_index) = index.left_operator() {
+                        // Everything between the last implicit concatenated string and the left operator
+                        // right before the implicit concatenated string:
+                        // ```python
+                        // a + b + "c" "d"
+                        //       ^--- left_operator
+                        // ^^^^^-- left
+                        // ```
+                        let left =
+                            flat_binary.between_operators(last_operator_index, left_operator_index);
+                        let left_operator = &flat_binary[left_operator_index];
+
+                        if let Some(leading) = left.first_operand().leading_binary_comments() {
+                            leading_comments(leading).fmt(f)?;
+                        }
+
+                        // Write the left, the left operator, and the space before the right side
+                        write!(
+                            f,
+                            [
+                                left,
+                                left.last_operand()
+                                    .trailing_binary_comments()
+                                    .map(trailing_comments),
+                                in_parentheses_only_soft_line_break_or_space(),
+                                left_operator,
+                            ]
+                        )?;
+
+                        // Finish the left-side group (the group was started before the loop or by the
+                        // previous iteration)
+                        write_in_parentheses_only_group_end_tag(f);
+
+                        if operand.has_leading_comments(f.context().comments())
+                            || left_operator.has_trailing_comments()
+                        {
+                            hard_line_break().fmt(f)?;
+                        } else {
+                            space().fmt(f)?;
+                        }
+
+                        write!(
+                            f,
+                            [
+                                operand.leading_binary_comments().map(leading_comments),
+                                string_constant
+                                    .format()
+                                    .with_options(ExprConstantLayout::String(
+                                        StringLayout::ImplicitConcatenatedStringInBinaryLike,
+                                    )),
+                                operand.trailing_binary_comments().map(trailing_comments),
+                                line_suffix_boundary(),
+                            ]
+                        )?;
+                    } else {
+                        // Binary expression that starts with an implicit concatenated string:
+                        // ```python
+                        // "a" "b" + c
+                        // ^^^^^^^-- format the first operand of a binary expression
+                        // ```
+                        string_constant
+                            .format()
+                            .with_options(ExprConstantLayout::String(
+                                StringLayout::ImplicitConcatenatedStringInBinaryLike,
+                            ))
+                            .fmt(f)?;
+                    }
+
+                    // Write the right operator and start the group for the right side (if any)
+                    // ```python
+                    // a + "b" "c" + ddddddd + "e" "d"
+                    //             ^^--- write this
+                    //             ^^^^^^^^^^^-- start this group
+                    // ```
+                    let right_operator_index = index.right_operator();
+                    if let Some(right_operator) = flat_binary.get_operator(index.right_operator()) {
+                        write_in_parentheses_only_group_start_tag(f);
+                        let right_operand = &flat_binary[right_operator_index.right_operand()];
+                        let right_operand_has_leading_comments =
+                            right_operand.has_leading_comments(f.context().comments());
+
+                        // Keep the operator on the same line if the right side has leading comments (and thus, breaks)
+                        if right_operand_has_leading_comments {
+                            space().fmt(f)?;
+                        } else {
+                            in_parentheses_only_soft_line_break_or_space().fmt(f)?;
+                        }
+
+                        right_operator.fmt(f)?;
+
+                        if right_operand_has_leading_comments
+                            || right_operator.has_trailing_comments()
+                        {
+                            hard_line_break().fmt(f)?;
+                        } else {
+                            space().fmt(f)?;
+                        }
+
+                        last_operator_index = Some(right_operator_index);
+                    } else {
+                        break;
+                    }
+                } else {
+                    if let Some(last_operator_index) = last_operator_index {
+                        let end = flat_binary.after_operator(last_operator_index);
+
+                        end.fmt(f)?;
+
+                        write_in_parentheses_only_group_end_tag(f);
+                    }
+
+                    break;
+                }
             }
+
+            // Finish the group that wraps all implicit concatenated strings
+            write_in_parentheses_only_group_end_tag(f);
+        } else {
+            in_parentheses_only_group(&&*flat_binary).fmt(f)?;
         }
+
+        Ok(())
     }
 
     fn fmt_dangling_comments(
@@ -83,36 +221,6 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
     ) -> FormatResult<()> {
         // Handled inside of `fmt_fields`
         Ok(())
-    }
-}
-
-impl FormatExprBinOp {
-    fn layout<'a>(bin_op: &'a ExprBinOp, context: &PyFormatContext) -> BinOpLayout<'a> {
-        if let Some(
-            constant @ ExprConstant {
-                value:
-                    Constant::Str(StringConstant {
-                        implicit_concatenated: true,
-                        ..
-                    }),
-                ..
-            },
-        ) = bin_op.left.as_constant_expr()
-        {
-            let comments = context.comments();
-
-            if bin_op.op == Operator::Mod
-                && context.node_level().is_parenthesized()
-                && !comments.has_dangling(constant)
-                && !comments.has_dangling(bin_op)
-            {
-                BinOpLayout::LeftString(constant)
-            } else {
-                BinOpLayout::Default
-            }
-        } else {
-            BinOpLayout::Default
-        }
     }
 }
 
@@ -135,65 +243,6 @@ const fn is_simple_power_operand(expr: &Expr) -> bool {
         Expr::UnaryOp(ExprUnaryOp { operand, .. }) => is_simple_power_operand(operand),
         Expr::Attribute(ExprAttribute { value, .. }) => is_simple_power_operand(value),
         _ => false,
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-enum BinOpLayout<'a> {
-    Default,
-
-    /// Specific layout for an implicit concatenated string using the "old" c-style formatting.
-    ///
-    /// ```python
-    /// (
-    ///     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa %s"
-    ///     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb %s" % (a, b)
-    /// )
-    /// ```
-    ///
-    /// Prefers breaking the string parts over breaking in front of the `%` because it looks better if it
-    /// is kept on the same line.
-    LeftString(&'a ExprConstant),
-}
-
-#[derive(Copy, Clone)]
-pub struct FormatOperator;
-
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Operator {
-    type Format<'a> = FormatRefWithRule<'a, Operator, FormatOperator, PyFormatContext<'ast>>;
-
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatOperator)
-    }
-}
-
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Operator {
-    type Format = FormatOwnedWithRule<Operator, FormatOperator, PyFormatContext<'ast>>;
-
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(self, FormatOperator)
-    }
-}
-
-impl FormatRule<Operator, PyFormatContext<'_>> for FormatOperator {
-    fn fmt(&self, item: &Operator, f: &mut PyFormatter) -> FormatResult<()> {
-        let operator = match item {
-            Operator::Add => "+",
-            Operator::Sub => "-",
-            Operator::Mult => "*",
-            Operator::MatMult => "@",
-            Operator::Div => "/",
-            Operator::Mod => "%",
-            Operator::Pow => "**",
-            Operator::LShift => "<<",
-            Operator::RShift => ">>",
-            Operator::BitOr => "|",
-            Operator::BitXor => "^",
-            Operator::BitAnd => "&",
-            Operator::FloorDiv => "//",
-        };
-
-        token(operator).fmt(f)
     }
 }
 
@@ -224,178 +273,155 @@ impl NeedsParentheses for ExprBinOp {
     }
 }
 
+/// Owned [`FlatBinaryExpressionSlice`]. Read the [`FlatBinaryExpressionSlice`] documentation for more details about the data structure.
 #[derive(Debug)]
-enum BinaryPart<'a> {
-    Operand(Operand<'a>),
-    Operator(OperatorPart<'a>),
-}
+struct FlatBinaryExpression<'a>(SmallVec<[OperandOrOperator<'a>; 8]>);
 
-#[derive(Debug)]
-struct Operand<'a> {
-    leading_comments: OperandComments<'a>,
-    expression: &'a Expr,
-    trailing_comments: &'a [SourceComment],
-}
-
-impl<'a> Operand<'a> {
-    fn has_leading_comments(&self) -> bool {
-        match self.leading_comments {
-            OperandComments::Binary(comments) | OperandComments::Node(comments) => {
-                !comments.is_empty()
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-enum OperandComments<'a> {
-    Binary(&'a [SourceComment]),
-    Node(&'a [SourceComment]),
-}
-
-#[derive(Debug)]
-struct OperatorPart<'a> {
-    operator: Operator,
-    trailing_comments: &'a [SourceComment],
-}
-
-impl OperatorPart<'_> {
-    fn precedence(&self) -> OperatorPrecedence {
-        OperatorPrecedence::from(self.operator)
-    }
-
-    fn has_trailing_comments(&self) -> bool {
-        !self.trailing_comments.is_empty()
-    }
-}
-
-impl<'a> BinaryPart<'a> {
-    fn leading_comments(&self) -> &'a [SourceComment] {
-        match self {
-            BinaryPart::Operand(Operand {
-                leading_comments:
-                    (OperandComments::Node(leading_comments)
-                    | OperandComments::Binary(leading_comments)),
-                ..
-            }) => leading_comments,
-            BinaryPart::Operator { .. } => &[],
-        }
-    }
-
-    fn unwrap_operand(&self) -> &Operand<'a> {
-        match self {
-            BinaryPart::Operand(operand) => operand,
-            BinaryPart::Operator(operator) => {
-                panic!("Expected operand but found operator {operator:?}.")
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-struct BinaryChain<'a>(SmallVec<[BinaryPart<'a>; 8]>);
-
-impl<'a> BinaryChain<'a> {
+impl<'a> FlatBinaryExpression<'a> {
+    /// Flattens parenthesized binary expression recursively (left and right)
     fn from_binary_expression(
         binary: &'a ExprBinOp,
         comments: &'a Comments,
         source: &'a str,
     ) -> Self {
-        enum Side<'a> {
-            Left(&'a ExprBinOp),
-            Right(&'a ExprBinOp),
-        }
-
-        impl<'a> Side<'a> {
-            fn expression(&self) -> &'a Expr {
-                match self {
-                    Side::Left(expression) => &expression.left,
-                    Side::Right(expression) => &expression.right,
-                }
-            }
-        }
-
         fn rec<'a>(
-            side: Side<'a>,
+            operand: Operand<'a>,
             comments: &'a Comments,
             source: &'a str,
-            parts: &mut SmallVec<[BinaryPart<'a>; 8]>,
+            parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
-            let expression = side.expression();
-            if let Expr::BinOp(binary) = expression {
-                if is_expression_parenthesized(expression.into(), source) {
-                    parts.push(BinaryPart::Operand(Operand {
-                        leading_comments: OperandComments::Node(comments.leading(expression)),
-                        expression,
-                        trailing_comments: &[],
-                    }));
-                } else {
-                    rec(Side::Left(binary), comments, source, parts);
-                    parts.push(BinaryPart::Operator(OperatorPart {
-                        operator: binary.op,
+            let expression = operand.expression();
+            match expression {
+                Expr::BinOp(binary) if !is_expression_parenthesized(expression.into(), source) => {
+                    let leading_comments = operand
+                        .leading_binary_comments()
+                        .unwrap_or_else(|| comments.leading(binary));
+
+                    rec(
+                        Operand::Left {
+                            leading_comments,
+                            expression: &binary.left,
+                        },
+                        comments,
+                        source,
+                        parts,
+                    );
+
+                    parts.push(OperandOrOperator::Operator(Operator {
+                        symbol: binary.op,
                         trailing_comments: comments.dangling(binary),
                     }));
 
-                    rec(Side::Right(binary), comments, source, parts);
+                    let trailing_comments = operand
+                        .trailing_binary_comments()
+                        .unwrap_or_else(|| comments.trailing(binary));
+
+                    rec(
+                        Operand::Right {
+                            expression: binary.right.as_ref(),
+                            trailing_comments,
+                        },
+                        comments,
+                        source,
+                        parts,
+                    );
                 }
-            } else {
-                let leading_comments = match side {
-                    Side::Left(enclosing) => OperandComments::Binary(comments.leading(enclosing)),
-                    Side::Right(_) => OperandComments::Node(comments.leading(expression)),
-                };
-
-                let trailing_comments = match side {
-                    Side::Left(_) => &[],
-                    Side::Right(enclosing) => comments.trailing(enclosing),
-                };
-
-                parts.push(BinaryPart::Operand(Operand {
-                    leading_comments,
-                    expression,
-                    trailing_comments,
-                }));
+                _ => {
+                    parts.push(OperandOrOperator::Operand(operand));
+                }
             }
         }
 
         let mut parts = SmallVec::new();
-        rec(Side::Left(binary), comments, source, &mut parts);
-        parts.push(BinaryPart::Operator(OperatorPart {
-            operator: binary.op,
+        rec(
+            Operand::Left {
+                expression: &binary.left,
+                leading_comments: &[], // Already handled by `FormatNodeRule`
+            },
+            comments,
+            source,
+            &mut parts,
+        );
+        parts.push(OperandOrOperator::Operator(Operator {
+            symbol: binary.op,
             trailing_comments: comments.dangling(binary),
         }));
-        rec(Side::Right(binary), comments, source, &mut parts);
-
-        if let Some(BinaryPart::Operand(last_operand)) = parts.last_mut() {
-            last_operand.trailing_comments = &[];
-        }
+        rec(
+            Operand::Right {
+                expression: &binary.right,
+                trailing_comments: &[], // Already handled by `FormatNodeRule`.
+            },
+            comments,
+            source,
+            &mut parts,
+        );
 
         Self(parts)
     }
 }
 
-impl<'a> Deref for BinaryChain<'a> {
-    type Target = BinaryChainSlice<'a>;
+impl<'a> Deref for FlatBinaryExpression<'a> {
+    type Target = FlatBinaryExpressionSlice<'a>;
 
     fn deref(&self) -> &Self::Target {
-        BinaryChainSlice::from_slice(&self.0)
+        FlatBinaryExpressionSlice::from_slice(&self.0)
     }
 }
 
+/// Binary chain represented as a flat vector where operands are stored at even indices and operators
+/// add odd indices.
+///
+/// ```python
+/// a + 5 * 3 + 2
+/// ```
+///
+/// Gets parsed as:
+///
+/// ```text
+/// graph
+/// +
+/// ├──a
+/// ├──*
+/// │   ├──b
+/// │   └──c
+/// └──d
+/// ```
+///
+/// The slice representation of the above is closer to what you have in source. It's a simple sequence of operands and operators,
+/// entirely ignoring operator precedence (doesn't flatten parenthesized expressions):
+///
+/// ```text
+/// -----------------------------
+/// | a | + | 5 | * | 3 | + | 2 |
+/// -----------------------------
+/// ```
+///
+/// The advantage of a flat structure are:
+/// * It becomes possible to adjust the operator / operand precedence. E.g splitting implicit concatenated strings before `+` operations.
+/// * It allows arbitrary slicing of binary expressions for as long as a slice always starts and ends with an operand.
+///
+/// A slice is guaranteed to always start and end with an operand. The smallest valid slice is a slice containing a single operand.
+/// Operands in multi-operand slices are separated by operators.
 #[repr(transparent)]
-struct BinaryChainSlice<'a>([BinaryPart<'a>]);
+struct FlatBinaryExpressionSlice<'a>([OperandOrOperator<'a>]);
 
-impl<'a> BinaryChainSlice<'a> {
-    fn from_slice<'slice>(slice: &'slice [BinaryPart<'a>]) -> &'slice Self {
+impl<'a> FlatBinaryExpressionSlice<'a> {
+    fn from_slice<'slice>(slice: &'slice [OperandOrOperator<'a>]) -> &'slice Self {
+        debug_assert!(
+            !slice.is_empty(),
+            "Operand slice must contain at least one operand"
+        );
+
         #[allow(unsafe_code)]
         unsafe {
             // SAFETY: `BinaryChainSlice` has the same layout as a slice because it uses `repr(transparent)`
-            std::mem::transmute(slice)
+            &*(slice as *const [OperandOrOperator<'a>] as *const FlatBinaryExpressionSlice<'a>)
         }
     }
 
-    fn operators(&self) -> impl Iterator<Item = (OperatorIndex, &OperatorPart<'a>)> {
+    fn operators(&self) -> impl Iterator<Item = (OperatorIndex, &Operator<'a>)> {
         self.0.iter().enumerate().filter_map(|(index, part)| {
-            if let BinaryPart::Operator(operator) = part {
+            if let OperandOrOperator::Operator(operator) = part {
                 Some((OperatorIndex::new(index), operator))
             } else {
                 None
@@ -403,19 +429,28 @@ impl<'a> BinaryChainSlice<'a> {
         })
     }
 
-    fn between_operators(&self, last_operator: Option<OperatorIndex>, end: OperatorIndex) -> &Self {
-        let start = last_operator.map_or(0usize, |operator| operator.right_operand().0);
-        Self::from_slice(&self.0[start..end.0.get()])
-    }
-    fn up_to_operator(&self, last_operand: OperandIndex, end: OperatorIndex) -> &Self {
-        Self::from_slice(&self.0[last_operand.0..end.0.get()])
+    fn operands(&self) -> impl Iterator<Item = (OperandIndex, &Operand<'a>)> {
+        self.0.iter().enumerate().filter_map(|(index, part)| {
+            if let OperandOrOperator::Operand(operand) = part {
+                Some((OperandIndex::new(index), operand))
+            } else {
+                None
+            }
+        })
     }
 
+    /// Creates a subslice that contains the operands coming after `last_operator` and up to, but not including the `end` operator.
+    fn between_operators(&self, last_operator: Option<OperatorIndex>, end: OperatorIndex) -> &Self {
+        let start = last_operator.map_or(0usize, |operator| operator.right_operand().0);
+        Self::from_slice(&self.0[start..end.value()])
+    }
+
+    /// Creates a slice starting at the right operand of `index`.
     fn after_operator(&self, index: OperatorIndex) -> &Self {
         Self::from_slice(&self.0[index.right_operand().0..])
     }
 
-    /// Returns the operator with the lowest precedence if any
+    /// Returns the lowest precedence of any operator in this binary chain.
     fn lowest_precedence(&self) -> OperatorPrecedence {
         self.operators()
             .map(|(_, operator)| operator.precedence())
@@ -423,30 +458,62 @@ impl<'a> BinaryChainSlice<'a> {
             .unwrap_or(OperatorPrecedence::None)
     }
 
+    /// Returns the first operand in the slice.
     fn first_operand(&self) -> &Operand<'a> {
         match self.0.first() {
-            Some(BinaryPart::Operand(operand)) => operand,
-            _ => panic!("Expected an operand"),
+            Some(OperandOrOperator::Operand(operand)) => operand,
+            _ => unreachable!("Expected an operand"),
         }
     }
 
+    /// Returns the last operand (the right most operand).
     fn last_operand(&self) -> &Operand<'a> {
         match self.0.last() {
-            Some(BinaryPart::Operand(operand)) => operand,
-            _ => panic!("Expected an operand"),
+            Some(OperandOrOperator::Operand(operand)) => operand,
+            _ => unreachable!("Expected an operand"),
         }
     }
 
-    const fn is_empty(&self) -> bool {
-        self.0.is_empty()
+    /// Returns the operator at the given index or `None` if it is out of bounds.
+    fn get_operator(&self, index: OperatorIndex) -> Option<&Operator<'a>> {
+        self.0
+            .get(index.value())
+            .map(OperandOrOperator::unwrap_operator)
     }
 }
 
-impl Format<PyFormatContext<'_>> for BinaryChainSlice<'_> {
+/// Formats a binary chain slice by inserting soft line breaks before the lowest-precedence operators.
+/// In other words: It splits the line before by the lowest precedence operators (and it either splits
+/// all of them or none). For example, the lowest precedence operator for `a + b * c + d` is the `+` operator.
+/// The expression either gets formatted as `a + b * c + d` if it fits on the line or as
+/// ```python
+/// a
+/// + b * c
+/// + d
+/// ```
+///
+/// Notice how the formatting first splits by the lower precedence operator `+` but tries to keep the `*` operation
+/// on a single line.
+///
+/// The formatting is recursive (with a depth of `O(operators)` where `operators` are operators with different precedences).
+///
+/// Comments before or after the first operand must be formatted by the caller because they shouldn't be part of the group
+/// wrapping the whole binary chain. This is to avoid that `b * c` expands in the following example because of its trailing comemnt:
+///
+/// ```python
+///
+/// ( a
+///     + b * c # comment
+///     + d
+/// )
+/// ```
+///
+///
+impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         // Single operand slice
-        if let [BinaryPart::Operand(Operand { expression, .. })] = &self.0 {
-            return expression.format().fmt(f);
+        if let [OperandOrOperator::Operand(operand)] = &self.0 {
+            return operand.expression().format().fmt(f);
         }
 
         let mut last_operator: Option<OperatorIndex> = None;
@@ -458,19 +525,21 @@ impl Format<PyFormatContext<'_>> for BinaryChainSlice<'_> {
                 let left = self.between_operators(last_operator, index);
                 let right = self.after_operator(index);
 
-                let is_pow = operator_part.operator.is_pow()
+                let is_pow = operator_part.symbol.is_pow()
                     && is_simple_power_expression(
-                        left.last_operand().expression,
-                        right.first_operand().expression,
+                        left.last_operand().expression(),
+                        right.first_operand().expression(),
                     );
 
-                if let OperandComments::Binary(leading) = left.first_operand().leading_comments {
+                if let Some(leading) = left.first_operand().leading_binary_comments() {
                     leading_comments(leading).fmt(f)?;
                 }
 
                 in_parentheses_only_group(&left).fmt(f)?;
 
-                trailing_comments(left.last_operand().trailing_comments).fmt(f)?;
+                if let Some(trailing) = left.last_operand().trailing_binary_comments() {
+                    trailing_comments(trailing).fmt(f)?;
+                }
 
                 if is_pow {
                     in_parentheses_only_soft_line_break().fmt(f)?;
@@ -478,12 +547,12 @@ impl Format<PyFormatContext<'_>> for BinaryChainSlice<'_> {
                     in_parentheses_only_soft_line_break_or_space().fmt(f)?;
                 }
 
-                operator_part.operator.format().fmt(f)?;
-                trailing_comments(operator_part.trailing_comments).fmt(f)?;
+                operator_part.fmt(f)?;
 
                 // Format the operator on its own line if the right side has any leading comments.
-                // if comments.has_leading(right.as_ref()) || !operator_comments.is_empty() {
-                if right.first_operand().has_leading_comments()
+                if right
+                    .first_operand()
+                    .has_leading_comments(f.context().comments())
                     || operator_part.has_trailing_comments()
                 {
                     hard_line_break().fmt(f)?;
@@ -496,23 +565,128 @@ impl Format<PyFormatContext<'_>> for BinaryChainSlice<'_> {
         }
 
         // Format the last right side
-        // SAFETY: Last operator is guaranteed to be initialized because the slice contains at least two elements.
+        // SAFETY: It is guaranteed that the slice contains at least a operand, operator, operand sequence or:
+        //  * the slice contains only a single operand in which case the function exits early above.
+        //  * the slice is empty, which isn't a valid slice
+        //  * the slice violates the operand, operator, operand constraint, in which case the error already happened earlier.
         let right = self.after_operator(last_operator.unwrap());
 
-        if !right.is_empty() {
-            if let OperandComments::Binary(leading) = right.first_operand().leading_comments {
-                leading_comments(leading).fmt(f)?;
-            }
-
-            in_parentheses_only_group(&right).fmt(f)?;
-
-            // trailing_comments(right.last_operand().trailing_comments).fmt(f)?;
+        if let Some(leading) = right.first_operand().leading_binary_comments() {
+            leading_comments(leading).fmt(f)?;
         }
 
-        Ok(())
+        in_parentheses_only_group(&right).fmt(f)
     }
 }
 
+/// Either an [`Operand`] or [`Operator`]
+#[derive(Debug)]
+enum OperandOrOperator<'a> {
+    Operand(Operand<'a>),
+    Operator(Operator<'a>),
+}
+
+impl<'a> OperandOrOperator<'a> {
+    fn unwrap_operand(&self) -> &Operand<'a> {
+        match self {
+            OperandOrOperator::Operand(operand) => operand,
+            OperandOrOperator::Operator(operator) => {
+                panic!("Expected operand but found operator {operator:?}.")
+            }
+        }
+    }
+
+    fn unwrap_operator(&self) -> &Operator<'a> {
+        match self {
+            OperandOrOperator::Operator(operator) => operator,
+            OperandOrOperator::Operand(operand) => {
+                panic!("Expected operator but found operand {operand:?}.")
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+enum Operand<'a> {
+    /// Operand that used to be on the left side of a binary operation.
+    Left {
+        expression: &'a Expr,
+        /// Leading comments of the outer most binary expression that starts at this node.
+        leading_comments: &'a [SourceComment],
+    },
+    Right {
+        expression: &'a Expr,
+        /// Trailing comments of the outer most binary expression that ends at this operand.
+        trailing_comments: &'a [SourceComment],
+    },
+}
+
+impl<'a> Operand<'a> {
+    fn expression(&self) -> &'a Expr {
+        match self {
+            Operand::Left { expression, .. } => expression,
+            Operand::Right { expression, .. } => expression,
+        }
+    }
+
+    fn has_leading_comments(&self, comments: &Comments) -> bool {
+        match self {
+            Operand::Left {
+                leading_comments, ..
+            } => !leading_comments.is_empty(),
+            Operand::Right { expression, .. } => comments.has_leading(*expression),
+        }
+    }
+
+    /// Comments of the outer-most enclosing binary expression.
+    fn leading_binary_comments(&self) -> Option<&'a [SourceComment]> {
+        match self {
+            Operand::Left {
+                leading_comments, ..
+            } => Some(leading_comments),
+            Operand::Right { .. } => None,
+        }
+    }
+
+    fn trailing_binary_comments(&self) -> Option<&'a [SourceComment]> {
+        match self {
+            Operand::Left { .. } => None,
+            Operand::Right {
+                trailing_comments, ..
+            } => Some(trailing_comments),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Operator<'a> {
+    symbol: ruff_python_ast::Operator,
+    trailing_comments: &'a [SourceComment],
+}
+
+impl Operator<'_> {
+    fn precedence(&self) -> OperatorPrecedence {
+        OperatorPrecedence::from(self.symbol)
+    }
+
+    fn has_trailing_comments(&self) -> bool {
+        !self.trailing_comments.is_empty()
+    }
+}
+
+impl Format<PyFormatContext<'_>> for Operator<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        write!(
+            f,
+            [
+                self.symbol.format(),
+                trailing_comments(self.trailing_comments)
+            ]
+        )
+    }
+}
+
+/// Index of an Operand in the [`FlatBinaryExpressionSlice`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 struct OperandIndex(usize);
 
@@ -522,8 +696,26 @@ impl OperandIndex {
 
         Self(index)
     }
+
+    /// Returns the index of the operator directly left to this operand. Returns [`None`] if
+    /// this is the first operand in the call chain.
+    fn left_operator(self) -> Option<OperatorIndex> {
+        if self.0 == 0 {
+            None
+        } else {
+            Some(OperatorIndex::new(self.0 - 1))
+        }
+    }
+
+    /// Returns the index of the operand's right operator. The method always returns an index
+    /// even if the operand has no right operator. Use [`BinaryCallChain::get_operator`] to test if
+    /// the operand has a right operator.
+    fn right_operator(self) -> OperatorIndex {
+        OperatorIndex::new(self.0 + 1)
+    }
 }
 
+/// Index of an Operator in the [`FlatBinaryExpressionSlice`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 struct OperatorIndex(NonZeroUsize);
 
@@ -536,11 +728,38 @@ impl OperatorIndex {
         Self(unsafe { NonZeroUsize::new_unchecked(index) })
     }
 
-    fn left_operand(self) -> OperandIndex {
-        OperandIndex::new(self.0.get() - 1)
+    const fn value(self) -> usize {
+        self.0.get()
     }
 
     fn right_operand(self) -> OperandIndex {
-        OperandIndex::new(self.0.get() + 1)
+        OperandIndex::new(self.value() + 1)
     }
+}
+
+impl<'a> Index<OperatorIndex> for FlatBinaryExpressionSlice<'a> {
+    type Output = Operator<'a>;
+
+    fn index(&self, index: OperatorIndex) -> &Self::Output {
+        self.0[index.value()].unwrap_operator()
+    }
+}
+
+impl<'a> Index<OperandIndex> for FlatBinaryExpressionSlice<'a> {
+    type Output = Operand<'a>;
+
+    fn index(&self, index: OperandIndex) -> &Self::Output {
+        self.0[index.0].unwrap_operand()
+    }
+}
+
+mod size_assertion {
+    use crate::expression::expr_bin_op::{
+        FlatBinaryExpressionSlice, OperandOrOperator, OperatorIndex,
+    };
+
+    static_assertions::assert_eq_size!(Option<OperatorIndex>, OperatorIndex);
+
+    static_assertions::assert_eq_size!(&FlatBinaryExpressionSlice, &[OperandOrOperator]);
+    static_assertions::assert_eq_align!(&FlatBinaryExpressionSlice, &[OperandOrOperator]);
 }

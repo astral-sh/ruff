@@ -30,6 +30,7 @@ once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 unicode-width = { workspace = true }

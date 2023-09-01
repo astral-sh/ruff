@@ -313,3 +313,18 @@ expected_content = (
         self.base_url
     )
 )
+
+
+rowuses = [(1 << j) |                  # column ordinal
+           (1 << (n + i-j + n-1)) |    # NW-SE ordinal
+           (1 << (n + 2*n-1 + i+j))    # NE-SW ordinal
+           for j in rangen]
+
+skip_bytes = (
+    header.timecnt * 5  # Transition times and types
+    + header.typecnt * 6  # Local time type records
+    + header.charcnt  # Time zone designations
+    + header.leapcnt * 8  # Leap second records
+    + header.isstdcnt  # Standard/wall indicators
+    + header.isutcnt  # UT/local indicators
+)

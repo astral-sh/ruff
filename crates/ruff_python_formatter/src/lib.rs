@@ -168,10 +168,9 @@ pub fn format_node<'a>(
 }
 
 /// Public function for generating a printable string of the debug comments.
-pub fn pretty_comments(formatted: &Formatted<PyFormatContext>, source: &str) -> String {
-    let comments = formatted.context().comments();
+pub fn pretty_comments(root: &Mod, comment_ranges: &CommentRanges, source: &str) -> String {
+    let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
 
-    // When comments are empty we'd display an empty map '{}'
     std::format!(
         "{comments:#?}",
         comments = comments.debug(SourceCode::new(source))
@@ -217,15 +216,13 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-if (
-    aaaaaaaaaaaaaaaaaa +
-    # has the child process finished?
-    bbbbbbbbbbbbbbb +
-    # the child process has finished, but the
-    # transport hasn't been notified yet?
-    ccccccccccc
-):
-    pass"#;
+(header.timecnt * 5  # Transition times and types
+  + header.typecnt * 6  # Local time type records
+  + header.charcnt  # Time zone designations
+  + header.leapcnt * 8  # Leap second records
+  + header.isstdcnt  # Standard/wall indicators
+  + header.isutcnt)  # UT/local indicators
+"#;
         // Tokenize once
         let mut tokens = Vec::new();
         let mut comment_ranges = CommentRangesBuilder::default();
@@ -247,10 +244,10 @@ if (
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
-        use ruff_formatter::FormatContext;
-        dbg!(formatted
-            .document()
-            .display(formatted.context().source_code()));
+        // use ruff_formatter::FormatContext;
+        // dbg!(formatted
+        //     .document()
+        //     .display(formatted.context().source_code()));
         //
         // dbg!(formatted
         //     .context()
