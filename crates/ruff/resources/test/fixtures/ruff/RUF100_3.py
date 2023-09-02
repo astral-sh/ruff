@@ -3,13 +3,13 @@
 print()  # noqa
 print()  # noqa # comment
 print()  # noqa  # comment
-print()  # noqa invalid-code
-print()  # noqa  invalid-code
+print()  # noqa comment
+print()  # noqa  comment
 print(a)  # noqa
 print(a)  # noqa # comment
 print(a)  # noqa  # comment
-print(a)  # noqa invalid-code
-print(a)  # noqa  invalid-code
+print(a)  # noqa comment
+print(a)  # noqa  comment
 
 # noqa: E501, F821
 # noqa: E501, F821 # comment

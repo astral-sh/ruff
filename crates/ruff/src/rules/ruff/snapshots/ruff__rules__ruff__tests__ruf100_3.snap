@@ -52,7 +52,7 @@ RUF100_3.py:3:10: RUF100 [*] Unused blanket `noqa` directive
   3 |+print()
 4 4 | print()  # noqa # comment
 5 5 | print()  # noqa  # comment
-6 6 | print()  # noqa invalid-code
+6 6 | print()  # noqa comment
 
 RUF100_3.py:4:10: RUF100 [*] Unused blanket `noqa` directive
   |
@@ -61,7 +61,7 @@ RUF100_3.py:4:10: RUF100 [*] Unused blanket `noqa` directive
 4 | print()  # noqa # comment
   |          ^^^^^^ RUF100
 5 | print()  # noqa  # comment
-6 | print()  # noqa invalid-code
+6 | print()  # noqa comment
   |
   = help: Remove unused `noqa` directive
 
@@ -72,8 +72,8 @@ RUF100_3.py:4:10: RUF100 [*] Unused blanket `noqa` directive
 4   |-print()  # noqa # comment
   4 |+print()  # comment
 5 5 | print()  # noqa  # comment
-6 6 | print()  # noqa invalid-code
-7 7 | print()  # noqa  invalid-code
+6 6 | print()  # noqa comment
+7 7 | print()  # noqa  comment
 
 RUF100_3.py:5:10: RUF100 [*] Unused blanket `noqa` directive
   |
@@ -81,8 +81,8 @@ RUF100_3.py:5:10: RUF100 [*] Unused blanket `noqa` directive
 4 | print()  # noqa # comment
 5 | print()  # noqa  # comment
   |          ^^^^^^ RUF100
-6 | print()  # noqa invalid-code
-7 | print()  # noqa  invalid-code
+6 | print()  # noqa comment
+7 | print()  # noqa  comment
   |
   = help: Remove unused `noqa` directive
 
@@ -92,17 +92,17 @@ RUF100_3.py:5:10: RUF100 [*] Unused blanket `noqa` directive
 4 4 | print()  # noqa # comment
 5   |-print()  # noqa  # comment
   5 |+print()  # comment
-6 6 | print()  # noqa invalid-code
-7 7 | print()  # noqa  invalid-code
+6 6 | print()  # noqa comment
+7 7 | print()  # noqa  comment
 8 8 | print(a)  # noqa
 
 RUF100_3.py:6:10: RUF100 [*] Unused blanket `noqa` directive
   |
 4 | print()  # noqa # comment
 5 | print()  # noqa  # comment
-6 | print()  # noqa invalid-code
+6 | print()  # noqa comment
   |          ^^^^^^ RUF100
-7 | print()  # noqa  invalid-code
+7 | print()  # noqa  comment
 8 | print(a)  # noqa
   |
   = help: Remove unused `noqa` directive
@@ -111,17 +111,17 @@ RUF100_3.py:6:10: RUF100 [*] Unused blanket `noqa` directive
 3 3 | print()  # noqa
 4 4 | print()  # noqa # comment
 5 5 | print()  # noqa  # comment
-6   |-print()  # noqa invalid-code
-  6 |+print()  # invalid-code
-7 7 | print()  # noqa  invalid-code
+6   |-print()  # noqa comment
+  6 |+print()  # comment
+7 7 | print()  # noqa  comment
 8 8 | print(a)  # noqa
 9 9 | print(a)  # noqa # comment
 
 RUF100_3.py:7:10: RUF100 [*] Unused blanket `noqa` directive
   |
 5 | print()  # noqa  # comment
-6 | print()  # noqa invalid-code
-7 | print()  # noqa  invalid-code
+6 | print()  # noqa comment
+7 | print()  # noqa  comment
   |          ^^^^^^ RUF100
 8 | print(a)  # noqa
 9 | print(a)  # noqa # comment
@@ -131,16 +131,16 @@ RUF100_3.py:7:10: RUF100 [*] Unused blanket `noqa` directive
 ℹ Suggested fix
 4 4 | print()  # noqa # comment
 5 5 | print()  # noqa  # comment
-6 6 | print()  # noqa invalid-code
-7   |-print()  # noqa  invalid-code
-  7 |+print()  # invalid-code
+6 6 | print()  # noqa comment
+7   |-print()  # noqa  comment
+  7 |+print()  # comment
 8 8 | print(a)  # noqa
 9 9 | print(a)  # noqa # comment
 10 10 | print(a)  # noqa  # comment
 
 RUF100_3.py:14:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
-12 | print(a)  # noqa  invalid-code
+12 | print(a)  # noqa  comment
 13 | 
 14 | # noqa: E501, F821
    | ^^^^^^^^^^^^^^^^^^ RUF100
@@ -150,8 +150,8 @@ RUF100_3.py:14:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    = help: Remove unused `noqa` directive
 
 ℹ Suggested fix
-11 11 | print(a)  # noqa invalid-code
-12 12 | print(a)  # noqa  invalid-code
+11 11 | print(a)  # noqa comment
+12 12 | print(a)  # noqa  comment
 13 13 | 
 14    |-# noqa: E501, F821
 15 14 | # noqa: E501, F821 # comment
@@ -169,7 +169,7 @@ RUF100_3.py:15:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    = help: Remove unused `noqa` directive
 
 ℹ Suggested fix
-12 12 | print(a)  # noqa  invalid-code
+12 12 | print(a)  # noqa  comment
 13 13 | 
 14 14 | # noqa: E501, F821
 15    |-# noqa: E501, F821 # comment
