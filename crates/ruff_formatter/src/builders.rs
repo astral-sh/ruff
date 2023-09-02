@@ -275,7 +275,7 @@ impl<Context> Format<Context> for Token {
 
 impl std::fmt::Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "StaticToken({})", self.text)
+        std::write!(f, "Token({})", self.text)
     }
 }
 
@@ -364,7 +364,7 @@ impl<Context> Format<Context> for Text<'_> {
 
 impl std::fmt::Debug for Text<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "DynamicToken({})", self.text)
+        std::write!(f, "Text({})", self.text)
     }
 }
 
@@ -2244,7 +2244,7 @@ where
 ///
 /// Formatting the same value twice results in a panic.
 ///
-/// ```panics
+/// ```should_panic
 /// use ruff_formatter::prelude::*;
 /// use ruff_formatter::{SimpleFormatContext, format, write, Buffer};
 /// use ruff_text_size::TextSize;
@@ -2252,7 +2252,7 @@ where
 /// let mut count = 0;
 ///
 /// let value = format_once(|f| {
-///     write!(f, [dynamic_token(&std::format!("Formatted {count}."), TextSize::default())])
+///     write!(f, [text(&std::format!("Formatted {count}."), None)])
 /// });
 ///
 /// format!(SimpleFormatContext::default(), [value]).expect("Formatting once works fine");
