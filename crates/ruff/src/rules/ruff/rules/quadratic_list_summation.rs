@@ -1,4 +1,5 @@
 use anyhow::Result;
+use itertools::Itertools;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -106,7 +107,7 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
             format!("{reduce_binding}({iadd_binding}, {iterable}, [])"),
             call.range(),
         ),
-        [reduce_edit, iadd_edit],
+        [reduce_edit, iadd_edit].into_iter().dedup(),
     ))
 }
 
