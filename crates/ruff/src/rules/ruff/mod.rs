@@ -211,6 +211,16 @@ mod tests {
     }
 
     #[test]
+    fn ruff_human_readable_noqa_codes() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_human_readable_noqa_codes.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn ruff_noqa_invalid() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_noqa_invalid.py"),

@@ -267,6 +267,8 @@ impl FileExemption {
                                 if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
                                 {
                                     Some(rule.noqa_code())
+                                } else if let Ok(rule) = Rule::from_name(code) {
+                                    Some(rule.noqa_code())
                                 } else {
                                     #[allow(deprecated)]
                                     let line = locator.compute_line_index(range.start());
@@ -430,7 +432,7 @@ impl<'a> ParsedFileExemption<'a> {
 /// The result of an [`Importer::get_or_import_symbol`] call.
 #[derive(Debug)]
 pub(crate) enum ParseError {
-    /// The `noqa` directive was missing valid codes (e.g., `# noqa: unused-import` instead of `# noqa: F401`).
+    /// The `noqa` directive was missing valid codes (e.g., `# noqa: _F401_` instead of `# noqa: F401`).
     MissingCodes,
     /// The `noqa` directive used an invalid suffix (e.g., `# noqa; F401` instead of `# noqa: F401`).
     InvalidSuffix,
