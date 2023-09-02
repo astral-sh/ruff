@@ -1,120 +1,120 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-B009_B010.py:40:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:46:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
-39 | # Invalid usage
-40 | setattr(foo, "bar", None)
+45 | # Invalid usage
+46 | setattr(foo, "bar", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ B010
-41 | setattr(foo, "_123abc", None)
-42 | setattr(foo, "__123abc__", None)
+47 | setattr(foo, "_123abc", None)
+48 | setattr(foo, "__123abc__", None)
    |
    = help: Replace `setattr` with assignment
 
 ℹ Suggested fix
-37 37 |     pass
-38 38 | 
-39 39 | # Invalid usage
-40    |-setattr(foo, "bar", None)
-   40 |+foo.bar = None
-41 41 | setattr(foo, "_123abc", None)
-42 42 | setattr(foo, "__123abc__", None)
-43 43 | setattr(foo, "abc123", None)
+43 43 |     pass
+44 44 | 
+45 45 | # Invalid usage
+46    |-setattr(foo, "bar", None)
+   46 |+foo.bar = None
+47 47 | setattr(foo, "_123abc", None)
+48 48 | setattr(foo, "__123abc__", None)
+49 49 | setattr(foo, "abc123", None)
 
-B009_B010.py:41:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:47:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
-39 | # Invalid usage
-40 | setattr(foo, "bar", None)
-41 | setattr(foo, "_123abc", None)
+45 | # Invalid usage
+46 | setattr(foo, "bar", None)
+47 | setattr(foo, "_123abc", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
-42 | setattr(foo, "__123abc__", None)
-43 | setattr(foo, "abc123", None)
+48 | setattr(foo, "__123abc__", None)
+49 | setattr(foo, "abc123", None)
    |
    = help: Replace `setattr` with assignment
 
 ℹ Suggested fix
-38 38 | 
-39 39 | # Invalid usage
-40 40 | setattr(foo, "bar", None)
-41    |-setattr(foo, "_123abc", None)
-   41 |+foo._123abc = None
-42 42 | setattr(foo, "__123abc__", None)
-43 43 | setattr(foo, "abc123", None)
-44 44 | setattr(foo, r"abc123", None)
+44 44 | 
+45 45 | # Invalid usage
+46 46 | setattr(foo, "bar", None)
+47    |-setattr(foo, "_123abc", None)
+   47 |+foo._123abc = None
+48 48 | setattr(foo, "__123abc__", None)
+49 49 | setattr(foo, "abc123", None)
+50 50 | setattr(foo, r"abc123", None)
 
-B009_B010.py:42:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:48:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
-40 | setattr(foo, "bar", None)
-41 | setattr(foo, "_123abc", None)
-42 | setattr(foo, "__123abc__", None)
+46 | setattr(foo, "bar", None)
+47 | setattr(foo, "_123abc", None)
+48 | setattr(foo, "__123abc__", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
-43 | setattr(foo, "abc123", None)
-44 | setattr(foo, r"abc123", None)
+49 | setattr(foo, "abc123", None)
+50 | setattr(foo, r"abc123", None)
    |
    = help: Replace `setattr` with assignment
 
 ℹ Suggested fix
-39 39 | # Invalid usage
-40 40 | setattr(foo, "bar", None)
-41 41 | setattr(foo, "_123abc", None)
-42    |-setattr(foo, "__123abc__", None)
-   42 |+foo.__123abc__ = None
-43 43 | setattr(foo, "abc123", None)
-44 44 | setattr(foo, r"abc123", None)
-45 45 | setattr(foo.bar, r"baz", None)
+45 45 | # Invalid usage
+46 46 | setattr(foo, "bar", None)
+47 47 | setattr(foo, "_123abc", None)
+48    |-setattr(foo, "__123abc__", None)
+   48 |+foo.__123abc__ = None
+49 49 | setattr(foo, "abc123", None)
+50 50 | setattr(foo, r"abc123", None)
+51 51 | setattr(foo.bar, r"baz", None)
 
-B009_B010.py:43:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:49:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
-41 | setattr(foo, "_123abc", None)
-42 | setattr(foo, "__123abc__", None)
-43 | setattr(foo, "abc123", None)
+47 | setattr(foo, "_123abc", None)
+48 | setattr(foo, "__123abc__", None)
+49 | setattr(foo, "abc123", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
-44 | setattr(foo, r"abc123", None)
-45 | setattr(foo.bar, r"baz", None)
+50 | setattr(foo, r"abc123", None)
+51 | setattr(foo.bar, r"baz", None)
    |
    = help: Replace `setattr` with assignment
 
 ℹ Suggested fix
-40 40 | setattr(foo, "bar", None)
-41 41 | setattr(foo, "_123abc", None)
-42 42 | setattr(foo, "__123abc__", None)
-43    |-setattr(foo, "abc123", None)
-   43 |+foo.abc123 = None
-44 44 | setattr(foo, r"abc123", None)
-45 45 | setattr(foo.bar, r"baz", None)
+46 46 | setattr(foo, "bar", None)
+47 47 | setattr(foo, "_123abc", None)
+48 48 | setattr(foo, "__123abc__", None)
+49    |-setattr(foo, "abc123", None)
+   49 |+foo.abc123 = None
+50 50 | setattr(foo, r"abc123", None)
+51 51 | setattr(foo.bar, r"baz", None)
 
-B009_B010.py:44:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:50:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
-42 | setattr(foo, "__123abc__", None)
-43 | setattr(foo, "abc123", None)
-44 | setattr(foo, r"abc123", None)
+48 | setattr(foo, "__123abc__", None)
+49 | setattr(foo, "abc123", None)
+50 | setattr(foo, r"abc123", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
-45 | setattr(foo.bar, r"baz", None)
+51 | setattr(foo.bar, r"baz", None)
    |
    = help: Replace `setattr` with assignment
 
 ℹ Suggested fix
-41 41 | setattr(foo, "_123abc", None)
-42 42 | setattr(foo, "__123abc__", None)
-43 43 | setattr(foo, "abc123", None)
-44    |-setattr(foo, r"abc123", None)
-   44 |+foo.abc123 = None
-45 45 | setattr(foo.bar, r"baz", None)
+47 47 | setattr(foo, "_123abc", None)
+48 48 | setattr(foo, "__123abc__", None)
+49 49 | setattr(foo, "abc123", None)
+50    |-setattr(foo, r"abc123", None)
+   50 |+foo.abc123 = None
+51 51 | setattr(foo.bar, r"baz", None)
 
-B009_B010.py:45:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:51:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
-43 | setattr(foo, "abc123", None)
-44 | setattr(foo, r"abc123", None)
-45 | setattr(foo.bar, r"baz", None)
+49 | setattr(foo, "abc123", None)
+50 | setattr(foo, r"abc123", None)
+51 | setattr(foo.bar, r"baz", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
    |
    = help: Replace `setattr` with assignment
 
 ℹ Suggested fix
-42 42 | setattr(foo, "__123abc__", None)
-43 43 | setattr(foo, "abc123", None)
-44 44 | setattr(foo, r"abc123", None)
-45    |-setattr(foo.bar, r"baz", None)
-   45 |+foo.bar.baz = None
+48 48 | setattr(foo, "__123abc__", None)
+49 49 | setattr(foo, "abc123", None)
+50 50 | setattr(foo, r"abc123", None)
+51    |-setattr(foo.bar, r"baz", None)
+   51 |+foo.bar.baz = None
 
 
