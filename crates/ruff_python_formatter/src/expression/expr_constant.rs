@@ -42,11 +42,11 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
         } = item;
 
         match value {
-            Constant::Ellipsis => text("...").fmt(f),
-            Constant::None => text("None").fmt(f),
+            Constant::Ellipsis => token("...").fmt(f),
+            Constant::None => token("None").fmt(f),
             Constant::Bool(value) => match value {
-                true => text("True").fmt(f),
-                false => text("False").fmt(f),
+                true => token("True").fmt(f),
+                false => token("False").fmt(f),
             },
             Constant::Int(_) => FormatInt::new(item).fmt(f),
             Constant::Float(_) => FormatFloat::new(item).fmt(f),

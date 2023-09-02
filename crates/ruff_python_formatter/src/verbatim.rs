@@ -871,7 +871,7 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
                 write!(
                     f,
                     [
-                        dynamic_text(&cleaned, Some(self.verbatim_range.start())),
+                        text(&cleaned, Some(self.verbatim_range.start())),
                         source_position(self.verbatim_range.end())
                     ]
                 )?;

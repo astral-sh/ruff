@@ -16,7 +16,7 @@ impl FormatNodeRule<ExprAwait> for FormatExprAwait {
         write!(
             f,
             [
-                text("await"),
+                token("await"),
                 space(),
                 maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
             ]

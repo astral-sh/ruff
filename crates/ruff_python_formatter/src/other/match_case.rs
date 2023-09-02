@@ -30,7 +30,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                     ClauseHeader::MatchCase(item),
                     dangling_item_comments,
                     &format_with(|f| {
-                        write!(f, [text("case"), space()])?;
+                        write!(f, [token("case"), space()])?;
 
                         let has_comments = comments.has_leading(pattern)
                             || comments.has_trailing_own_line(pattern);
@@ -58,7 +58,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                         }
 
                         if let Some(guard) = guard {
-                            write!(f, [space(), text("if"), space(), guard.format()])?;
+                            write!(f, [space(), token("if"), space(), guard.format()])?;
                         }
 
                         Ok(())

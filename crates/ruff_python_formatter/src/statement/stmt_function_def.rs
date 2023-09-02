@@ -50,10 +50,10 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                     trailing_definition_comments,
                     &format_with(|f| {
                         if *is_async {
-                            write!(f, [text("async"), space()])?;
+                            write!(f, [token("async"), space()])?;
                         }
 
-                        write!(f, [text("def"), space(), name.format()])?;
+                        write!(f, [token("def"), space(), name.format()])?;
 
                         if let Some(type_params) = type_params.as_ref() {
                             write!(f, [type_params.format()])?;
@@ -63,7 +63,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                             write!(f, [parameters.format()])?;
 
                             if let Some(return_annotation) = returns.as_ref() {
-                                write!(f, [space(), text("->"), space()])?;
+                                write!(f, [space(), token("->"), space()])?;
 
                                 if return_annotation.is_tuple_expr() {
                                     let parentheses =

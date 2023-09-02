@@ -62,12 +62,12 @@ impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
                     body.format(),
                     in_parentheses_only_soft_line_break_or_space(),
                     leading_comments(comments.leading(test.as_ref())),
-                    text("if"),
+                    token("if"),
                     space(),
                     test.format(),
                     in_parentheses_only_soft_line_break_or_space(),
                     leading_comments(comments.leading(orelse.as_ref())),
-                    text("else"),
+                    token("else"),
                     space(),
                 ]
             )?;

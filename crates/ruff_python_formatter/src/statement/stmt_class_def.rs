@@ -44,7 +44,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                     ClauseHeader::Class(item),
                     trailing_definition_comments,
                     &format_with(|f| {
-                        write!(f, [text("class"), space(), name.format()])?;
+                        write!(f, [token("class"), space(), name.format()])?;
 
                         if let Some(type_params) = type_params.as_deref() {
                             write!(f, [type_params.format()])?;

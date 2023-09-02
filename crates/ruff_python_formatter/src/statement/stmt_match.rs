@@ -29,7 +29,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
             ClauseHeader::Match(item),
             dangling_item_comments,
             &format_args![
-                text("match"),
+                token("match"),
                 space(),
                 maybe_parenthesize_expression(subject, item, Parenthesize::IfBreaks),
             ],

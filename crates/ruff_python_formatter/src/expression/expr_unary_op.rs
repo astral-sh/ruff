@@ -26,7 +26,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
             UnaryOp::USub => "-",
         };
 
-        text(operator).fmt(f)?;
+        token(operator).fmt(f)?;
 
         let comments = f.context().comments().clone();
 

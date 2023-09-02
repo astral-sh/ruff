@@ -25,7 +25,7 @@ impl Format<PyFormatContext<'_>> for FormatInt<'_> {
 
         match normalized {
             Cow::Borrowed(_) => source_text_slice(range, ContainsNewlines::No).fmt(f),
-            Cow::Owned(normalized) => dynamic_text(&normalized, Some(range.start())).fmt(f),
+            Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
         }
     }
 }
@@ -50,7 +50,7 @@ impl Format<PyFormatContext<'_>> for FormatFloat<'_> {
 
         match normalized {
             Cow::Borrowed(_) => source_text_slice(range, ContainsNewlines::No).fmt(f),
-            Cow::Owned(normalized) => dynamic_text(&normalized, Some(range.start())).fmt(f),
+            Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
         }
     }
 }
@@ -78,11 +78,11 @@ impl Format<PyFormatContext<'_>> for FormatComplex<'_> {
                 source_text_slice(range.sub_end(TextSize::from(1)), ContainsNewlines::No).fmt(f)?;
             }
             Cow::Owned(normalized) => {
-                dynamic_text(&normalized, Some(range.start())).fmt(f)?;
+                text(&normalized, Some(range.start())).fmt(f)?;
             }
         }
 
-        text("j").fmt(f)
+        token("j").fmt(f)
     }
 }
 

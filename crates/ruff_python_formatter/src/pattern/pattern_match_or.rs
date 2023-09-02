@@ -35,7 +35,7 @@ impl FormatNodeRule<PatternMatchOr> for FormatPatternMatchOr {
                         [hard_line_break(), leading_comments(leading_value_comments)]
                     )?;
                 }
-                write!(f, [text("|"), space(), pattern.format()])?;
+                write!(f, [token("|"), space(), pattern.format()])?;
             }
 
             Ok(())

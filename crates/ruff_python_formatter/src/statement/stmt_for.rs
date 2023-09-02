@@ -54,12 +54,12 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                     ClauseHeader::For(item),
                     trailing_condition_comments,
                     &format_args![
-                        is_async.then_some(format_args![text("async"), space()]),
-                        text("for"),
+                        is_async.then_some(format_args![token("async"), space()]),
+                        token("for"),
                         space(),
                         ExprTupleWithoutParentheses(target),
                         space(),
-                        text("in"),
+                        token("in"),
                         space(),
                         maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
                     ],
@@ -83,7 +83,7 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                     clause_header(
                         ClauseHeader::OrElse(ElseClause::For(item)),
                         trailing,
-                        &text("else"),
+                        &token("else"),
                     )
                     .with_leading_comments(leading, body.last()),
                     clause_body(orelse, trailing),

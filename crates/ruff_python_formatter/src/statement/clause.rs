@@ -349,7 +349,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
             write_suppressed_clause_header(self.header, f)?;
         } else {
             f.write_fmt(Arguments::from(&self.formatter))?;
-            text(":").fmt(f)?;
+            token(":").fmt(f)?;
         }
 
         trailing_comments(self.trailing_colon_comment).fmt(f)

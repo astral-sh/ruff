@@ -455,7 +455,7 @@ pub type FormatResult<F> = Result<F, FormatError>;
 ///     fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
 ///         write!(f, [
 ///             hard_line_break(),
-///             dynamic_text(&self.0, None),
+///             text(&self.0, None),
 ///             hard_line_break(),
 ///         ])
 ///     }
@@ -704,7 +704,7 @@ where
 /// let mut state = FormatState::new(SimpleFormatContext::default());
 /// let mut buffer = VecBuffer::new(&mut state);
 ///
-/// write!(&mut buffer, [format_args!(text("Hello World"))])?;
+/// write!(&mut buffer, [format_args!(token("Hello World"))])?;
 ///
 /// let formatted = Formatted::new(Document::from(buffer.into_vec()), SimpleFormatContext::default());
 ///
@@ -723,7 +723,7 @@ where
 /// let mut state = FormatState::new(SimpleFormatContext::default());
 /// let mut buffer = VecBuffer::new(&mut state);
 ///
-/// write!(&mut buffer, [text("Hello World")])?;
+/// write!(&mut buffer, [token("Hello World")])?;
 ///
 /// let formatted = Formatted::new(Document::from(buffer.into_vec()), SimpleFormatContext::default());
 ///
@@ -754,7 +754,7 @@ pub fn write<Context>(
 /// use ruff_formatter::{format, format_args};
 ///
 /// # fn main() -> FormatResult<()> {
-/// let formatted = format!(SimpleFormatContext::default(), [&format_args!(text("test"))])?;
+/// let formatted = format!(SimpleFormatContext::default(), [&format_args!(token("test"))])?;
 /// assert_eq!("test", formatted.print()?.as_code());
 /// # Ok(())
 /// # }
@@ -767,7 +767,7 @@ pub fn write<Context>(
 /// use ruff_formatter::{format};
 ///
 /// # fn main() -> FormatResult<()> {
-/// let formatted = format!(SimpleFormatContext::default(), [text("test")])?;
+/// let formatted = format!(SimpleFormatContext::default(), [token("test")])?;
 /// assert_eq!("test", formatted.print()?.as_code());
 /// # Ok(())
 /// # }

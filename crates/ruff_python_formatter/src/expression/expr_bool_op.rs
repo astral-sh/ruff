@@ -132,6 +132,6 @@ impl FormatRule<BoolOp, PyFormatContext<'_>> for FormatBoolOp {
             BoolOp::Or => "or",
         };
 
-        text(operator).fmt(f)
+        token(operator).fmt(f)
     }
 }

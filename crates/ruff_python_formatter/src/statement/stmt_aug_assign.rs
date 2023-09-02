@@ -24,7 +24,7 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
                 target.format(),
                 space(),
                 op.format(),
-                text("="),
+                token("="),
                 space(),
                 maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
             ]

@@ -27,9 +27,9 @@ impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
             write!(
                 f,
                 [group(&format_args![
-                    if_group_breaks(&text("(")),
+                    if_group_breaks(&token("(")),
                     soft_block_indent(&Arguments::from(&self.inner)),
-                    if_group_breaks(&text(")")),
+                    if_group_breaks(&token(")")),
                 ])]
             )
         }
@@ -152,7 +152,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     {
         self.result = self.result.and_then(|_| {
             if self.entries.is_one_or_more() {
-                write!(self.fmt, [text(","), separator])?;
+                write!(self.fmt, [token(","), separator])?;
             }
 
             self.entries = self.entries.next(node.end());
@@ -204,7 +204,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
                     || self.trailing_comma == TrailingComma::OneOrMore
                     || self.entries.is_more_than_one()
                 {
-                    if_group_breaks(&text(",")).fmt(self.fmt)?;
+                    if_group_breaks(&token(",")).fmt(self.fmt)?;
                 }
 
                 if magic_trailing_comma {

@@ -30,12 +30,11 @@ pub enum FormatElement {
     /// formatted position.
     SourcePosition(TextSize),
 
-    /// Token constructed by the formatter from a static string
-    StaticText { text: &'static str },
+    /// A ASCII only Token that contains no line breaks or tab characters.
+    Token { text: &'static str },
 
-    /// Token constructed from the input source as a dynamic
-    /// string.
-    DynamicText {
+    /// An arbitrary text that can contain tabs, newlines, and unicode characters.
+    Text {
         /// There's no need for the text to be mutable, using `Box<str>` safes 8 bytes over `String`.
         text: Box<str>,
     },
@@ -72,12 +71,8 @@ impl std::fmt::Debug for FormatElement {
             FormatElement::Space => write!(fmt, "Space"),
             FormatElement::Line(mode) => fmt.debug_tuple("Line").field(mode).finish(),
             FormatElement::ExpandParent => write!(fmt, "ExpandParent"),
-            FormatElement::StaticText { text } => {
-                fmt.debug_tuple("StaticText").field(text).finish()
-            }
-            FormatElement::DynamicText { text, .. } => {
-                fmt.debug_tuple("DynamicText").field(text).finish()
-            }
+            FormatElement::Token { text } => fmt.debug_tuple("Token").field(text).finish(),
+            FormatElement::Text { text, .. } => fmt.debug_tuple("DynamicText").field(text).finish(),
             FormatElement::SourceCodeSlice {
                 slice,
                 contains_newlines,
@@ -244,8 +239,8 @@ impl FormatElement {
         matches!(
             self,
             FormatElement::SourceCodeSlice { .. }
-                | FormatElement::DynamicText { .. }
-                | FormatElement::StaticText { .. }
+                | FormatElement::Text { .. }
+                | FormatElement::Token { .. }
         )
     }
 
@@ -260,8 +255,8 @@ impl FormatElements for FormatElement {
             FormatElement::ExpandParent => true,
             FormatElement::Tag(Tag::StartGroup(group)) => !group.mode().is_flat(),
             FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
-            FormatElement::StaticText { text } => text.contains('\n'),
-            FormatElement::DynamicText { text, .. } => text.contains('\n'),
+
+            FormatElement::Text { text, .. } => text.contains('\n'),
             FormatElement::SourceCodeSlice {
                 contains_newlines, ..
             } => *contains_newlines,
@@ -275,6 +270,7 @@ impl FormatElements for FormatElement {
             FormatElement::LineSuffixBoundary
             | FormatElement::Space
             | FormatElement::Tag(_)
+            | FormatElement::Token { .. }
             | FormatElement::SourcePosition(_) => false,
         }
     }

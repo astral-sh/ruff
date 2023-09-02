@@ -276,16 +276,16 @@ for converter in connection.ops.get_db_converters(
                 f: &mut ruff_formatter::formatter::Formatter<SimpleFormatContext>,
             ) -> FormatResult<()> {
                 let format_str = format_with(|f| {
-                    write!(f, [text("\"")])?;
+                    write!(f, [token("\"")])?;
 
                     let mut words = self.0.split_whitespace().peekable();
                     let mut fill = f.fill();
 
                     let separator = format_with(|f| {
                         group(&format_args![
-                            if_group_breaks(&text("\"")),
+                            if_group_breaks(&token("\"")),
                             soft_line_break_or_space(),
-                            if_group_breaks(&text("\" "))
+                            if_group_breaks(&token("\" "))
                         ])
                         .fmt(f)
                     });
@@ -293,10 +293,10 @@ for converter in connection.ops.get_db_converters(
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [dynamic_text(word, None)])?;
+                            write!(f, [text(word, None)])?;
 
                             if is_last {
-                                write!(f, [text("\"")])?;
+                                write!(f, [token("\"")])?;
                             }
 
                             Ok(())
@@ -311,9 +311,9 @@ for converter in connection.ops.get_db_converters(
                 write!(
                     f,
                     [group(&format_args![
-                        if_group_breaks(&text("(")),
+                        if_group_breaks(&token("(")),
                         soft_block_indent(&format_str),
-                        if_group_breaks(&text(")"))
+                        if_group_breaks(&token(")"))
                     ])]
                 )
             }

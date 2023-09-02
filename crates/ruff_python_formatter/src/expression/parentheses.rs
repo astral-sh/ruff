@@ -172,10 +172,10 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let inner = format_with(|f| {
             group(&format_args![
-                text(self.left),
+                token(self.left),
                 dangling_open_parenthesis_comments(self.comments),
                 soft_block_indent(&Arguments::from(&self.content)),
-                text(self.right)
+                token(self.right)
             ])
             .fmt(f)
         });
@@ -232,13 +232,13 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast>
         write!(
             f,
             [group(&format_args![
-                if_group_breaks(&text("(")),
+                if_group_breaks(&token("(")),
                 indent_if_group_breaks(
                     &format_args![soft_line_break(), Arguments::from(&self.content)],
                     parens_id
                 ),
                 soft_line_break(),
-                if_group_breaks(&text(")"))
+                if_group_breaks(&token(")"))
             ])
             .with_group_id(Some(parens_id))]
         )
@@ -375,7 +375,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
         write!(
             f,
             [group(&format_args![
-                text(self.left),
+                token(self.left),
                 // end-of-line comments
                 trailing_comments(&self.comments[..end_of_line_split]),
                 // Avoid unstable formatting with
@@ -390,7 +390,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
                 (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
                 // own line comments, which need to be indented
                 soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
-                text(self.right)
+                token(self.right)
             ])]
         )
     }

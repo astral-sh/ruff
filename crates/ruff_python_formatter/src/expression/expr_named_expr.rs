@@ -25,7 +25,7 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
             f,
             [
                 group(&format_args!(target.format(), soft_line_break_or_space())),
-                text(":=")
+                token(":=")
             ]
         )?;
 

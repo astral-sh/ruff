@@ -70,10 +70,10 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         write!(
             f,
             [group(&format_args![
-                text("["),
+                token("["),
                 trailing_comments(dangling_comments),
                 soft_block_indent(&format_slice),
-                text("]")
+                token("]")
             ])]
         )
     }

@@ -248,9 +248,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                         // The group here is necessary because `format_expression` may contain IR elements
                         // that refer to the group id
                         group(&format_args![
-                            text("("),
+                            token("("),
                             soft_block_indent(&format_expression),
-                            text(")")
+                            token(")")
                         ])
                         .with_group_id(Some(group_id))
                         .fmt(f)
@@ -267,9 +267,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                             // Variant 2:
                             // Try to fit the expression by adding parentheses and indenting the expression.
                             group(&format_args![
-                                text("("),
+                                token("("),
                                 soft_block_indent(&format_expression),
-                                text(")")
+                                token(")")
                             ])
                             .with_group_id(Some(group_id))
                             .should_expand(true),

@@ -34,7 +34,7 @@ pub trait MemoizeFormat<Context> {
     ///         let value = self.value.get();
     ///         self.value.set(value + 1);
     ///
-    ///         write!(f, [dynamic_text(&std::format!("Formatted {value} times."), None)])
+    ///         write!(f, [text(&std::format!("Formatted {value} times."), None)])
     ///     }
     /// }
     ///
@@ -110,9 +110,9 @@ where
     ///         let current = self.value.get();
     ///
     ///         write!(f, [
-    ///             text("Count:"),
+    ///             token("Count:"),
     ///             space(),
-    ///             dynamic_text(&std::format!("{current}"), None),
+    ///             text(&std::format!("{current}"), None),
     ///             hard_line_break()
     ///         ])?;
     ///
@@ -127,9 +127,9 @@ where
     ///     let counter_content = counter.inspect(f)?;
     ///
     ///     if counter_content.will_break() {
-    ///         write!(f, [text("Counter:"), block_indent(&counter)])
+    ///         write!(f, [token("Counter:"), block_indent(&counter)])
     ///     } else {
-    ///         write!(f, [text("Counter:"), counter])
+    ///         write!(f, [token("Counter:"), counter])
     ///     }?;
     ///
     ///     write!(f, [counter])

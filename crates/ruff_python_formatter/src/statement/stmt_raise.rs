@@ -17,7 +17,7 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
             cause,
         } = item;
 
-        text("raise").fmt(f)?;
+        token("raise").fmt(f)?;
 
         if let Some(value) = exc {
             write!(
@@ -34,7 +34,7 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
                 f,
                 [
                     space(),
-                    text("from"),
+                    token("from"),
                     space(),
                     maybe_parenthesize_expression(value, item, Parenthesize::Optional)
                 ]

@@ -113,6 +113,6 @@ impl FormatRule<CmpOp, PyFormatContext<'_>> for FormatCmpOp {
             CmpOp::NotIn => "not in",
         };
 
-        text(operator).fmt(f)
+        token(operator).fmt(f)
     }
 }
