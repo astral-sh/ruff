@@ -124,7 +124,7 @@ B009_B010.py:24:15: B009 [*] Do not call `getattr` with a constant attribute val
    24 |+_ = lambda x: x.bar
 25 25 | if getattr(x, "bar"):
 26 26 |     pass
-27 27 | 
+27 27 | getattr(1, "real")
 
 B009_B010.py:25:4: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -133,6 +133,7 @@ B009_B010.py:25:4: B009 [*] Do not call `getattr` with a constant attribute valu
 25 | if getattr(x, "bar"):
    |    ^^^^^^^^^^^^^^^^^ B009
 26 |     pass
+27 | getattr(1, "real")
    |
    = help: Replace `getattr` with attribute access
 
@@ -143,7 +144,109 @@ B009_B010.py:25:4: B009 [*] Do not call `getattr` with a constant attribute valu
 25    |-if getattr(x, "bar"):
    25 |+if x.bar:
 26 26 |     pass
-27 27 | 
-28 28 | # Valid setattr usage
+27 27 | getattr(1, "real")
+28 28 | getattr(1., "real")
+
+B009_B010.py:27:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+25 | if getattr(x, "bar"):
+26 |     pass
+27 | getattr(1, "real")
+   | ^^^^^^^^^^^^^^^^^^ B009
+28 | getattr(1., "real")
+29 | getattr(1.0, "real")
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+24 24 | _ = lambda x: getattr(x, "bar")
+25 25 | if getattr(x, "bar"):
+26 26 |     pass
+27    |-getattr(1, "real")
+   27 |+(1).real
+28 28 | getattr(1., "real")
+29 29 | getattr(1.0, "real")
+30 30 | getattr(1j, "real")
+
+B009_B010.py:28:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+26 |     pass
+27 | getattr(1, "real")
+28 | getattr(1., "real")
+   | ^^^^^^^^^^^^^^^^^^^ B009
+29 | getattr(1.0, "real")
+30 | getattr(1j, "real")
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+25 25 | if getattr(x, "bar"):
+26 26 |     pass
+27 27 | getattr(1, "real")
+28    |-getattr(1., "real")
+   28 |+1..real
+29 29 | getattr(1.0, "real")
+30 30 | getattr(1j, "real")
+31 31 | getattr(True, "real")
+
+B009_B010.py:29:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+27 | getattr(1, "real")
+28 | getattr(1., "real")
+29 | getattr(1.0, "real")
+   | ^^^^^^^^^^^^^^^^^^^^ B009
+30 | getattr(1j, "real")
+31 | getattr(True, "real")
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+26 26 |     pass
+27 27 | getattr(1, "real")
+28 28 | getattr(1., "real")
+29    |-getattr(1.0, "real")
+   29 |+1.0.real
+30 30 | getattr(1j, "real")
+31 31 | getattr(True, "real")
+32 32 | 
+
+B009_B010.py:30:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+28 | getattr(1., "real")
+29 | getattr(1.0, "real")
+30 | getattr(1j, "real")
+   | ^^^^^^^^^^^^^^^^^^^ B009
+31 | getattr(True, "real")
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+27 27 | getattr(1, "real")
+28 28 | getattr(1., "real")
+29 29 | getattr(1.0, "real")
+30    |-getattr(1j, "real")
+   30 |+1j.real
+31 31 | getattr(True, "real")
+32 32 | 
+33 33 | 
+
+B009_B010.py:31:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+29 | getattr(1.0, "real")
+30 | getattr(1j, "real")
+31 | getattr(True, "real")
+   | ^^^^^^^^^^^^^^^^^^^^^ B009
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+28 28 | getattr(1., "real")
+29 29 | getattr(1.0, "real")
+30 30 | getattr(1j, "real")
+31    |-getattr(True, "real")
+   31 |+True.real
+32 32 | 
+33 33 | 
+34 34 | # Valid setattr usage
 
 
