@@ -79,21 +79,22 @@ pub(crate) fn getattr_with_constant(
 
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let fixed = if matches!(
-            obj,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(_),
-                ..
-            })
-        ) {
-            // Attribute accesses on `int` literals must be parenthesized.
-            // e.g., `getattr(1, "real")` becomes `(1).real`
-            format!("({}).{}", checker.locator().slice(obj), value)
-        } else {
-            format!("{}.{}", checker.locator().slice(obj), value)
-        };
-
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(fixed, expr.range())));
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            if matches!(
+                obj,
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Int(_),
+                    ..
+                })
+            ) {
+                // Attribute accesses on `int` literals must be parenthesized, e.g.,
+                // `getattr(1, "real")` becomes `(1).real`.
+                format!("({}).{}", checker.locator().slice(obj), value)
+            } else {
+                format!("{}.{}", checker.locator().slice(obj), value)
+            },
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
