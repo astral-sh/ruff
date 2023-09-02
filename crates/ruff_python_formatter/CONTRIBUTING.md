@@ -1,28 +1,21 @@
-# Rust Python Formatter
+# Contributing to the Ruff Formatter
 
 The goal of our formatter is to be compatible with Black except for rare edge cases (mostly
-involving comment placement).
+involving comment placement). This document outlines the expected development workflow for the
+formatter and walks through some of its internals.
 
-You can try an experimental version of the formatter on your project with:
+## Testing your changes
 
-```shell
-cargo run --bin ruff -- format path/to/your/project
-```
-
-Note that currently the only supported option is `line-length` and that both the CLI and the
-formatting are a work-in-progress and will change before the stable release.
-
-## Dev tools
-
-**Testing your changes** You can use the `ruff_python_formatter` binary to format individual files
-and show debug info. It's fast to compile because it doesn't depend on `ruff`. The easiest way is to
-create a `scratch.py` (or `scratch.pyi`) in the project root and run
+You can use the `ruff_python_formatter` binary to format individual files and show debug info.
+It's fast to compile because it doesn't depend on `ruff`. The easiest way is to create a
+`scratch.py` (or `scratch.pyi`) in the project root and run:
 
 ```shell
 cargo run --bin ruff_python_formatter -- --emit stdout scratch.py
 ```
 
-which has `--print-ir` and `--print-comments` options. We especially recommend `--print-comments`.
+...which supports the `--print-ir` and `--print-comments` flag. (We recommend running with
+`--print-comments`.)
 
 <details>
 <summary>Usage example</summary>
