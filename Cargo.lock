@@ -1269,12 +1269,11 @@ checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 [[package]]
 name = "libcst"
 version = "0.1.0"
-source = "git+https://github.com/Instagram/LibCST.git?rev=3cacca1a1029f05707e50703b49fe3dd860aa839#3cacca1a1029f05707e50703b49fe3dd860aa839"
+source = "git+https://github.com/Instagram/LibCST.git?rev=9c263aa8977962a870ce2770d2aa18ee0dacb344#9c263aa8977962a870ce2770d2aa18ee0dacb344"
 dependencies = [
  "chic",
- "itertools",
  "libcst_derive",
- "once_cell",
+ "memchr",
  "paste",
  "peg",
  "regex",
@@ -1284,7 +1283,7 @@ dependencies = [
 [[package]]
 name = "libcst_derive"
 version = "0.1.0"
-source = "git+https://github.com/Instagram/LibCST.git?rev=3cacca1a1029f05707e50703b49fe3dd860aa839#3cacca1a1029f05707e50703b49fe3dd860aa839"
+source = "git+https://github.com/Instagram/LibCST.git?rev=9c263aa8977962a870ce2770d2aa18ee0dacb344#9c263aa8977962a870ce2770d2aa18ee0dacb344"
 dependencies = [
  "quote",
  "syn 1.0.109",

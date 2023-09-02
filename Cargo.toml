@@ -54,7 +54,7 @@ uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics", "
 wsl = { version = "0.1.0" }
 
 # v1.0.1
-libcst = { git = "https://github.com/Instagram/LibCST.git", rev = "3cacca1a1029f05707e50703b49fe3dd860aa839", default-features = false }
+libcst = { git = "https://github.com/Instagram/LibCST.git", rev = "9c263aa8977962a870ce2770d2aa18ee0dacb344", default-features = false }
 
 [profile.release]
 lto = "fat"
