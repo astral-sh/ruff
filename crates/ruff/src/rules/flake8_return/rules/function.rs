@@ -12,6 +12,7 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::is_python_whitespace;
 
 use crate::autofix::edits;
 use crate::checkers::ast::Checker;
@@ -549,11 +550,11 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     if content[after_equals..]
                         .chars()
                         .next()
-                        .is_some_and(char::is_alphabetic)
+                        .is_some_and(is_python_whitespace)
                     {
-                        "return ".to_string()
-                    } else {
                         "return".to_string()
+                    } else {
+                        "return ".to_string()
                     },
                     // Replace from the start of the assignment statement to the end of the equals
                     // sign.
