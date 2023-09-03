@@ -29,6 +29,10 @@ getattr(1., "real")
 getattr(1.0, "real")
 getattr(1j, "real")
 getattr(True, "real")
+getattr(x := 1, "real")
+getattr(x + y, "real")
+getattr("foo"
+        "bar", "real")
 
 
 # Valid setattr usage

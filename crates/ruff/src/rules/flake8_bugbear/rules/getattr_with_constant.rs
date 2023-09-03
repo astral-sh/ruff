@@ -82,16 +82,14 @@ pub(crate) fn getattr_with_constant(
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             if matches!(
                 obj,
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(_),
-                    ..
-                })
+                Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
             ) {
-                // Attribute accesses on `int` literals must be parenthesized, e.g.,
-                // `getattr(1, "real")` becomes `(1).real`.
-                format!("({}).{}", checker.locator().slice(obj), value)
-            } else {
                 format!("{}.{}", checker.locator().slice(obj), value)
+            } else {
+                // Defensively parenthesize any other expressions. For example, attribute accesses
+                // on `int` literals must be parenthesized, e.g., `getattr(1, "real")` becomes
+                // `(1).real`. The same is true for named expressions and others.
+                format!("({}).{}", checker.locator().slice(obj), value)
             },
             expr.range(),
         )));
