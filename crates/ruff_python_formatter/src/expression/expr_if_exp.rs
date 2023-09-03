@@ -1,6 +1,8 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprIfExp};
+use ruff_python_ast::{Expr, ExprIfExp, ExpressionRef};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::Ranged;
 
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
@@ -53,16 +55,19 @@ impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
         let comments = f.context().comments().clone();
 
         let inner = format_with(|f: &mut PyFormatter| {
-            // If the expression has any leading or trailing comments, always expand it, as in:
+            // If the expression has any leading or trailing comments, and is "alone" in brackets,
+            // always expand it, as in:
             // ```
-            // (
+            // [
             //     # comment
             //     0
             //     if self.thing is None
             //     else before - after
-            // )
+            // ]
             // ```
-            if comments.has_leading(item) || comments.has_trailing(item) {
+            if (comments.has_leading(item) || comments.has_trailing(item))
+                && is_expression_bracketed(item.into(), f.context().source())
+            {
                 expand_parent().fmt(f)?;
             }
 
@@ -120,5 +125,34 @@ impl Format<PyFormatContext<'_>> for FormatOrElse<'_> {
             }
             _ => write!(f, [in_parentheses_only_group(&self.orelse.format())]),
         }
+    }
+}
+
+/// Returns `true` if the expression is surrounded by brackets (e.g., parenthesized, or the only
+/// expression in a list, tuple, or set).
+fn is_expression_bracketed(expr: ExpressionRef, contents: &str) -> bool {
+    let mut tokenizer = SimpleTokenizer::starts_at(expr.end(), contents)
+        .skip_trivia()
+        .skip_while(|token| matches!(token.kind, SimpleTokenKind::Comma));
+
+    if matches!(
+        tokenizer.next(),
+        Some(SimpleToken {
+            kind: SimpleTokenKind::RParen | SimpleTokenKind::RBrace | SimpleTokenKind::RBracket,
+            ..
+        })
+    ) {
+        let mut tokenizer =
+            SimpleTokenizer::up_to_without_back_comment(expr.start(), contents).skip_trivia();
+
+        matches!(
+            tokenizer.next_back(),
+            Some(SimpleToken {
+                kind: SimpleTokenKind::LParen | SimpleTokenKind::LBrace | SimpleTokenKind::LBracket,
+                ..
+            })
+        )
+    } else {
+        false
     }
 }

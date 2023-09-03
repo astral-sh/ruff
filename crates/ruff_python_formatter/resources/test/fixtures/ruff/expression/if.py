@@ -149,7 +149,8 @@ before = (
     # comment
     0
     if self.thing is None
-    else before - after
+    else before - after,
+    2
 )
 
 before = [
