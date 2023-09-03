@@ -1,6 +1,5 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use std::ops::Deref;
 
 use ruff_python_ast::{
@@ -8,8 +7,8 @@ use ruff_python_ast::{
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern, Stmt,
     Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
+use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
-
 use ruff_source_file::LineEnding;
 
 use super::stylist::{Indentation, Quote, Stylist};
@@ -1381,11 +1380,11 @@ impl<'a> Generator<'a> {
 mod tests {
     use ruff_python_ast::{Mod, ModModule};
     use ruff_python_parser::{self, parse_suite, Mode};
-
     use ruff_source_file::LineEnding;
 
-    use super::Generator;
     use crate::stylist::{Indentation, Quote};
+
+    use super::Generator;
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
