@@ -35,6 +35,13 @@ if output:
         encoding="utf-8",
     )
 
+output = subprocess.run(
+    ["foo"], stdout=subprocess.PIPE, capture_output=True, stderr=subprocess.PIPE
+)
+
+output = subprocess.run(
+    ["foo"], stdout=subprocess.PIPE, capture_output=False, stderr=subprocess.PIPE
+)
 
 # Examples that should NOT trigger the rule
 from foo import PIPE
