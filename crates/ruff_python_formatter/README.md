@@ -116,6 +116,13 @@ setting, which can be provided via a `pyproject.toml` or `ruff.toml` file, or on
 In future releases, the Ruff formatter will likely support configuration of quote style (single vs.
 double) and indentation (width, and spaces vs. tabs).
 
+### Suppressing formatting
+
+Ruff supports Black's `# fmt: off`, `# fmt: on`, and `# fmt: skip` pragmas, with a few caveats.
+
+See Ruff's [suppression comment proposal](https://github.com/astral-sh/ruff/discussions/6338) for
+details.
+
 ## Black compatibility
 
 The formatter is designed to be a drop-in replacement for [Black](https://github.com/psf/black).
@@ -130,4 +137,170 @@ and so more deviations should be expected.
 
 ### Intentional deviations
 
-...
+This section enumerates the known, intentional deviations between the Ruff formatter and Black's
+stable style. (Unintentional deviations are tracked in the [issue tracker](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3Aformatter).)
+
+#### Trailing end-of-line comments
+
+Black's priority is to fit an entire statement on a line, even if it contains end-of-line comments.
+In such cases, Black collapses the statement, and moves the comment to the end of the collapsed
+statement:
+
+```python
+# Input
+while (
+    cond1  # almost always true
+    and cond2  # almost never true
+):
+    print("Do something")
+
+# Black
+while cond1 and cond2:  # almost always true  # almost never true
+    print("Do something")
+```
+
+Ruff, like [Prettier](https://prettier.io/), expands any statement that contains trailing
+end-of-line comments. For example, Ruff would avoid collapsing the `while` test in the snippet
+above. This ensures that the comments remain close to their original position and retain their
+original intent, at the cost of retaining additional vertical space.
+
+This deviation only impacts unformatted code, in that Ruff's output should not deviate for code that
+has already been formatted by Black.
+
+### Pragma comments are ignored when computing line width
+
+Pragma comments (`# type: ignore`, `# noqa`, etc.) are ignored when computing the width of a line.
+This prevents Ruff from moving pragma comments around, thereby modifying their meaning and behavior:
+
+See Ruff's [pargma comment handling proposal](https://github.com/astral-sh/ruff/discussions/6670)
+for details.
+
+This is similar to [Pyink](https://github.com/google/pyink) but a deviation from Black. Black uses
+this behavior for `# type: ignore` comments ([#997](https://github.com/psf/black/issues/997)), while
+Ruff applies it to all such pragmas.
+
+As Ruff expands trailing end-of-line comments, Ruff will also avoid moving pragma comments in cases
+like the following, where moving the `# noqa` to the end of the line causes it to suppress errors
+on both `first()` and `second()`:
+
+```python
+# Input
+[
+    first(),  # noqa
+    second()
+]
+
+# Black
+[first(), second()]  # noqa
+
+# Ruff
+[
+    first(),  # noqa
+    second(),
+]
+```
+
+### Line width vs. line length
+
+Ruff uses the unicode width of a line to determine if a line fits. Black's stable style uses
+character width, while Black's preview style uses unicode width for strings ([#3445](https://github.com/psf/black/pull/3445)),
+and character width for all other tokens.
+
+### Walruses in slice expressions
+
+Black avoids inserting space around `:=` operators within slices. For example, the following adheres
+to Black stable style:
+
+```python
+# Input
+x[y:=1]
+
+# Black
+x[y:=1]
+```
+
+Ruff will instead add space around the `:=` operator:
+
+```python
+# Input
+x[y:=1]
+
+# Ruff
+x[y := 1]
+```
+
+This will likely be incorporated into Black's preview style ([#3823](https://github.com/psf/black/pull/3823)).
+
+### `global` and `nonlocal` names are broken across multiple lines by continuations
+
+If a `global` or `nonlocal` statement includes multiple names, and exceeds the configured line
+width, Ruff will break them across multiple lines using continuations:
+
+```python
+# Input
+global analyze_featuremap_layer, analyze_featuremapcompression_layer, analyze_latencies_post, analyze_motions_layer, analyze_size_model
+
+# Ruff
+global \
+    analyze_featuremap_layer, \
+    analyze_featuremapcompression_layer, \
+    analyze_latencies_post, \
+    analyze_motions_layer, \
+    analyze_size_model
+```
+
+### Newlines are inserted after single-quoted docstrings
+
+Black typically enforces a single newline after a class docstring. However, it does not apply such
+formatting if the docstring is single-quoted rather than triple-quoted, while Ruff enforces a
+single newline in both cases:
+
+```python
+# Input
+class IntFromGeom(GEOSFuncFactory):
+    """Argument is a geometry, return type is an integer."""
+    argtypes = [GEOM_PTR]
+    restype = c_int
+    errcheck = staticmethod(check_minus_one)
+
+# Black
+class IntFromGeom(GEOSFuncFactory):
+    """Argument is a geometry, return type is an integer."""
+    argtypes = [GEOM_PTR]
+    restype = c_int
+    errcheck = staticmethod(check_minus_one)
+
+# Ruff
+class IntFromGeom(GEOSFuncFactory):
+    """Argument is a geometry, return type is an integer."""
+
+    argtypes = [GEOM_PTR]
+    restype = c_int
+    errcheck = staticmethod(check_minus_one)
+```
+
+### Trailing own-line comments on imports are not moved to the next line
+
+Black enforces a single empty line between an import and a trailing own-line comment. Ruff leaves
+such comments in-place:
+
+```python
+# Input
+import os
+# comment
+
+import sys
+
+# Black
+import os
+
+# comment
+
+import sys
+
+# Ruff
+import os
+# comment
+
+import sys
+```
