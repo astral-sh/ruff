@@ -77,10 +77,17 @@ pub(crate) fn use_pep604_annotation(
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    optional(slice, checker.locator()),
-                    expr.range(),
-                )));
+                match slice {
+                    Expr::Tuple(_) => {
+                        // Invalid type annotation.
+                    }
+                    _ => {
+                        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            optional(slice, checker.locator()),
+                            expr.range(),
+                        )));
+                    }
+                }
             }
             checker.diagnostics.push(diagnostic);
         }
