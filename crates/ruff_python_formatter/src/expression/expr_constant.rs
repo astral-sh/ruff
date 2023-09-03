@@ -78,13 +78,13 @@ impl NeedsParentheses for ExprConstant {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if self.value.is_implicit_concatenated() {
-            OptionalParentheses::Multiline
-        } else if is_multiline_string(self, context.source())
+        if self.value.is_implicit_concatenated()
             || self.value.is_none()
             || self.value.is_bool()
             || self.value.is_ellipsis()
         {
+            OptionalParentheses::Multiline
+        } else if is_multiline_string(self, context.source()) {
             OptionalParentheses::Never
         } else if should_use_best_fit(self, context) {
             OptionalParentheses::BestFit
