@@ -1253,14 +1253,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             range: _,
         }) => {
             if checker.enabled(Rule::IfExprWithTrueFalse) {
-                flake8_simplify::rules::explicit_true_false_in_ifexpr(
-                    checker, expr, test, body, orelse,
-                );
+                flake8_simplify::rules::if_expr_with_true_false(checker, expr, test, body, orelse);
             }
             if checker.enabled(Rule::IfExprWithFalseTrue) {
-                flake8_simplify::rules::explicit_false_true_in_ifexpr(
-                    checker, expr, test, body, orelse,
-                );
+                flake8_simplify::rules::if_expr_with_false_true(checker, expr, test, body, orelse);
             }
             if checker.enabled(Rule::IfExprWithTwistedArms) {
                 flake8_simplify::rules::twisted_arms_in_ifexpr(checker, expr, test, body, orelse);
