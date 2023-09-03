@@ -361,4 +361,12 @@ UP007.py:92:10: UP007 Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
+UP007.py:96:10: UP007 Use `X | Y` for type annotations
+   |
+96 | def f(x: Optional[int, float]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^ UP007
+97 |     ...
+   |
+   = help: Convert to `X | Y`
+
 

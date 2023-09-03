@@ -91,3 +91,7 @@ def f(x: Optional[int : float]) -> None:
 
 def f(x: Optional[str, int : float]) -> None:
     ...
+
+
+def f(x: Optional[int, float]) -> None:
+    ...
