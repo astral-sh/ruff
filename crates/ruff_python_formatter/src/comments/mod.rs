@@ -481,6 +481,28 @@ impl<'a> Comments<'a> {
 
 pub(crate) type LeadingDanglingTrailingComments<'a> = LeadingDanglingTrailing<'a, SourceComment>;
 
+impl LeadingDanglingTrailingComments<'_> {
+    /// Returns `true` if the struct has any [leading comments](self#leading-comments).
+    #[inline]
+    pub(crate) fn has_leading(&self) -> bool {
+        !self.leading.is_empty()
+    }
+
+    /// Returns `true` if the struct has any [trailing comments](self#trailing-comments).
+    #[inline]
+    pub(crate) fn has_trailing(&self) -> bool {
+        !self.trailing.is_empty()
+    }
+
+    /// Returns `true` if the struct has any [trailing own line comments](self#trailing-comments).
+    #[inline]
+    pub(crate) fn has_trailing_own_line(&self) -> bool {
+        self.trailing
+            .iter()
+            .any(|comment| comment.line_position().is_own_line())
+    }
+}
+
 #[derive(Debug, Default)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
