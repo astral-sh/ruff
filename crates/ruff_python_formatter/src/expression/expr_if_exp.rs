@@ -53,9 +53,22 @@ impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
         let comments = f.context().comments().clone();
 
         let inner = format_with(|f: &mut PyFormatter| {
-            // We place `if test` and `else orelse` on a single line, so the `test` and `orelse` leading
-            // comments go on the line before the `if` or `else` instead of directly ahead `test` or
-            // `orelse`
+            // If the expression has any leading or trailing comments, always expand it, as in:
+            // ```
+            // (
+            //     # comment
+            //     0
+            //     if self.thing is None
+            //     else before - after
+            // )
+            // ```
+            if comments.has_leading(item) || comments.has_trailing(item) {
+                expand_parent().fmt(f)?;
+            }
+
+            // We place `if test` and `else orelse` on a single line, so the `test` and `orelse`
+            // leading comments go on the line before the `if` or `else` instead of directly ahead
+            // `test` or `orelse`.
             write!(
                 f,
                 [

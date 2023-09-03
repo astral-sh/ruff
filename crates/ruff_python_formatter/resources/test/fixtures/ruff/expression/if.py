@@ -108,3 +108,60 @@ def something():
         if flat
         else ValuesListIterable)
     )
+
+
+# Expanding leading and trailing comments.
+before = (
+    # comment
+    0
+    if self.thing is None
+    else before - after
+)
+
+before = (
+    0
+    if self.thing is None
+    else before - after
+    # comment
+)
+
+before = (  # comment
+    0
+    if self.thing is None
+    else before - after
+)
+
+before = (
+    # comment
+    (0
+     if self.thing is None
+     else before - after
+     ))
+
+before = [
+    # comment
+    0
+    if self.thing is None
+    else before - after
+]
+
+before = (
+    # comment
+    0
+    if self.thing is None
+    else before - after
+)
+
+before = [
+    # comment
+    0
+    if self.thing is None
+    else before - after,
+    2
+]
+
+before = (
+    0
+    if self.thing is None
+    else before - after  # comment
+)
