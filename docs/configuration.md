@@ -57,23 +57,20 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py38"
 ```
 
-As an example, the following would configure Ruff to: (1) enforce flake8-bugbear rules, in addition
-to the defaults; (2) avoid enforcing line-length violations (`E501`); (3) avoid attempting to fix
-flake8-bugbear (`B`) violations; and (3) ignore import-at-top-of-file violations (`E402`) in
-`__init__.py` files:
+As an example, the following would configure Ruff to:
 
 ```toml
 [tool.ruff]
-# Enable flake8-bugbear (`B`) rules.
+# 1. Enable flake8-bugbear (`B`) rules, in addition to the defaults.
 select = ["E", "F", "B"]
 
-# Never enforce `E501` (line length violations).
+# 2. Avoid enforcing line-length violations (`E501`)
 ignore = ["E501"]
 
-# Avoid trying to fix flake8-bugbear (`B`) violations.
+# 3. Avoid trying to fix flake8-bugbear (`B`) violations.
 unfixable = ["B"]
 
-# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+# 4. Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["E402"]
 "path/to/file.py" = ["E402"]
