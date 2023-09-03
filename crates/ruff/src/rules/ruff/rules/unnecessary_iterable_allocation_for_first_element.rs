@@ -218,7 +218,6 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
             },
         },
         Expr::List(ast::ExprList { elts, .. }) => {
-            // println!("{:?}", elts);
             let [elt] = elts.as_slice() else {
                 return None;
             };
