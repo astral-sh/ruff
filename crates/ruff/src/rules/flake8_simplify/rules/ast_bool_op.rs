@@ -11,6 +11,8 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{contains_effect, Truthiness};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_codegen::Generator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -692,12 +694,12 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-pub(crate) fn get_short_circuit_edit(
+fn get_short_circuit_edit(
     expr: &Expr,
     range: TextRange,
     truthiness: Truthiness,
     in_boolean_test: bool,
-    checker: &Checker,
+    generator: Generator,
 ) -> Edit {
     let content = if in_boolean_test {
         match truthiness {
@@ -708,9 +710,17 @@ pub(crate) fn get_short_circuit_edit(
             }
         }
     } else {
-        checker.generator().expr(expr)
+        generator.expr(expr)
     };
-    Edit::range_replacement(content, range)
+    Edit::range_replacement(
+        if matches!(expr, Expr::Tuple(ast::ExprTuple { elts, ctx: _, range: _}) if !elts.is_empty())
+        {
+            format!("({content})")
+        } else {
+            content
+        },
+        range,
+    )
 }
 
 fn is_short_circuit(
@@ -734,7 +744,7 @@ fn is_short_circuit(
         BoolOp::Or => Truthiness::Truthy,
     };
 
-    let mut location = expr.start();
+    let mut furthest = expr;
     let mut edit = None;
     let mut remove = None;
 
@@ -749,7 +759,7 @@ fn is_short_circuit(
             && (!checker.semantic().in_boolean_test()
                 || contains_effect(value, |id| checker.semantic().is_builtin(id)))
         {
-            location = next_value.start();
+            furthest = next_value;
             continue;
         }
 
@@ -758,17 +768,19 @@ fn is_short_circuit(
         // short-circuit expression is the first expression in the list; otherwise, we'll see it
         // as `next_value` before we see it as `value`.
         if value_truthiness == short_circuit_truthiness {
-            remove = Some(if location == value.start() {
-                ContentAround::After
-            } else {
-                ContentAround::Both
-            });
+            remove = Some(ContentAround::After);
+
             edit = Some(get_short_circuit_edit(
                 value,
-                TextRange::new(location, expr.end()),
+                TextRange::new(
+                    parenthesized_range(furthest.into(), expr.into(), checker.locator().contents())
+                        .unwrap_or(furthest.range())
+                        .start(),
+                    expr.end(),
+                ),
                 short_circuit_truthiness,
                 checker.semantic().in_boolean_test(),
-                checker,
+                checker.generator(),
             ));
             break;
         }
@@ -776,17 +788,22 @@ fn is_short_circuit(
         // If the next expression is a constant, and it matches the short-circuit value, then
         // we can return the location of the expression.
         if next_value_truthiness == short_circuit_truthiness {
-            remove = Some(if index == values.len() - 2 {
+            remove = Some(if index + 1 == values.len() - 1 {
                 ContentAround::Before
             } else {
                 ContentAround::Both
             });
             edit = Some(get_short_circuit_edit(
                 next_value,
-                TextRange::new(location, expr.end()),
+                TextRange::new(
+                    parenthesized_range(furthest.into(), expr.into(), checker.locator().contents())
+                        .unwrap_or(furthest.range())
+                        .start(),
+                    expr.end(),
+                ),
                 short_circuit_truthiness,
                 checker.semantic().in_boolean_test(),
-                checker,
+                checker.generator(),
             ));
             break;
         }
