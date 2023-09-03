@@ -653,6 +653,17 @@ pub fn map_subscript(expr: &Expr) -> &Expr {
     }
 }
 
+/// Given an [`Expr`] that can be starred, return the underlying starred expression.
+pub fn map_starred(expr: &Expr) -> &Expr {
+    if let Expr::Starred(ast::ExprStarred { value, .. }) = expr {
+        // Ex) `*args`
+        value
+    } else {
+        // Ex) `args`
+        expr
+    }
+}
+
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
 ///
 /// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
