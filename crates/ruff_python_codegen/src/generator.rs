@@ -359,7 +359,7 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(target, precedence::ANN_ASSIGN);
                     self.p_if(need_parens, ")");
                     self.p(": ");
-                    self.unparse_expr(annotation, precedence::ANN_ASSIGN);
+                    self.unparse_expr(annotation, precedence::COMMA);
                     if let Some(value) = value {
                         self.p(" = ");
                         self.unparse_expr(value, precedence::COMMA);
@@ -1636,6 +1636,10 @@ class Foo:
         assert_round_trip!(r#"[n * 2 for n in range(10)]"#);
         assert_round_trip!(r#"{n * 2 for n in range(10)}"#);
         assert_round_trip!(r#"{i: n * 2 for i, n in enumerate(range(10))}"#);
+        assert_round_trip!(
+            "class SchemaItem(NamedTuple):
+    fields: ((\"property_key\", str),)"
+        );
 
         // Type aliases
         assert_round_trip!(r#"type Foo = int | str"#);
