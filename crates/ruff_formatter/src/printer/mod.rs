@@ -54,32 +54,31 @@ impl<'a> Printer<'a> {
 
     /// Prints the passed in element as well as all its content,
     /// starting at the specified indentation level
+    #[tracing::instrument(name = "Printer::print", skip_all)]
     pub fn print_with_indent(
         mut self,
         document: &'a Document,
         indent: u16,
     ) -> PrintResult<Printed> {
-        tracing::debug_span!("Printer::print").in_scope(move || {
-            let mut stack = PrintCallStack::new(PrintElementArgs::new(Indention::Level(indent)));
-            let mut queue: PrintQueue<'a> = PrintQueue::new(document.as_ref());
+        let mut stack = PrintCallStack::new(PrintElementArgs::new(Indention::Level(indent)));
+        let mut queue: PrintQueue<'a> = PrintQueue::new(document.as_ref());
 
-            loop {
-                if let Some(element) = queue.pop() {
-                    self.print_element(&mut stack, &mut queue, element)?;
-                } else {
-                    if !self.flush_line_suffixes(&mut queue, &mut stack, None) {
-                        break;
-                    }
+        loop {
+            if let Some(element) = queue.pop() {
+                self.print_element(&mut stack, &mut queue, element)?;
+            } else {
+                if !self.flush_line_suffixes(&mut queue, &mut stack, None) {
+                    break;
                 }
             }
+        }
 
-            Ok(Printed::new(
-                self.state.buffer,
-                None,
-                self.state.source_markers,
-                self.state.verbatim_markers,
-            ))
-        })
+        Ok(Printed::new(
+            self.state.buffer,
+            None,
+            self.state.source_markers,
+            self.state.verbatim_markers,
+        ))
     }
 
     /// Prints a single element and push the following elements to queue
