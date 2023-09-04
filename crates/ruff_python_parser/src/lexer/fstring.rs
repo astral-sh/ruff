@@ -97,11 +97,9 @@ impl FStringContext {
     }
 
     /// Decrements the number of parentheses for the current f-string. If the
-    /// lexer is in a format spec, also decrements the number of format specs.
+    /// lexer is in a format spec, also decrements the format spec depth.
     pub(crate) fn decrement_closing_parentheses(&mut self) {
-        if self.is_in_format_spec() {
-            self.format_spec_depth = self.format_spec_depth.saturating_sub(1);
-        }
+        self.try_end_format_spec();
         self.open_parentheses_count = self.open_parentheses_count.saturating_sub(1);
     }
 
@@ -118,7 +116,7 @@ impl FStringContext {
 
     /// Returns `true` if the context is in a valid position to start format spec
     /// i.e., at the same level of nesting as the opening parentheses token.
-    /// Increments the number of format specs if it is.
+    /// Increments the format spec depth if it is.
     ///
     /// This assumes that the current character for the lexer is a colon (`:`).
     pub(crate) fn try_start_format_spec(&mut self) -> bool {
@@ -131,6 +129,13 @@ impl FStringContext {
             true
         } else {
             false
+        }
+    }
+
+    /// Decrements the format spec depth if the lexer is in a format spec.
+    pub(crate) fn try_end_format_spec(&mut self) {
+        if self.is_in_format_spec() {
+            self.format_spec_depth = self.format_spec_depth.saturating_sub(1);
         }
     }
 }

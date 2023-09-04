@@ -548,6 +548,7 @@ impl<'source> Lexer<'source> {
         let mut last_offset = self.offset();
 
         let mut in_named_unicode = false;
+        let mut try_end_format_spec = false;
 
         loop {
             match self.cursor.first() {
@@ -620,6 +621,7 @@ impl<'source> Lexer<'source> {
                         self.cursor.bump(); // Skip the second `}`
                         last_offset = self.offset();
                     } else {
+                        try_end_format_spec = true;
                         break;
                     }
                 }
@@ -630,20 +632,36 @@ impl<'source> Lexer<'source> {
         }
 
         let range = self.token_range();
-        if range.is_empty() {
+
+        // Avoid emitting the empty `FStringMiddle` token for anything other than
+        // the closing curly braces (`}`).
+        if range.is_empty() && !try_end_format_spec {
             return Ok(None);
         }
 
-        let value = if normalized.is_empty() {
+        let value = if range.is_empty() {
+            // Emit an empty `FStringMiddle` token for a special case to disallow
+            // lambda expressions without parenthesis. For example, in `f"{lambda x:{x}}"`
+            // the lexer wouldn't have emitted a `FStringMiddle` token.
+            String::new()
+        } else if normalized.is_empty() {
             self.source[range].to_string()
         } else {
             normalized.push_str(&self.source[TextRange::new(last_offset, self.offset())]);
             normalized
         };
-        Ok(Some(Tok::FStringMiddle {
-            value,
-            is_raw: fstring.is_raw_string(),
-        }))
+        let is_raw = fstring.is_raw_string();
+        if try_end_format_spec {
+            // We need to decrement the format spec depth to avoid going into infinite
+            // loop where the lexer keeps on emitting an empty `FStringMiddle` token.
+            // This is because the lexer still thinks that we're in a f-string expression
+            // but as we've encountered a `}` token, we need to decrement the depth so
+            // that the lexer can go forward with the `Rbrace` token.
+            //
+            // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
+            self.fstrings.current_mut().unwrap().try_end_format_spec();
+        }
+        Ok(Some(Tok::FStringMiddle { value, is_raw }))
     }
 
     /// Lex a string literal.

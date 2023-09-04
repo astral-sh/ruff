@@ -22,6 +22,10 @@ expression: lex_source(source)
         name: "x",
     },
     Rbrace,
+    FStringMiddle {
+        value: "",
+        is_raw: true,
+    },
     Rbrace,
     FStringMiddle {
         value: " \\\"\\\"\\\n end",

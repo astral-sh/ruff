@@ -9,6 +9,10 @@ expression: lex_source(source)
         name: "foo",
     },
     Colon,
+    FStringMiddle {
+        value: "",
+        is_raw: false,
+    },
     Rbrace,
     FStringMiddle {
         value: " ",
@@ -77,7 +81,15 @@ expression: lex_source(source)
         value: 1,
     },
     Rbrace,
+    FStringMiddle {
+        value: "",
+        is_raw: false,
+    },
     Rbrace,
+    FStringMiddle {
+        value: "",
+        is_raw: false,
+    },
     Rbrace,
     FStringEnd,
     Newline,
