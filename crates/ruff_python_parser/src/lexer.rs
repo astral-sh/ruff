@@ -539,9 +539,9 @@ impl<'source> Lexer<'source> {
             return Ok(Some(Tok::FStringEnd));
         }
 
-        // The normalized string if the token value is not yet normalized.
-        // This must remain empty if it's already normalized. Normalization
-        // is to replace `{{` and `}}` with `{` and `}` respectively.
+        // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
+        // optimization, we only allocate a new string we find any escaped curly braces,
+        // otherwise this string will remain empty and we'll use a source slice instead.
         let mut normalized = String::new();
 
         // Tracks the last offset of token value that has been written to `normalized`.
