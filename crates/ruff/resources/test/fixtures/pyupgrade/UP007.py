@@ -95,3 +95,11 @@ def f(x: Optional[str, int : float]) -> None:
 
 def f(x: Optional[int, float]) -> None:
     ...
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7131
+class ServiceRefOrValue:
+    service_specification: Optional[
+        list[ServiceSpecificationRef]
+        | list[ServiceSpecification]
+    ] = None
