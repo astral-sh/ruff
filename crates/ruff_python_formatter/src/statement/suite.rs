@@ -142,18 +142,22 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             )
         };
 
+        let mut preceding_comments = comments.leading_dangling_trailing(preceding);
+
         while let Some(following) = iter.next() {
+            let following_comments = comments.leading_dangling_trailing(following);
+
             // Add empty lines before and after a function or class definition. If the preceding
             // node is a function or class, and contains trailing comments, then the statement
             // itself will add the requisite empty lines when formatting its comments.
             if (is_class_or_function_definition(preceding)
-                && !comments.has_trailing_own_line(preceding))
+                && !preceding_comments.has_trailing_own_line())
                 || is_class_or_function_definition(following)
             {
                 match self.kind {
                     SuiteKind::TopLevel if source_type.is_stub() => {
                         // Preserve the empty line if the definitions are separated by a comment
-                        if comments.has_trailing(preceding) || comments.has_leading(following) {
+                        if preceding_comments.has_trailing() || following_comments.has_leading() {
                             empty_line().fmt(f)?;
                         } else {
                             // Two subsequent classes that both have an ellipsis only body
@@ -196,7 +200,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     }
                 }
             } else if is_import_definition(preceding)
-                && (!is_import_definition(following) || comments.has_leading(following))
+                && (!is_import_definition(following) || following_comments.has_leading())
             {
                 // Enforce _at least_ one empty line after an import statement (but allow up to
                 // two at the top-level). In this context, "after an import statement" means that
@@ -230,7 +234,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // which is 0 instead of 1, the number of lines between the trailing comment and
                 // the leading comment. This is why the suite handling counts the lines before the
                 // start of the next statement or before the first leading comments for compound statements.
-                let start = if let Some(first_leading) = comments.leading(following).first() {
+                let start = if let Some(first_leading) = following_comments.leading.first() {
                     first_leading.start()
                 } else {
                     following.start()
@@ -285,8 +289,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     lines_after(offset, source)
                 };
 
-                let end = comments
-                    .trailing(preceding)
+                let end = preceding_comments
+                    .trailing
                     .last()
                     .map_or(preceding.end(), |comment| comment.slice().end());
 
@@ -306,8 +310,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 }
             }
 
-            let following_comments = comments.leading_dangling_trailing(following);
-
             if following_comments
                 .leading
                 .iter()
@@ -318,6 +320,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     &mut iter,
                     f,
                 )?;
+                preceding_comments = comments.leading_dangling_trailing(preceding);
             } else if following_comments
                 .trailing
                 .iter()
@@ -328,10 +331,13 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     &mut iter,
                     f,
                 )?;
+                preceding_comments = comments.leading_dangling_trailing(preceding);
             } else {
                 following.format().fmt(f)?;
                 preceding = following;
+                preceding_comments = following_comments;
             }
+
             after_class_docstring = false;
         }
 
