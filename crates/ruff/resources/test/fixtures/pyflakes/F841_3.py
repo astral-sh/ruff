@@ -165,3 +165,9 @@ def f():
     x = 1
 
     y = 2
+
+
+def f():
+    (x) = foo()
+    ((x)) = foo()
+    (x) = (y.z) = foo()

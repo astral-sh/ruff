@@ -1,9 +1,9 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
-use ruff_text_size::{TextLen, TextRange};
 
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -58,13 +58,30 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::Expr
         let Some(kwarg) = call.arguments.find_keyword("universal_newlines") else {
             return;
         };
-        let range = TextRange::at(kwarg.start(), "universal_newlines".text_len());
-        let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
+
+        let Some(arg) = kwarg.arg.as_ref() else {
+            return;
+        };
+
+        let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, arg.range());
+
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                "text".to_string(),
-                range,
-            )));
+            if call.arguments.find_keyword("text").is_some() {
+                diagnostic.try_set_fix(|| {
+                    remove_argument(
+                        kwarg,
+                        &call.arguments,
+                        Parentheses::Preserve,
+                        checker.locator().contents(),
+                    )
+                    .map(Fix::suggested)
+                });
+            } else {
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    "text".to_string(),
+                    arg.range(),
+                )));
+            }
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -966,21 +966,21 @@ pub(crate) fn fix_unnecessary_map(
                 }));
             }
             ObjectType::Dict => {
-                let (key, value) = if let Expression::Tuple(tuple) = func_body.body.as_ref() {
-                    if tuple.elements.len() != 2 {
-                        bail!("Expected two elements")
+                let elements = match func_body.body.as_ref() {
+                    Expression::Tuple(tuple) => &tuple.elements,
+                    Expression::List(list) => &list.elements,
+                    _ => {
+                        bail!("Expected tuple or list for dictionary comprehension")
                     }
-
-                    let Some(Element::Simple { value: key, .. }) = &tuple.elements.get(0) else {
-                        bail!("Expected tuple to contain a key as the first element");
-                    };
-                    let Some(Element::Simple { value, .. }) = &tuple.elements.get(1) else {
-                        bail!("Expected tuple to contain a key as the second element");
-                    };
-
-                    (key, value)
-                } else {
-                    bail!("Expected tuple for dict comprehension")
+                };
+                let [key, value] = elements.as_slice() else {
+                    bail!("Expected container to include two elements");
+                };
+                let Element::Simple { value: key, .. } = key else {
+                    bail!("Expected container to use a key as the first element");
+                };
+                let Element::Simple { value, .. } = value else {
+                    bail!("Expected container to use a value as the second element");
                 };
 
                 tree = Expression::DictComp(Box::new(DictComp {

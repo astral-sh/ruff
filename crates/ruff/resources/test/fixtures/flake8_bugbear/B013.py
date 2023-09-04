@@ -1,3 +1,5 @@
+retriable_exceptions = (FileExistsError, FileNotFoundError)
+
 try:
     pass
 except (ValueError,):
@@ -5,4 +7,6 @@ except (ValueError,):
 except AttributeError:
     pass
 except (ImportError, TypeError):
+    pass
+except (*retriable_exceptions,):
     pass

@@ -50,29 +50,6 @@ impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
     }
 }
 
-/// Generate a [`Edit`] for a `stdout` and `stderr` [`Keyword`] pair.
-fn generate_fix(
-    stdout: &Keyword,
-    stderr: &Keyword,
-    call: &ast::ExprCall,
-    source: &str,
-) -> Result<Fix> {
-    let (first, second) = if stdout.start() < stderr.start() {
-        (stdout, stderr)
-    } else {
-        (stderr, stdout)
-    };
-    Ok(Fix::suggested_edits(
-        Edit::range_replacement("capture_output=True".to_string(), first.range()),
-        [remove_argument(
-            second,
-            &call.arguments,
-            Parentheses::Preserve,
-            source,
-        )?],
-    ))
-}
-
 /// UP022
 pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
@@ -107,5 +84,43 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
                 .try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator().contents()));
         }
         checker.diagnostics.push(diagnostic);
+    }
+}
+
+/// Generate a [`Edit`] for a `stdout` and `stderr` [`Keyword`] pair.
+fn generate_fix(
+    stdout: &Keyword,
+    stderr: &Keyword,
+    call: &ast::ExprCall,
+    source: &str,
+) -> Result<Fix> {
+    let (first, second) = if stdout.start() < stderr.start() {
+        (stdout, stderr)
+    } else {
+        (stderr, stdout)
+    };
+
+    if call.arguments.find_keyword("capture_output").is_some() {
+        // Remove both arguments.
+        Ok(Fix::suggested_edits(
+            remove_argument(first, &call.arguments, Parentheses::Preserve, source)?,
+            [remove_argument(
+                second,
+                &call.arguments,
+                Parentheses::Preserve,
+                source,
+            )?],
+        ))
+    } else {
+        // Replace one argument with `capture_output=True`, and remove the other.
+        Ok(Fix::suggested_edits(
+            Edit::range_replacement("capture_output=True".to_string(), first.range()),
+            [remove_argument(
+                second,
+                &call.arguments,
+                Parentheses::Preserve,
+                source,
+            )?],
+        ))
     }
 }
