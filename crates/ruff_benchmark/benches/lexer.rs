@@ -47,7 +47,8 @@ fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
             &case,
             |b, case| {
                 b.iter(|| {
-                    let result = lexer::lex(case.code(), Mode::Module).find(|tok| tok.is_err());
+                    let result =
+                        lexer::lex(case.code(), Mode::Module).find(std::result::Result::is_err);
                     assert_eq!(result, None, "Input to be a valid Python program");
                 });
             },
