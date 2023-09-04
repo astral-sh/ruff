@@ -37,25 +37,20 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            // If the value is an integer, we need to parenthesize it to avoid a syntax error.
-            let requires_parentheses = matches!(
-                value.as_ref(),
-                Expr::Constant(ExprConstant {
-                    value: Constant::Int(_) | Constant::Float(_),
-                    ..
-                })
-            );
+            let parenthesize_value =
+                // If the value is an integer, we need to parenthesize it to avoid a syntax error.
+                matches!(
+                    value.as_ref(),
+                    Expr::Constant(ExprConstant {
+                        value: Constant::Int(_) | Constant::Float(_),
+                        ..
+                    })
+                ) || is_expression_parenthesized(value.into(), f.context().source());
 
             if call_chain_layout == CallChainLayout::Fluent {
-                if requires_parentheses {
+                if parenthesize_value {
                     // Don't propagate the call chain layout.
                     value.format().with_options(Parentheses::Always).fmt(f)?;
-
-                    // Format the dot on its own line.
-                    soft_line_break().fmt(f)?;
-                } else if is_expression_parenthesized(value.as_ref().into(), f.context().source()) {
-                    // Don't propagate the call chain layout.
-                    value.format().fmt(f)?;
 
                     // Format the dot on its own line.
                     soft_line_break().fmt(f)?;
@@ -73,16 +68,14 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                             soft_line_break().fmt(f)?;
                         }
                         _ => {
-                            value.format().fmt(f)?;
+                            value.format().with_options(Parentheses::Never).fmt(f)?;
                         }
                     }
                 }
+            } else if parenthesize_value {
+                value.format().with_options(Parentheses::Always).fmt(f)?;
             } else {
-                if requires_parentheses {
-                    value.format().with_options(Parentheses::Always).fmt(f)?;
-                } else {
-                    value.format().fmt(f)?;
-                }
+                value.format().with_options(Parentheses::Never).fmt(f)?;
             }
 
             // Identify dangling comments before and after the dot:

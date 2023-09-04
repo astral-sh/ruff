@@ -630,20 +630,21 @@ impl CallChainLayout {
         loop {
             match expr {
                 ExpressionRef::Attribute(ast::ExprAttribute { value, .. }) => {
-                    expr = ExpressionRef::from(value.as_ref());
                     // ```
                     // f().g
                     // ^^^ value
                     // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
-                    if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
-                        attributes_after_parentheses += 1;
-                    } else if is_expression_parenthesized(expr, source) {
+                    if is_expression_parenthesized(value.into(), source) {
                         // `(a).b`. We preserve these parentheses so don't recurse
                         attributes_after_parentheses += 1;
                         break;
+                    } else if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
+                        attributes_after_parentheses += 1;
                     }
+
+                    expr = ExpressionRef::from(value.as_ref());
                 }
                 // ```
                 // f()
@@ -666,9 +667,11 @@ impl CallChainLayout {
                     if is_expression_parenthesized(expr, source) {
                         attributes_after_parentheses += 1;
                     }
+
                     break;
                 }
             }
+
             // We preserve these parentheses so don't recurse
             if is_expression_parenthesized(expr, source) {
                 break;
