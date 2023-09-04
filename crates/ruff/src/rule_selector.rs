@@ -2,13 +2,14 @@ use std::str::FromStr;
 
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::codes::RuleCodePrefix;
 use crate::codes::RuleIter;
 use crate::registry::{Linter, Rule, RuleNamespace};
-use crate::rule_redirects::get_redirect;
+use crate::rule_redirects;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
@@ -47,19 +48,20 @@ impl FromStr for RuleSelector {
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
-                let (s, redirected_from) = match get_redirect(s) {
+                let (s, redirected_from) = match rule_redirects::get_code_redirect(s)
+                    .or_else(|| rule_redirects::get_name_redirect(s))
+                {
                     Some((from, target)) => (target, Some(from)),
                     None => (s, None),
                 };
 
-                let mut s = String::from(s);
-                // If a human-readable name is provided, convert it back to a structude code
-                if let Ok(rule) = Rule::from_name(&s) {
-                    s.clear();
-                    let noqa_code = rule.noqa_code();
-                    s.push_str(noqa_code.prefix());
-                    s.push_str(noqa_code.suffix());
-                }
+                let s = if let Ok(rule) = Rule::from_name(s) {
+                    // If a human-readable name is provided, convert it back to a
+                    // structured code
+                    Cow::Owned(rule.noqa_code().to_string())
+                } else {
+                    Cow::Borrowed(s)
+                };
 
                 let (linter, code) =
                     Linter::parse_code(&s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;

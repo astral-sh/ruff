@@ -17,7 +17,6 @@ use ruff_source_file::{LineEnding, Locator};
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule, RuleSet};
-use crate::rule_redirects::get_redirect_target;
 
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
 /// `# noqa: F401, F841`).
@@ -84,8 +83,8 @@ impl<'a> Directive<'a> {
                     let mut codes = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
-                    while let Some(code) =
-                        Self::lex_code_or_name(&text[codes_end + leading_space..])
+                    while let Some(code) = Self::lex_code(&text[codes_end + leading_space..])
+                        .or_else(|| Self::lex_name(&text[codes_end + leading_space..]))
                     {
                         codes.push(code);
                         codes_end += leading_space;
@@ -147,14 +146,33 @@ impl<'a> Directive<'a> {
         Ok(None)
     }
 
-    /// Lex an individual rule code or human-readable name (e.g., `F401` or `unused-import`).
+    /// Lex an individual rule code (e.g., `F401`).
     #[inline]
-    fn lex_code_or_name(line: &str) -> Option<&str> {
+    fn lex_code(line: &str) -> Option<&str> {
+        // Extract, e.g., the `F` in `F401`.
+        let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
+        // Extract, e.g., the `401` in `F401`.
+        let suffix = line[prefix..]
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .count();
+        if prefix > 0 && suffix > 0 {
+            Some(&line[..prefix + suffix])
+        } else {
+            None
+        }
+    }
+
+    /// Lex a human-readable name (e.g., `unused-import`).
+    #[inline]
+    fn lex_name(line: &str) -> Option<&str> {
+        // According to https://beta.ruff.rs/docs/rules/, all rule names are lowercase + at least 1 dash
         let length = line
             .chars()
             .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
             .count();
-        if length > 0 {
+        let has_dash = line[..length].chars().any(|c| c == '-');
+        if has_dash && length > 0 {
             Some(&line[..length])
         } else {
             None
@@ -197,12 +215,9 @@ impl Ranged for Codes<'_> {
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
 pub(crate) fn includes(needle: Rule, haystack: &[&str]) -> bool {
-    // Get the human-readable name
-    let needle_str: &str = needle.as_ref();
-    let needle = needle.noqa_code();
-    haystack.iter().any(|candidate| {
-        needle == get_redirect_target(candidate).unwrap_or(candidate) || needle_str == *candidate
-    })
+    haystack
+        .iter()
+        .any(|candidate| Rule::from_code_or_name(candidate, true).is_ok_and(|rule| rule == needle))
 }
 
 /// Returns `true` if the given [`Rule`] is ignored at the specified `lineno`.
@@ -263,17 +278,14 @@ impl FileExemption {
                             return Some(Self::All);
                         }
                         ParsedFileExemption::Codes(codes) => {
-                            exempt_codes.extend(codes.into_iter().filter_map(|code| {
-                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
-                                {
-                                    Some(rule.noqa_code())
-                                } else if let Ok(rule) = Rule::from_name(code) {
+                            exempt_codes.extend(codes.into_iter().filter_map(|code_or_name| {
+                                if let Ok(rule) = Rule::from_code_or_name(code_or_name, true) {
                                     Some(rule.noqa_code())
                                 } else {
                                     #[allow(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
-                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
+                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code_or_name}");
                                     None
                                 }
                             }));
@@ -339,7 +351,7 @@ impl<'a> ParsedFileExemption<'a> {
             // Extract the codes from the line (e.g., `F401, F841`).
             let mut codes = vec![];
             let mut line = line;
-            while let Some(code) = Self::lex_code_or_name(line) {
+            while let Some(code) = Self::lex_code(line).or_else(|| Self::lex_name(line)) {
                 codes.push(code);
                 line = &line[code.len()..];
 
@@ -414,14 +426,33 @@ impl<'a> ParsedFileExemption<'a> {
         }
     }
 
-    /// Lex an individual rule code or human-readable name (e.g., `F401` or `unused-import`).
+    /// Lex an individual rule code (e.g., `F401`).
     #[inline]
-    fn lex_code_or_name(line: &str) -> Option<&str> {
+    fn lex_code(line: &str) -> Option<&str> {
+        // Extract, e.g., the `F` in `F401`.
+        let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
+        // Extract, e.g., the `401` in `F401`.
+        let suffix = line[prefix..]
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .count();
+        if prefix > 0 && suffix > 0 {
+            Some(&line[..prefix + suffix])
+        } else {
+            None
+        }
+    }
+
+    /// Lex a human-readable name (e.g., `unused-import`).
+    #[inline]
+    fn lex_name(line: &str) -> Option<&str> {
+        // According to https://beta.ruff.rs/docs/rules/, all rule names are lowercase + at least 1 dash
         let length = line
             .chars()
             .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
             .count();
-        if length > 0 {
+        let has_dash = line[..length].chars().any(|c| c == '-');
+        if has_dash && length > 0 {
             Some(&line[..length])
         } else {
             None
@@ -640,8 +671,8 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) range: TextRange,
     /// The noqa directive.
     pub(crate) directive: Directive<'a>,
-    /// The codes that are ignored by the directive.
-    pub(crate) matches: Vec<NoqaCode>,
+    /// The rules that are ignored by the directive.
+    pub(crate) matches: Vec<Rule>,
 }
 
 impl Ranged for NoqaDirectiveLine<'_> {

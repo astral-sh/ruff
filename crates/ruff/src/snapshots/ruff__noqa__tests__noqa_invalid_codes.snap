@@ -6,13 +6,10 @@ Ok(
     Some(
         Codes(
             Codes {
-                range: 0..52,
+                range: 0..35,
                 codes: [
                     "unused-import-invalid",
                     "F401",
-                    "some",
-                    "other",
-                    "code",
                 ],
             },
         ),
