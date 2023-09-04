@@ -354,7 +354,7 @@ pub(crate) fn lint_path(
                     source_kind.source_code(),
                     &LineIndex::from_source_text(source_kind.source_code())
                 ),
-                Some(&source_kind),
+                &source_kind,
             )
         );
     }
@@ -503,11 +503,11 @@ pub(crate) fn lint_stdin(
 }
 
 #[derive(Debug)]
-struct LintSource(SourceKind);
+pub(crate) struct LintSource(pub(crate) SourceKind);
 
 impl LintSource {
     /// Extract the lint [`LintSource`] from the given file path.
-    fn try_from_path(
+    pub(crate) fn try_from_path(
         path: &Path,
         source_type: PySourceType,
     ) -> Result<Option<LintSource>, SourceExtractionError> {
@@ -526,7 +526,7 @@ impl LintSource {
     /// Extract the lint [`LintSource`] from the raw string contents, optionally accompanied by a
     /// file path indicating the path to the file from which the contents were read. If provided,
     /// the file path should be used for diagnostics, but not for reading the file from disk.
-    fn try_from_source_code(
+    pub(crate) fn try_from_source_code(
         source_code: String,
         source_type: PySourceType,
     ) -> Result<Option<LintSource>, SourceExtractionError> {

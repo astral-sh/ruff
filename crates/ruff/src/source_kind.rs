@@ -10,15 +10,6 @@ pub enum SourceKind {
 }
 
 impl SourceKind {
-    /// Return the [`Notebook`] if the source kind is [`SourceKind::IpyNotebook`].
-    pub fn notebook(&self) -> Option<&Notebook> {
-        if let Self::IpyNotebook(notebook) = self {
-            Some(notebook)
-        } else {
-            None
-        }
-    }
-
     #[must_use]
     pub(crate) fn updated(&self, new_source: String, source_map: &SourceMap) -> Self {
         match self {

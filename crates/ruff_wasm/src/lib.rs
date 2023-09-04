@@ -10,6 +10,7 @@ use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
 use ruff::settings::types::PythonVersion;
 use ruff::settings::{defaults, flags, Settings};
+use ruff::source_kind::SourceKind;
 use ruff_formatter::{FormatResult, Formatted};
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
@@ -165,6 +166,9 @@ impl Workspace {
     pub fn check(&self, contents: &str) -> Result<JsValue, Error> {
         let source_type = PySourceType::default();
 
+        // TODO(dhruvmanila): Support Jupyter Notebooks
+        let source_kind = SourceKind::Python(contents.to_string());
+
         // Tokenize once.
         let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
@@ -195,7 +199,7 @@ impl Workspace {
             &directives,
             &self.settings,
             flags::Noqa::Enabled,
-            None,
+            &source_kind,
             source_type,
         );
 

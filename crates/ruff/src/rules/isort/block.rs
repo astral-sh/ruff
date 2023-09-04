@@ -43,7 +43,7 @@ impl<'a> BlockBuilder<'a> {
         locator: &'a Locator<'a>,
         directives: &'a IsortDirectives,
         is_stub: bool,
-        source_kind: Option<&'a SourceKind>,
+        source_kind: &'a SourceKind,
     ) -> Self {
         Self {
             locator,
@@ -53,7 +53,7 @@ impl<'a> BlockBuilder<'a> {
             exclusions: &directives.exclusions,
             nested: false,
             cell_offsets: source_kind
-                .and_then(SourceKind::notebook)
+                .as_ipy_notebook()
                 .map(Notebook::cell_offsets)
                 .map(|offsets| offsets.iter().peekable()),
         }

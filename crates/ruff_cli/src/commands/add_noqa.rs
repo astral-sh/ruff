@@ -12,6 +12,7 @@ use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
 
 use crate::args::Overrides;
+use crate::diagnostics::LintSource;
 
 /// Add `noqa` directives to a collection of files.
 pub(crate) fn add_noqa(
@@ -56,7 +57,15 @@ pub(crate) fn add_noqa(
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
             let settings = resolver.resolve(path, pyproject_config);
-            match add_noqa_to_path(path, package, source_type, settings) {
+            let LintSource(source_kind) = match LintSource::try_from_path(path, source_type) {
+                Ok(Some(source)) => source,
+                Ok(None) => return None,
+                Err(e) => {
+                    error!("Failed to extract source from {}: {e}", path.display());
+                    return None;
+                }
+            };
+            match add_noqa_to_path(path, package, &source_kind, source_type, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
                     error!("Failed to add noqa to {}: {e}", path.display());

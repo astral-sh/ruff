@@ -132,7 +132,7 @@ pub(crate) fn test_contents<'a>(
         &directives,
         settings,
         flags::Noqa::Enabled,
-        Some(source_kind),
+        source_kind,
         source_type,
     );
 
@@ -195,7 +195,7 @@ pub(crate) fn test_contents<'a>(
                 &directives,
                 settings,
                 flags::Noqa::Enabled,
-                Some(source_kind),
+                source_kind,
                 source_type,
             );
 
@@ -274,7 +274,7 @@ fn print_diagnostics(diagnostics: Vec<Diagnostic>, path: &Path, source: &SourceK
         })
         .collect();
 
-    if let Some(notebook) = source.notebook() {
+    if let Some(notebook) = source.as_ipy_notebook() {
         print_jupyter_messages(&messages, path, notebook)
     } else {
         print_messages(&messages)
