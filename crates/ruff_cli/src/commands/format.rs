@@ -8,10 +8,10 @@ use std::time::Instant;
 
 use anyhow::Result;
 use colored::Colorize;
-use log::{debug, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
+use tracing::{debug, warn};
 
 use ruff::fs;
 use ruff::logging::LogLevel;
@@ -61,30 +61,38 @@ pub(crate) fn format(
     let start = Instant::now();
     let (results, errors): (Vec<_>, Vec<_>) = paths
         .into_par_iter()
-        .filter_map(|entry| match entry {
-            Ok(entry) => {
-                let path = entry.path();
+        .filter_map(|entry| {
+            match entry {
+                Ok(entry) => {
+                    let path = entry.path();
 
-                let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
-                    SourceType::from(path)
-                else {
-                    // Ignore any non-Python files.
-                    return None;
-                };
+                    let SourceType::Python(
+                        source_type @ (PySourceType::Python | PySourceType::Stub),
+                    ) = SourceType::from(path)
+                    else {
+                        // Ignore any non-Python files.
+                        return None;
+                    };
 
-                let line_length = resolver.resolve(path, &pyproject_config).line_length;
-                let options = PyFormatOptions::from_source_type(source_type)
-                    .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
-                Some(format_path(path, options, mode))
+                    let line_length = resolver.resolve(path, &pyproject_config).line_length;
+                    let options = PyFormatOptions::from_source_type(source_type)
+                        .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
+                    debug!("Formatting {} with {:?}", path.display(), options);
+                    Some(format_path(path, options, mode))
+                }
+                Err(err) => Some(Err(FormatCommandError::Ignore(err))),
             }
-            Err(err) => Some(Err(FormatCommandError::Ignore(err))),
         })
         .partition_map(|result| match result {
             Ok(diagnostic) => Left(diagnostic),
             Err(err) => Right(err),
         });
     let duration = start.elapsed();
-    debug!("Formatted files in: {:?}", duration);
+    debug!(
+        "Formatted {} files in {:.2?}",
+        results.len() + errors.len(),
+        duration
+    );
 
     let summary = FormatResultSummary::new(results, mode);
 

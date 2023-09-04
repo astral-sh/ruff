@@ -64,7 +64,7 @@ shellexpand = { workspace = true }
 similar = { workspace = true }
 strum = { workspace = true, features = [] }
 thiserror = { workspace = true }
-tracing = { workspace = true }
+tracing = { workspace = true, features = ["log"] }
 walkdir = { version = "2.3.2" }
 wild = { version = "2" }
 
