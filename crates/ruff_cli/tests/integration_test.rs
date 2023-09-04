@@ -389,3 +389,44 @@ fn unreadable_dir() -> Result<()> {
     );
     Ok(())
 }
+
+/// Read input using argfile
+#[cfg(unix)]
+#[test]
+fn check_input_from_argfile() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    // Create python files
+    let file_a_path = tempdir.path().join("a.py");
+    let file_b_path = tempdir.path().join("b.py");
+    fs::write(&file_a_path, b"import os")?;
+    fs::write(&file_b_path, b"print('hello, world!')")?;
+
+    // Create a the input file for argfile to expand
+    let input_file_path = tempdir.path().join("file_paths.txt");
+    fs::write(
+        &input_file_path,
+        format!("{}\n{}", file_a_path.display(), file_b_path.display()),
+    )?;
+
+    // Generate the args with the argfile notation
+    let args = vec![
+        "check".to_string(),
+        "--no-cache".to_string(),
+        format!("@{}", &input_file_path.display()),
+    ];
+
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let output = cmd.args(args).write_stdin("").assert().failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        format!(
+            "{}:1:8: F401 [*] `os` imported but unused
+Found 1 error.
+[*] 1 potentially fixable with the --fix option.
+",
+            file_a_path.display()
+        )
+    );
+    Ok(())
+}
