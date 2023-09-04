@@ -1,7 +1,5 @@
 use std::fmt::{Display, Formatter};
-use std::fs::File;
 use std::io;
-use std::io::{BufWriter, Write};
 use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -98,15 +96,10 @@ pub(crate) fn format(
 
     // Report on the formatting changes.
     if log_level >= LogLevel::Default {
-        let mut writer: Box<dyn Write> = match &cli.output_file {
-            Some(path) => {
-                colored::control::set_override(false);
-                let file = File::create(path)?;
-                Box::new(BufWriter::new(file))
-            }
-            _ => Box::new(BufWriter::new(io::stdout())),
-        };
-        writeln!(writer, "{summary}")?;
+        #[allow(clippy::print_stdout)]
+        {
+            println!("{summary}");
+        }
     }
 
     match mode {
