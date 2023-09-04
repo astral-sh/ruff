@@ -41,7 +41,16 @@ fn stdin_success() {
 fn stdin_error() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .pass_stdin("import os\n"));
+        .pass_stdin("import os\n"), @r#"
+success: false
+exit_code: 1
+----- stdout -----
+-:1:8: F401 [*] `os` imported but unused
+Found 1 error.
+[*] 1 potentially fixable with the --fix option.
+
+----- stderr -----
+"#);
 }
 
 #[test]
