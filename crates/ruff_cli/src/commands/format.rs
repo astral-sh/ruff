@@ -12,7 +12,6 @@ use log::{debug, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
-use tracing::{span, Level};
 
 use ruff::fs;
 use ruff::logging::LogLevel;
@@ -20,6 +19,7 @@ use ruff::warn_user_once;
 use ruff_formatter::LineWidth;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
+use ruff_source_file::{find_newline, LineEnding};
 use ruff_workspace::resolver::python_files_in_path;
 
 use crate::args::{FormatArguments, Overrides};
@@ -140,12 +140,18 @@ fn format_path(
 ) -> Result<FormatCommandResult, FormatCommandError> {
     let unformatted = std::fs::read_to_string(path)
         .map_err(|err| FormatCommandError::Read(Some(path.to_path_buf()), err))?;
-    let formatted = {
-        let span = span!(Level::TRACE, "format_path_without_io", path = %path.display());
-        let _enter = span.enter();
-        format_module(&unformatted, options)
-            .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?
+
+    let line_ending = match find_newline(&unformatted) {
+        Some((_, LineEnding::Lf)) | None => ruff_formatter::printer::LineEnding::LineFeed,
+        Some((_, LineEnding::Cr)) => ruff_formatter::printer::LineEnding::CarriageReturn,
+        Some((_, LineEnding::CrLf)) => ruff_formatter::printer::LineEnding::CarriageReturnLineFeed,
     };
+
+    let options = options.with_line_ending(line_ending);
+
+    let formatted = format_module(&unformatted, options)
+        .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?;
+
     let formatted = formatted.as_code();
     if formatted.len() == unformatted.len() && formatted == unformatted {
         Ok(FormatCommandResult::Unchanged)

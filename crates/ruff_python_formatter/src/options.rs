@@ -28,6 +28,8 @@ pub struct PyFormatOptions {
     #[cfg_attr(feature = "serde", serde(default = "default_tab_width"))]
     tab_width: TabWidth,
 
+    line_ending: LineEnding,
+
     /// The preferred quote style to use (single vs double quotes).
     quote_style: QuoteStyle,
 
@@ -59,6 +61,7 @@ impl Default for PyFormatOptions {
             line_width: default_line_width(),
             tab_width: default_tab_width(),
             quote_style: QuoteStyle::default(),
+            line_ending: LineEnding::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
         }
@@ -94,6 +97,10 @@ impl PyFormatOptions {
         self.source_map_generation
     }
 
+    pub fn line_ending(&self) -> LineEnding {
+        self.line_ending
+    }
+
     #[must_use]
     pub fn with_tab_width(mut self, tab_width: TabWidth) -> Self {
         self.tab_width = tab_width;
@@ -123,6 +130,12 @@ impl PyFormatOptions {
         self.line_width = line_width;
         self
     }
+
+    #[must_use]
+    pub fn with_line_ending(mut self, line_ending: LineEnding) -> Self {
+        self.line_ending = line_ending;
+        self
+    }
 }
 
 impl FormatOptions for PyFormatOptions {
@@ -142,7 +155,7 @@ impl FormatOptions for PyFormatOptions {
         PrinterOptions {
             tab_width: self.tab_width,
             line_width: self.line_width,
-            line_ending: LineEnding::LineFeed,
+            line_ending: self.line_ending,
             indent_style: self.indent_style,
             source_map_generation: self.source_map_generation,
         }
