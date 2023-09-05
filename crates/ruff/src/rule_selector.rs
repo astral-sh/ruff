@@ -319,7 +319,7 @@ impl RuleSelector {
 pub enum Specificity {
     /// The specificity when selecting all rules (e.g., `--select ALL`).
     All,
-    /// The specificity when selecting a linter group (e.g., `--select PL`).
+    /// The specificity when selecting a legacy linter group (e.g., `--select C` or `--select T`).
     LinterGroup,
     /// The specificity when selecting a linter (e.g., `--select PLE` or `--select UP`).
     Linter,
