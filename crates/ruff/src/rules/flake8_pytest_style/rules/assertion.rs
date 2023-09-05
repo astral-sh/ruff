@@ -598,7 +598,7 @@ fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
 /// assert (b ==
 ///     "")
 /// ```
-fn parenthesize<'a>(expression: Expression<'a>, parent: &Expression<'a>) -> Expression<'a> {
+fn parenthesize<'a>(expression: &Expression<'a>, parent: &Expression<'a>) -> Expression<'a> {
     if matches!(
         expression,
         Expression::Comparison(_)
@@ -626,10 +626,10 @@ fn parenthesize<'a>(expression: Expression<'a>, parent: &Expression<'a>) -> Expr
             | Expression::NamedExpr(_)
     ) {
         if let (Some(left), Some(right)) = (parent.lpar().first(), parent.rpar().first()) {
-            return expression.with_parens(left.clone(), right.clone());
+            return expression.clone().with_parens(left.clone(), right.clone());
         }
     }
-    expression
+    expression.clone()
 }
 
 /// Replace composite condition `assert a == "hello" and b == "world"` with two statements
@@ -685,10 +685,16 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     match &assert_statement.test {
         Expression::UnaryOperation(op) => {
             if matches!(op.operator, libcst_native::UnaryOp::Not { .. }) {
-                if let Expression::BooleanOperation(op) = &*op.expression {
-                    if matches!(op.operator, BooleanOp::Or { .. }) {
-                        conditions.push(parenthesize(negate(&op.left), &assert_statement.test));
-                        conditions.push(parenthesize(negate(&op.right), &assert_statement.test));
+                if let Expression::BooleanOperation(boolean_operation) = &*op.expression {
+                    if matches!(boolean_operation.operator, BooleanOp::Or { .. }) {
+                        conditions.push(negate(&parenthesize(
+                            &boolean_operation.left,
+                            &op.expression,
+                        )));
+                        conditions.push(negate(&parenthesize(
+                            &boolean_operation.right,
+                            &op.expression,
+                        )));
                     } else {
                         bail!("Expected assert statement to be a composite condition");
                     }
@@ -699,8 +705,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         }
         Expression::BooleanOperation(op) => {
             if matches!(op.operator, BooleanOp::And { .. }) {
-                conditions.push(parenthesize(*op.left.clone(), &assert_statement.test));
-                conditions.push(parenthesize(*op.right.clone(), &assert_statement.test));
+                conditions.push(parenthesize(&op.left, &assert_statement.test));
+                conditions.push(parenthesize(&op.right, &assert_statement.test));
             } else {
                 bail!("Expected assert statement to be a composite condition");
             }
