@@ -388,7 +388,7 @@ pub struct LogLevelArgs {
         help_heading = "Log levels"
     )]
     pub verbose: bool,
-    /// Print lint violations, but nothing else.
+    /// Print diagnostics, but nothing else.
     #[arg(
         short,
         long,
@@ -397,7 +397,7 @@ pub struct LogLevelArgs {
         help_heading = "Log levels"
     )]
     pub quiet: bool,
-    /// Disable all logging (but still exit with status code "1" upon detecting lint violations).
+    /// Disable all logging (but still exit with status code "1" upon detecting diagnostics).
     #[arg(
         short,
         long,

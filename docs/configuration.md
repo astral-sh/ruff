@@ -171,8 +171,8 @@ Options:
 
 Log levels:
   -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
+  -q, --quiet    Print diagnostics, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -265,8 +265,8 @@ Miscellaneous:
 
 Log levels:
   -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
+  -q, --quiet    Print diagnostics, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
 ```
 
 <!-- End auto-generated subcommand help. -->

@@ -12,14 +12,13 @@ The formatter is designed to be a drop-in replacement for [Black](https://github
 but with an excessive focus on performance and direct integration with Ruff.
 
 Specifically, the formatter is intended to emit near-identical output when run over Black-formatted
-code, achieving Jaccard similarity scores of over 0.999 on extensive Black-formatted projects like
-Django and Zulip. When migrating an existing project from Black to Ruff, you should expect to see
-a few differences on the margins, but the vast majority of your code should be formatted
-identically.
+code. When run over extensive Black-formatted projects like Django and Zulip, > 99.9% of lines
+are formatted identically. When migrating an existing project from Black to Ruff, you should expect
+to see a few differences on the margins, but the vast majority of your code should be unchanged.
 
 If you identify deviations in your project, spot-check them against the [intentional deviations](#intentional-deviations)
 enumerated below, as well as the [unintentional deviations](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3Aformatter)
-filed in the issue tracker. If you've identified a new deviation, feel free to [file an issue](https://github.com/astral-sh/ruff/issues/new).
+filed in the issue tracker. If you've identified a new deviation, please [file an issue](https://github.com/astral-sh/ruff/issues/new).
 
 When run over _non_-Black-formatted code, the formatter makes some different decisions than Black,
 and so more deviations should be expected, especially around the treatment of end-of-line comments.
@@ -43,16 +42,9 @@ Arguments:
   [FILES]...  List of files or directories to format
 
 Options:
-      --check
-          Avoid writing any formatted files back; instead, exit with a non-zero status code if any files would have been modified, and zero otherwise
-  -o, --output-file <OUTPUT_FILE>
-          Specify file to write the formatter output to (default: stdout)
-      --target-version <TARGET_VERSION>
-          The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-  -h, --help
-          Print help
+      --check            Avoid writing any formatted files back; instead, exit with a non-zero status code if any files would have been modified, and zero otherwise
+      --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+  -h, --help             Print help
 
 File selection:
       --respect-gitignore  Respect file exclusions via `.gitignore` and other standard ignore files
@@ -64,8 +56,8 @@ Miscellaneous:
 
 Log levels:
   -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
+  -q, --quiet    Print diagnostics, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
 ```
 
 Note: `ruff format` is currently hidden by default and will not be visible when running
@@ -74,8 +66,6 @@ Note: `ruff format` is currently hidden by default and will not be visible when 
 Similar to Black, running `ruff format /path/to/file.py` will format the given file or directory
 in-place, while `ruff format --check /path/to/file.py` will avoid writing any formatted files back,
 instead exiting with a non-zero status code if any files are not already formatted.
-
-In future releases, the Ruff formatter will be integrated into `ruff check`.
 
 ### VS Code
 
@@ -110,13 +100,20 @@ on-save by adding `"editor.formatOnSave": true` to your `settings.json`:
 ### Configuration
 
 The Ruff formatter respects Ruff's [`line-length`](https://beta.ruff.rs/docs/settings/#line-length)
-setting, which can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as with
-`ruff check`.
+setting, which can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as in:
 
-In future releases, the Ruff formatter will likely support configuration of quote style (single vs.
-double) and indentation (width, and spaces vs. tabs).
+```console
+ruff format --line-length 100 /path/to/file.py
+```
 
-### Suppressing formatting
+In future releases, the Ruff formatter will likely support configuration of:
+
+- Quote style (single vs. double).
+- Line endings (LF vs. CRLF).
+- Indentation (tabs vs. spaces).
+- Tab width.
+
+### Excluding code from formatting
 
 Ruff supports Black's `# fmt: off`, `# fmt: on`, and `# fmt: skip` pragmas, with a few caveats.
 
@@ -169,15 +166,15 @@ has already been formatted by Black.
 
 ### Pragma comments are ignored when computing line width
 
-Pragma comments (`# type: ignore`, `# noqa`, etc.) are ignored when computing the width of a line.
+Pragma comments (`# type`, `# noqa`, `# pyright`, `# pylint`, etc.) are ignored when computing the width of a line.
 This prevents Ruff from moving pragma comments around, thereby modifying their meaning and behavior:
 
-See Ruff's [pargma comment handling proposal](https://github.com/astral-sh/ruff/discussions/6670)
+See Ruff's [pragma comment handling proposal](https://github.com/astral-sh/ruff/discussions/6670)
 for details.
 
-This is similar to [Pyink](https://github.com/google/pyink) but a deviation from Black. Black uses
-this behavior for `# type: ignore` comments ([#997](https://github.com/psf/black/issues/997)), while
-Ruff applies it to all such pragmas.
+This is similar to [Pyink](https://github.com/google/pyink) but a deviation from Black. Black avoids
+splitting any lines that contain a `# type` comment ([#997](https://github.com/psf/black/issues/997)),
+but otherwise avoids special-casing pragma comments.
 
 As Ruff expands trailing end-of-line comments, Ruff will also avoid moving pragma comments in cases
 like the following, where moving the `# noqa` to the end of the line causes it to suppress errors
@@ -202,9 +199,10 @@ on both `first()` and `second()`:
 
 ### Line width vs. line length
 
-Ruff uses the unicode width of a line to determine if a line fits. Black's stable style uses
-character width, while Black's preview style uses unicode width for strings ([#3445](https://github.com/psf/black/pull/3445)),
-and character width for all other tokens.
+Ruff uses the Unicode width of a line to determine if a line fits. Black's stable style uses
+character width, while Black's preview style uses Unicode width for strings ([#3445](https://github.com/psf/black/pull/3445)),
+and character width for all other tokens. Ruff's behavior is closer to Black's preview style than
+Black's stable style, although Ruff _also_ uses Unicode width for identifiers and comments.
 
 ### Walruses in slice expressions
 
@@ -249,7 +247,7 @@ global \
     analyze_size_model
 ```
 
-### Newlines are inserted after single-quoted docstrings
+### Newlines are inserted after all class docstrings
 
 Black typically enforces a single newline after a class docstring. However, it does not apply such
 formatting if the docstring is single-quoted rather than triple-quoted, while Ruff enforces a
@@ -258,21 +256,21 @@ single newline in both cases:
 ```python
 # Input
 class IntFromGeom(GEOSFuncFactory):
-    """Argument is a geometry, return type is an integer."""
+    "Argument is a geometry, return type is an integer."
     argtypes = [GEOM_PTR]
     restype = c_int
     errcheck = staticmethod(check_minus_one)
 
 # Black
 class IntFromGeom(GEOSFuncFactory):
-    """Argument is a geometry, return type is an integer."""
+    "Argument is a geometry, return type is an integer."
     argtypes = [GEOM_PTR]
     restype = c_int
     errcheck = staticmethod(check_minus_one)
 
 # Ruff
 class IntFromGeom(GEOSFuncFactory):
-    """Argument is a geometry, return type is an integer."""
+    "Argument is a geometry, return type is an integer."
 
     argtypes = [GEOM_PTR]
     restype = c_int
