@@ -34,7 +34,13 @@ const STDIN_BASE_OPTIONS: &[&str] = &["--isolated", "--no-cache", "-", "--format
 fn stdin_success() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .pass_stdin(""));
+        .pass_stdin(""), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
 }
 
 #[test]
@@ -42,15 +48,15 @@ fn stdin_error() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .pass_stdin("import os\n"), @r#"
-success: false
-exit_code: 1
------ stdout -----
--:1:8: F401 [*] `os` imported but unused
-Found 1 error.
-[*] 1 potentially fixable with the --fix option.
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 potentially fixable with the --fix option.
 
------ stderr -----
-"#);
+    ----- stderr -----
+    "#);
 }
 
 #[test]
@@ -58,7 +64,16 @@ fn stdin_filename() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(["--stdin-filename", "F401.py"])
-        .pass_stdin("import os\n"));
+        .pass_stdin("import os\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 potentially fixable with the --fix option.
+
+    ----- stderr -----
+    "###);
 }
 
 #[test]
@@ -67,7 +82,16 @@ fn stdin_source_type_py() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(["--stdin-filename", "TCH.py"])
-        .pass_stdin("import os\n"));
+        .pass_stdin("import os\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    TCH.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 potentially fixable with the --fix option.
+
+    ----- stderr -----
+    "###);
 }
 
 /// ... but not in `.pyi` files.
@@ -77,7 +101,13 @@ fn stdin_source_type_pyi() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("import os\n"));
+        .pass_stdin("import os\n"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
 }
 
 #[cfg(unix)]
@@ -112,7 +142,16 @@ fn stdin_autofix() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("import os\nimport sys\n\nprint(sys.version)\n"));
+        .pass_stdin("import os\nimport sys\n\nprint(sys.version)\n"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    import sys
+
+    print(sys.version)
+
+    ----- stderr -----
+    "###);
 }
 
 #[test]
@@ -121,7 +160,17 @@ fn stdin_autofix_when_not_fixable_should_still_print_contents() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"));
+        .pass_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    import sys
+
+    if (1, 2):
+         print(sys.version)
+
+    ----- stderr -----
+    "###);
 }
 
 #[test]
@@ -130,7 +179,16 @@ fn stdin_autofix_when_no_issues_should_still_print_contents() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("import sys\n\nprint(sys.version)\n"));
+        .pass_stdin("import sys\n\nprint(sys.version)\n"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    import sys
+
+    print(sys.version)
+
+    ----- stderr -----
+    "###);
 }
 
 #[test]
@@ -139,7 +197,20 @@ fn show_source() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("l = 1"));
+        .pass_stdin("l = 1"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `l`
+      |
+    1 | l = 1
+      | ^ E741
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
 }
 
 #[test]
@@ -148,7 +219,16 @@ fn explain_status_codes_f401() {
 }
 #[test]
 fn explain_status_codes_ruf404() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME)).args(["--explain", "RUF404"]));
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME)).args(["--explain", "RUF404"]), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'RUF404' for '[RULE]': unknown rule code
+
+    For more information, try '--help'.
+    "###);
 }
 
 #[test]
@@ -157,7 +237,14 @@ fn show_statistics() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"));
+        .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1	F401	[*] `sys` imported but unused
+
+    ----- stderr -----
+    "###);
 }
 
 #[test]
@@ -167,7 +254,15 @@ fn nursery_prefix() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"));
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
 }
 
 #[test]
@@ -177,7 +272,18 @@ fn nursery_all() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"));
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    -:1:1: D100 Missing docstring in public module
+    Found 2 errors.
+
+    ----- stderr -----
+    warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
+    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
+    "###);
 }
 
 #[test]
@@ -187,7 +293,15 @@ fn nursery_direct() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"));
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:2: E225 Missing whitespace around operator
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
 }
 
 /// An unreadable pyproject.toml in non-isolated mode causes ruff to hard-error trying to build up
@@ -231,7 +345,14 @@ fn unreadable_dir() -> Result<()> {
     // TODO(konstin): This should be a failure, but we currently can't track that
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["--no-cache", "--isolated"])
-        .arg(&unreadable_dir));
+        .arg(&unreadable_dir), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: Encountered error: Permission denied (os error 13)
+    "###);
     Ok(())
 }
 
@@ -261,17 +382,22 @@ fn check_input_from_argfile() -> Result<()> {
         format!("@{}", &input_file_path.display()),
     ];
 
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
-    let output = cmd.args(args).write_stdin("").assert().failure();
-    assert_eq!(
-        str::from_utf8(&output.get_output().stdout)?,
-        format!(
-            "{}:1:8: F401 [*] `os` imported but unused
-Found 1 error.
-[*] 1 potentially fixable with the --fix option.
-",
-            file_a_path.display()
-        )
-    );
+    insta::with_settings!({filters => vec![
+        (file_a_path.display().to_string().as_str(), "/path/to/a.py"),
+    ]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(args)
+            .pass_stdin(""), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        /path/to/a.py:1:8: F401 [*] `os` imported but unused
+        Found 1 error.
+        [*] 1 potentially fixable with the --fix option.
+
+        ----- stderr -----
+        "###);
+    });
+
     Ok(())
 }
