@@ -116,8 +116,24 @@ fn key_in_dict(
         TextRange::new(left_range.start(), right_range.end()),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        // If the `.keys()` is followed by (e.g.) a keyword, we need to insert a space,
+        // since we're removing parentheses, which could lead to invalid syntax, as in:
+        // ```python
+        // if key in foo.keys()and bar:
+        // ```
+        let requires_space = checker
+            .locator()
+            .after(right_range.end())
+            .chars()
+            .next()
+            .is_some_and(|char| char.is_ascii_alphabetic());
+
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            value_content.to_string(),
+            if requires_space {
+                format!("{value_content} ")
+            } else {
+                value_content.to_string()
+            },
             right_range,
         )));
     }

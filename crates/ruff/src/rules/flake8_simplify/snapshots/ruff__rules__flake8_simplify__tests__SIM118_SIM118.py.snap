@@ -309,4 +309,57 @@ SIM118.py:34:1: SIM118 [*] Use `(key) in (obj or {})` instead of `(key) in (obj 
 36 36 | from typing import KeysView
 37 37 | 
 
+SIM118.py:48:1: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
+   |
+47 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
+48 | key in obj.keys()and foo
+   | ^^^^^^^^^^^^^^^^^ SIM118
+49 | (key in obj.keys())and foo
+50 | key in (obj.keys())and foo
+   |
+   = help: Convert to `key in obj`
+
+ℹ Suggested fix
+45 45 | 
+46 46 | 
+47 47 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
+48    |-key in obj.keys()and foo
+   48 |+key in obj and foo
+49 49 | (key in obj.keys())and foo
+50 50 | key in (obj.keys())and foo
+
+SIM118.py:49:2: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
+   |
+47 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
+48 | key in obj.keys()and foo
+49 | (key in obj.keys())and foo
+   |  ^^^^^^^^^^^^^^^^^ SIM118
+50 | key in (obj.keys())and foo
+   |
+   = help: Convert to `key in obj`
+
+ℹ Suggested fix
+46 46 | 
+47 47 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
+48 48 | key in obj.keys()and foo
+49    |-(key in obj.keys())and foo
+   49 |+(key in obj)and foo
+50 50 | key in (obj.keys())and foo
+
+SIM118.py:50:1: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
+   |
+48 | key in obj.keys()and foo
+49 | (key in obj.keys())and foo
+50 | key in (obj.keys())and foo
+   | ^^^^^^^^^^^^^^^^^^^ SIM118
+   |
+   = help: Convert to `key in obj`
+
+ℹ Suggested fix
+47 47 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
+48 48 | key in obj.keys()and foo
+49 49 | (key in obj.keys())and foo
+50    |-key in (obj.keys())and foo
+   50 |+key in obj and foo
+
 
