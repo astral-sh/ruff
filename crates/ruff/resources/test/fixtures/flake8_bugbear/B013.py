@@ -10,3 +10,5 @@ except (ImportError, TypeError):
     pass
 except (*retriable_exceptions,):
     pass
+except(ValueError,):
+    pass
