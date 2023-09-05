@@ -2020,6 +2020,16 @@ allowed {x}"""} string""#;
         assert_debug_snapshot!(lex_source(source));
     }
 
+    #[test]
+    fn test_fstring_with_lambda_expression() {
+        let source = r#"
+f"{lambda x:{x}}"
+f"{(lambda x:{x})}"
+"#
+        .trim();
+        assert_debug_snapshot!(lex_source(source));
+    }
+
     fn lex_fstring_error(source: &str) -> FStringErrorType {
         match lex(source, Mode::Module).find_map(std::result::Result::err) {
             Some(err) => match err.error {
