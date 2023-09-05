@@ -1586,25 +1586,26 @@ StringLiteral: ast::ParenthesizedExpr = {
 FStringExpr: ast::ParenthesizedExpr = {
     <location:@L> FStringStart <values:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
         ast::ExprFString {
-            values,
+            values: values.into_iter().flatten().collect(),
             implicit_concatenated: false,
             range: (location..end_location).into()
         }.into()
     }
 };
 
-FStringMiddlePattern: ast::Expr = {
+FStringMiddlePattern: Option<ast::Expr> = {
     FStringReplacementField,
     <location:@L> <s:fstring_middle> =>? Ok(parse_fstring_middle(<>)?),
 };
 
-FStringReplacementField: ast::Expr = {
+FStringReplacementField: Option<ast::Expr> = {
     <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <c:FStringConversion?> <format_spec:FStringFormatSpec?> "}" <end_location:@R> => {
         let mut conversion = ast::ConversionFlag::None;
         let debug_text = if debug.is_some() {
-            let start_offset = location + TextSize::from(1);
+            let start_offset = location + TextSize::from(1);  // +1 to skip the opening brace
             let format_spec_ref = format_spec.as_ref();
             let end_offset = c.map_or_else(|| {
+                // Subtract 1 to account for the closing brace or the `:` in the format spec
                 format_spec_ref.map_or(end_location, |f| f.range().start()) - TextSize::from(1)
             }, |(offset, flag)| {
                 conversion = flag;
@@ -1617,20 +1618,20 @@ FStringReplacementField: ast::Expr = {
         } else {
             None
         };
-        ast::ExprFormattedValue {
+        Some(ast::ExprFormattedValue {
             value: Box::new(value.into()),
             debug_text,
             conversion,
             format_spec: format_spec.map(Box::new),
             range: (location..end_location).into(),
-        }.into()
+        }.into())
     }
 };
 
 FStringFormatSpec: ast::Expr = {
     ":" <location:@L> <values:FStringMiddlePattern*> <end_location:@R> => {
         ast::ExprFString {
-            values,
+            values: values.into_iter().flatten().collect(),
             implicit_concatenated: false,
             range: (location..end_location).into()
         }.into()

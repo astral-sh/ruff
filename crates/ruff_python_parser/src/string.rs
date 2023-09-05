@@ -254,13 +254,20 @@ pub(crate) fn parse_string_literal(
 pub(crate) fn parse_fstring_middle(
     start: TextSize,
     (source, is_raw): (String, bool),
-) -> Result<Expr, LexicalError> {
+) -> Result<Option<Expr>, LexicalError> {
+    // This is to account for the empty `FStringMiddle` token that is created
+    // to check for non-parenthesized lambda expressions.
+    if source.is_empty() {
+        return Ok(None);
+    }
     let kind = if is_raw {
         StringKind::RawString
     } else {
         StringKind::String
     };
-    StringParser::new(source.as_str(), kind, start).parse_fstring_middle()
+    StringParser::new(source.as_str(), kind, start)
+        .parse_fstring_middle()
+        .map(Some)
 }
 
 /// Concatenate a list of string expressions into a single string expression.
