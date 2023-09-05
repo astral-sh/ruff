@@ -174,7 +174,7 @@ UP022.py:29:14: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
 35 34 |         encoding="utf-8",
 36 35 |     )
 
-UP022.py:38:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:38:10: UP022 Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
    |
 36 |       )
 37 |   
@@ -188,17 +188,7 @@ UP022.py:38:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
    |
    = help: Replace with `capture_output` keyword argument
 
-ℹ Suggested fix
-36 36 |     )
-37 37 | 
-38 38 | output = subprocess.run(
-39    |-    ["foo"], stdout=subprocess.PIPE, capture_output=True, stderr=subprocess.PIPE
-   39 |+    ["foo"], capture_output=True
-40 40 | )
-41 41 | 
-42 42 | output = subprocess.run(
-
-UP022.py:42:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:42:10: UP022 Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
    |
 40 |   )
 41 |   
@@ -208,18 +198,22 @@ UP022.py:42:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
 44 | | )
    | |_^ UP022
 45 |   
-46 |   # Examples that should NOT trigger the rule
+46 |   output = subprocess.run(
    |
    = help: Replace with `capture_output` keyword argument
 
-ℹ Suggested fix
-40 40 | )
-41 41 | 
-42 42 | output = subprocess.run(
-43    |-    ["foo"], stdout=subprocess.PIPE, capture_output=False, stderr=subprocess.PIPE
-   43 |+    ["foo"], capture_output=False
-44 44 | )
-45 45 | 
-46 46 | # Examples that should NOT trigger the rule
+UP022.py:46:10: UP022 Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+   |
+44 |   )
+45 |   
+46 |   output = subprocess.run(
+   |  __________^
+47 | |     ["foo"], capture_output=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+48 | | )
+   | |_^ UP022
+49 |   
+50 |   # OK
+   |
+   = help: Replace with `capture_output` keyword argument
 
 
