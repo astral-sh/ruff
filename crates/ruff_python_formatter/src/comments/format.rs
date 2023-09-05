@@ -32,27 +32,30 @@ pub(crate) enum FormatLeadingComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
+        fn write_leading_comments(
+            comments: &[SourceComment],
+            f: &mut PyFormatter,
+        ) -> FormatResult<()> {
+            for comment in comments.iter().filter(|comment| comment.is_unformatted()) {
+                let lines_after_comment = lines_after(comment.end(), f.context().source());
+                write!(
+                    f,
+                    [format_comment(comment), empty_lines(lines_after_comment)]
+                )?;
 
-        let leading_comments = match self {
-            FormatLeadingComments::Node(node) => comments.leading(*node),
-            FormatLeadingComments::Comments(comments) => comments,
-        };
+                comment.mark_formatted();
+            }
 
-        for comment in leading_comments
-            .iter()
-            .filter(|comment| comment.is_unformatted())
-        {
-            let lines_after_comment = lines_after(comment.end(), f.context().source());
-            write!(
-                f,
-                [format_comment(comment), empty_lines(lines_after_comment)]
-            )?;
-
-            comment.mark_formatted();
+            Ok(())
         }
 
-        Ok(())
+        match self {
+            FormatLeadingComments::Node(node) => {
+                let comments = f.context().comments().clone();
+                write_leading_comments(comments.leading(*node), f)
+            }
+            FormatLeadingComments::Comments(comments) => write_leading_comments(comments, f),
+        }
     }
 }
 
@@ -121,61 +124,64 @@ pub(crate) enum FormatTrailingComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
+        fn write_trailing_comments(
+            comments: &[SourceComment],
+            f: &mut PyFormatter,
+        ) -> FormatResult<()> {
+            let mut has_trailing_own_line_comment = false;
 
-        let trailing_comments = match self {
-            FormatTrailingComments::Node(node) => comments.trailing(*node),
-            FormatTrailingComments::Comments(comments) => comments,
-        };
+            for trailing in comments.iter().filter(|comment| comment.is_unformatted()) {
+                has_trailing_own_line_comment |= trailing.line_position().is_own_line();
 
-        let mut has_trailing_own_line_comment = false;
+                if has_trailing_own_line_comment {
+                    let lines_before_comment = lines_before(trailing.start(), f.context().source());
 
-        for trailing in trailing_comments
-            .iter()
-            .filter(|comment| comment.is_unformatted())
-        {
-            has_trailing_own_line_comment |= trailing.line_position().is_own_line();
+                    // A trailing comment at the end of a body or list
+                    // ```python
+                    // def test():
+                    //      pass
+                    //
+                    //      # Some comment
+                    // ```
+                    write!(
+                        f,
+                        [
+                            line_suffix(
+                                &format_args![
+                                    empty_lines(lines_before_comment),
+                                    format_comment(trailing)
+                                ],
+                                // Reserving width isn't necessary because we don't split
+                                // comments and the empty lines expand any enclosing group.
+                                0
+                            ),
+                            expand_parent()
+                        ]
+                    )?;
+                } else {
+                    // A trailing comment at the end of a line has a reserved width to
+                    // consider during line measurement.
+                    // ```python
+                    // tup = (
+                    //     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    // )  # Some comment
+                    // ```
+                    trailing_end_of_line_comment(trailing).fmt(f)?;
+                }
 
-            if has_trailing_own_line_comment {
-                let lines_before_comment = lines_before(trailing.start(), f.context().source());
-
-                // A trailing comment at the end of a body or list
-                // ```python
-                // def test():
-                //      pass
-                //
-                //      # Some comment
-                // ```
-                write!(
-                    f,
-                    [
-                        line_suffix(
-                            &format_args![
-                                empty_lines(lines_before_comment),
-                                format_comment(trailing)
-                            ],
-                            // Reserving width isn't necessary because we don't split
-                            // comments and the empty lines expand any enclosing group.
-                            0
-                        ),
-                        expand_parent()
-                    ]
-                )?;
-            } else {
-                // A trailing comment at the end of a line has a reserved width to
-                // consider during line measurement.
-                // ```python
-                // tup = (
-                //     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                // )  # Some comment
-                // ```
-                trailing_end_of_line_comment(trailing).fmt(f)?;
+                trailing.mark_formatted();
             }
 
-            trailing.mark_formatted();
+            Ok(())
         }
 
-        Ok(())
+        match self {
+            FormatTrailingComments::Node(node) => {
+                let comments = f.context().comments().clone();
+                write_trailing_comments(comments.trailing(*node), f)
+            }
+            FormatTrailingComments::Comments(comments) => write_trailing_comments(comments, f),
+        }
     }
 }
 
