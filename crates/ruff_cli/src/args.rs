@@ -338,12 +338,6 @@ pub struct FormatCommand {
     /// files would have been modified, and zero otherwise.
     #[arg(long)]
     pub check: bool,
-    /// Specify file to write the formatter output to (default: stdout).
-    #[arg(short, long)]
-    pub output_file: Option<PathBuf>,
-    /// The minimum Python version that should be supported.
-    #[arg(long, value_enum)]
-    pub target_version: Option<PythonVersion>,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
@@ -494,7 +488,6 @@ impl FormatCommand {
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
-                output_file: self.output_file,
                 stdin_filename: self.stdin_filename,
             },
             Overrides {
@@ -504,7 +497,6 @@ impl FormatCommand {
                     self.no_respect_gitignore,
                 ),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                target_version: self.target_version,
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..Overrides::default()
             },
@@ -556,7 +548,6 @@ pub struct FormatArguments {
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
-    pub output_file: Option<PathBuf>,
     pub stdin_filename: Option<PathBuf>,
 }
 
