@@ -1,0 +1,541 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..9,
+            value: FString(
+                ExprFString {
+                    range: 0..9,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 2..8,
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 3..7,
+                                        value: Str(
+                                            StringConstant {
+                                                value: " f",
+                                                implicit_concatenated: false,
+                                            },
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 10..17,
+            value: FString(
+                ExprFString {
+                    range: 10..17,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 12..16,
+                                value: Tuple(
+                                    ExprTuple {
+                                        range: 13..15,
+                                        elts: [
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 13..14,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 18..28,
+            value: FString(
+                ExprFString {
+                    range: 18..28,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 20..27,
+                                value: Compare(
+                                    ExprCompare {
+                                        range: 21..25,
+                                        left: Constant(
+                                            ExprConstant {
+                                                range: 21..22,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
+                                        ops: [
+                                            NotEq,
+                                        ],
+                                        comparators: [
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 24..25,
+                                                    value: Int(
+                                                        4,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: Some(
+                                    FString(
+                                        ExprFString {
+                                            range: 26..26,
+                                            values: [],
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 29..44,
+            value: FString(
+                ExprFString {
+                    range: 29..44,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 31..43,
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 32..33,
+                                        value: Int(
+                                            3,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: Some(
+                                    FString(
+                                        ExprFString {
+                                            range: 34..42,
+                                            values: [
+                                                FormattedValue(
+                                                    ExprFormattedValue {
+                                                        range: 34..39,
+                                                        value: Constant(
+                                                            ExprConstant {
+                                                                range: 35..38,
+                                                                value: Str(
+                                                                    StringConstant {
+                                                                        value: "}",
+                                                                        implicit_concatenated: false,
+                                                                    },
+                                                                ),
+                                                                kind: None,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Constant(
+                                                    ExprConstant {
+                                                        range: 39..42,
+                                                        value: Str(
+                                                            StringConstant {
+                                                                value: ">10",
+                                                                implicit_concatenated: false,
+                                                            },
+                                                        ),
+                                                        kind: None,
+                                                    },
+                                                ),
+                                            ],
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 45..60,
+            value: FString(
+                ExprFString {
+                    range: 45..60,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 47..59,
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 48..49,
+                                        value: Int(
+                                            3,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: Some(
+                                    FString(
+                                        ExprFString {
+                                            range: 50..58,
+                                            values: [
+                                                FormattedValue(
+                                                    ExprFormattedValue {
+                                                        range: 50..55,
+                                                        value: Constant(
+                                                            ExprConstant {
+                                                                range: 51..54,
+                                                                value: Str(
+                                                                    StringConstant {
+                                                                        value: "{",
+                                                                        implicit_concatenated: false,
+                                                                    },
+                                                                ),
+                                                                kind: None,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Constant(
+                                                    ExprConstant {
+                                                        range: 55..58,
+                                                        value: Str(
+                                                            StringConstant {
+                                                                value: ">10",
+                                                                implicit_concatenated: false,
+                                                            },
+                                                        ),
+                                                        kind: None,
+                                                    },
+                                                ),
+                                            ],
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 61..75,
+            value: FString(
+                ExprFString {
+                    range: 61..75,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 63..74,
+                                value: Name(
+                                    ExprName {
+                                        range: 66..69,
+                                        id: "foo",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: Some(
+                                    DebugText {
+                                        leading: "  ",
+                                        trailing: " =  ",
+                                    },
+                                ),
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 76..96,
+            value: FString(
+                ExprFString {
+                    range: 76..96,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 78..95,
+                                value: Name(
+                                    ExprName {
+                                        range: 81..84,
+                                        id: "foo",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: Some(
+                                    DebugText {
+                                        leading: "  ",
+                                        trailing: " =  ",
+                                    },
+                                ),
+                                conversion: None,
+                                format_spec: Some(
+                                    FString(
+                                        ExprFString {
+                                            range: 89..94,
+                                            values: [
+                                                Constant(
+                                                    ExprConstant {
+                                                        range: 89..94,
+                                                        value: Str(
+                                                            StringConstant {
+                                                                value: ".3f  ",
+                                                                implicit_concatenated: false,
+                                                            },
+                                                        ),
+                                                        kind: None,
+                                                    },
+                                                ),
+                                            ],
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 97..115,
+            value: FString(
+                ExprFString {
+                    range: 97..115,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 99..114,
+                                value: Name(
+                                    ExprName {
+                                        range: 102..105,
+                                        id: "foo",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: Some(
+                                    DebugText {
+                                        leading: "  ",
+                                        trailing: " =  ",
+                                    },
+                                ),
+                                conversion: Str,
+                                format_spec: None,
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 116..132,
+            value: FString(
+                ExprFString {
+                    range: 116..132,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 118..131,
+                                value: Tuple(
+                                    ExprTuple {
+                                        range: 121..125,
+                                        elts: [
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 121..122,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 124..125,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: Some(
+                                    DebugText {
+                                        leading: "  ",
+                                        trailing: "  =  ",
+                                    },
+                                ),
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 133..159,
+            value: FString(
+                ExprFString {
+                    range: 133..159,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 135..158,
+                                value: FString(
+                                    ExprFString {
+                                        range: 136..152,
+                                        values: [
+                                            FormattedValue(
+                                                ExprFormattedValue {
+                                                    range: 138..151,
+                                                    value: Constant(
+                                                        ExprConstant {
+                                                            range: 139..145,
+                                                            value: Float(
+                                                                3.1415,
+                                                            ),
+                                                            kind: None,
+                                                        },
+                                                    ),
+                                                    debug_text: Some(
+                                                        DebugText {
+                                                            leading: "",
+                                                            trailing: "=",
+                                                        },
+                                                    ),
+                                                    conversion: None,
+                                                    format_spec: Some(
+                                                        FString(
+                                                            ExprFString {
+                                                                range: 147..150,
+                                                                values: [
+                                                                    Constant(
+                                                                        ExprConstant {
+                                                                            range: 147..150,
+                                                                            value: Str(
+                                                                                StringConstant {
+                                                                                    value: ".1f",
+                                                                                    implicit_concatenated: false,
+                                                                                },
+                                                                            ),
+                                                                            kind: None,
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                implicit_concatenated: false,
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        implicit_concatenated: false,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: Some(
+                                    FString(
+                                        ExprFString {
+                                            range: 153..157,
+                                            values: [
+                                                Constant(
+                                                    ExprConstant {
+                                                        range: 153..157,
+                                                        value: Str(
+                                                            StringConstant {
+                                                                value: "*^20",
+                                                                implicit_concatenated: false,
+                                                            },
+                                                        ),
+                                                        kind: None,
+                                                    },
+                                                ),
+                                            ],
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+]

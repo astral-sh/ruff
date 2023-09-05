@@ -1249,4 +1249,42 @@ a = 1
                 .to_string()
         );
     }
+
+    #[test]
+    fn test_fstrings() {
+        let parse_ast = parse_suite(
+            r#"
+f"{" f"}"
+f"{3,}"
+f"{3!=4:}"
+f'{3:{"}"}>10}'
+f'{3:{"{"}>10}'
+f"{  foo =  }"
+f"{  foo =  :.3f  }"
+f"{  foo =  !s  }"
+f"{  1, 2  =  }"
+f'{f"{3.1415=:.1f}":*^20}'
+"#
+            .trim(),
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_fstrings_with_unicode() {
+        let parse_ast = parse_suite(
+            r#"
+u"foo" f"{bar}" "baz" " some"
+"foo" f"{bar}" u"baz" " some"
+"foo" f"{bar}" "baz" u" some"
+u"foo" f"bar {baz} realy" u"bar" "no"
+"#
+            .trim(),
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }
