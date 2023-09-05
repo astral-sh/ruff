@@ -45,7 +45,7 @@ pub enum Tok {
         triple_quoted: bool,
     },
     /// Token value for IPython escape commands. These are recognized by the lexer
-    /// only when the mode is [`Mode::Jupyter`].
+    /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
         /// The magic command value.
         value: String,
@@ -64,7 +64,7 @@ pub enum Tok {
     /// Token value for a dedent.
     Dedent,
     EndOfFile,
-    /// Token value for a question mark `?`. This is only used in [`Mode::Jupyter`].
+    /// Token value for a question mark `?`. This is only used in [`Mode::Ipython`].
     Question,
     /// Token value for a left parenthesis `(`.
     Lpar,
