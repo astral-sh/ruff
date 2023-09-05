@@ -52,3 +52,21 @@ def test_multiline():
 
     x = 1; \
         assert something and something_else
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7143
+def test_parenthesized_not():
+    assert not (
+        self.find_graph_output(node.output[0])
+        or self.find_graph_input(node.input[0])
+        or self.find_graph_output(node.input[0])
+    )
+
+    assert (not (
+        self.find_graph_output(node.output[0])
+        or self.find_graph_input(node.input[0])
+        or self.find_graph_output(node.input[0])
+    ))
+
+    assert (not self.find_graph_output(node.output[0]) or
+            self.find_graph_input(node.input[0]))
