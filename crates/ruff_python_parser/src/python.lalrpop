@@ -325,7 +325,7 @@ AssertStatement: ast::Stmt = {
 
 IpyEscapeCommandStatement: ast::Stmt = {
     <location:@L> <c:ipy_escape_command> <end_location:@R> =>? {
-        if mode == Mode::Jupyter {
+        if mode == Mode::Ipython {
             Ok(ast::Stmt::IpyEscapeCommand(
                 ast::StmtIpyEscapeCommand {
                     kind: c.0,
@@ -335,7 +335,7 @@ IpyEscapeCommandStatement: ast::Stmt = {
             ))
         } else {
             Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
+                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
                 location,
             })?
         }
@@ -344,7 +344,7 @@ IpyEscapeCommandStatement: ast::Stmt = {
 
 IpyEscapeCommandExpr: ast::ParenthesizedExpr = {
     <location:@L> <c:ipy_escape_command> <end_location:@R> =>? {
-        if mode == Mode::Jupyter {
+        if mode == Mode::Ipython {
             // This should never occur as the lexer won't allow it.
             if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
                 return Err(LexicalError {
@@ -359,7 +359,7 @@ IpyEscapeCommandExpr: ast::ParenthesizedExpr = {
             }.into())
         } else {
             Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
+                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
                 location,
             })?
         }
@@ -403,10 +403,10 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
             Ok(())
         }
 
-        if mode != Mode::Jupyter {
+        if mode != Mode::Ipython {
             return Err(ParseError::User {
                 error: LexicalError {
-                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
+                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
                     location,
                 },
             });

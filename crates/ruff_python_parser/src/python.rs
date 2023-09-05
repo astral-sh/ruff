@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 881894e86e83fb2796a9e4c17985d838c69f27db7808ddcdc24f35fd9aa742a2
+// sha3: 516ee93137b3322a578922c24eb95daee3078883fdfa0c097268e64b78fcc54f
 use num_bigint::BigInt;
 use ruff_text_size::{Ranged, TextSize};
 use ruff_python_ast::{self as ast, IpyEscapeKind};
@@ -31681,7 +31681,7 @@ fn __action74<
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        if mode == Mode::Jupyter {
+        if mode == Mode::Ipython {
             Ok(ast::Stmt::IpyEscapeCommand(
                 ast::StmtIpyEscapeCommand {
                     kind: c.0,
@@ -31691,7 +31691,7 @@ fn __action74<
             ))
         } else {
             Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
+                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
                 location,
             })?
         }
@@ -31709,7 +31709,7 @@ fn __action75<
 ) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        if mode == Mode::Jupyter {
+        if mode == Mode::Ipython {
             // This should never occur as the lexer won't allow it.
             if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
                 return Err(LexicalError {
@@ -31724,7 +31724,7 @@ fn __action75<
             }.into())
         } else {
             Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
+                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
                 location,
             })?
         }
@@ -31775,10 +31775,10 @@ fn __action76<
             Ok(())
         }
 
-        if mode != Mode::Jupyter {
+        if mode != Mode::Ipython {
             return Err(ParseError::User {
                 error: LexicalError {
-                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
+                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
                     location,
                 },
             });
