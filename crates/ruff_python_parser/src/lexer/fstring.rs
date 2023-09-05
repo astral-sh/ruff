@@ -25,9 +25,8 @@ bitflags! {
 pub(crate) struct FStringContext {
     flags: FStringContextFlags,
 
-    /// The number of open parentheses for the current f-string. This includes all
-    /// three types of parentheses: round (`(`), square (`[`), and curly (`{`).
-    open_parentheses_count: u32,
+    /// The level of nesting for the lexer when it entered the current f-string.
+    nesting: u32,
 
     /// The current depth of format spec for the current f-string. This is because
     /// there can be multiple format specs nested for the same f-string.
@@ -36,11 +35,11 @@ pub(crate) struct FStringContext {
 }
 
 impl FStringContext {
-    pub(crate) fn new(flags: FStringContextFlags) -> Self {
+    pub(crate) fn new(flags: FStringContextFlags, nesting: u32) -> Self {
         Self {
             flags,
-            open_parentheses_count: 0,
             format_spec_depth: 0,
+            nesting,
         }
     }
 
@@ -86,32 +85,24 @@ impl FStringContext {
         self.flags.contains(FStringContextFlags::TRIPLE)
     }
 
+    fn open_parentheses_count(&self, current_nesting: u32) -> u32 {
+        current_nesting.saturating_sub(self.nesting)
+    }
+
     /// Returns `true` if the current f-string has open parentheses.
-    pub(crate) fn has_open_parentheses(&mut self) -> bool {
-        self.open_parentheses_count > 0
-    }
-
-    /// Increments the number of parentheses for the current f-string.
-    pub(crate) fn increment_opening_parentheses(&mut self) {
-        self.open_parentheses_count += 1;
-    }
-
-    /// Decrements the number of parentheses for the current f-string. If the
-    /// lexer is in a format spec, also decrements the format spec depth.
-    pub(crate) fn decrement_closing_parentheses(&mut self) {
-        self.try_end_format_spec();
-        self.open_parentheses_count = self.open_parentheses_count.saturating_sub(1);
+    pub(crate) fn has_open_parentheses(&self, current_nesting: u32) -> bool {
+        self.open_parentheses_count(current_nesting) > 0
     }
 
     /// Returns `true` if the lexer is in a f-string expression i.e., between
     /// two curly braces.
-    pub(crate) fn is_in_expression(&self) -> bool {
-        self.open_parentheses_count > self.format_spec_depth
+    pub(crate) fn is_in_expression(&self, current_nesting: u32) -> bool {
+        self.open_parentheses_count(current_nesting) > self.format_spec_depth
     }
 
     /// Returns `true` if the lexer is in a f-string format spec i.e., after a colon.
-    pub(crate) fn is_in_format_spec(&self) -> bool {
-        self.format_spec_depth > 0 && !self.is_in_expression()
+    pub(crate) fn is_in_format_spec(&self, current_nesting: u32) -> bool {
+        self.format_spec_depth > 0 && !self.is_in_expression(current_nesting)
     }
 
     /// Returns `true` if the context is in a valid position to start format spec
@@ -119,9 +110,9 @@ impl FStringContext {
     /// Increments the format spec depth if it is.
     ///
     /// This assumes that the current character for the lexer is a colon (`:`).
-    pub(crate) fn try_start_format_spec(&mut self) -> bool {
+    pub(crate) fn try_start_format_spec(&mut self, current_nesting: u32) -> bool {
         if self
-            .open_parentheses_count
+            .open_parentheses_count(current_nesting)
             .saturating_sub(self.format_spec_depth)
             == 1
         {
@@ -132,11 +123,9 @@ impl FStringContext {
         }
     }
 
-    /// Decrements the format spec depth if the lexer is in a format spec.
-    pub(crate) fn try_end_format_spec(&mut self) {
-        if self.is_in_format_spec() {
-            self.format_spec_depth = self.format_spec_depth.saturating_sub(1);
-        }
+    /// Decrements the format spec depth unconditionally.
+    pub(crate) fn end_format_spec(&mut self) {
+        self.format_spec_depth = self.format_spec_depth.saturating_sub(1);
     }
 }
 

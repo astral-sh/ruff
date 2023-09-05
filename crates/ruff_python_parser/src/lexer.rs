@@ -520,7 +520,7 @@ impl<'source> Lexer<'source> {
             flags |= FStringContextFlags::TRIPLE;
         };
 
-        self.fstrings.push(FStringContext::new(flags));
+        self.fstrings.push(FStringContext::new(flags, self.nesting));
         Tok::FStringStart
     }
 
@@ -548,7 +548,7 @@ impl<'source> Lexer<'source> {
         let mut last_offset = self.offset();
 
         let mut in_named_unicode = false;
-        let mut try_end_format_spec = false;
+        let mut end_format_spec = false;
 
         loop {
             match self.cursor.first() {
@@ -614,14 +614,18 @@ impl<'source> Lexer<'source> {
                     if in_named_unicode {
                         in_named_unicode = false;
                         self.cursor.bump();
-                    } else if self.cursor.second() == '}' && !fstring.is_in_format_spec() {
+                    } else if self.cursor.second() == '}'
+                        && !fstring.is_in_format_spec(self.nesting)
+                    {
                         self.cursor.bump();
                         normalized
                             .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
                         self.cursor.bump(); // Skip the second `}`
                         last_offset = self.offset();
                     } else {
-                        try_end_format_spec = true;
+                        // The lexer can only be in a format spec if we encounter a `}` token
+                        // while scanning for `FStringMiddle` tokens.
+                        end_format_spec = true;
                         break;
                     }
                 }
@@ -635,7 +639,7 @@ impl<'source> Lexer<'source> {
 
         // Avoid emitting the empty `FStringMiddle` token for anything other than
         // the closing curly braces (`}`).
-        if range.is_empty() && !try_end_format_spec {
+        if range.is_empty() && !end_format_spec {
             return Ok(None);
         }
 
@@ -651,7 +655,7 @@ impl<'source> Lexer<'source> {
             normalized
         };
         let is_raw = fstring.is_raw_string();
-        if try_end_format_spec {
+        if end_format_spec {
             // We need to decrement the format spec depth to avoid going into infinite
             // loop where the lexer keeps on emitting an empty `FStringMiddle` token.
             // This is because the lexer still thinks that we're in a f-string expression
@@ -659,7 +663,7 @@ impl<'source> Lexer<'source> {
             // that the lexer can go forward with the `Rbrace` token.
             //
             // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
-            self.fstrings.current_mut().unwrap().try_end_format_spec();
+            self.fstrings.current_mut().unwrap().end_format_spec();
         }
         Ok(Some(Tok::FStringMiddle { value, is_raw }))
     }
@@ -756,7 +760,7 @@ impl<'source> Lexer<'source> {
     // This function is used by the iterator implementation.
     pub fn next_token(&mut self) -> LexResult {
         if let Some(fstring) = self.fstrings.current() {
-            if !fstring.is_in_expression() {
+            if !fstring.is_in_expression(self.nesting) {
                 self.cursor.start_token();
                 if let Some(tok) = self.lex_fstring_middle_or_end()? {
                     if matches!(tok, Tok::FStringEnd) {
@@ -1079,49 +1083,33 @@ impl<'source> Lexer<'source> {
             }
             '~' => Tok::Tilde,
             '(' => {
-                if let Some(fstring) = self.fstrings.current_mut() {
-                    fstring.increment_opening_parentheses();
-                }
                 self.nesting += 1;
                 Tok::Lpar
             }
             ')' => {
-                if let Some(fstring) = self.fstrings.current_mut() {
-                    fstring.decrement_closing_parentheses();
-                }
                 self.nesting = self.nesting.saturating_sub(1);
                 Tok::Rpar
             }
             '[' => {
-                if let Some(fstring) = self.fstrings.current_mut() {
-                    fstring.increment_opening_parentheses();
-                }
                 self.nesting += 1;
                 Tok::Lsqb
             }
             ']' => {
-                if let Some(fstring) = self.fstrings.current_mut() {
-                    fstring.decrement_closing_parentheses();
-                }
                 self.nesting = self.nesting.saturating_sub(1);
                 Tok::Rsqb
             }
             '{' => {
-                if let Some(fstring) = self.fstrings.current_mut() {
-                    fstring.increment_opening_parentheses();
-                }
                 self.nesting += 1;
                 Tok::Lbrace
             }
             '}' => {
-                if let Some(fstring) = self.fstrings.current_mut() {
-                    if !fstring.has_open_parentheses() {
+                if let Some(fstring) = self.fstrings.current() {
+                    if !fstring.has_open_parentheses(self.nesting) {
                         return Err(LexicalError {
                             error: LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
                             location: self.token_start(),
                         });
                     }
-                    fstring.decrement_closing_parentheses();
                 }
                 self.nesting = self.nesting.saturating_sub(1);
                 Tok::Rbrace
@@ -1130,7 +1118,7 @@ impl<'source> Lexer<'source> {
                 if self
                     .fstrings
                     .current_mut()
-                    .is_some_and(FStringContext::try_start_format_spec)
+                    .is_some_and(|fstring| fstring.try_start_format_spec(self.nesting))
                 {
                     Tok::Colon
                 } else if self.cursor.eat_char('=') {
