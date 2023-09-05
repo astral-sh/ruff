@@ -390,7 +390,7 @@ fn unreadable_dir() -> Result<()> {
     Ok(())
 }
 
-/// Read input using argfile
+/// Check that reading arguments from an argfile works
 #[cfg(unix)]
 #[test]
 fn check_input_from_argfile() -> Result<()> {
