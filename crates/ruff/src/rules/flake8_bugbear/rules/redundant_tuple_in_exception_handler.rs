@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_starred;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -78,8 +78,26 @@ pub(crate) fn redundant_tuple_in_exception_handler(
             type_.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
+            // If there's no space between the `except` and the tuple, we need to insert a space,
+            // as in:
+            // ```python
+            // except(ValueError,):
+            // ```
+            // Otherwise, the output will be invalid syntax, since we're removing a set of
+            // parentheses.
+            let requires_space = checker
+                .locator()
+                .slice(TextRange::up_to(type_.start()))
+                .chars()
+                .last()
+                .is_some_and(|char| char.is_ascii_alphabetic());
+            let content = checker.generator().expr(elt);
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                checker.generator().expr(elt),
+                if requires_space {
+                    format!(" {content}")
+                } else {
+                    content
+                },
                 type_.range(),
             )));
         }
