@@ -43,7 +43,11 @@ output = subprocess.run(
     ["foo"], stdout=subprocess.PIPE, capture_output=False, stderr=subprocess.PIPE
 )
 
-# Examples that should NOT trigger the rule
+output = subprocess.run(
+    ["foo"], capture_output=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+)
+
+# OK
 from foo import PIPE
 subprocess.run(["foo"], stdout=PIPE, stderr=PIPE)
 run(["foo"], stdout=None, stderr=PIPE)
