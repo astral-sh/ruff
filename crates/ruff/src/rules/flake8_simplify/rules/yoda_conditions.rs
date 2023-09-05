@@ -7,10 +7,11 @@ use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::str::{self};
 use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
 use crate::registry::AsRule;
 
@@ -116,43 +117,43 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
                 whitespace_before,
                 whitespace_after,
             } => CompOp::GreaterThan {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::GreaterThan {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::LessThan {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::LessThanEqual {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::GreaterThanEqual {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::GreaterThanEqual {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::LessThanEqual {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::Equal {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::Equal {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::NotEqual {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::NotEqual {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             _ => panic!("Expected comparison operator"),
         };
@@ -193,7 +194,7 @@ pub(crate) fn yoda_conditions(
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                suggestion,
+                pad(suggestion, expr.range(), checker.locator()),
                 expr.range(),
             )));
         }
@@ -204,4 +205,30 @@ pub(crate) fn yoda_conditions(
             expr.range(),
         ));
     }
+}
+
+/// Add leading or trailing whitespace to a snippet, if it's immediately preceded or followed by
+/// an identifier or keyword.
+fn pad(mut content: String, range: TextRange, locator: &Locator) -> String {
+    // Ex) `A or(B)>1`. To avoid `A or1<(B)`, insert a space before the fix, to achieve `A or 1<(B)`.
+    if locator
+        .up_to(range.start())
+        .chars()
+        .last()
+        .is_some_and(|char| char.is_ascii_alphabetic())
+    {
+        content.insert(0, ' ');
+    }
+
+    // Ex) `1>(B)or A`. To avoid `(B)<1or A`, insert a space after the fix, to achieve `(B)<1 or A`.
+    if locator
+        .after(range.end())
+        .chars()
+        .next()
+        .is_some_and(|char| char.is_ascii_alphabetic())
+    {
+        content.push(' ');
+    }
+
+    content
 }

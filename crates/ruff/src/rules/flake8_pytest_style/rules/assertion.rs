@@ -3,9 +3,8 @@ use std::borrow::Cow;
 use anyhow::Result;
 use anyhow::{bail, Context};
 use libcst_native::{
-    self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace,
-    ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
-    TrailingWhitespace, UnaryOperation,
+    self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizedNode, SimpleStatementLine,
+    SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace, UnaryOperation,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -22,6 +21,7 @@ use ruff_text_size::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
+use crate::cst::helpers::space;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::importer::ImportRequest;
@@ -576,7 +576,7 @@ fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
     }
     Expression::UnaryOperation(Box::new(UnaryOperation {
         operator: libcst_native::UnaryOp::Not {
-            whitespace_after: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
+            whitespace_after: space(),
         },
         expression: Box::new(expression.clone()),
         lpar: vec![],
