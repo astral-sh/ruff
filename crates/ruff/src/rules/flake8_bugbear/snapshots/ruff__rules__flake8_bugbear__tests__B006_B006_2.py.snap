@@ -1,0 +1,29 @@
+---
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
+---
+B006_2.py:4:43: B006 [*] Do not use mutable data structures for argument defaults
+  |
+3 |   def readLinkagesByLineFile(linkages_file, 
+4 |                              column_mapping={
+  |  ___________________________________________^
+5 | |                            }):    
+  | |____________________________^ B006
+6 |       """
+7 |       """                           
+  |
+  = help: Replace with `None`; initialize within function
+
+ℹ Possible fix
+1 1 | # Regression test for https://github.com/astral-sh/ruff/issues/7155
+2 2 | 
+3 3 | def readLinkagesByLineFile(linkages_file, 
+4   |-                           column_mapping={
+5   |-                           }):    
+  4 |+                           column_mapping=None):    
+6 5 |     """
+7   |-    """                           
+  6 |+    """                           
+  7 |+    if column_mapping is None:
+  8 |+        column_mapping = {}
+
+
