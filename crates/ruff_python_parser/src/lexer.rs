@@ -756,7 +756,7 @@ impl<'source> Lexer<'source> {
             }
 
             c @ ('%' | '!')
-                if self.mode == Mode::Jupyter
+                if self.mode == Mode::Ipython
                     && self.state.is_after_equal()
                     && self.nesting == 0 =>
             {
@@ -765,7 +765,7 @@ impl<'source> Lexer<'source> {
             }
 
             c @ ('%' | '!' | '?' | '/' | ';' | ',')
-                if self.mode == Mode::Jupyter && self.state.is_new_logical_line() =>
+                if self.mode == Mode::Ipython && self.state.is_new_logical_line() =>
             {
                 let kind = if let Ok(kind) = IpyEscapeKind::try_from([c, self.cursor.first()]) {
                     self.cursor.bump();
@@ -778,7 +778,7 @@ impl<'source> Lexer<'source> {
                 self.lex_ipython_escape_command(kind)
             }
 
-            '?' if self.mode == Mode::Jupyter => Tok::Question,
+            '?' if self.mode == Mode::Ipython => Tok::Question,
 
             '/' => {
                 if self.cursor.eat_char('=') {
@@ -1220,7 +1220,7 @@ mod tests {
     }
 
     pub(crate) fn lex_jupyter_source(source: &str) -> Vec<Tok> {
-        let lexer = lex(source, Mode::Jupyter);
+        let lexer = lex(source, Mode::Ipython);
         lexer.map(|x| x.unwrap().0).collect()
     }
 

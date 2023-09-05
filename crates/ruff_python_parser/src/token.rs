@@ -211,7 +211,7 @@ pub enum Tok {
 impl Tok {
     pub fn start_marker(mode: Mode) -> Self {
         match mode {
-            Mode::Module | Mode::Jupyter => Tok::StartModule,
+            Mode::Module | Mode::Ipython => Tok::StartModule,
             Mode::Expression => Tok::StartExpression,
         }
     }

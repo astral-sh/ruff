@@ -1412,7 +1412,7 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let ast = ruff_python_parser::parse(contents, Mode::Jupyter, "<filename>").unwrap();
+        let ast = ruff_python_parser::parse(contents, Mode::Ipython, "<filename>").unwrap();
         let Mod::Module(ModModule { body, .. }) = ast else {
             panic!("Source code didn't return ModModule")
         };
