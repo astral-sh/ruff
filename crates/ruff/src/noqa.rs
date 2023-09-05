@@ -169,7 +169,7 @@ impl<'a> Directive<'a> {
         // According to https://beta.ruff.rs/docs/rules/, all rule names are lowercase + at least 1 dash
         let length = line
             .chars()
-            .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
+            .take_while(|c| c.is_ascii_lowercase() || *c == '-')
             .count();
         let has_dash = line[..length].chars().any(|c| c == '-');
         if has_dash && length > 0 {
@@ -449,7 +449,7 @@ impl<'a> ParsedFileExemption<'a> {
         // According to https://beta.ruff.rs/docs/rules/, all rule names are lowercase + at least 1 dash
         let length = line
             .chars()
-            .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
+            .take_while(|c| c.is_ascii_lowercase() || *c == '-')
             .count();
         let has_dash = line[..length].chars().any(|c| c == '-');
         if has_dash && length > 0 {
