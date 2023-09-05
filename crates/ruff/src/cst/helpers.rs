@@ -1,4 +1,4 @@
-use libcst_native::{Expression, NameOrAttribute};
+use libcst_native::{Expression, NameOrAttribute, ParenthesizableWhitespace, SimpleWhitespace};
 
 fn compose_call_path_inner<'a>(expr: &'a Expression, parts: &mut Vec<&'a str>) {
     match expr {
@@ -34,5 +34,19 @@ pub(crate) fn compose_module_path(module: &NameOrAttribute) -> String {
             let prefix = compose_call_path(&attr.value);
             prefix.map_or_else(|| name.to_string(), |prefix| format!("{prefix}.{name}"))
         }
+    }
+}
+
+/// Return a [`ParenthesizableWhitespace`] containing a single space.
+pub(crate) fn space() -> ParenthesizableWhitespace<'static> {
+    ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" "))
+}
+
+/// Ensure that a [`ParenthesizableWhitespace`] contains at least one space.
+pub(crate) fn or_space(whitespace: ParenthesizableWhitespace) -> ParenthesizableWhitespace {
+    if whitespace == ParenthesizableWhitespace::default() {
+        space()
+    } else {
+        whitespace
     }
 }

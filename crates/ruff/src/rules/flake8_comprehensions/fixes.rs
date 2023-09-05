@@ -15,6 +15,7 @@ use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
+use crate::cst::helpers::space;
 use crate::rules::flake8_comprehensions::rules::ObjectType;
 use crate::{
     checkers::ast::Checker,
@@ -133,7 +134,7 @@ pub(crate) fn fix_unnecessary_generator_dict(checker: &Checker, expr: &Expr) -> 
         lpar: vec![],
         rpar: vec![],
         whitespace_before_colon: ParenthesizableWhitespace::default(),
-        whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
+        whitespace_after_colon: space(),
     }));
 
     Ok(Edit::range_replacement(
@@ -205,7 +206,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
         value: Box::new(value.clone()),
         for_in: list_comp.for_in.clone(),
         whitespace_before_colon: ParenthesizableWhitespace::default(),
-        whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
+        whitespace_after_colon: space(),
         lbrace: LeftCurlyBrace {
             whitespace_after: call.whitespace_before_args.clone(),
         },
@@ -936,14 +937,10 @@ pub(crate) fn fix_unnecessary_map(
             ifs: vec![],
             inner_for_in: None,
             asynchronous: None,
-            whitespace_before: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
-            whitespace_after_for: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(
-                " ",
-            )),
-            whitespace_before_in: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(
-                " ",
-            )),
-            whitespace_after_in: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
+            whitespace_before: space(),
+            whitespace_after_for: space(),
+            whitespace_before_in: space(),
+            whitespace_after_in: space(),
         });
 
         match object_type {
