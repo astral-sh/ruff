@@ -273,10 +273,7 @@ for converter in connection.ops.get_db_converters(
         struct FormatString<'a>(&'a str);
 
         impl Format<SimpleFormatContext> for FormatString<'_> {
-            fn fmt(
-                &self,
-                f: &mut ruff_formatter::formatter::Formatter<SimpleFormatContext>,
-            ) -> FormatResult<()> {
+            fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
                 let format_str = format_with(|f| {
                     write!(f, [token("\"")])?;
 
