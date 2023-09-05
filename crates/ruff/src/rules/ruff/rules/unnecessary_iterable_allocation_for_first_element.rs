@@ -272,7 +272,7 @@ fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Optio
 
 // Returns true if the function is a builtin iterator
 // The list of iterators is: enumerate, filter, map, reversed, zip, and range
-fn is_func_builtin_iterator(func: &Box<ast::Expr>, semantic: &SemanticModel) -> bool {
+fn is_func_builtin_iterator(func: &Expr, semantic: &SemanticModel) -> bool {
     let builtins = [
         "enumerate",
         "filter",
