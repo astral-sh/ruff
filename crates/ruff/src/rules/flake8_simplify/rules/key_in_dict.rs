@@ -6,6 +6,7 @@ use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::autofix::edits::pad_end;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -121,19 +122,12 @@ fn key_in_dict(
         // ```python
         // if key in foo.keys()and bar:
         // ```
-        let requires_space = checker
-            .locator()
-            .after(right_range.end())
-            .chars()
-            .next()
-            .is_some_and(|char| char.is_ascii_alphabetic());
-
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            if requires_space {
-                format!("{value_content} ")
-            } else {
-                value_content.to_string()
-            },
+            pad_end(
+                value_content.to_string(),
+                right_range.end(),
+                checker.locator(),
+            ),
             right_range,
         )));
     }

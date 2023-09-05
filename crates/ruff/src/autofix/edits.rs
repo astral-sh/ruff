@@ -10,7 +10,7 @@ use ruff_python_trivia::{
     has_leading_content, is_python_whitespace, PythonWhitespace, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
-use ruff_text_size::{Ranged, TextLen, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::autofix::codemods;
 
@@ -247,6 +247,44 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
     }
 
     locator.line_end(start_location)
+}
+
+/// Add leading whitespace to a snippet, if it's immediately preceded an identifier or keyword.
+pub(crate) fn pad_start(mut content: String, start: TextSize, locator: &Locator) -> String {
+    // Ex) When converting `except(ValueError,)` from a tuple to a single argument, we need to
+    // insert a space before the fix, to achieve `except ValueError`.
+    if locator
+        .up_to(start)
+        .chars()
+        .last()
+        .is_some_and(|char| char.is_ascii_alphabetic())
+    {
+        content.insert(0, ' ');
+    }
+    content
+}
+
+/// Add trailing whitespace to a snippet, if it's immediately followed by an identifier or keyword.
+pub(crate) fn pad_end(mut content: String, end: TextSize, locator: &Locator) -> String {
+    if locator
+        .after(end)
+        .chars()
+        .next()
+        .is_some_and(|char| char.is_ascii_alphabetic())
+    {
+        content.push(' ');
+    }
+    content
+}
+
+/// Add leading or trailing whitespace to a snippet, if it's immediately preceded or followed by
+/// an identifier or keyword.
+pub(crate) fn pad(content: String, range: TextRange, locator: &Locator) -> String {
+    pad_start(
+        pad_end(content, range.end(), locator),
+        range.start(),
+        locator,
+    )
 }
 
 #[cfg(test)]
