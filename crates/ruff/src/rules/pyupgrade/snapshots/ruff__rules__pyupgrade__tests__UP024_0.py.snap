@@ -264,4 +264,22 @@ UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
 89 89 | 
 90 90 | try:
 
+UP024_0.py:105:11: UP024 [*] Replace aliased errors with `OSError`
+    |
+103 |     try:
+104 |         mac_address = get_primary_mac_address()
+105 |     except(IOError, OSError) as ex:
+    |           ^^^^^^^^^^^^^^^^^^ UP024
+106 |         msg = 'Unable to query URL to get Owner ID: {u}\n{e}'.format(u=owner_id_url, e=ex)
+    |
+    = help: Replace with builtin `OSError`
+
+ℹ Fix
+102 102 | def get_owner_id_from_mac_address():
+103 103 |     try:
+104 104 |         mac_address = get_primary_mac_address()
+105     |-    except(IOError, OSError) as ex:
+    105 |+    except OSError as ex:
+106 106 |         msg = 'Unable to query URL to get Owner ID: {u}\n{e}'.format(u=owner_id_url, e=ex)
+
 
