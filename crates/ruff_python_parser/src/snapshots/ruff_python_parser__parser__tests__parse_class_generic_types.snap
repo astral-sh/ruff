@@ -43,7 +43,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 26..29,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -99,7 +98,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 73..76,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -170,7 +168,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 135..138,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -228,7 +225,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 178..181,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -286,7 +282,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 220..223,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -333,7 +328,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 258..261,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -380,7 +374,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 293..296,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },

@@ -14,10 +14,10 @@ Call(
                         value: Str(
                             StringConstant {
                                 value: " ",
+                                unicode: false,
                                 implicit_concatenated: false,
                             },
                         ),
-                        kind: None,
                     },
                 ),
                 attr: Identifier {
@@ -73,10 +73,10 @@ Call(
                                                                     value: Str(
                                                                         StringConstant {
                                                                             value: "LIMIT %d",
+                                                                            unicode: false,
                                                                             implicit_concatenated: false,
                                                                         },
                                                                     ),
-                                                                    kind: None,
                                                                 },
                                                             ),
                                                             op: Mod,
@@ -93,7 +93,6 @@ Call(
                                                         ExprConstant {
                                                             range: 76..80,
                                                             value: None,
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -117,10 +116,10 @@ Call(
                                                                     value: Str(
                                                                         StringConstant {
                                                                             value: "OFFSET %d",
+                                                                            unicode: false,
                                                                             implicit_concatenated: false,
                                                                         },
                                                                     ),
-                                                                    kind: None,
                                                                 },
                                                             ),
                                                             op: Mod,
@@ -137,7 +136,6 @@ Call(
                                                         ExprConstant {
                                                             range: 128..132,
                                                             value: None,
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },

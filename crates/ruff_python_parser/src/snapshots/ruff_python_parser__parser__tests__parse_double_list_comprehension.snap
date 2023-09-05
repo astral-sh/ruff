@@ -84,7 +84,6 @@ ListComp(
                                         value: Int(
                                             5,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -110,7 +109,6 @@ ListComp(
                                         value: Int(
                                             10,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],

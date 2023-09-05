@@ -84,10 +84,10 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             value: Str(
                                 StringConstant {
                                     value: "ForwardRefY",
+                                    unicode: false,
                                     implicit_concatenated: false,
                                 },
                             ),
-                            kind: None,
                         },
                     ),
                 },

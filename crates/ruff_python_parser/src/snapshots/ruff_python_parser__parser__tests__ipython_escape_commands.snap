@@ -227,7 +227,6 @@ Module(
                                             value: Int(
                                                 5,
                                             ),
-                                            kind: None,
                                         },
                                     ),
                                 ],

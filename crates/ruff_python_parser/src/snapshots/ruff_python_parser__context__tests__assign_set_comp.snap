@@ -45,7 +45,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                         Constant(
@@ -54,7 +53,6 @@ expression: parse_ast
                                                 value: Int(
                                                     2,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                         Constant(
@@ -63,7 +61,6 @@ expression: parse_ast
                                                 value: Int(
                                                     3,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     ],

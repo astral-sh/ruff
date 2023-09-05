@@ -623,7 +623,7 @@ StarPattern: ast::Pattern = {
 
 ConstantAtom: ast::ParenthesizedExpr = {
     <location:@L> <value:Constant> <end_location:@R> => ast::Expr::Constant(
-        ast::ExprConstant { value, kind: None, range: (location..end_location).into() }
+        ast::ExprConstant { value, range: (location..end_location).into() }
     ).into(),
 }
 
@@ -716,17 +716,14 @@ MappingKey: ast::Expr = {
     <e:AddOpExpr> => e.into(),
     <location:@L> "None" <end_location:@R> => ast::ExprConstant {
         value: ast::Constant::None,
-        kind: None,
         range: (location..end_location).into()
     }.into(),
     <location:@L> "True" <end_location:@R> => ast::ExprConstant {
         value: true.into(),
-        kind: None,
         range: (location..end_location).into()
     }.into(),
     <location:@L> "False" <end_location:@R> => ast::ExprConstant {
         value: false.into(),
-        kind: None,
         range: (location..end_location).into()
     }.into(),
     <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?),
@@ -1580,7 +1577,6 @@ Atom<Goal>: ast::ParenthesizedExpr = {
     <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?.into()),
     <location:@L> <value:Constant> <end_location:@R> => ast::ExprConstant {
         value,
-        kind: None,
         range: (location..end_location).into(),
     }.into(),
     <location:@L> <id:Identifier> <end_location:@R> => ast::ExprName {
@@ -1671,10 +1667,10 @@ Atom<Goal>: ast::ParenthesizedExpr = {
         generators,
         range: (location..end_location).into(),
     }.into(),
-    <location:@L> "True" <end_location:@R> => ast::ExprConstant { value: true.into(), kind: None, range: (location..end_location).into() }.into(),
-    <location:@L> "False" <end_location:@R> => ast::ExprConstant { value: false.into(), kind: None, range: (location..end_location).into() }.into(),
-    <location:@L> "None" <end_location:@R> => ast::ExprConstant { value: ast::Constant::None, kind: None, range: (location..end_location).into() }.into(),
-    <location:@L> "..." <end_location:@R> => ast::ExprConstant { value: ast::Constant::Ellipsis, kind: None, range: (location..end_location).into() }.into(),
+    <location:@L> "True" <end_location:@R> => ast::ExprConstant { value: true.into(), range: (location..end_location).into() }.into(),
+    <location:@L> "False" <end_location:@R> => ast::ExprConstant { value: false.into(), range: (location..end_location).into() }.into(),
+    <location:@L> "None" <end_location:@R> => ast::ExprConstant { value: ast::Constant::None, range: (location..end_location).into() }.into(),
+    <location:@L> "..." <end_location:@R> => ast::ExprConstant { value: ast::Constant::Ellipsis, range: (location..end_location).into() }.into(),
 };
 
 ListLiteralValues: Vec<ast::ParenthesizedExpr> = {

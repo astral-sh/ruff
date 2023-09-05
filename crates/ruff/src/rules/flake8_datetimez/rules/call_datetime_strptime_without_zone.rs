@@ -77,7 +77,6 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
     // Does the `strptime` call contain a format string with a timezone specifier?
     if let Some(Expr::Constant(ast::ExprConstant {
         value: Constant::Str(format),
-        kind: None,
         range: _,
     })) = call.arguments.args.get(1).as_ref()
     {

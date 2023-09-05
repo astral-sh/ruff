@@ -129,7 +129,6 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 op: Operator::BitOr,
                 right: Box::new(Expr::Constant(ast::ExprConstant {
                     value: Constant::None,
-                    kind: None,
                     range: TextRange::default(),
                 })),
                 range: TextRange::default(),
@@ -188,7 +187,6 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
         if let Expr::Constant(ast::ExprConstant {
             range,
             value: Constant::Str(string),
-            ..
         }) = annotation.as_ref()
         {
             // Quoted annotation.

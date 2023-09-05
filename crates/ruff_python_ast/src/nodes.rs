@@ -945,7 +945,6 @@ impl From<ExprFString> for Expr {
 pub struct ExprConstant {
     pub range: TextRange,
     pub value: Constant,
-    pub kind: Option<String>,
 }
 
 impl From<ExprConstant> for Expr {
@@ -2559,6 +2558,8 @@ pub struct StringConstant {
     /// The string value as resolved by the parser (i.e., without quotes, or escape sequences, or
     /// implicit concatenations).
     pub value: String,
+    /// Whether the string is a Unicode string (i.e., `u"..."`).
+    pub unicode: bool,
     /// Whether the string contains multiple string tokens that were implicitly concatenated.
     pub implicit_concatenated: bool,
 }
@@ -2598,6 +2599,7 @@ impl From<String> for Constant {
     fn from(value: String) -> Constant {
         Self::Str(StringConstant {
             value,
+            unicode: false,
             implicit_concatenated: false,
         })
     }

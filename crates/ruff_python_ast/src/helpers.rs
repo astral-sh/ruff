@@ -576,7 +576,6 @@ pub const fn is_const_none(expr: &Expr) -> bool {
         expr,
         Expr::Constant(ast::ExprConstant {
             value: Constant::None,
-            kind: None,
             ..
         }),
     )
@@ -588,7 +587,6 @@ pub const fn is_const_true(expr: &Expr) -> bool {
         expr,
         Expr::Constant(ast::ExprConstant {
             value: Constant::Bool(true),
-            kind: None,
             ..
         }),
     )
@@ -600,7 +598,6 @@ pub const fn is_const_false(expr: &Expr) -> bool {
         expr,
         Expr::Constant(ast::ExprConstant {
             value: Constant::Bool(false),
-            kind: None,
             ..
         }),
     )
@@ -1190,17 +1187,14 @@ mod tests {
         });
         let constant_one = Expr::Constant(ExprConstant {
             value: Constant::Int(1.into()),
-            kind: Some("x".to_string()),
             range: TextRange::default(),
         });
         let constant_two = Expr::Constant(ExprConstant {
             value: Constant::Int(2.into()),
-            kind: Some("y".to_string()),
             range: TextRange::default(),
         });
         let constant_three = Expr::Constant(ExprConstant {
             value: Constant::Int(3.into()),
-            kind: Some("z".to_string()),
             range: TextRange::default(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
@@ -1243,7 +1237,6 @@ mod tests {
 
         let bound = Expr::Constant(ExprConstant {
             value: Constant::Int(1.into()),
-            kind: Some("x".to_string()),
             range: TextRange::default(),
         });
 

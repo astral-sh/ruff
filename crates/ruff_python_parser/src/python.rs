@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 516ee93137b3322a578922c24eb95daee3078883fdfa0c097268e64b78fcc54f
+// sha3: e8f3229288c1a13387ea6041355e2d8fe9ab788fbc7229032d2de92beb675944
 use num_bigint::BigInt;
 use ruff_text_size::{Ranged, TextSize};
 use ruff_python_ast::{self as ast, IpyEscapeKind};
@@ -32376,7 +32376,7 @@ fn __action111<
 ) -> ast::ParenthesizedExpr
 {
     ast::Expr::Constant(
-        ast::ExprConstant { value, kind: None, range: (location..end_location).into() }
+        ast::ExprConstant { value, range: (location..end_location).into() }
     ).into()
 }
 
@@ -32660,7 +32660,6 @@ fn __action129<
 {
     ast::ExprConstant {
         value: ast::Constant::None,
-        kind: None,
         range: (location..end_location).into()
     }.into()
 }
@@ -32677,7 +32676,6 @@ fn __action130<
 {
     ast::ExprConstant {
         value: true.into(),
-        kind: None,
         range: (location..end_location).into()
     }.into()
 }
@@ -32694,7 +32692,6 @@ fn __action131<
 {
     ast::ExprConstant {
         value: false.into(),
-        kind: None,
         range: (location..end_location).into()
     }.into()
 }
@@ -38353,7 +38350,6 @@ fn __action523<
 {
     ast::ExprConstant {
         value,
-        kind: None,
         range: (location..end_location).into(),
     }.into()
 }
@@ -38644,7 +38640,7 @@ fn __action537<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParenthesizedExpr
 {
-    ast::ExprConstant { value: true.into(), kind: None, range: (location..end_location).into() }.into()
+    ast::ExprConstant { value: true.into(), range: (location..end_location).into() }.into()
 }
 
 #[allow(unused_variables)]
@@ -38657,7 +38653,7 @@ fn __action538<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParenthesizedExpr
 {
-    ast::ExprConstant { value: false.into(), kind: None, range: (location..end_location).into() }.into()
+    ast::ExprConstant { value: false.into(), range: (location..end_location).into() }.into()
 }
 
 #[allow(unused_variables)]
@@ -38670,7 +38666,7 @@ fn __action539<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParenthesizedExpr
 {
-    ast::ExprConstant { value: ast::Constant::None, kind: None, range: (location..end_location).into() }.into()
+    ast::ExprConstant { value: ast::Constant::None, range: (location..end_location).into() }.into()
 }
 
 #[allow(unused_variables)]
@@ -38683,7 +38679,7 @@ fn __action540<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParenthesizedExpr
 {
-    ast::ExprConstant { value: ast::Constant::Ellipsis, kind: None, range: (location..end_location).into() }.into()
+    ast::ExprConstant { value: ast::Constant::Ellipsis, range: (location..end_location).into() }.into()
 }
 
 #[allow(unused_variables)]
@@ -39037,7 +39033,6 @@ fn __action566<
 {
     ast::ExprConstant {
         value,
-        kind: None,
         range: (location..end_location).into(),
     }.into()
 }
@@ -39302,7 +39297,7 @@ fn __action579<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParenthesizedExpr
 {
-    ast::ExprConstant { value: true.into(), kind: None, range: (location..end_location).into() }.into()
+    ast::ExprConstant { value: true.into(), range: (location..end_location).into() }.into()
 }
 
 #[allow(unused_variables)]
@@ -39315,7 +39310,7 @@ fn __action580<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParenthesizedExpr
 {
-    ast::ExprConstant { value: false.into(), kind: None, range: (location..end_location).into() }.into()
+    ast::ExprConstant { value: false.into(), range: (location..end_location).into() }.into()
 }
 
 #[allow(unused_variables)]
@@ -39328,7 +39323,7 @@ fn __action581<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParenthesizedExpr
 {
-    ast::ExprConstant { value: ast::Constant::None, kind: None, range: (location..end_location).into() }.into()
+    ast::ExprConstant { value: ast::Constant::None, range: (location..end_location).into() }.into()
 }
 
 #[allow(unused_variables)]
@@ -39341,7 +39336,7 @@ fn __action582<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParenthesizedExpr
 {
-    ast::ExprConstant { value: ast::Constant::Ellipsis, kind: None, range: (location..end_location).into() }.into()
+    ast::ExprConstant { value: ast::Constant::Ellipsis, range: (location..end_location).into() }.into()
 }
 
 #[allow(unused_variables)]

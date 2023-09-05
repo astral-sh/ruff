@@ -184,8 +184,12 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         return;
     }
     let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(ast::StringConstant { value: env_var, .. }),
-        kind,
+        value:
+            Constant::Str(ast::StringConstant {
+                value: env_var,
+                unicode,
+                ..
+            }),
         range: _,
     }) = slice.as_ref()
     else {
@@ -205,8 +209,11 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         let node = ast::ExprConstant {
-            value: capital_env_var.into(),
-            kind: kind.clone(),
+            value: ast::Constant::Str(ast::StringConstant {
+                value: capital_env_var,
+                unicode: *unicode,
+                implicit_concatenated: false,
+            }),
             range: TextRange::default(),
         };
         let new_env_var = node.into();

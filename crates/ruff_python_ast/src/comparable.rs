@@ -334,7 +334,7 @@ impl<'a> From<&'a ast::Decorator> for ComparableDecorator<'a> {
 pub enum ComparableConstant<'a> {
     None,
     Bool(&'a bool),
-    Str(&'a str),
+    Str { value: &'a str, unicode: bool },
     Bytes(&'a [u8]),
     Int(&'a BigInt),
     Tuple(Vec<ComparableConstant<'a>>),
@@ -353,7 +353,11 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
                 // Compare strings based on resolved value, not representation (i.e., ignore whether
                 // the string was implicitly concatenated).
                 implicit_concatenated: _,
-            }) => Self::Str(value),
+                unicode,
+            }) => Self::Str {
+                value,
+                unicode: *unicode,
+            },
             ast::Constant::Bytes(ast::BytesConstant {
                 value,
                 // Compare bytes based on resolved value, not representation (i.e., ignore whether
@@ -655,7 +659,6 @@ pub struct ExprFString<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprConstant<'a> {
     value: ComparableConstant<'a>,
-    kind: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -904,14 +907,11 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }) => Self::FString(ExprFString {
                 values: values.iter().map(Into::into).collect(),
             }),
-            ast::Expr::Constant(ast::ExprConstant {
-                value,
-                kind,
-                range: _,
-            }) => Self::Constant(ExprConstant {
-                value: value.into(),
-                kind: kind.as_ref().map(String::as_str),
-            }),
+            ast::Expr::Constant(ast::ExprConstant { value, range: _ }) => {
+                Self::Constant(ExprConstant {
+                    value: value.into(),
+                })
+            }
             ast::Expr::Attribute(ast::ExprAttribute {
                 value,
                 attr,
