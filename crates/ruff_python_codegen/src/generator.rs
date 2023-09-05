@@ -14,6 +14,7 @@ use ruff_source_file::LineEnding;
 use super::stylist::{Indentation, Quote, Stylist};
 
 mod precedence {
+    pub(crate) const NAMED_EXPR: u8 = 1;
     pub(crate) const ASSIGN: u8 = 3;
     pub(crate) const ANN_ASSIGN: u8 = 5;
     pub(crate) const AUG_ASSIGN: u8 = 5;
@@ -30,7 +31,6 @@ mod precedence {
     pub(crate) const TUPLE: u8 = 19;
     pub(crate) const FORMATTED_VALUE: u8 = 19;
     pub(crate) const COMMA: u8 = 21;
-    pub(crate) const NAMED_EXPR: u8 = 23;
     pub(crate) const ASSERT: u8 = 23;
     pub(crate) const COMPREHENSION_ELEMENT: u8 = 27;
     pub(crate) const LAMBDA: u8 = 27;
@@ -1639,6 +1639,13 @@ class Foo:
             "class SchemaItem(NamedTuple):
     fields: ((\"property_key\", str),)"
         );
+        assert_round_trip!(
+            "def func():
+    return (i := 1)"
+        );
+        assert_round_trip!("yield (i := 1)");
+        assert_round_trip!("x = (i := 1)");
+        assert_round_trip!("x += (i := 1)");
 
         // Type aliases
         assert_round_trip!(r#"type Foo = int | str"#);

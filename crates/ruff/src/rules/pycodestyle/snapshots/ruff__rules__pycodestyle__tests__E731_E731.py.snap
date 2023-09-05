@@ -339,6 +339,8 @@ E731.py:139:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     139 |+    def CELSIUS(deg_c):
     140 |+        return deg_c
 140 141 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
+141 142 | 
+142 143 | 
 
 E731.py:140:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
@@ -356,5 +358,30 @@ E731.py:140:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 140     |-    FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
     140 |+    def FAHRENHEIT(deg_c):
     141 |+        return deg_c * 9 / 5 + 32
+141 142 | 
+142 143 | 
+143 144 | # Regression test for: https://github.com/astral-sh/ruff/issues/7141
+
+E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+    |
+145 |       # E731
+146 |   
+147 |       f = lambda: (
+    |  _____^
+148 | |         i := 1,
+149 | |     )
+    | |_____^ E731
+    |
+    = help: Rewrite `f` as a `def`
+
+ℹ Suggested fix
+144 144 | def scope():
+145 145 |     # E731
+146 146 | 
+147     |-    f = lambda: (
+148     |-        i := 1,
+149     |-    )
+    147 |+    def f():
+    148 |+        return (i := 1),
 
 
