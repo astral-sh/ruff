@@ -197,7 +197,11 @@ impl RuleSelector {
     /// Returns rules matching the selector, taking into account whether preview mode is enabled.
     pub fn rules(&self, preview: PreviewMode) -> impl Iterator<Item = Rule> + '_ {
         self.all_rules().filter(move |rule| {
-            matches!(self, RuleSelector::Rule { .. }) || preview.is_enabled() || !rule.is_preview()
+            !(rule.is_preview() || rule.is_nursery())
+            // Backwards compatibility allows selection of nursery rules by exact code
+            || matches!(self, RuleSelector::Rule { .. }) && rule.is_nursery()
+            // Otherwise, preview must be enabled for inclusion of preview or nursery rules
+            || preview.is_enabled()
         })
     }
 }
@@ -227,7 +231,7 @@ impl Iterator for RuleSelectorIter {
 // Note that Rust doesn't yet support `impl const From<RuleCodePrefix> for
 // RuleSelector` (see https://github.com/rust-lang/rust/issues/67792).
 // TODO(martin): Remove once RuleSelector is an enum with Linter & Rule variants
-pub(crate) const fn prefix_to_selector(prefix: RuleCodePrefix) -> RuleSelector {
+pub const fn prefix_to_selector(prefix: RuleCodePrefix) -> RuleSelector {
     RuleSelector::Prefix {
         prefix,
         redirected_from: None,

@@ -159,6 +159,7 @@ mod tests {
     use ruff::codes;
     use ruff::codes::RuleCodePrefix;
     use ruff::line_width::LineLength;
+    use ruff::rule_selector::prefix_to_selector;
     use ruff::settings::types::PatternPrefixPair;
     use rustc_hash::FxHashMap;
 
@@ -307,7 +308,9 @@ other-attribute = 1
                 ]),
                 per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
-                    vec![RuleCodePrefix::Pyflakes(codes::Pyflakes::_401).into()]
+                    vec![prefix_to_selector(RuleCodePrefix::Pyflakes(
+                        codes::Pyflakes::_401
+                    ))]
                 )])),
                 ..Options::default()
             }

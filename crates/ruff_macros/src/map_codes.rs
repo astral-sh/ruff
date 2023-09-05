@@ -300,6 +300,10 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             pub fn is_preview(&self) -> bool {
                 matches!(self.group(), RuleGroup::Preview)
             }
+
+            pub fn is_nursery(&self) -> bool {
+                matches!(self.group(), RuleGroup::Nursery)
+            }
         }
 
         impl Linter {
