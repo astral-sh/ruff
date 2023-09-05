@@ -461,8 +461,6 @@ pub enum FStringErrorType {
     UnclosedLbrace,
     /// An invalid conversion flag was encountered.
     InvalidConversionFlag,
-    /// An empty expression was encountered.
-    EmptyExpression,
     /// A single right brace was encountered.
     SingleRbrace,
     /// Unterminated string.
@@ -474,13 +472,12 @@ pub enum FStringErrorType {
 impl std::fmt::Display for FStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use FStringErrorType::{
-            EmptyExpression, InvalidConversionFlag, SingleRbrace, UnclosedLbrace,
-            UnterminatedString, UnterminatedTripleQuotedString,
+            InvalidConversionFlag, SingleRbrace, UnclosedLbrace, UnterminatedString,
+            UnterminatedTripleQuotedString,
         };
         match self {
             UnclosedLbrace => write!(f, "expecting '}}'"),
             InvalidConversionFlag => write!(f, "invalid conversion character"),
-            EmptyExpression => write!(f, "empty expression not allowed"),
             SingleRbrace => write!(f, "single '}}' is not allowed"),
             UnterminatedString => write!(f, "unterminated string"),
             UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
@@ -574,9 +571,7 @@ mod tests {
         use FStringErrorType::InvalidConversionFlag;
 
         assert_eq!(parse_fstring_error(r#"f"{5!x}""#), InvalidConversionFlag);
-
-        // TODO: check for InvalidExpression enum?
-        assert!(parse_suite("{class}", "<test>").is_err());
+        assert!(parse_suite(r#"f"{class}""#, "<test>").is_err());
     }
 
     #[test]
