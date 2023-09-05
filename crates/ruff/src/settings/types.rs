@@ -194,6 +194,7 @@ pub struct PerFileIgnore {
 
 impl PerFileIgnore {
     pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
         let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
         let path = Path::new(&pattern);
         let absolute = match project_root {
