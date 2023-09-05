@@ -32,6 +32,7 @@ impl UniversalNewlines for str {
 /// assert_eq!(lines.next_back(), Some(Line::new("\r\n", TextSize::from(8))));
 /// assert_eq!(lines.next(), None);
 /// ```
+#[derive(Clone)]
 pub struct UniversalNewlineIterator<'a> {
     text: &'a str,
     offset: TextSize,
