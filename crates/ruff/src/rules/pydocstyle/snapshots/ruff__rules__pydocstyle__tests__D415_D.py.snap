@@ -271,6 +271,7 @@ D.py:639:17: D415 [*] First line should end with a period, question mark, or exc
     639 |+class SameLine: """This is a docstring on the same line."""
 640 640 | 
 641 641 | def same_line(): """This is a docstring on the same line"""
+642 642 | 
 
 D.py:641:18: D415 [*] First line should end with a period, question mark, or exclamation point
     |
@@ -287,5 +288,8 @@ D.py:641:18: D415 [*] First line should end with a period, question mark, or exc
 640 640 | 
 641     |-def same_line(): """This is a docstring on the same line"""
     641 |+def same_line(): """This is a docstring on the same line."""
+642 642 | 
+643 643 | 
+644 644 | def single_line_docstring_with_an_escaped_backslash():
 
 

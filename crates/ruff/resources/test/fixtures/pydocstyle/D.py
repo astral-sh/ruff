@@ -639,3 +639,8 @@ def starts_with_space_then_this():
 class SameLine: """This is a docstring on the same line"""
 
 def same_line(): """This is a docstring on the same line"""
+
+
+def single_line_docstring_with_an_escaped_backslash():
+    "\
+    "
