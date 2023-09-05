@@ -2,6 +2,8 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::Stmt;
+use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::Imported;
 
 use crate::checkers::ast::Checker;
 
@@ -57,6 +59,9 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt])
         .filter_map(ruff_python_ast::Stmt::as_function_def_stmt)
         .filter(|method| {
             if is_known_dunder_method(&method.name) {
+                return false;
+            }
+            if visibility::is_override(&method.decorator_list, &checker.semantic()) {
                 return false;
             }
             method.name.starts_with('_') && method.name.ends_with('_')
