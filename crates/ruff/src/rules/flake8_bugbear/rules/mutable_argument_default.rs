@@ -175,7 +175,7 @@ fn move_initialization(
                 return None;
             }
             Edit::insertion(content, locator.line_start(statement.start()))
-        } else if statement.end() == locator.text_len() {
+        } else if locator.full_line_end(statement.end()) == locator.text_len() {
             // If the statement is at the end of the file, without a trailing newline, insert
             // _after_ it with an extra newline.
             Edit::insertion(
