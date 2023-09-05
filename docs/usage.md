@@ -7,6 +7,7 @@ ruff check .                        # Lint all files in the current directory (a
 ruff check path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories)
 ruff check path/to/code/*.py        # Lint all `.py` files in `/path/to/code`
 ruff check path/to/code/to/file.py  # Lint `file.py`
+ruff check @file_paths.txt          # Lint using an input file and treat its contents as command-line arguments (newline delimiter)
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
