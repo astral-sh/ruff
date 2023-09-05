@@ -551,9 +551,7 @@ fn format_dir_entry(
     let settings = resolver.resolve(&path, pyproject_config);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
     if settings.line_length != LineLength::default() {
-        let line_width = LineWidth::try_from(settings.line_length.value())
-            .expect("Configured line length is too large for the formatter");
-        options = options.with_line_width(line_width);
+        options = options.with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
     }
 
     // Handle panics (mostly in `debug_assert!`)
