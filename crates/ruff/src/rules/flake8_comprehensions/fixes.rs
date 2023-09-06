@@ -212,10 +212,20 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
         bail!("Expected tuple with two elements");
     };
 
+    // Insert whitespace before the `for`, since we're removing parentheses, as in:
+    // ```python
+    // dict((x, x)for x in range(3))
+    // ```
+    let mut for_in = list_comp.for_in.clone();
+    if for_in.whitespace_before == ParenthesizableWhitespace::default() {
+        for_in.whitespace_before =
+            ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" "));
+    }
+
     tree = Expression::DictComp(Box::new(DictComp {
         key: Box::new(key.clone()),
         value: Box::new(value.clone()),
-        for_in: list_comp.for_in.clone(),
+        for_in,
         whitespace_before_colon: ParenthesizableWhitespace::default(),
         whitespace_after_colon: space(),
         lbrace: LeftCurlyBrace {
