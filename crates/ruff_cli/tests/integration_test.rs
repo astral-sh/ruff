@@ -301,6 +301,7 @@ fn nursery_direct() {
     Found 1 error.
 
     ----- stderr -----
+    warning: Selection of nursery rule `E225` without the `--preview` flag is deprecated.
     "###);
 }
 
