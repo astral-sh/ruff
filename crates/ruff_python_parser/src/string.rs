@@ -1,5 +1,4 @@
-//! Contains the logic for parsing string and bytes literals, as well as
-//! implicit string concatenation.
+//! Parsing of string literals, bytes literals, and implicit string concatenation.
 
 use ruff_python_ast::{
     self as ast, BytesConstant, Constant, Expr, ParenthesizedExpr, StringConstant,
@@ -219,7 +218,7 @@ impl<'a> StringParser<'a> {
             }
         }
         Ok(Expr::from(ast::ExprConstant {
-            value: ast::Constant::Str(ast::StringConstant {
+            value: Constant::Str(StringConstant {
                 value,
                 unicode: self.kind.is_unicode(),
                 implicit_concatenated: false,
@@ -238,25 +237,46 @@ impl<'a> StringParser<'a> {
 }
 
 pub(crate) fn parse_string_literal(
-    start: TextSize,
-    (source, kind, triple_quoted): (String, StringKind, bool),
+    source: &str,
+    kind: StringKind,
+    triple_quoted: bool,
+    start_location: TextSize,
 ) -> Result<Expr, LexicalError> {
-    let start = start
+    let start_location = start_location
         + kind.prefix_len()
         + if triple_quoted {
             TextSize::from(3)
         } else {
             TextSize::from(1)
         };
-    StringParser::new(source.as_str(), kind, start).parse()
+    StringParser::new(source, kind, start_location).parse()
 }
 
 pub(crate) fn parse_fstring_middle(
-    start: TextSize,
-    (source, is_raw): (String, bool),
+    source: &str,
+    is_raw: bool,
+    start_location: TextSize,
 ) -> Result<Option<Expr>, LexicalError> {
     // This is to account for the empty `FStringMiddle` token that is created
-    // to check for non-parenthesized lambda expressions.
+    // to check for non-parenthesized lambda expressions. `FStringMiddle` token
+    // is created for anything which is not part of the f-string expression nor
+    // an opening or closing brace. With that in mind take following example:
+    //
+    // ```python
+    // f"{lambda x:{x}}"
+    // ```
+    //
+    // Here, when the lexer encounters the `:` token, we'll enter format spec
+    // mode which means to look out for `FStringMiddle` tokens until we end
+    // format spec mode. However, there's `{` right after the `:` token which
+    // means we exit format spec mode immediately and start lexing the expression
+    // and not emit any `FStringMiddle` tokens.
+    //
+    // This becomes a problem because lambda expression without parentheses aren't
+    // allowed in f-strings but here the lambda pattern matches and thus we would
+    // parse it as a lambda expression. To prevent this, we create an empty
+    // `FStringMiddle` token so that the parser will fail when it encounters it
+    // as it's not defined in the lambda expression grammar.
     if source.is_empty() {
         return Ok(None);
     }
@@ -265,7 +285,7 @@ pub(crate) fn parse_fstring_middle(
     } else {
         StringKind::String
     };
-    StringParser::new(source.as_str(), kind, start)
+    StringParser::new(source, kind, start_location)
         .parse_fstring_middle()
         .map(Some)
 }
@@ -281,25 +301,22 @@ pub(crate) fn concatenate_strings(
     #[cfg(debug_assertions)]
     debug_assert!(!strings.is_empty());
 
-    let has_fstring = strings
-        .iter()
-        .any(|parenthesized_expr| parenthesized_expr.expr.is_f_string_expr());
-    let num_bytes = strings
-        .iter()
-        .filter(|parenthesized_expr| {
-            matches!(
-                parenthesized_expr.expr,
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bytes(_),
-                    ..
-                })
-            )
-        })
-        .count();
-    let has_bytes = num_bytes > 0;
+    let mut has_fstring = false;
+    let mut byte_literal_count = 0;
+    for parenthesized_expr in &strings {
+        match parenthesized_expr.expr {
+            Expr::FString(_) => has_fstring = true,
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Bytes(_),
+                ..
+            }) => byte_literal_count += 1,
+            _ => {}
+        }
+    }
+    let has_bytes = byte_literal_count > 0;
     let implicit_concatenated = strings.len() > 1;
 
-    if has_bytes && num_bytes < strings.len() {
+    if has_bytes && byte_literal_count < strings.len() {
         return Err(LexicalError {
             error: LexicalErrorType::OtherError(
                 "cannot mix bytes and nonbytes literals".to_owned(),
@@ -330,12 +347,12 @@ pub(crate) fn concatenate_strings(
     }
 
     if !has_fstring {
-        let mut content: Vec<String> = vec![];
+        let mut content = String::new();
         let is_unicode = match strings.get(0) {
             Some(ParenthesizedExpr {
-                expr: Expr::Constant(..),
+                expr: Expr::Constant(ast::ExprConstant { value, .. }),
                 ..
-            }) => expr.is_unicode_string(),
+            }) => value.is_unicode_string(),
             _ => false,
         };
         for parenthesized_expr in strings {
@@ -343,13 +360,13 @@ pub(crate) fn concatenate_strings(
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Str(StringConstant { value, .. }),
                     ..
-                }) => content.push(value),
+                }) => content.push_str(&value),
                 _ => unreachable!("Unexpected non-string expression."),
             }
         }
         return Ok(ast::ExprConstant {
             value: Constant::Str(StringConstant {
-                value: content.join(""),
+                value: content,
                 unicode: is_unicode,
                 implicit_concatenated,
             }),
@@ -360,16 +377,16 @@ pub(crate) fn concatenate_strings(
 
     // De-duplicate adjacent constants.
     let mut deduped: Vec<Expr> = vec![];
-    let mut current: Vec<String> = vec![];
+    let mut current = String::new();
     let mut current_start = range.start();
     let mut current_end = range.end();
     let mut is_unicode = false;
 
-    let take_current = |current: &mut Vec<String>, start, end| -> Expr {
+    let take_current = |current: &mut String, start, end, unicode| -> Expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(StringConstant {
-                value: current.drain(..).collect::<String>(),
-                unicode: is_unicode,
+                value: std::mem::take(current),
+                unicode,
                 implicit_concatenated,
             }),
             range: TextRange::new(start, end),
@@ -389,6 +406,7 @@ pub(crate) fn concatenate_strings(
                                     &mut current,
                                     current_start,
                                     current_end,
+                                    is_unicode,
                                 ));
                             }
                             deduped.push(value);
@@ -403,7 +421,7 @@ pub(crate) fn concatenate_strings(
                                 current_start = value_range.start();
                             }
                             current_end = value_range.end();
-                            current.push(value);
+                            current.push_str(&value);
                         }
                         _ => unreachable!("Unexpected non-string expression."),
                     }
@@ -418,13 +436,18 @@ pub(crate) fn concatenate_strings(
                     current_start = expr_range.start();
                 }
                 current_end = expr_range.end();
-                current.push(value);
+                current.push_str(&value);
             }
             _ => unreachable!("Unexpected non-string expression."),
         }
     }
     if !current.is_empty() {
-        deduped.push(take_current(&mut current, current_start, current_end));
+        deduped.push(take_current(
+            &mut current,
+            current_start,
+            current_end,
+            is_unicode,
+        ));
     }
 
     Ok(ast::ExprFString {

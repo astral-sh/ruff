@@ -3,32 +3,6 @@ source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
 [
-<<<<<<< HEAD
-    FormattedValue(
-        ExprFormattedValue {
-            range: 2..10,
-            value: Compare(
-                ExprCompare {
-                    range: 3..9,
-                    left: Constant(
-                        ExprConstant {
-                            range: 3..4,
-                            value: Int(
-                                1,
-                            ),
-                        },
-                    ),
-                    ops: [
-                        NotEq,
-                    ],
-                    comparators: [
-                        Constant(
-                            ExprConstant {
-                                range: 8..9,
-                                value: Int(
-                                    2,
-                                ),
-=======
     Expr(
         StmtExpr {
             range: 0..11,
@@ -48,7 +22,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                         ops: [
@@ -61,7 +34,6 @@ expression: parse_ast
                                                     value: Int(
                                                         2,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -70,7 +42,6 @@ expression: parse_ast
                                 debug_text: None,
                                 conversion: None,
                                 format_spec: None,
->>>>>>> d34b4d3b9 (Add support for parsing f-strings as per PEP 701)
                             },
                         ),
                     ],

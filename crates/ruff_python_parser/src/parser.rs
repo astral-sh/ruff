@@ -1255,6 +1255,7 @@ a = 1
         let parse_ast = parse_suite(
             r#"
 f"{" f"}"
+f"{foo!s}"
 f"{3,}"
 f"{3!=4:}"
 f'{3:{"}"}>10}'
@@ -1264,6 +1265,11 @@ f"{  foo =  :.3f  }"
 f"{  foo =  !s  }"
 f"{  1, 2  =  }"
 f'{f"{3.1415=:.1f}":*^20}'
+
+{"foo " f"bar {x + y} " "baz": 10}
+match foo:
+    case "foo " f"bar {x + y} " "baz":
+        pass
 "#
             .trim(),
             "<test>",
@@ -1279,7 +1285,7 @@ f'{f"{3.1415=:.1f}":*^20}'
 u"foo" f"{bar}" "baz" " some"
 "foo" f"{bar}" u"baz" " some"
 "foo" f"{bar}" "baz" u" some"
-u"foo" f"bar {baz} realy" u"bar" "no"
+u"foo" f"bar {baz} really" u"bar" "no"
 "#
             .trim(),
             "<test>",

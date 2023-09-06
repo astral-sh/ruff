@@ -16,11 +16,9 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "foo",
+                                        unicode: true,
                                         implicit_concatenated: true,
                                     },
-                                ),
-                                kind: Some(
-                                    "u",
                                 ),
                             },
                         ),
@@ -45,10 +43,10 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "baz some",
+                                        unicode: false,
                                         implicit_concatenated: true,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                     ],
@@ -70,10 +68,10 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "foo",
+                                        unicode: false,
                                         implicit_concatenated: true,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                         FormattedValue(
@@ -97,11 +95,9 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "baz some",
+                                        unicode: true,
                                         implicit_concatenated: true,
                                     },
-                                ),
-                                kind: Some(
-                                    "u",
                                 ),
                             },
                         ),
@@ -124,10 +120,10 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "foo",
+                                        unicode: false,
                                         implicit_concatenated: true,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                         FormattedValue(
@@ -151,10 +147,10 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "baz some",
+                                        unicode: false,
                                         implicit_concatenated: true,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                     ],
@@ -165,10 +161,10 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 90..127,
+            range: 90..128,
             value: FString(
                 ExprFString {
-                    range: 90..127,
+                    range: 90..128,
                     values: [
                         Constant(
                             ExprConstant {
@@ -176,11 +172,9 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "foobar ",
+                                        unicode: true,
                                         implicit_concatenated: true,
                                     },
-                                ),
-                                kind: Some(
-                                    "u",
                                 ),
                             },
                         ),
@@ -201,14 +195,14 @@ expression: parse_ast
                         ),
                         Constant(
                             ExprConstant {
-                                range: 108..126,
+                                range: 108..127,
                                 value: Str(
                                     StringConstant {
-                                        value: " realybarno",
+                                        value: " reallybarno",
+                                        unicode: false,
                                         implicit_concatenated: true,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                     ],

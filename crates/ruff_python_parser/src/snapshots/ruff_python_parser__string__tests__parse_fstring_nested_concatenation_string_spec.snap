@@ -3,38 +3,6 @@ source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
 [
-<<<<<<< HEAD
-    FormattedValue(
-        ExprFormattedValue {
-            range: 2..15,
-            value: Name(
-                ExprName {
-                    range: 3..6,
-                    id: "foo",
-                    ctx: Load,
-                },
-            ),
-            debug_text: None,
-            conversion: None,
-            format_spec: Some(
-                FString(
-                    ExprFString {
-                        range: 7..14,
-                        values: [
-                            FormattedValue(
-                                ExprFormattedValue {
-                                    range: 7..14,
-                                    value: Constant(
-                                        ExprConstant {
-                                            range: 8..13,
-                                            value: Str(
-                                                StringConstant {
-                                                    value: "",
-                                                    unicode: false,
-                                                    implicit_concatenated: true,
-                                                },
-                                            ),
-=======
     Expr(
         StmtExpr {
             range: 0..16,
@@ -68,10 +36,10 @@ expression: parse_ast
                                                                 value: Str(
                                                                     StringConstant {
                                                                         value: "",
+                                                                        unicode: false,
                                                                         implicit_concatenated: true,
                                                                     },
                                                                 ),
-                                                                kind: None,
                                                             },
                                                         ),
                                                         debug_text: None,
@@ -81,7 +49,6 @@ expression: parse_ast
                                                 ),
                                             ],
                                             implicit_concatenated: false,
->>>>>>> d34b4d3b9 (Add support for parsing f-strings as per PEP 701)
                                         },
                                     ),
                                 ),

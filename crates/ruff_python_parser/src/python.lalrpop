@@ -4,7 +4,7 @@
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
 use num_bigint::BigInt;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, IpyEscapeKind};
 use crate::{
     FStringErrorType,
@@ -1580,7 +1580,10 @@ StringLiteralOrFString: ast::ParenthesizedExpr = {
 };
 
 StringLiteral: ast::ParenthesizedExpr = {
-    <location:@L> <s:string> =>? Ok(parse_string_literal(<>)?.into()),
+    <start_location:@L> <string:string> =>? {
+        let (source, kind, triple_quoted) = string;
+        Ok(parse_string_literal(&source, kind, triple_quoted, start_location)?.into())
+    }
 };
 
 FStringExpr: ast::ParenthesizedExpr = {
@@ -1595,41 +1598,50 @@ FStringExpr: ast::ParenthesizedExpr = {
 
 FStringMiddlePattern: Option<ast::Expr> = {
     FStringReplacementField,
-    <location:@L> <s:fstring_middle> =>? Ok(parse_fstring_middle(<>)?),
-};
-
-FStringReplacementField: Option<ast::Expr> = {
-    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <c:FStringConversion?> <format_spec:FStringFormatSpec?> "}" <end_location:@R> => {
-        let mut conversion = ast::ConversionFlag::None;
-        let debug_text = if debug.is_some() {
-            let start_offset = location + TextSize::from(1);  // +1 to skip the opening brace
-            let format_spec_ref = format_spec.as_ref();
-            let end_offset = c.map_or_else(|| {
-                // Subtract 1 to account for the closing brace or the `:` in the format spec
-                format_spec_ref.map_or(end_location, |f| f.range().start()) - TextSize::from(1)
-            }, |(offset, flag)| {
-                conversion = flag;
-                offset
-            });
-            Some(ast::DebugText {
-                leading: source_code[TextRange::new(start_offset, value.range().start())].to_string(),
-                trailing: source_code[TextRange::new(value.range().end(), end_offset)].to_string(),
-            })
-        } else {
-            None
-        };
-        Some(ast::ExprFormattedValue {
-            value: Box::new(value.into()),
-            debug_text,
-            conversion,
-            format_spec: format_spec.map(Box::new),
-            range: (location..end_location).into(),
-        }.into())
+    <start_location:@L> <fstring_middle:fstring_middle> =>? {
+        let (source, is_raw) = fstring_middle;
+        Ok(parse_fstring_middle(&source, is_raw, start_location)?)
     }
 };
 
+FStringReplacementField: Option<ast::Expr> = {
+    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> => {
+        let debug_text = debug.map(|_| {
+            let start_offset = location + "{".text_len();
+            let end_offset = if let Some((conversion_start, _)) = conversion {
+                conversion_start
+            } else {
+                format_spec.as_ref().map_or_else(
+                    || end_location - "}".text_len(),
+                    |spec| spec.range().start() - ":".text_len(),
+                )
+            };
+            ast::DebugText {
+                leading: source_code[TextRange::new(start_offset, value.range().start())].to_string(),
+                trailing: source_code[TextRange::new(value.range().end(), end_offset)].to_string(),
+            }
+        });
+        Some(
+            ast::ExprFormattedValue {
+                value: Box::new(value.into()),
+                debug_text,
+                conversion: conversion.map_or(ast::ConversionFlag::None, |(_, conversion_flag)| {
+                    conversion_flag
+                }),
+                format_spec: format_spec.map(Box::new),
+                range: (location..end_location).into(),
+            }
+            .into()
+        )
+    }
+};
+
+FStringFormatSpecSuffix: ast::Expr = {
+    ":" <format_spec:FStringFormatSpec> => format_spec
+};
+
 FStringFormatSpec: ast::Expr = {
-    ":" <location:@L> <values:FStringMiddlePattern*> <end_location:@R> => {
+    <location:@L> <values:FStringMiddlePattern*> <end_location:@R> => {
         ast::ExprFString {
             values: values.into_iter().flatten().collect(),
             implicit_concatenated: false,

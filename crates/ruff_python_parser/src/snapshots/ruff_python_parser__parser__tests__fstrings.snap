@@ -19,10 +19,10 @@ expression: parse_ast
                                         value: Str(
                                             StringConstant {
                                                 value: " f",
+                                                unicode: false,
                                                 implicit_concatenated: false,
                                             },
                                         ),
-                                        kind: None,
                                     },
                                 ),
                                 debug_text: None,
@@ -38,25 +38,52 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 10..17,
+            range: 10..20,
             value: FString(
                 ExprFString {
-                    range: 10..17,
+                    range: 10..20,
                     values: [
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 12..16,
+                                range: 12..19,
+                                value: Name(
+                                    ExprName {
+                                        range: 13..16,
+                                        id: "foo",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: Str,
+                                format_spec: None,
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 21..28,
+            value: FString(
+                ExprFString {
+                    range: 21..28,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 23..27,
                                 value: Tuple(
                                     ExprTuple {
-                                        range: 13..15,
+                                        range: 24..26,
                                         elts: [
                                             Constant(
                                                 ExprConstant {
-                                                    range: 13..14,
+                                                    range: 24..25,
                                                     value: Int(
                                                         3,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -76,24 +103,23 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 18..28,
+            range: 29..39,
             value: FString(
                 ExprFString {
-                    range: 18..28,
+                    range: 29..39,
                     values: [
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 20..27,
+                                range: 31..38,
                                 value: Compare(
                                     ExprCompare {
-                                        range: 21..25,
+                                        range: 32..36,
                                         left: Constant(
                                             ExprConstant {
-                                                range: 21..22,
+                                                range: 32..33,
                                                 value: Int(
                                                     3,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                         ops: [
@@ -102,11 +128,10 @@ expression: parse_ast
                                         comparators: [
                                             Constant(
                                                 ExprConstant {
-                                                    range: 24..25,
+                                                    range: 35..36,
                                                     value: Int(
                                                         4,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -117,7 +142,7 @@ expression: parse_ast
                                 format_spec: Some(
                                     FString(
                                         ExprFString {
-                                            range: 26..26,
+                                            range: 37..37,
                                             values: [],
                                             implicit_concatenated: false,
                                         },
@@ -133,21 +158,20 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 29..44,
+            range: 40..55,
             value: FString(
                 ExprFString {
-                    range: 29..44,
+                    range: 40..55,
                     values: [
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 31..43,
+                                range: 42..54,
                                 value: Constant(
                                     ExprConstant {
-                                        range: 32..33,
+                                        range: 43..44,
                                         value: Int(
                                             3,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                                 debug_text: None,
@@ -155,21 +179,21 @@ expression: parse_ast
                                 format_spec: Some(
                                     FString(
                                         ExprFString {
-                                            range: 34..42,
+                                            range: 45..53,
                                             values: [
                                                 FormattedValue(
                                                     ExprFormattedValue {
-                                                        range: 34..39,
+                                                        range: 45..50,
                                                         value: Constant(
                                                             ExprConstant {
-                                                                range: 35..38,
+                                                                range: 46..49,
                                                                 value: Str(
                                                                     StringConstant {
                                                                         value: "}",
+                                                                        unicode: false,
                                                                         implicit_concatenated: false,
                                                                     },
                                                                 ),
-                                                                kind: None,
                                                             },
                                                         ),
                                                         debug_text: None,
@@ -179,14 +203,14 @@ expression: parse_ast
                                                 ),
                                                 Constant(
                                                     ExprConstant {
-                                                        range: 39..42,
+                                                        range: 50..53,
                                                         value: Str(
                                                             StringConstant {
                                                                 value: ">10",
+                                                                unicode: false,
                                                                 implicit_concatenated: false,
                                                             },
                                                         ),
-                                                        kind: None,
                                                     },
                                                 ),
                                             ],
@@ -204,21 +228,20 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 45..60,
+            range: 56..71,
             value: FString(
                 ExprFString {
-                    range: 45..60,
+                    range: 56..71,
                     values: [
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 47..59,
+                                range: 58..70,
                                 value: Constant(
                                     ExprConstant {
-                                        range: 48..49,
+                                        range: 59..60,
                                         value: Int(
                                             3,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                                 debug_text: None,
@@ -226,21 +249,21 @@ expression: parse_ast
                                 format_spec: Some(
                                     FString(
                                         ExprFString {
-                                            range: 50..58,
+                                            range: 61..69,
                                             values: [
                                                 FormattedValue(
                                                     ExprFormattedValue {
-                                                        range: 50..55,
+                                                        range: 61..66,
                                                         value: Constant(
                                                             ExprConstant {
-                                                                range: 51..54,
+                                                                range: 62..65,
                                                                 value: Str(
                                                                     StringConstant {
                                                                         value: "{",
+                                                                        unicode: false,
                                                                         implicit_concatenated: false,
                                                                     },
                                                                 ),
-                                                                kind: None,
                                                             },
                                                         ),
                                                         debug_text: None,
@@ -250,14 +273,14 @@ expression: parse_ast
                                                 ),
                                                 Constant(
                                                     ExprConstant {
-                                                        range: 55..58,
+                                                        range: 66..69,
                                                         value: Str(
                                                             StringConstant {
                                                                 value: ">10",
+                                                                unicode: false,
                                                                 implicit_concatenated: false,
                                                             },
                                                         ),
-                                                        kind: None,
                                                     },
                                                 ),
                                             ],
@@ -275,17 +298,17 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 61..75,
+            range: 72..86,
             value: FString(
                 ExprFString {
-                    range: 61..75,
+                    range: 72..86,
                     values: [
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 63..74,
+                                range: 74..85,
                                 value: Name(
                                     ExprName {
-                                        range: 66..69,
+                                        range: 77..80,
                                         id: "foo",
                                         ctx: Load,
                                     },
@@ -308,17 +331,17 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 76..96,
+            range: 87..107,
             value: FString(
                 ExprFString {
-                    range: 76..96,
+                    range: 87..107,
                     values: [
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 78..95,
+                                range: 89..106,
                                 value: Name(
                                     ExprName {
-                                        range: 81..84,
+                                        range: 92..95,
                                         id: "foo",
                                         ctx: Load,
                                     },
@@ -333,18 +356,18 @@ expression: parse_ast
                                 format_spec: Some(
                                     FString(
                                         ExprFString {
-                                            range: 89..94,
+                                            range: 100..105,
                                             values: [
                                                 Constant(
                                                     ExprConstant {
-                                                        range: 89..94,
+                                                        range: 100..105,
                                                         value: Str(
                                                             StringConstant {
                                                                 value: ".3f  ",
+                                                                unicode: false,
                                                                 implicit_concatenated: false,
                                                             },
                                                         ),
-                                                        kind: None,
                                                     },
                                                 ),
                                             ],
@@ -362,17 +385,17 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 97..115,
+            range: 108..126,
             value: FString(
                 ExprFString {
-                    range: 97..115,
+                    range: 108..126,
                     values: [
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 99..114,
+                                range: 110..125,
                                 value: Name(
                                     ExprName {
-                                        range: 102..105,
+                                        range: 113..116,
                                         id: "foo",
                                         ctx: Load,
                                     },
@@ -395,34 +418,32 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 116..132,
+            range: 127..143,
             value: FString(
                 ExprFString {
-                    range: 116..132,
+                    range: 127..143,
                     values: [
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 118..131,
+                                range: 129..142,
                                 value: Tuple(
                                     ExprTuple {
-                                        range: 121..125,
+                                        range: 132..136,
                                         elts: [
                                             Constant(
                                                 ExprConstant {
-                                                    range: 121..122,
+                                                    range: 132..133,
                                                     value: Int(
                                                         1,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                             Constant(
                                                 ExprConstant {
-                                                    range: 124..125,
+                                                    range: 135..136,
                                                     value: Int(
                                                         2,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -447,28 +468,27 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 133..159,
+            range: 144..170,
             value: FString(
                 ExprFString {
-                    range: 133..159,
+                    range: 144..170,
                     values: [
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 135..158,
+                                range: 146..169,
                                 value: FString(
                                     ExprFString {
-                                        range: 136..152,
+                                        range: 147..163,
                                         values: [
                                             FormattedValue(
                                                 ExprFormattedValue {
-                                                    range: 138..151,
+                                                    range: 149..162,
                                                     value: Constant(
                                                         ExprConstant {
-                                                            range: 139..145,
+                                                            range: 150..156,
                                                             value: Float(
                                                                 3.1415,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                     debug_text: Some(
@@ -481,18 +501,18 @@ expression: parse_ast
                                                     format_spec: Some(
                                                         FString(
                                                             ExprFString {
-                                                                range: 147..150,
+                                                                range: 158..161,
                                                                 values: [
                                                                     Constant(
                                                                         ExprConstant {
-                                                                            range: 147..150,
+                                                                            range: 158..161,
                                                                             value: Str(
                                                                                 StringConstant {
                                                                                     value: ".1f",
+                                                                                    unicode: false,
                                                                                     implicit_concatenated: false,
                                                                                 },
                                                                             ),
-                                                                            kind: None,
                                                                         },
                                                                     ),
                                                                 ],
@@ -511,18 +531,18 @@ expression: parse_ast
                                 format_spec: Some(
                                     FString(
                                         ExprFString {
-                                            range: 153..157,
+                                            range: 164..168,
                                             values: [
                                                 Constant(
                                                     ExprConstant {
-                                                        range: 153..157,
+                                                        range: 164..168,
                                                         value: Str(
                                                             StringConstant {
                                                                 value: "*^20",
+                                                                unicode: false,
                                                                 implicit_concatenated: false,
                                                             },
                                                         ),
-                                                        kind: None,
                                                     },
                                                 ),
                                             ],
@@ -536,6 +556,180 @@ expression: parse_ast
                     implicit_concatenated: false,
                 },
             ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 172..206,
+            value: Dict(
+                ExprDict {
+                    range: 172..206,
+                    keys: [
+                        Some(
+                            FString(
+                                ExprFString {
+                                    range: 173..201,
+                                    values: [
+                                        Constant(
+                                            ExprConstant {
+                                                range: 174..186,
+                                                value: Str(
+                                                    StringConstant {
+                                                        value: "foo bar ",
+                                                        unicode: false,
+                                                        implicit_concatenated: true,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 186..193,
+                                                value: BinOp(
+                                                    ExprBinOp {
+                                                        range: 187..192,
+                                                        left: Name(
+                                                            ExprName {
+                                                                range: 187..188,
+                                                                id: "x",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        op: Add,
+                                                        right: Name(
+                                                            ExprName {
+                                                                range: 191..192,
+                                                                id: "y",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Constant(
+                                            ExprConstant {
+                                                range: 193..200,
+                                                value: Str(
+                                                    StringConstant {
+                                                        value: " baz",
+                                                        unicode: false,
+                                                        implicit_concatenated: true,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    implicit_concatenated: true,
+                                },
+                            ),
+                        ),
+                    ],
+                    values: [
+                        Constant(
+                            ExprConstant {
+                                range: 203..205,
+                                value: Int(
+                                    10,
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 207..269,
+            subject: Name(
+                ExprName {
+                    range: 213..216,
+                    id: "foo",
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 222..269,
+                    pattern: MatchValue(
+                        PatternMatchValue {
+                            range: 227..255,
+                            value: FString(
+                                ExprFString {
+                                    range: 227..255,
+                                    values: [
+                                        Constant(
+                                            ExprConstant {
+                                                range: 228..240,
+                                                value: Str(
+                                                    StringConstant {
+                                                        value: "foo bar ",
+                                                        unicode: false,
+                                                        implicit_concatenated: true,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 240..247,
+                                                value: BinOp(
+                                                    ExprBinOp {
+                                                        range: 241..246,
+                                                        left: Name(
+                                                            ExprName {
+                                                                range: 241..242,
+                                                                id: "x",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        op: Add,
+                                                        right: Name(
+                                                            ExprName {
+                                                                range: 245..246,
+                                                                id: "y",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Constant(
+                                            ExprConstant {
+                                                range: 247..254,
+                                                value: Str(
+                                                    StringConstant {
+                                                        value: " baz",
+                                                        unicode: false,
+                                                        implicit_concatenated: true,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    implicit_concatenated: true,
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 265..269,
+                            },
+                        ),
+                    ],
+                },
+            ],
         },
     ),
 ]
