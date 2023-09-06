@@ -766,11 +766,16 @@ mod tests {
     use crate::configuration::{Configuration, RuleSelection};
     use ruff::codes::Pycodestyle;
     use ruff::registry::{Rule, RuleSet};
+    use ruff::settings::types::PreviewMode;
 
     #[allow(clippy::needless_pass_by_value)]
-    fn resolve_rules(selections: impl IntoIterator<Item = RuleSelection>) -> RuleSet {
+    fn resolve_rules(
+        selections: impl IntoIterator<Item = RuleSelection>,
+        preview: Option<PreviewMode>,
+    ) -> RuleSet {
         Configuration {
             rule_selections: selections.into_iter().collect(),
+            preview,
             ..Configuration::default()
         }
         .as_rule_table()
@@ -780,10 +785,13 @@ mod tests {
 
     #[test]
     fn select_linter() {
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W.into()]),
-            ..RuleSelection::default()
-        }]);
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W.into()]),
+                ..RuleSelection::default()
+            }],
+            None,
+        );
 
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
@@ -798,21 +806,27 @@ mod tests {
 
     #[test]
     fn select_prefix() {
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W6.into()]),
-            ..RuleSelection::default()
-        }]);
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W6.into()]),
+                ..RuleSelection::default()
+            }],
+            None,
+        );
         let expected = RuleSet::from_rule(Rule::InvalidEscapeSequence);
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn select_linter_ignore_code() {
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W.into()]),
-            ignore: vec![Pycodestyle::W292.into()],
-            ..RuleSelection::default()
-        }]);
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W.into()]),
+                ignore: vec![Pycodestyle::W292.into()],
+                ..RuleSelection::default()
+            }],
+            None,
+        );
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
@@ -825,39 +839,48 @@ mod tests {
 
     #[test]
     fn select_code_ignore_linter() {
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W292.into()]),
-            ignore: vec![Pycodestyle::W.into()],
-            ..RuleSelection::default()
-        }]);
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W292.into()]),
+                ignore: vec![Pycodestyle::W.into()],
+                ..RuleSelection::default()
+            }],
+            None,
+        );
         let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn select_code_ignore_code() {
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W605.into()]),
-            ignore: vec![Pycodestyle::W605.into()],
-            ..RuleSelection::default()
-        }]);
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W605.into()]),
+                ignore: vec![Pycodestyle::W605.into()],
+                ..RuleSelection::default()
+            }],
+            None,
+        );
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
     }
 
     #[test]
-    fn select_linter_ignore_code_extend_select_code() {
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                extend_select: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-        ]);
+    fn select_linter_ignore_code_then_extend_select_code() {
+        let actual = resolve_rules(
+            [
+                RuleSelection {
+                    select: Some(vec![Pycodestyle::W.into()]),
+                    ignore: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    extend_select: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+            ],
+            None,
+        );
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::MissingNewlineAtEndOfFile,
@@ -871,35 +894,41 @@ mod tests {
 
     #[test]
     fn select_linter_ignore_code_then_extend_select_code_ignore_linter() {
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                extend_select: vec![Pycodestyle::W292.into()],
-                ignore: vec![Pycodestyle::W.into()],
-                ..RuleSelection::default()
-            },
-        ]);
+        let actual = resolve_rules(
+            [
+                RuleSelection {
+                    select: Some(vec![Pycodestyle::W.into()]),
+                    ignore: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    extend_select: vec![Pycodestyle::W292.into()],
+                    ignore: vec![Pycodestyle::W.into()],
+                    ..RuleSelection::default()
+                },
+            ],
+            None,
+        );
         let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn ignore_code_then_select_linter() {
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ..RuleSelection::default()
-            },
-        ]);
+        let actual = resolve_rules(
+            [
+                RuleSelection {
+                    select: Some(vec![]),
+                    ignore: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    select: Some(vec![Pycodestyle::W.into()]),
+                    ..RuleSelection::default()
+                },
+            ],
+            None,
+        );
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
@@ -912,18 +941,21 @@ mod tests {
 
     #[test]
     fn ignore_code_then_select_linter_ignore_code() {
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W505.into()],
-                ..RuleSelection::default()
-            },
-        ]);
+        let actual = resolve_rules(
+            [
+                RuleSelection {
+                    select: Some(vec![]),
+                    ignore: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    select: Some(vec![Pycodestyle::W.into()]),
+                    ignore: vec![Pycodestyle::W505.into()],
+                    ..RuleSelection::default()
+                },
+            ],
+            None,
+        );
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
