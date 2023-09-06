@@ -134,21 +134,21 @@ pub enum Stmt {
 ///
 /// ## Syntax
 ///
+/// `<IpyEscapeKind><Command value>`
+///
 /// The simplest form is an escape kind token followed by the command value. For example,
 /// `%matplotlib inline`, `/foo`, `!pwd`, etc.
 ///
-///         `<IpyEscapeKind><Command value>`
+/// `<Command value><IpyEscapeKind ("?" or "??")>`
 ///
 /// The help end escape command would be the reverse of the above syntax. Here, the
 /// escape kind token can only be either `?` or `??` and it is at the end of the line.
 /// For example, `str.replace?`, `math.pi??`, etc.
 ///
-///         `<Command value><IpyEscapeKind ("?" or "??")>`
+/// `<IpyEscapeKind><Command value><EscapeKind ("?" or "??")>`
 ///
 /// The final syntax is the combined version of the above two. For example, `%matplotlib?`,
 /// `%%timeit??`, etc.
-///
-///         `<IpyEscapeKind><Command value><EscapeKind ("?" or "??")>`
 ///
 /// [Escape kind]: IpyEscapeKind
 #[derive(Clone, Debug, PartialEq)]
