@@ -134,7 +134,11 @@ pub(crate) fn suppressible_exception(
         stmt.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !checker.indexer().has_comments(stmt, checker.locator()) {
+        if !checker.indexer().has_comments(stmt, checker.locator())
+            && !checker
+                .indexer()
+                .in_multi_statement_line(stmt, checker.locator())
+        {
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import("contextlib", "suppress"),
