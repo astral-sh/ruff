@@ -1,6 +1,6 @@
 use crate::comments::format::empty_lines_before_trailing_comments;
 use ruff_formatter::write;
-use ruff_python_ast::{Parameters, StmtFunctionDef};
+use ruff_python_ast::{Parameters, PySourceType, StmtFunctionDef};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
@@ -164,15 +164,13 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         //
         // # comment
         // ```
-        empty_lines_before_trailing_comments(
-            comments.trailing(item),
-            if f.context().node_level() == NodeLevel::TopLevel {
-                2
-            } else {
-                1
-            },
-        )
-        .fmt(f)
+        let empty_lines = match (f.options().source_type(), f.context().node_level()) {
+            (PySourceType::Stub, NodeLevel::TopLevel) => 1,
+            (PySourceType::Stub, _) => 0,
+            (_, NodeLevel::TopLevel) => 2,
+            (_, _) => 1,
+        };
+        empty_lines_before_trailing_comments(comments.trailing(item), empty_lines).fmt(f)
     }
 
     fn fmt_dangling_comments(
