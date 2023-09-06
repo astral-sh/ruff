@@ -14,7 +14,7 @@ pub struct FormatExprBinOp;
 impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
     #[inline]
     fn fmt_fields(&self, item: &ExprBinOp, f: &mut PyFormatter) -> FormatResult<()> {
-        BinaryLike(item).fmt(f)
+        BinaryLike::BinaryExpression(item).fmt(f)
     }
 
     fn fmt_dangling_comments(
