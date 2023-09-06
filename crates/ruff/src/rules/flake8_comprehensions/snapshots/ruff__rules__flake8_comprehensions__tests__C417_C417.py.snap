@@ -290,4 +290,57 @@ C417.py:35:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
 37 37 | # Ok because of the default parameters, and variadic arguments.
 38 38 | map(lambda x=1: x, nums)
 
+C417.py:46:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+45 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
+46 | map(lambda x: x, y if y else z)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+47 | map(lambda x: x, (y if y else z))
+48 | map(lambda x: x, (x, y, z))
+   |
+   = help: Replace `map` with a generator expression
+
+ℹ Suggested fix
+43 43 | dict(map(lambda k, v: (k, v), keys, values))
+44 44 | 
+45 45 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
+46    |-map(lambda x: x, y if y else z)
+   46 |+(x for x in (y if y else z))
+47 47 | map(lambda x: x, (y if y else z))
+48 48 | map(lambda x: x, (x, y, z))
+
+C417.py:47:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+45 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
+46 | map(lambda x: x, y if y else z)
+47 | map(lambda x: x, (y if y else z))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+48 | map(lambda x: x, (x, y, z))
+   |
+   = help: Replace `map` with a generator expression
+
+ℹ Suggested fix
+44 44 | 
+45 45 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
+46 46 | map(lambda x: x, y if y else z)
+47    |-map(lambda x: x, (y if y else z))
+   47 |+(x for x in (y if y else z))
+48 48 | map(lambda x: x, (x, y, z))
+
+C417.py:48:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+46 | map(lambda x: x, y if y else z)
+47 | map(lambda x: x, (y if y else z))
+48 | map(lambda x: x, (x, y, z))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+   |
+   = help: Replace `map` with a generator expression
+
+ℹ Suggested fix
+45 45 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
+46 46 | map(lambda x: x, y if y else z)
+47 47 | map(lambda x: x, (y if y else z))
+48    |-map(lambda x: x, (x, y, z))
+   48 |+(x for x in (x, y, z))
+
 

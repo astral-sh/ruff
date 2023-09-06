@@ -3,8 +3,8 @@ use itertools::Itertools;
 use libcst_native::{
     Arg, AssignEqual, AssignTargetExpression, Call, Comment, CompFor, Dict, DictComp, DictElement,
     Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen, LeftSquareBracket,
-    List, ListComp, Name, ParenthesizableWhitespace, ParenthesizedWhitespace, RightCurlyBrace,
-    RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
+    List, ListComp, Name, ParenthesizableWhitespace, ParenthesizedNode, ParenthesizedWhitespace,
+    RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
 use ruff_python_ast::Expr;
@@ -938,134 +938,135 @@ pub(crate) fn fix_unnecessary_map(
     let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
 
-    let (args, lambda_func) = match &arg.value {
-        Expression::Call(outer_call) => {
-            let inner_lambda = outer_call.args.first().unwrap().value.clone();
-            match &inner_lambda {
-                Expression::Lambda(..) => (outer_call.args.clone(), inner_lambda),
-                _ => {
-                    bail!("Expected a lambda function")
-                }
-            }
+    let (lambda, iter) = match call.args.as_slice() {
+        [call] => {
+            let call = match_call(&call.value)?;
+            let [lambda, iter] = call.args.as_slice() else {
+                bail!("Expected two arguments");
+            };
+            let lambda = match_lambda(&lambda.value)?;
+            let iter = &iter.value;
+            (lambda, iter)
         }
-        Expression::Lambda(..) => (call.args.clone(), arg.value.clone()),
-        _ => {
-            bail!("Expected a lambda or call")
+        [lambda, iter] => {
+            let lambda = match_lambda(&lambda.value)?;
+            let iter = &iter.value;
+            (lambda, iter)
         }
+        _ => bail!("Expected a call or lambda"),
     };
 
-    let func_body = match_lambda(&lambda_func)?;
+    // Format the lambda arguments as a comma-separated list.
+    let mut args_str = lambda.params.params.iter().map(|f| f.name.value).join(", ");
+    if args_str.is_empty() {
+        args_str = "_".to_string();
+    }
 
-    if args.len() == 2 {
-        if func_body.params.params.iter().any(|f| f.default.is_some()) {
-            bail!("Currently not supporting default values");
+    // Parenthesize the iterator, if necessary, as in:
+    // ```python
+    // map(lambda x: x, y if y else z)
+    // ```
+    let iter = iter.clone();
+    let iter = if iter.lpar().is_empty()
+        && iter.rpar().is_empty()
+        && matches!(iter, Expression::IfExp(_) | Expression::Lambda(_))
+    {
+        iter.with_parens(LeftParen::default(), RightParen::default())
+    } else {
+        iter
+    };
+
+    let compfor = Box::new(CompFor {
+        target: AssignTargetExpression::Name(Box::new(Name {
+            value: args_str.as_str(),
+            lpar: vec![],
+            rpar: vec![],
+        })),
+        iter,
+        ifs: vec![],
+        inner_for_in: None,
+        asynchronous: None,
+        whitespace_before: space(),
+        whitespace_after_for: space(),
+        whitespace_before_in: space(),
+        whitespace_after_in: space(),
+    });
+
+    match object_type {
+        ObjectType::Generator => {
+            tree = Expression::GeneratorExp(Box::new(GeneratorExp {
+                elt: lambda.body.clone(),
+                for_in: compfor,
+                lpar: vec![LeftParen::default()],
+                rpar: vec![RightParen::default()],
+            }));
         }
-
-        let mut args_str = func_body
-            .params
-            .params
-            .iter()
-            .map(|f| f.name.value)
-            .join(", ");
-        if args_str.is_empty() {
-            args_str = "_".to_string();
-        }
-
-        let compfor = Box::new(CompFor {
-            target: AssignTargetExpression::Name(Box::new(Name {
-                value: args_str.as_str(),
+        ObjectType::List => {
+            tree = Expression::ListComp(Box::new(ListComp {
+                elt: lambda.body.clone(),
+                for_in: compfor,
+                lbracket: LeftSquareBracket::default(),
+                rbracket: RightSquareBracket::default(),
                 lpar: vec![],
                 rpar: vec![],
-            })),
-            iter: args.last().unwrap().value.clone(),
-            ifs: vec![],
-            inner_for_in: None,
-            asynchronous: None,
-            whitespace_before: space(),
-            whitespace_after_for: space(),
-            whitespace_before_in: space(),
-            whitespace_after_in: space(),
-        });
-
-        match object_type {
-            ObjectType::Generator => {
-                tree = Expression::GeneratorExp(Box::new(GeneratorExp {
-                    elt: func_body.body.clone(),
-                    for_in: compfor,
-                    lpar: vec![LeftParen::default()],
-                    rpar: vec![RightParen::default()],
-                }));
-            }
-            ObjectType::List => {
-                tree = Expression::ListComp(Box::new(ListComp {
-                    elt: func_body.body.clone(),
-                    for_in: compfor,
-                    lbracket: LeftSquareBracket::default(),
-                    rbracket: RightSquareBracket::default(),
-                    lpar: vec![],
-                    rpar: vec![],
-                }));
-            }
-            ObjectType::Set => {
-                tree = Expression::SetComp(Box::new(SetComp {
-                    elt: func_body.body.clone(),
-                    for_in: compfor,
-                    lpar: vec![],
-                    rpar: vec![],
-                    lbrace: LeftCurlyBrace::default(),
-                    rbrace: RightCurlyBrace::default(),
-                }));
-            }
-            ObjectType::Dict => {
-                let elements = match func_body.body.as_ref() {
-                    Expression::Tuple(tuple) => &tuple.elements,
-                    Expression::List(list) => &list.elements,
-                    _ => {
-                        bail!("Expected tuple or list for dictionary comprehension")
-                    }
-                };
-                let [key, value] = elements.as_slice() else {
-                    bail!("Expected container to include two elements");
-                };
-                let Element::Simple { value: key, .. } = key else {
-                    bail!("Expected container to use a key as the first element");
-                };
-                let Element::Simple { value, .. } = value else {
-                    bail!("Expected container to use a value as the second element");
-                };
-
-                tree = Expression::DictComp(Box::new(DictComp {
-                    for_in: compfor,
-                    lpar: vec![],
-                    rpar: vec![],
-                    key: Box::new(key.clone()),
-                    value: Box::new(value.clone()),
-                    lbrace: LeftCurlyBrace::default(),
-                    rbrace: RightCurlyBrace::default(),
-                    whitespace_before_colon: ParenthesizableWhitespace::default(),
-                    whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(
-                        SimpleWhitespace(" "),
-                    ),
-                }));
-            }
+            }));
         }
-
-        let mut content = tree.codegen_stylist(stylist);
-
-        // If the expression is embedded in an f-string, surround it with spaces to avoid
-        // syntax errors.
-        if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
-            if parent.is_some_and(Expr::is_formatted_value_expr) {
-                content = format!(" {content} ");
-            }
+        ObjectType::Set => {
+            tree = Expression::SetComp(Box::new(SetComp {
+                elt: lambda.body.clone(),
+                for_in: compfor,
+                lpar: vec![],
+                rpar: vec![],
+                lbrace: LeftCurlyBrace::default(),
+                rbrace: RightCurlyBrace::default(),
+            }));
         }
+        ObjectType::Dict => {
+            let elements = match lambda.body.as_ref() {
+                Expression::Tuple(tuple) => &tuple.elements,
+                Expression::List(list) => &list.elements,
+                _ => {
+                    bail!("Expected tuple or list for dictionary comprehension")
+                }
+            };
+            let [key, value] = elements.as_slice() else {
+                bail!("Expected container to include two elements");
+            };
+            let Element::Simple { value: key, .. } = key else {
+                bail!("Expected container to use a key as the first element");
+            };
+            let Element::Simple { value, .. } = value else {
+                bail!("Expected container to use a value as the second element");
+            };
 
-        Ok(Edit::range_replacement(content, expr.range()))
-    } else {
-        bail!("Should have two arguments");
+            tree = Expression::DictComp(Box::new(DictComp {
+                for_in: compfor,
+                lpar: vec![],
+                rpar: vec![],
+                key: Box::new(key.clone()),
+                value: Box::new(value.clone()),
+                lbrace: LeftCurlyBrace::default(),
+                rbrace: RightCurlyBrace::default(),
+                whitespace_before_colon: ParenthesizableWhitespace::default(),
+                whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(
+                    SimpleWhitespace(" "),
+                ),
+            }));
+        }
     }
+
+    let mut content = tree.codegen_stylist(stylist);
+
+    // If the expression is embedded in an f-string, surround it with spaces to avoid
+    // syntax errors.
+    if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
+        if parent.is_some_and(Expr::is_formatted_value_expr) {
+            content = format!(" {content} ");
+        }
+    }
+
+    Ok(Edit::range_replacement(content, expr.range()))
 }
 
 /// (C418) Convert `dict({"a": 1})` to `{"a": 1}`
