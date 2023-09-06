@@ -25,10 +25,10 @@ expression: parse_ast
                                     value: Str(
                                         StringConstant {
                                             value: "Hello world",
+                                            unicode: false,
                                             implicit_concatenated: false,
                                         },
                                     ),
-                                    kind: None,
                                 },
                             ),
                             Constant(
@@ -37,7 +37,6 @@ expression: parse_ast
                                     value: Int(
                                         2,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         ],

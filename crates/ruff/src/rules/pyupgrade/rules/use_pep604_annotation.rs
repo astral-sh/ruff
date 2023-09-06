@@ -121,7 +121,6 @@ fn optional(expr: &Expr) -> Expr {
         op: Operator::BitOr,
         right: Box::new(Expr::Constant(ast::ExprConstant {
             value: Constant::None,
-            kind: None,
             range: TextRange::default(),
         })),
         range: TextRange::default(),

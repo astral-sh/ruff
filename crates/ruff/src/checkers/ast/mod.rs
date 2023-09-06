@@ -1188,7 +1188,6 @@ where
             }
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
-                kind: _,
                 range: _,
             }) => {
                 if self.semantic.in_type_definition()

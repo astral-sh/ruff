@@ -40,6 +40,7 @@ impl From<LiteralType> for Constant {
         match value {
             LiteralType::Str => Constant::Str(ast::StringConstant {
                 value: String::new(),
+                unicode: false,
                 implicit_concatenated: false,
             }),
             LiteralType::Bytes => Constant::Bytes(ast::BytesConstant {

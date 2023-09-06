@@ -325,7 +325,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -365,7 +364,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -439,7 +437,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -498,7 +495,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -549,7 +545,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },

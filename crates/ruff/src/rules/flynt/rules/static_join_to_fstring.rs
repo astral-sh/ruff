@@ -86,7 +86,6 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
                 .join(joiner)
                 .into(),
             range: TextRange::default(),
-            kind: None,
         };
         return Some(node.into());
     }

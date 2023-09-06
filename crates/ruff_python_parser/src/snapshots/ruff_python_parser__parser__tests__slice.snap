@@ -22,7 +22,6 @@ Subscript(
                             value: Int(
                                 1,
                             ),
-                            kind: None,
                         },
                     ),
                 ),
@@ -33,7 +32,6 @@ Subscript(
                             value: Int(
                                 2,
                             ),
-                            kind: None,
                         },
                     ),
                 ),
@@ -44,7 +42,6 @@ Subscript(
                             value: Int(
                                 3,
                             ),
-                            kind: None,
                         },
                     ),
                 ),

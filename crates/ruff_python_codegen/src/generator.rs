@@ -1078,14 +1078,7 @@ impl<'a> Generator<'a> {
             Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, false);
             }
-            Expr::Constant(ast::ExprConstant {
-                value,
-                kind,
-                range: _,
-            }) => {
-                if let Some(kind) = kind {
-                    self.p(kind);
-                }
+            Expr::Constant(ast::ExprConstant { value, range: _ }) => {
                 self.unparse_constant(value);
             }
             Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
@@ -1168,7 +1161,10 @@ impl<'a> Generator<'a> {
             Constant::Bytes(b) => {
                 self.p_bytes_repr(b);
             }
-            Constant::Str(ast::StringConstant { value, .. }) => {
+            Constant::Str(ast::StringConstant { value, unicode, .. }) => {
+                if *unicode {
+                    self.p("u");
+                }
                 self.p_str_repr(value);
             }
             Constant::None => self.p("None"),

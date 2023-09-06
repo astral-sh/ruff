@@ -35,7 +35,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                                 Starred(
@@ -61,7 +60,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -99,7 +97,6 @@ expression: parse_ast
                                             value: Int(
                                                 0,
                                             ),
-                                            kind: None,
                                         },
                                     ),
                                     Starred(
@@ -125,7 +122,6 @@ expression: parse_ast
                                                     value: Int(
                                                         1,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         },
@@ -226,7 +222,6 @@ expression: parse_ast
                                                     value: Int(
                                                         3,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ),
@@ -237,7 +232,6 @@ expression: parse_ast
                                                     value: Int(
                                                         5,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ),

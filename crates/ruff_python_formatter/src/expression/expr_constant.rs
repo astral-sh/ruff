@@ -35,11 +35,7 @@ impl FormatRuleWithOptions<ExprConstant, PyFormatContext<'_>> for FormatExprCons
 
 impl FormatNodeRule<ExprConstant> for FormatExprConstant {
     fn fmt_fields(&self, item: &ExprConstant, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprConstant {
-            range: _,
-            value,
-            kind: _,
-        } = item;
+        let ExprConstant { range: _, value } = item;
 
         match value {
             Constant::Ellipsis => token("...").fmt(f),

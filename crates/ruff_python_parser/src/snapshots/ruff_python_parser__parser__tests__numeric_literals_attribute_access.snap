@@ -27,7 +27,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Float(
                                         0.1,
                                     ),
-                                    kind: None,
                                 },
                             ),
                             attr: Identifier {
@@ -67,7 +66,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             value: Float(
                                 1.0,
                             ),
-                            kind: None,
                         },
                     ),
                     attr: Identifier {
@@ -100,7 +98,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             value: Float(
                                 10.0,
                             ),
-                            kind: None,
                         },
                     ),
                     attr: Identifier {
@@ -133,7 +130,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             value: Float(
                                 0.1,
                             ),
-                            kind: None,
                         },
                     ),
                     attr: Identifier {
@@ -169,7 +165,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Float(
                                         123456789.12345679,
                                     ),
-                                    kind: None,
                                 },
                             ),
                             attr: Identifier {
@@ -209,7 +204,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             value: Float(
                                 inf,
                             ),
-                            kind: None,
                         },
                     ),
                     attr: Identifier {
@@ -245,7 +239,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Float(
                                         inf,
                                     ),
-                                    kind: None,
                                 },
                             ),
                             attr: Identifier {
@@ -286,7 +279,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 real: 0.0,
                                 imag: 123456789.0,
                             },
-                            kind: None,
                         },
                     ),
                     attr: Identifier {
@@ -323,7 +315,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         real: 0.0,
                                         imag: 123456789.12345679,
                                     },
-                                    kind: None,
                                 },
                             ),
                             attr: Identifier {
@@ -348,7 +339,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                     value: Int(
                                                         11,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                             attr: Identifier {
@@ -396,7 +386,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Int(
                                         727756,
                                     ),
-                                    kind: None,
                                 },
                             ),
                             attr: Identifier {
@@ -439,7 +428,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Int(
                                         11,
                                     ),
-                                    kind: None,
                                 },
                             ),
                             attr: Identifier {
@@ -479,7 +467,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             value: Int(
                                 511,
                             ),
-                            kind: None,
                         },
                     ),
                     attr: Identifier {
@@ -515,7 +502,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     value: Float(
                                         6e-9,
                                     ),
-                                    kind: None,
                                 },
                             ),
                             attr: Identifier {
@@ -557,7 +543,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 real: 0.0,
                                 imag: 100.0,
                             },
-                            kind: None,
                         },
                     ),
                 },
@@ -576,7 +561,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             value: Int(
                                 10,
                             ),
-                            kind: None,
                         },
                     ),
                     attr: Identifier {
@@ -594,7 +578,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 363..366,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -624,7 +607,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             value: Int(
                                 100,
                             ),
-                            kind: None,
                         },
                     ),
                     slice: Name(
@@ -660,7 +642,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             value: Int(
                                 100,
                             ),
-                            kind: None,
                         },
                     ),
                     arguments: Arguments {

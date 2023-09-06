@@ -454,7 +454,6 @@ fn check_dynamically_typed<F>(
     if let Expr::Constant(ast::ExprConstant {
         range,
         value: Constant::Str(string),
-        ..
     }) = annotation
     {
         // Quoted annotations

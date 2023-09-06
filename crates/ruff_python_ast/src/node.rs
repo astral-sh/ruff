@@ -2682,11 +2682,7 @@ impl AstNode for ast::ExprConstant {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprConstant {
-            value,
-            range: _,
-            kind: _,
-        } = self;
+        let ast::ExprConstant { value, range: _ } = self;
         visitor.visit_constant(value);
     }
 }
