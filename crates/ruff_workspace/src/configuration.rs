@@ -812,6 +812,8 @@ mod tests {
         Rule::DeleteFullSlice,
         Rule::CheckAndRemoveFromSet,
         Rule::QuadraticListSummation,
+        #[cfg(feature = "unreachable-code")]
+        Rule::UnreachableCode,
     ];
 
     #[allow(clippy::needless_pass_by_value)]
