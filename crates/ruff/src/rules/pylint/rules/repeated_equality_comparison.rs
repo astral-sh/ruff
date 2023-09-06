@@ -44,14 +44,14 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[violation]
-pub struct RepeatedEqualityComparisonTarget {
+pub struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
 }
 
-impl Violation for RepeatedEqualityComparisonTarget {
+impl Violation for RepeatedEqualityComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RepeatedEqualityComparisonTarget { expression } = self;
+        let RepeatedEqualityComparison { expression } = self;
         if let Some(expression) = expression.full_display() {
             format!(
                 "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
@@ -65,10 +65,7 @@ impl Violation for RepeatedEqualityComparisonTarget {
 }
 
 /// PLR1714
-pub(crate) fn repeated_equality_comparison_target(
-    checker: &mut Checker,
-    bool_op: &ast::ExprBoolOp,
-) {
+pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast::ExprBoolOp) {
     if bool_op
         .values
         .iter()
@@ -117,7 +114,7 @@ pub(crate) fn repeated_equality_comparison_target(
     for (value, (count, comparators)) in value_to_comparators {
         if count > 1 {
             checker.diagnostics.push(Diagnostic::new(
-                RepeatedEqualityComparisonTarget {
+                RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
                         value.as_expr(),
                         bool_op.op,

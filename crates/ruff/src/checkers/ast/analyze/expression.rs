@@ -1351,8 +1351,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ExprAndFalse) {
                 flake8_simplify::rules::expr_and_false(checker, expr);
             }
-            if checker.enabled(Rule::RepeatedEqualityComparisonTarget) {
-                pylint::rules::repeated_equality_comparison_target(checker, bool_op);
+            if checker.enabled(Rule::RepeatedEqualityComparison) {
+                pylint::rules::repeated_equality_comparison(checker, bool_op);
             }
         }
         _ => {}
