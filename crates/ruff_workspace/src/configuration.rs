@@ -812,8 +812,6 @@ mod tests {
         Rule::DeleteFullSlice,
         Rule::CheckAndRemoveFromSet,
         Rule::QuadraticListSummation,
-        #[cfg(feature = "unreachable-code")]
-        Rule::UnreachableCode,
     ];
 
     #[allow(clippy::needless_pass_by_value)]
@@ -828,6 +826,8 @@ mod tests {
         }
         .as_rule_table()
         .iter_enabled()
+        // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is off-by-default
+        .filter(|rule| rule.noqa_code() != "RUF014")
         .collect()
     }
 
