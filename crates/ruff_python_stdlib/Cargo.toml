@@ -13,3 +13,4 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+unic-ucd-ident = "0.9.0"
