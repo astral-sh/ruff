@@ -50,11 +50,16 @@ tracing = "0.1.37"
 tracing-indicatif = "0.3.4"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 unicode-width = "0.1.10"
-uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
+uuid = { version = "1.4.1", features = [
+    "v4",
+    "fast-rng",
+    "macro-diagnostics",
+    "js",
+] }
 wsl = { version = "0.1.0" }
 
 # v1.0.1
-libcst = { version = "0.1.0" }
+libcst = { version = "0.1.0", default-features = false }
 
 [profile.release]
 lto = "fat"
