@@ -19,6 +19,7 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 
+mod binary_like;
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
