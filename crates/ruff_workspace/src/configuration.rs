@@ -787,6 +787,46 @@ mod tests {
     fn select_linter() {
         let actual = resolve_rules(
             [RuleSelection {
+                select: Some(vec![Linter::Pycodestyle.into()]),
+                ..RuleSelection::default()
+            }],
+            None,
+        );
+
+        let expected = RuleSet::from_rules(&[
+            Rule::MixedSpacesAndTabs,
+            Rule::MultipleImportsOnOneLine,
+            Rule::ModuleImportNotAtTopOfFile,
+            Rule::LineTooLong,
+            Rule::MultipleStatementsOnOneLineColon,
+            Rule::MultipleStatementsOnOneLineSemicolon,
+            Rule::UselessSemicolon,
+            Rule::NoneComparison,
+            Rule::TrueFalseComparison,
+            Rule::NotInTest,
+            Rule::NotIsTest,
+            Rule::TypeComparison,
+            Rule::BareExcept,
+            Rule::LambdaAssignment,
+            Rule::AmbiguousVariableName,
+            Rule::AmbiguousClassName,
+            Rule::AmbiguousFunctionName,
+            Rule::IOError,
+            Rule::SyntaxError,
+            Rule::TabIndentation,
+            Rule::TrailingWhitespace,
+            Rule::MissingNewlineAtEndOfFile,
+            Rule::BlankLineWithWhitespace,
+            Rule::DocLineTooLong,
+            Rule::InvalidEscapeSequence,
+        ]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_one_char_prefix() {
+        let actual = resolve_rules(
+            [RuleSelection {
                 select: Some(vec![Pycodestyle::W.into()]),
                 ..RuleSelection::default()
             }],
@@ -805,7 +845,7 @@ mod tests {
     }
 
     #[test]
-    fn select_prefix() {
+    fn select_two_char_prefix() {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Pycodestyle::W6.into()]),
@@ -818,7 +858,7 @@ mod tests {
     }
 
     #[test]
-    fn select_linter_ignore_code() {
+    fn select_prefix_ignore_code() {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Pycodestyle::W.into()]),
@@ -838,7 +878,7 @@ mod tests {
     }
 
     #[test]
-    fn select_code_ignore_linter() {
+    fn select_code_ignore_prefix() {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Pycodestyle::W292.into()]),
@@ -866,7 +906,7 @@ mod tests {
     }
 
     #[test]
-    fn select_linter_ignore_code_then_extend_select_code() {
+    fn select_prefix_ignore_code_then_extend_select_code() {
         let actual = resolve_rules(
             [
                 RuleSelection {
@@ -893,7 +933,7 @@ mod tests {
     }
 
     #[test]
-    fn select_linter_ignore_code_then_extend_select_code_ignore_linter() {
+    fn select_prefix_ignore_code_then_extend_select_code_ignore_prefix() {
         let actual = resolve_rules(
             [
                 RuleSelection {
@@ -914,7 +954,7 @@ mod tests {
     }
 
     #[test]
-    fn ignore_code_then_select_linter() {
+    fn ignore_code_then_select_prefix() {
         let actual = resolve_rules(
             [
                 RuleSelection {
@@ -940,7 +980,7 @@ mod tests {
     }
 
     #[test]
-    fn ignore_code_then_select_linter_ignore_code() {
+    fn ignore_code_then_select_prefix_ignore_code() {
         let actual = resolve_rules(
             [
                 RuleSelection {
