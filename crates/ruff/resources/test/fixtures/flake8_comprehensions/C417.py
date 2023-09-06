@@ -41,3 +41,8 @@ map(lambda **kwargs: len(kwargs), range(4))
 
 # Ok because multiple arguments are allowed.
 dict(map(lambda k, v: (k, v), keys, values))
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7121
+map(lambda x: x, y if y else z)
+map(lambda x: x, (y if y else z))
+map(lambda x: x, (x, y, z))
