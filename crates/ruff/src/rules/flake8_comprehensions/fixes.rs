@@ -16,6 +16,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
+use crate::autofix::edits::pad;
 use crate::cst::helpers::space;
 use crate::rules::flake8_comprehensions::rules::ObjectType;
 use crate::{
@@ -922,7 +923,7 @@ pub(crate) fn fix_unnecessary_comprehension(
     }
 
     Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
+        pad(tree.codegen_stylist(stylist), expr.range(), locator),
         expr.range(),
     ))
 }
