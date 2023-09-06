@@ -1240,6 +1240,14 @@ pub struct Flake8SelfOptions {
     )]
     /// A list of names to ignore when considering `flake8-self` violations.
     pub ignore_names: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"extend-ignore-names = ["_base_manager", "_default_manager",  "_meta"]"#
+    )]
+    /// Additional names to ignore when considering `flake8-self` violations,
+    /// in addition to those included in `ignore-names`.
+    pub extend_ignore_names: Option<Vec<String>>,
 }
 
 impl Flake8SelfOptions {
@@ -1248,7 +1256,9 @@ impl Flake8SelfOptions {
             ignore_names: self.ignore_names.unwrap_or_else(|| {
                 flake8_self::settings::IGNORE_NAMES
                     .map(String::from)
-                    .to_vec()
+                    .into_iter()
+                    .chain(self.extend_ignore_names.unwrap_or_default())
+                    .collect()
             }),
         }
     }
