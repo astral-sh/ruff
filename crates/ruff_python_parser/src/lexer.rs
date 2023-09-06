@@ -580,6 +580,82 @@ impl<'source> Lexer<'source> {
             }
         }
 
+        if self.state.is_after_newline() {
+            if let Some(indentation) = self.eat_indentation()? {
+                return Ok(indentation);
+            }
+        } else {
+            self.skip_whitespace()?;
+        }
+
+        self.cursor.start_token();
+        if let Some(c) = self.cursor.bump() {
+            if c.is_ascii() {
+                self.consume_ascii_character(c)
+            } else if is_unicode_identifier_start(c) {
+                let identifier = self.lex_identifier(c)?;
+                self.state = State::Other;
+
+                Ok((identifier, self.token_range()))
+            } else if is_emoji_presentation(c) {
+                self.state = State::Other;
+
+                Ok((
+                    Tok::Name {
+                        name: c.to_string(),
+                    },
+                    self.token_range(),
+                ))
+            } else {
+                Err(LexicalError {
+                    error: LexicalErrorType::UnrecognizedToken { tok: c },
+                    location: self.token_start(),
+                })
+            }
+        } else {
+            // Reached the end of the file. Emit a trailing newline token if not at the beginning of a logical line,
+            // empty the dedent stack, and finally, return the EndOfFile token.
+            self.consume_end()
+        }
+    }
+
+    fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
+        loop {
+            match self.cursor.first() {
+                ' ' => {
+                    self.cursor.bump();
+                }
+                '\t' => {
+                    self.cursor.bump();
+                }
+                '\\' => {
+                    self.cursor.bump();
+                    if self.cursor.eat_char('\r') {
+                        self.cursor.eat_char('\n');
+                    } else if self.cursor.is_eof() {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::Eof,
+                            location: self.token_start(),
+                        });
+                    } else if !self.cursor.eat_char('\n') {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::LineContinuationError,
+                            location: self.token_start(),
+                        });
+                    }
+                }
+                // Form feed
+                '\x0C' => {
+                    self.cursor.bump();
+                }
+                _ => break,
+            }
+        }
+
+        Ok(())
+    }
+
+    fn eat_indentation(&mut self) -> Result<Option<Spanned>, LexicalError> {
         let mut indentation = Indentation::root();
         self.cursor.start_token();
 
@@ -619,48 +695,18 @@ impl<'source> Lexer<'source> {
             }
         }
 
-        if self.state.is_after_newline() {
-            // Handle indentation if this is a new, not all empty, logical line
-            if !matches!(self.cursor.first(), '\n' | '\r' | '#' | EOF_CHAR) {
-                self.state = State::NonEmptyLogicalLine;
+        // Handle indentation if this is a new, not all empty, logical line
+        if !matches!(self.cursor.first(), '\n' | '\r' | '#' | EOF_CHAR) {
+            self.state = State::NonEmptyLogicalLine;
 
-                if let Some(spanned) = self.handle_indentation(indentation)? {
-                    // Set to false so that we don't handle indentation on the next call.
+            if let Some(spanned) = self.handle_indentation(indentation)? {
+                // Set to false so that we don't handle indentation on the next call.
 
-                    return Ok(spanned);
-                }
+                return Ok(Some(spanned));
             }
         }
 
-        self.cursor.start_token();
-        if let Some(c) = self.cursor.bump() {
-            if c.is_ascii() {
-                self.consume_ascii_character(c)
-            } else if is_unicode_identifier_start(c) {
-                let identifier = self.lex_identifier(c)?;
-                self.state = State::Other;
-
-                Ok((identifier, self.token_range()))
-            } else if is_emoji_presentation(c) {
-                self.state = State::Other;
-
-                Ok((
-                    Tok::Name {
-                        name: c.to_string(),
-                    },
-                    self.token_range(),
-                ))
-            } else {
-                Err(LexicalError {
-                    error: LexicalErrorType::UnrecognizedToken { tok: c },
-                    location: self.token_start(),
-                })
-            }
-        } else {
-            // Reached the end of the file. Emit a trailing newline token if not at the beginning of a logical line,
-            // empty the dedent stack, and finally, return the EndOfFile token.
-            self.consume_end()
-        }
+        Ok(None)
     }
 
     fn handle_indentation(
