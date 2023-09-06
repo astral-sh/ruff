@@ -3,12 +3,14 @@ pub mod tag;
 
 use std::borrow::Cow;
 use std::hash::{Hash, Hasher};
+use std::num::NonZeroU32;
 use std::ops::Deref;
 use std::rc::Rc;
+use unicode_width::UnicodeWidthChar;
 
 use crate::format_element::tag::{GroupMode, LabelId, Tag};
 use crate::source_code::SourceCodeSlice;
-use crate::TagKind;
+use crate::{TabWidth, TagKind};
 use ruff_text_size::TextSize;
 
 /// Language agnostic IR for formatting source code.
@@ -37,13 +39,13 @@ pub enum FormatElement {
     Text {
         /// There's no need for the text to be mutable, using `Box<str>` safes 8 bytes over `String`.
         text: Box<str>,
+        text_width: TextWidth,
     },
 
     /// Text that gets emitted as it is in the source code. Optimized to avoid any allocations.
     SourceCodeSlice {
         slice: SourceCodeSlice,
-        /// Whether the string contains any new line characters
-        contains_newlines: bool,
+        text_width: TextWidth,
     },
 
     /// Prevents that line suffixes move past this boundary. Forces the printer to print any pending
@@ -73,13 +75,10 @@ impl std::fmt::Debug for FormatElement {
             FormatElement::ExpandParent => write!(fmt, "ExpandParent"),
             FormatElement::Token { text } => fmt.debug_tuple("Token").field(text).finish(),
             FormatElement::Text { text, .. } => fmt.debug_tuple("DynamicText").field(text).finish(),
-            FormatElement::SourceCodeSlice {
-                slice,
-                contains_newlines,
-            } => fmt
+            FormatElement::SourceCodeSlice { slice, text_width } => fmt
                 .debug_tuple("Text")
                 .field(slice)
-                .field(contains_newlines)
+                .field(text_width)
                 .finish(),
             FormatElement::LineSuffixBoundary => write!(fmt, "LineSuffixBoundary"),
             FormatElement::BestFitting { variants, mode } => fmt
@@ -255,11 +254,8 @@ impl FormatElements for FormatElement {
             FormatElement::ExpandParent => true,
             FormatElement::Tag(Tag::StartGroup(group)) => !group.mode().is_flat(),
             FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
-
-            FormatElement::Text { text, .. } => text.contains('\n'),
-            FormatElement::SourceCodeSlice {
-                contains_newlines, ..
-            } => *contains_newlines,
+            FormatElement::Text { text_width, .. } => text_width.is_multiline(),
+            FormatElement::SourceCodeSlice { text_width, .. } => text_width.is_multiline(),
             FormatElement::Interned(interned) => interned.will_break(),
             // Traverse into the most flat version because the content is guaranteed to expand when even
             // the most flat version contains some content that forces a break.
@@ -403,6 +399,67 @@ pub trait FormatElements {
     fn end_tag(&self, kind: TagKind) -> Option<&Tag>;
 }
 
+/// New-type wrapper for a single-line text unicode width.
+/// Mainly to prevent access to the inner value.
+///
+/// ## Representation
+///
+/// Represents the width by adding 1 to the actual width so that the width can be represented by a [`NonZeroU32`],
+/// allowing [`TextWidth`] or [`Option<Width>`] fit in 4 bytes rather than 8.
+///
+/// This means that 2^32 can not be precisely represented and instead has the same value as 2^32-1.
+/// This imprecision shouldn't matter in practice because either text are longer than any configured line width
+/// and thus, the text should break.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct Width(NonZeroU32);
+
+impl Width {
+    pub(crate) const fn new(width: u32) -> Self {
+        Width(NonZeroU32::MIN.saturating_add(width))
+    }
+
+    pub const fn value(self) -> u32 {
+        self.0.get() - 1
+    }
+}
+
+/// The pre-computed unicode width of a text if it is a single-line text or a marker
+/// that it is a multiline text if it contains a line feed.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum TextWidth {
+    Width(Width),
+    Multiline,
+}
+
+impl TextWidth {
+    pub fn from_text(text: &str, tab_width: TabWidth) -> TextWidth {
+        let mut width = 0u32;
+
+        for c in text.chars() {
+            let char_width = match c {
+                '\t' => tab_width.value(),
+                '\n' => return TextWidth::Multiline,
+                #[allow(clippy::cast_possible_truncation)]
+                c => c.width().unwrap_or(0) as u32,
+            };
+            width += char_width;
+        }
+
+        Self::Width(Width::new(width))
+    }
+
+    pub const fn width(self) -> Option<Width> {
+        match self {
+            TextWidth::Width(width) => Some(width),
+            TextWidth::Multiline => None,
+        }
+    }
+
+    pub(crate) const fn is_multiline(self) -> bool {
+        matches!(self, TextWidth::Multiline)
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -430,19 +487,21 @@ mod sizes {
     // be recomputed at a later point in time?
     // You reduced the size of a format element? Excellent work!
 
+    use super::{BestFittingVariants, Interned, TextWidth};
     use static_assertions::assert_eq_size;
 
     assert_eq_size!(ruff_text_size::TextRange, [u8; 8]);
-    assert_eq_size!(crate::prelude::tag::VerbatimKind, [u8; 8]);
-    assert_eq_size!(crate::prelude::Interned, [u8; 16]);
-    assert_eq_size!(crate::format_element::BestFittingVariants, [u8; 16]);
+    assert_eq_size!(TextWidth, [u8; 4]);
+    assert_eq_size!(super::tag::VerbatimKind, [u8; 8]);
+    assert_eq_size!(Interned, [u8; 16]);
+    assert_eq_size!(BestFittingVariants, [u8; 16]);
 
     #[cfg(not(debug_assertions))]
     assert_eq_size!(crate::SourceCodeSlice, [u8; 8]);
 
     #[cfg(not(debug_assertions))]
-    assert_eq_size!(crate::format_element::Tag, [u8; 16]);
+    assert_eq_size!(super::Tag, [u8; 16]);
 
     #[cfg(not(debug_assertions))]
-    assert_eq_size!(crate::FormatElement, [u8; 24]);
+    assert_eq_size!(super::FormatElement, [u8; 24]);
 }

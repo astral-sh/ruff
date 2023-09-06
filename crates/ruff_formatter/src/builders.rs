@@ -9,7 +9,9 @@ use Tag::*;
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
-use crate::{format_element, write, Argument, Arguments, FormatContext, GroupId, TextSize};
+use crate::{
+    format_element, write, Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize,
+};
 use crate::{Buffer, VecBuffer};
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -348,7 +350,10 @@ pub struct Text<'a> {
     position: Option<TextSize>,
 }
 
-impl<Context> Format<Context> for Text<'_> {
+impl<Context> Format<Context> for Text<'_>
+where
+    Context: FormatContext,
+{
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         if let Some(source_position) = self.position {
             f.write_element(FormatElement::SourcePosition(source_position));
@@ -356,6 +361,7 @@ impl<Context> Format<Context> for Text<'_> {
 
         f.write_element(FormatElement::Text {
             text: self.text.to_string().into_boxed_str(),
+            text_width: TextWidth::from_text(self.text, f.options().tab_width()),
         });
 
         Ok(())
@@ -369,31 +375,13 @@ impl std::fmt::Debug for Text<'_> {
 }
 
 /// Emits a text as it is written in the source document. Optimized to avoid allocations.
-pub const fn source_text_slice(
-    range: TextRange,
-    newlines: ContainsNewlines,
-) -> SourceTextSliceBuilder {
-    SourceTextSliceBuilder {
-        range,
-        new_lines: newlines,
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum ContainsNewlines {
-    /// The string contains newline characters
-    Yes,
-    /// The string contains no newline characters
-    No,
-
-    /// The string may contain newline characters, search the string to determine if there are any newlines.
-    Detect,
+pub const fn source_text_slice(range: TextRange) -> SourceTextSliceBuilder {
+    SourceTextSliceBuilder { range }
 }
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct SourceTextSliceBuilder {
     range: TextRange,
-    new_lines: ContainsNewlines,
 }
 
 impl<Context> Format<Context> for SourceTextSliceBuilder
@@ -405,28 +393,10 @@ where
         let slice = source_code.slice(self.range);
         debug_assert_no_newlines(slice.text(source_code));
 
-        let contains_newlines = match self.new_lines {
-            ContainsNewlines::Yes => {
-                debug_assert!(
-                    slice.text(source_code).contains('\n'),
-                    "Text contains no new line characters but the caller specified that it does."
-                );
-                true
-            }
-            ContainsNewlines::No => {
-                debug_assert!(
-                    !slice.text(source_code).contains('\n'),
-                    "Text contains new line characters but the caller specified that it does not."
-                );
-                false
-            }
-            ContainsNewlines::Detect => slice.text(source_code).contains('\n'),
-        };
+        let text_width =
+            TextWidth::from_text(slice.text(source_code), f.context().options().tab_width());
 
-        f.write_element(FormatElement::SourceCodeSlice {
-            slice,
-            contains_newlines,
-        });
+        f.write_element(FormatElement::SourceCodeSlice { slice, text_width });
 
         Ok(())
     }

@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_nesting() {
-        let mut context = FormatState::new(());
+        let mut context = FormatState::new(SimpleFormatContext::default());
         let mut buffer = VecBuffer::new(&mut context);
 
         write!(

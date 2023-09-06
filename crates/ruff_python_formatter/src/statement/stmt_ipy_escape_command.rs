@@ -9,7 +9,7 @@ pub struct FormatStmtIpyEscapeCommand;
 
 impl FormatNodeRule<StmtIpyEscapeCommand> for FormatStmtIpyEscapeCommand {
     fn fmt_fields(&self, item: &StmtIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
-        source_text_slice(item.range(), ContainsNewlines::No).fmt(f)
+        source_text_slice(item.range()).fmt(f)
     }
 
     fn is_suppressed(

@@ -314,7 +314,7 @@ impl FormatStringPart {
 
 impl Format<PyFormatContext<'_>> for FormatStringPart {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let (normalized, contains_newlines) = normalize_string(
+        let normalized = normalize_string(
             f.context().locator().slice(self.range),
             self.preferred_quotes,
             self.is_raw_string,
@@ -323,7 +323,7 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
         write!(f, [self.prefix, self.preferred_quotes])?;
         match normalized {
             Cow::Borrowed(_) => {
-                source_text_slice(self.range(), contains_newlines).fmt(f)?;
+                source_text_slice(self.range()).fmt(f)?;
             }
             Cow::Owned(normalized) => {
                 text(&normalized, Some(self.start())).fmt(f)?;
@@ -604,19 +604,13 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
 /// with the provided `style`.
 ///
 /// Returns the normalized string and whether it contains new lines.
-fn normalize_string(
-    input: &str,
-    quotes: StringQuotes,
-    is_raw: bool,
-) -> (Cow<str>, ContainsNewlines) {
+fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
     // Tracks the last index of `input` that has been written to `output`.
     // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
     let mut last_index = 0;
-
-    let mut newlines = ContainsNewlines::No;
 
     let style = quotes.style;
     let preferred_quote = style.as_char();
@@ -638,9 +632,6 @@ fn normalize_string(
             }
 
             last_index = index + '\r'.len_utf8();
-            newlines = ContainsNewlines::Yes;
-        } else if c == '\n' {
-            newlines = ContainsNewlines::Yes;
         } else if !quotes.triple && !is_raw {
             if c == '\\' {
                 if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
@@ -675,7 +666,7 @@ fn normalize_string(
         Cow::Owned(output)
     };
 
-    (normalized, newlines)
+    normalized
 }
 
 /// For docstring indentation, black counts spaces as 1 and tabs by increasing the indentation up
@@ -792,7 +783,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
         return string_part.fmt(f);
     }
 
-    let (normalized, _) = normalize_string(
+    let normalized = normalize_string(
         locator.slice(string_part),
         string_part.preferred_quotes,
         string_part.is_raw_string,
@@ -837,7 +828,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
         let trimmed_line_range =
             TextRange::at(offset, trim_end.text_len()).add_start(leading_whitespace);
         if already_normalized {
-            source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+            source_text_slice(trimmed_line_range).fmt(f)?;
         } else {
             text(trim_both, Some(trimmed_line_range.start())).fmt(f)?;
         }
@@ -954,7 +945,7 @@ fn format_docstring_line(
         let trimmed_line_range =
             TextRange::at(offset, trim_end.text_len()).add_start(stripped_indentation);
         if already_normalized {
-            source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+            source_text_slice(trimmed_line_range).fmt(f)?;
         } else {
             // All indents are ascii spaces, so the slicing is correct
             text(
