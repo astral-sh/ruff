@@ -11,7 +11,7 @@ use ruff_diagnostics::AutofixKind;
 use ruff_workspace::options::Options;
 
 const FIX_SYMBOL: &str = "🛠";
-const PREVIEW_SYMBOL: &str = "🌅";
+const PREVIEW_SYMBOL: &str = "🚧";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
     table_out.push_str("| Code | Name | Message | |");
