@@ -204,10 +204,11 @@ impl RuleSelector {
     /// Returns rules matching the selector, taking into account whether preview mode is enabled.
     pub fn rules(&self, preview: PreviewMode) -> impl Iterator<Item = Rule> + '_ {
         self.all_rules().filter(move |rule| {
+            // Always include rules that are not in preview or the nursery
             !(rule.is_preview() || rule.is_nursery())
-            // Backwards compatibility allows selection of nursery rules by exact code
-            || matches!(self, RuleSelector::Rule { .. }) && rule.is_nursery()
-            // Otherwise, preview must be enabled for inclusion of preview or nursery rules
+            // Backwards compatibility allows selection of nursery rules by exact code or dedicated grooup
+            || (matches!(self, RuleSelector::Rule { .. }) || matches!(self, RuleSelector::Nursery { .. }) && rule.is_nursery())
+            // Enabling preview includes all preview or nursery rules
             || preview.is_enabled()
         })
     }
