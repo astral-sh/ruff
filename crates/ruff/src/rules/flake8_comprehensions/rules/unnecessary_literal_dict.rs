@@ -82,7 +82,7 @@ pub(crate) fn unnecessary_literal_dict(
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic
-            .try_set_fix(|| fixes::fix_unnecessary_literal_dict(checker, expr).map(Fix::suggested));
+            .try_set_fix(|| fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::suggested));
     }
     checker.diagnostics.push(diagnostic);
 }

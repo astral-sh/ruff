@@ -98,9 +98,9 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_literal_within_tuple_call(
+                expr,
                 checker.locator(),
                 checker.stylist(),
-                expr,
             )
             .map(Fix::suggested)
         });

@@ -58,7 +58,7 @@ pub(crate) fn unnecessary_list_call(
     let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_list_call(checker.locator(), checker.stylist(), expr)
+            fixes::fix_unnecessary_list_call(expr, checker.locator(), checker.stylist())
                 .map(Fix::suggested)
         });
     }

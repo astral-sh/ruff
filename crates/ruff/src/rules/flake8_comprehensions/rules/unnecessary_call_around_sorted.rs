@@ -85,9 +85,9 @@ pub(crate) fn unnecessary_call_around_sorted(
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             let edit = fixes::fix_unnecessary_call_around_sorted(
+                expr,
                 checker.locator(),
                 checker.stylist(),
-                expr,
             )?;
             if outer.id == "reversed" {
                 Ok(Fix::suggested(edit))
