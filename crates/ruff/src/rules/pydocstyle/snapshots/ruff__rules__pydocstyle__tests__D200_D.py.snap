@@ -97,4 +97,14 @@ D.py:624:5: D200 One-line docstring should fit on one line
     |
     = help: Reformat to one line
 
+D.py:645:5: D200 One-line docstring should fit on one line
+    |
+644 |   def single_line_docstring_with_an_escaped_backslash():
+645 |       "\
+    |  _____^
+646 | |     "
+    | |_____^ D200
+    |
+    = help: Reformat to one line
+
 
