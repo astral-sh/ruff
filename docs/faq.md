@@ -387,7 +387,7 @@ alone.
 Preview enables a collection of newer rules and fixes that are considered experimental or unstable.
 
 If a rule is marked as preview, it can only be enabled if the `--preview` flag is toggled. For example, consider a
-hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enabled by adding following to your 
+hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enabled by adding following to your
 `pyproject.toml`:
 
 ```toml
