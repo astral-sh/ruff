@@ -764,8 +764,8 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 #[cfg(test)]
 mod tests {
     use crate::configuration::{Configuration, RuleSelection};
-    use ruff::codes::Pycodestyle;
-    use ruff::registry::{Rule, RuleSet};
+    use ruff::codes::{Flake8Copyright, Pycodestyle};
+    use ruff::registry::{Linter, Rule, RuleSet};
     use ruff::settings::types::PreviewMode;
 
     #[allow(clippy::needless_pass_by_value)]
@@ -962,6 +962,77 @@ mod tests {
             Rule::InvalidEscapeSequence,
             Rule::TabIndentation,
         ]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn preview_select_linter() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Linter::Flake8Copyright.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::empty();
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Linter::Flake8Copyright.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn preview_select_prefix() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Flake8Copyright::_0.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::empty();
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Flake8Copyright::_0.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn nursery_select_code() {
+        // Backwards compatible behavior allows selection of nursery rules with their exact code
+        // when preview is disabled
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Flake8Copyright::_001.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Flake8Copyright::_001.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
     }
 }
