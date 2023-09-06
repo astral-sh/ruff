@@ -779,7 +779,7 @@ mod tests {
     }
 
     #[test]
-    fn rule_codes() {
+    fn select_linter() {
         let actual = resolve_rules([RuleSelection {
             select: Some(vec![Pycodestyle::W.into()]),
             ..RuleSelection::default()
@@ -794,14 +794,20 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+    }
 
+    #[test]
+    fn select_prefix() {
         let actual = resolve_rules([RuleSelection {
             select: Some(vec![Pycodestyle::W6.into()]),
             ..RuleSelection::default()
         }]);
         let expected = RuleSet::from_rule(Rule::InvalidEscapeSequence);
         assert_eq!(actual, expected);
+    }
 
+    #[test]
+    fn select_linter_ignore_code() {
         let actual = resolve_rules([RuleSelection {
             select: Some(vec![Pycodestyle::W.into()]),
             ignore: vec![Pycodestyle::W292.into()],
@@ -815,7 +821,10 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+    }
 
+    #[test]
+    fn select_code_ignore_linter() {
         let actual = resolve_rules([RuleSelection {
             select: Some(vec![Pycodestyle::W292.into()]),
             ignore: vec![Pycodestyle::W.into()],
@@ -823,7 +832,10 @@ mod tests {
         }]);
         let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
         assert_eq!(actual, expected);
+    }
 
+    #[test]
+    fn select_code_ignore_code() {
         let actual = resolve_rules([RuleSelection {
             select: Some(vec![Pycodestyle::W605.into()]),
             ignore: vec![Pycodestyle::W605.into()],
@@ -831,7 +843,10 @@ mod tests {
         }]);
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
+    }
 
+    #[test]
+    fn select_linter_ignore_code_extend_select_code() {
         let actual = resolve_rules([
             RuleSelection {
                 select: Some(vec![Pycodestyle::W.into()]),
@@ -852,7 +867,10 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+    }
 
+    #[test]
+    fn select_linter_ignore_code_then_extend_select_code_ignore_linter() {
         let actual = resolve_rules([
             RuleSelection {
                 select: Some(vec![Pycodestyle::W.into()]),
@@ -870,7 +888,7 @@ mod tests {
     }
 
     #[test]
-    fn carry_over_ignore() {
+    fn ignore_code_then_select_linter() {
         let actual = resolve_rules([
             RuleSelection {
                 select: Some(vec![]),
@@ -890,7 +908,10 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+    }
 
+    #[test]
+    fn ignore_code_then_select_linter_ignore_code() {
         let actual = resolve_rules([
             RuleSelection {
                 select: Some(vec![]),
