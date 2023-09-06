@@ -445,8 +445,7 @@ impl Configuration {
         // The select_set keeps track of which rules have been selected.
         let mut select_set: RuleSet = defaults::PREFIXES
             .iter()
-            .map(|selector| selector.rules(preview))
-            .flatten()
+            .flat_map(|selector| selector.rules(preview))
             .collect();
 
         // The fixable set keeps track of which rules are fixable.
