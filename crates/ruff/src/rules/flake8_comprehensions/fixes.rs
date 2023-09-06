@@ -957,11 +957,29 @@ pub(crate) fn fix_unnecessary_map(
         _ => bail!("Expected a call or lambda"),
     };
 
-    // Format the lambda arguments as a comma-separated list.
-    let mut args_str = lambda.params.params.iter().map(|f| f.name.value).join(", ");
-    if args_str.is_empty() {
-        args_str = "_".to_string();
-    }
+    // Format the lambda target.
+    let target = match lambda.params.params.as_slice() {
+        // Ex) `lambda: x`
+        [] => AssignTargetExpression::Name(Box::new(Name {
+            value: "_",
+            lpar: vec![],
+            rpar: vec![],
+        })),
+        // Ex) `lambda x: y`
+        [param] => AssignTargetExpression::Name(Box::new(param.name.clone())),
+        // Ex) `lambda x, y: z`
+        params => AssignTargetExpression::Tuple(Box::new(Tuple {
+            elements: params
+                .iter()
+                .map(|param| Element::Simple {
+                    value: Expression::Name(Box::new(param.name.clone())),
+                    comma: None,
+                })
+                .collect(),
+            lpar: vec![],
+            rpar: vec![],
+        })),
+    };
 
     // Parenthesize the iterator, if necessary, as in:
     // ```python
@@ -978,11 +996,7 @@ pub(crate) fn fix_unnecessary_map(
     };
 
     let compfor = Box::new(CompFor {
-        target: AssignTargetExpression::Name(Box::new(Name {
-            value: args_str.as_str(),
-            lpar: vec![],
-            rpar: vec![],
-        })),
+        target,
         iter,
         ifs: vec![],
         inner_for_in: None,
