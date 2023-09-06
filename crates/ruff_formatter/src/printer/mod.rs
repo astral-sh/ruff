@@ -99,7 +99,7 @@ impl<'a> Printer<'a> {
             FormatElement::Text { text, text_width } => self.print_text(
                 Text::Text {
                     text,
-                    width: *text_width,
+                    text_width: *text_width,
                 },
                 None,
             ),
@@ -108,7 +108,7 @@ impl<'a> Printer<'a> {
                 self.print_text(
                     Text::Text {
                         text,
-                        width: *text_width,
+                        text_width: *text_width,
                     },
                     Some(slice.range()),
                 );
@@ -407,10 +407,13 @@ impl<'a> Printer<'a> {
                 self.state.buffer.push_str(token);
                 self.state.line_width += token.len() as u32;
             }
-            Text::Text { text, width } => {
+            Text::Text {
+                text,
+                text_width: width,
+            } => {
                 if let Some(width) = width.width() {
                     self.state.buffer.push_str(text);
-                    self.state.line_width += width;
+                    self.state.line_width += width.value();
                 } else {
                     for char in text.chars() {
                         self.print_char(char);
@@ -1107,7 +1110,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 return Ok(self.fits_text(
                     Text::Text {
                         text,
-                        width: *text_width,
+                        text_width: *text_width,
                     },
                     args,
                 ))
@@ -1117,7 +1120,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 return Ok(self.fits_text(
                     Text::Text {
                         text,
-                        width: *text_width,
+                        text_width: *text_width,
                     },
                     args,
                 ));
@@ -1338,9 +1341,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             Text::Token(token) => {
                 self.state.line_width += token.len() as u32;
             }
-            Text::Text { text, width } => {
-                if let Some(width) = width.width() {
-                    self.state.line_width += width;
+            Text::Text { text, text_width } => {
+                if let Some(width) = text_width.width() {
+                    self.state.line_width += width.value();
                 } else {
                     for c in text.chars() {
                         let char_width = match c {
@@ -1486,7 +1489,10 @@ enum Text<'a> {
     /// ASCII only text that contains no line breaks or tab characters.
     Token(&'a str),
     /// Arbitrary text. May contain `\n` line breaks, tab characters, or unicode characters.
-    Text { text: &'a str, width: TextWidth },
+    Text {
+        text: &'a str,
+        text_width: TextWidth,
+    },
 }
 
 #[cfg(test)]

@@ -399,19 +399,39 @@ pub trait FormatElements {
     fn end_tag(&self, kind: TagKind) -> Option<&Tag>;
 }
 
+/// New-type wrapper for a single-line text unicode width.
+/// Mainly to prevent access to the inner value.
+///
+/// ## Representation
+///
+/// Represents the width by adding 1 to the actual width so that the width can be represented by a [`NonZeroU32`],
+/// allowing [`TextWidth`] or [`Option<Width>`] fit in 4 bytes rather than 8.
+///
+/// This means that 2^32 can not be precisely represented and instead has the same value as 2^32-1.
+/// This imprecision shouldn't matter in practice because either text are longer than any configured line width
+/// and thus, the text should break.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct Width(NonZeroU32);
+
+impl Width {
+    pub(crate) const fn new(width: u32) -> Self {
+        Width(NonZeroU32::MIN.saturating_add(width))
+    }
+
+    pub const fn value(self) -> u32 {
+        self.0.get() - 1
+    }
+}
+
+/// The pre-computed unicode width of a text if it is a single-line text or a marker
+/// that it is a multiline text if it contains a line feed.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum TextWidth {
-    Width(NonZeroU32),
+    Width(Width),
     Multiline,
 }
 
 impl TextWidth {
-    pub(crate) const fn new_width(width: u32) -> Self {
-        // SAFETY: 1 + x is guaranteed to be non zero
-        #[allow(unsafe_code)]
-        TextWidth::Width(unsafe { NonZeroU32::new_unchecked(width.saturating_add(1)) })
-    }
-
     pub fn from_text(text: &str, tab_width: TabWidth) -> TextWidth {
         let mut width = 0u32;
 
@@ -425,12 +445,12 @@ impl TextWidth {
             width += char_width;
         }
 
-        Self::new_width(width)
+        Self::Width(Width::new(width))
     }
 
-    pub const fn width(self) -> Option<u32> {
+    pub const fn width(self) -> Option<Width> {
         match self {
-            TextWidth::Width(width) => Some(width.get() - 1),
+            TextWidth::Width(width) => Some(width),
             TextWidth::Multiline => None,
         }
     }
@@ -467,19 +487,21 @@ mod sizes {
     // be recomputed at a later point in time?
     // You reduced the size of a format element? Excellent work!
 
+    use super::{BestFittingVariants, Interned, TextWidth};
     use static_assertions::assert_eq_size;
 
     assert_eq_size!(ruff_text_size::TextRange, [u8; 8]);
-    assert_eq_size!(crate::prelude::tag::VerbatimKind, [u8; 8]);
-    assert_eq_size!(crate::prelude::Interned, [u8; 16]);
-    assert_eq_size!(crate::format_element::BestFittingVariants, [u8; 16]);
+    assert_eq_size!(TextWidth, [u8; 4]);
+    assert_eq_size!(super::tag::VerbatimKind, [u8; 8]);
+    assert_eq_size!(Interned, [u8; 16]);
+    assert_eq_size!(BestFittingVariants, [u8; 16]);
 
     #[cfg(not(debug_assertions))]
     assert_eq_size!(crate::SourceCodeSlice, [u8; 8]);
 
     #[cfg(not(debug_assertions))]
-    assert_eq_size!(crate::format_element::Tag, [u8; 16]);
+    assert_eq_size!(super::Tag, [u8; 16]);
 
     #[cfg(not(debug_assertions))]
-    assert_eq_size!(crate::FormatElement, [u8; 24]);
+    assert_eq_size!(super::FormatElement, [u8; 24]);
 }

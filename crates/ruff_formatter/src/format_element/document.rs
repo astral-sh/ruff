@@ -263,7 +263,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         let (text, text_width) = match element {
                             #[allow(clippy::cast_possible_truncation)]
                             FormatElement::Token { text } => {
-                                (*text, TextWidth::new_width(text.len() as u32))
+                                (*text, TextWidth::Width(Width::new(text.len() as u32)))
                             }
                             FormatElement::Text { text, text_width } => {
                                 (text.as_ref(), *text_width)
