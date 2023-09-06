@@ -110,3 +110,11 @@ try:
     print()
 except "not an exception":
     pass
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7123
+def write_models(directory, Models):
+    try:
+        os.makedirs(model_dir);
+    except OSError:
+        pass;
