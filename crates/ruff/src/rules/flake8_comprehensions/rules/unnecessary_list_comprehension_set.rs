@@ -60,7 +60,7 @@ pub(crate) fn unnecessary_list_comprehension_set(
         let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_list_comprehension_set(checker, expr).map(Fix::suggested)
+                fixes::fix_unnecessary_list_comprehension_set(expr, checker).map(Fix::suggested)
             });
         }
         checker.diagnostics.push(diagnostic);
