@@ -13,10 +13,12 @@ use crate::settings::types::PreviewMode;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
-    /// Select all stable rules.
+    /// Select all rules (includes rules in preview if enabled)
     All,
-    /// Category to select all preview rules, previously known as the nursery
+    /// Category to select all rules in preview (includes legacy nursery rules)
     Preview,
+    /// Legacy category to select all rules in the "nursery" which predated preview mode
+    Nursery,
     /// Legacy category to select both the `mccabe` and `flake8-comprehensions` linters
     /// via a single selector.
     C,
@@ -49,8 +51,7 @@ impl FromStr for RuleSelector {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "ALL" => Ok(Self::All),
-            // Legacy support for selecting preview rules as "nursery"
-            "NURSERY" => Ok(Self::Preview),
+            "NURSERY" => Ok(Self::Nursery),
             "PREVIEW" => Ok(Self::Preview),
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
@@ -115,6 +116,7 @@ impl RuleSelector {
     pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
             RuleSelector::All => ("", "ALL"),
+            RuleSelector::Nursery => ("", "NURSERY"),
             RuleSelector::Preview => ("", "PREVIEW"),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
@@ -174,9 +176,13 @@ impl RuleSelector {
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
-            RuleSelector::Preview => {
-                RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_preview))
+
+            RuleSelector::Nursery => {
+                RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_nursery))
             }
+            RuleSelector::Preview => RuleSelectorIter::Nursery(
+                Rule::iter().filter(|rule| rule.is_preview() || rule.is_nursery()),
+            ),
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
                     .rules()
@@ -301,6 +307,7 @@ impl RuleSelector {
         match self {
             RuleSelector::All => Specificity::All,
             RuleSelector::Preview => Specificity::All,
+            RuleSelector::Nursery => Specificity::All,
             RuleSelector::T => Specificity::LinterGroup,
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
