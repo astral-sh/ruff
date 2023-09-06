@@ -103,3 +103,8 @@ class ServiceRefOrValue:
         list[ServiceSpecificationRef]
         | list[ServiceSpecification]
     ] = None
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7201
+class ServiceRefOrValue:
+    service_specification: Optional[str]is not True = None

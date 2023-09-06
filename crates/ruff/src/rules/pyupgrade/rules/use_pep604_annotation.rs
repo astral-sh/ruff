@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Constant, Expr, ExprContext, Operator};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::autofix::edits::pad;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -79,7 +80,11 @@ pub(crate) fn use_pep604_annotation(
                     }
                     _ => {
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                            checker.generator().expr(&optional(slice)),
+                            pad(
+                                checker.generator().expr(&optional(slice)),
+                                expr.range(),
+                                checker.locator(),
+                            ),
                             expr.range(),
                         )));
                     }
@@ -96,14 +101,22 @@ pub(crate) fn use_pep604_annotation(
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                            checker.generator().expr(&union(elts)),
+                            pad(
+                                checker.generator().expr(&union(elts)),
+                                expr.range(),
+                                checker.locator(),
+                            ),
                             expr.range(),
                         )));
                     }
                     _ => {
                         // Single argument.
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                            checker.locator().slice(slice).to_string(),
+                            pad(
+                                checker.locator().slice(slice).to_string(),
+                                expr.range(),
+                                checker.locator(),
+                            ),
                             expr.range(),
                         )));
                     }
