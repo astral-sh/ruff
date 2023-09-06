@@ -98,6 +98,59 @@ pub enum Stmt {
     IpyEscapeCommand(StmtIpyEscapeCommand),
 }
 
+/// An AST node used to represent a IPython escape command at the statement level.
+///
+/// For example,
+/// ```python
+/// %matplotlib inline
+/// ```
+///
+/// ## Terminology
+///
+/// Escape commands are special IPython syntax which starts with a token to identify
+/// the escape kind followed by the command value itself. [Escape kind] are the kind
+/// of escape commands that are recognized by the token: `%`, `%%`, `!`, `!!`,
+/// `?`, `??`, `/`, `;`, and `,`.
+///
+/// Help command (or Dynamic Object Introspection as it's called) are the escape commands
+/// of the kind `?` and `??`. For example, `?str.replace`. Help end command are a subset
+/// of Help command where the token can be at the end of the line i.e., after the value.
+/// For example, `str.replace?`.
+///
+/// Here's where things get tricky. I'll divide the help end command into two types for
+/// better understanding:
+/// 1. Strict version: The token is _only_ at the end of the line. For example,
+///    `str.replace?` or `str.replace??`.
+/// 2. Combined version: Along with the `?` or `??` token, which are at the end of the
+///    line, there are other escape kind tokens that are present at the start as well.
+///    For example, `%matplotlib?` or `%%timeit?`.
+///
+/// Priority comes into picture for the "Combined version" mentioned above. How do
+/// we determine the escape kind if there are tokens on both side of the value, i.e., which
+/// token to choose? The Help end command always takes priority over any other token which
+/// means that if there is `?`/`??` at the end then that is used to determine the kind.
+/// For example, in `%matplotlib?` the escape kind is determined using the `?` token
+/// instead of `%` token.
+///
+/// ## Syntax
+///
+/// `<IpyEscapeKind><Command value>`
+///
+/// The simplest form is an escape kind token followed by the command value. For example,
+/// `%matplotlib inline`, `/foo`, `!pwd`, etc.
+///
+/// `<Command value><IpyEscapeKind ("?" or "??")>`
+///
+/// The help end escape command would be the reverse of the above syntax. Here, the
+/// escape kind token can only be either `?` or `??` and it is at the end of the line.
+/// For example, `str.replace?`, `math.pi??`, etc.
+///
+/// `<IpyEscapeKind><Command value><EscapeKind ("?" or "??")>`
+///
+/// The final syntax is the combined version of the above two. For example, `%matplotlib?`,
+/// `%%timeit??`, etc.
+///
+/// [Escape kind]: IpyEscapeKind
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
@@ -559,6 +612,17 @@ pub enum Expr {
     IpyEscapeCommand(ExprIpyEscapeCommand),
 }
 
+/// An AST node used to represent a IPython escape command at the expression level.
+///
+/// For example,
+/// ```python
+/// dir = !pwd
+/// ```
+///
+/// Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
+///
+/// For more information related to terminology and syntax of escape commands,
+/// see [`StmtIpyEscapeCommand`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
