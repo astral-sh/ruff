@@ -9,7 +9,7 @@ use super::Settings;
 use crate::codes::{self, RuleCodePrefix};
 use crate::line_width::{LineLength, TabSize};
 use crate::registry::Linter;
-use crate::rule_selector::{prefix_to_selector, RuleSelector};
+use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
@@ -20,7 +20,10 @@ use crate::rules::{
 use crate::settings::types::FilePatternSet;
 
 pub const PREFIXES: &[RuleSelector] = &[
-    prefix_to_selector(RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E)),
+    RuleSelector::Prefix {
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E),
+        redirected_from: None,
+    },
     RuleSelector::Linter(Linter::Pyflakes),
 ];
 

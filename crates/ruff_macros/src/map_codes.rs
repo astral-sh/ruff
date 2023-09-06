@@ -113,6 +113,9 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                     Self::#linter(linter)
                 }
             }
+
+            // Rust doesn't yet support `impl const From<RuleCodePrefix> for RuleSelector`
+            // See https://github.com/rust-lang/rust/issues/67792
             impl From<#linter> for crate::rule_selector::RuleSelector {
                 fn from(linter: #linter) -> Self {
                     let prefix = RuleCodePrefix::#linter(linter);

@@ -233,18 +233,6 @@ impl Iterator for RuleSelectorIter {
     }
 }
 
-/// A const alternative to the `impl From<RuleCodePrefix> for RuleSelector`
-/// to let us keep the fields of [`RuleSelector`] private.
-// Note that Rust doesn't yet support `impl const From<RuleCodePrefix> for
-// RuleSelector` (see https://github.com/rust-lang/rust/issues/67792).
-// TODO(martin): Remove once RuleSelector is an enum with Linter & Rule variants
-pub const fn prefix_to_selector(prefix: RuleCodePrefix) -> RuleSelector {
-    RuleSelector::Prefix {
-        prefix,
-        redirected_from: None,
-    }
-}
-
 #[cfg(feature = "schemars")]
 mod schema {
     use itertools::Itertools;
