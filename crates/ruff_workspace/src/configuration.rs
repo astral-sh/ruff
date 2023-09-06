@@ -460,9 +460,9 @@ impl Configuration {
         let mut carryover_ignores: Option<&[RuleSelector]> = None;
         let mut carryover_unfixables: Option<&[RuleSelector]> = None;
 
-        // Store redirects for displaying warnings
+        // Store selectors for displaying warnings
         let mut redirects = FxHashMap::default();
-        let mut backwards_compat_nursery_rules = FxHashSet::default();
+        let mut deprecated_nursery_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
 
         for selection in &self.rule_selections {
@@ -597,7 +597,7 @@ impl Configuration {
                 if preview.is_disabled() {
                     if let RuleSelector::Rule { prefix, .. } = selector {
                         if prefix.rules().any(|rule| rule.is_nursery()) {
-                            backwards_compat_nursery_rules.insert(selector);
+                            deprecated_nursery_selectors.insert(selector);
                         }
                     }
 
@@ -627,7 +627,7 @@ impl Configuration {
             );
         }
 
-        for selection in backwards_compat_nursery_rules {
+        for selection in deprecated_nursery_selectors {
             let (prefix, code) = selection.prefix_and_code();
             warn_user!("Selection of nursery rule `{prefix}{code}` without the `--preview` flag is deprecated.",);
         }
