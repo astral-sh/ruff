@@ -767,6 +767,52 @@ mod tests {
     use ruff::codes::{Flake8Copyright, Pycodestyle};
     use ruff::registry::{Linter, Rule, RuleSet};
     use ruff::settings::types::PreviewMode;
+    use ruff::RuleSelector;
+
+    const NURSERY_RULES: &[Rule] = &[
+        Rule::MissingCopyrightNotice,
+        Rule::IndentationWithInvalidMultiple,
+        Rule::NoIndentedBlock,
+        Rule::UnexpectedIndentation,
+        Rule::IndentationWithInvalidMultipleComment,
+        Rule::NoIndentedBlockComment,
+        Rule::UnexpectedIndentationComment,
+        Rule::OverIndented,
+        Rule::WhitespaceAfterOpenBracket,
+        Rule::WhitespaceBeforeCloseBracket,
+        Rule::WhitespaceBeforePunctuation,
+        Rule::WhitespaceBeforeParameters,
+        Rule::MultipleSpacesBeforeOperator,
+        Rule::MultipleSpacesAfterOperator,
+        Rule::TabBeforeOperator,
+        Rule::TabAfterOperator,
+        Rule::MissingWhitespaceAroundOperator,
+        Rule::MissingWhitespaceAroundArithmeticOperator,
+        Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
+        Rule::MissingWhitespaceAroundModuloOperator,
+        Rule::MissingWhitespace,
+        Rule::MultipleSpacesAfterComma,
+        Rule::TabAfterComma,
+        Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+        Rule::MissingWhitespaceAroundParameterEquals,
+        Rule::TooFewSpacesBeforeInlineComment,
+        Rule::NoSpaceAfterInlineComment,
+        Rule::NoSpaceAfterBlockComment,
+        Rule::MultipleLeadingHashesForBlockComment,
+        Rule::MultipleSpacesAfterKeyword,
+        Rule::MultipleSpacesBeforeKeyword,
+        Rule::TabAfterKeyword,
+        Rule::TabBeforeKeyword,
+        Rule::MissingWhitespaceAfterKeyword,
+        Rule::CompareToEmptyString,
+        Rule::NoSelfUse,
+        Rule::EqWithoutHash,
+        Rule::BadDunderMethodName,
+        Rule::RepeatedAppend,
+        Rule::DeleteFullSlice,
+        Rule::CheckAndRemoveFromSet,
+        Rule::QuadraticListSummation,
+    ];
 
     #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(
@@ -1006,7 +1052,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_select_linter() {
+    fn select_linter_preview() {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Linter::Flake8Copyright.into()]),
@@ -1029,7 +1075,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_select_prefix() {
+    fn select_prefix_preview() {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Flake8Copyright::_0.into()]),
@@ -1048,6 +1094,29 @@ mod tests {
             Some(PreviewMode::Enabled),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_preview() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::Preview]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::empty();
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::Preview]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
     }
 
@@ -1073,6 +1142,31 @@ mod tests {
             Some(PreviewMode::Enabled),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_nursery() {
+        // Backwards compatible behavior allows selection of nursery rules with the nursery selector
+        // when preview is disabled
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::Nursery]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::from_rules(NURSERY_RULES);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::Nursery]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
     }
 }
