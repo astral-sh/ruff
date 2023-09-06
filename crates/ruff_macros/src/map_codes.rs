@@ -115,7 +115,18 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             }
             impl From<#linter> for crate::rule_selector::RuleSelector {
                 fn from(linter: #linter) -> Self {
-                    Self::Prefix{prefix: RuleCodePrefix::#linter(linter), redirected_from: None}
+                    let prefix = RuleCodePrefix::#linter(linter);
+                    if is_single_rule_selector(&prefix) {
+                        Self::Rule {
+                            prefix,
+                            redirected_from: None,
+                        }
+                    } else {
+                        Self::Prefix {
+                            prefix,
+                            redirected_from: None,
+                        }
+                    }
                 }
             }
         });

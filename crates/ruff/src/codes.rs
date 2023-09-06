@@ -9,6 +9,7 @@ use strum_macros::{AsRefStr, EnumIter};
 use ruff_diagnostics::Violation;
 
 use crate::registry::{AsRule, Linter};
+use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]

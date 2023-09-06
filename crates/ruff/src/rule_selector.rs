@@ -71,6 +71,7 @@ impl FromStr for RuleSelector {
                 // Does the selector select a single rule?
                 let prefix = RuleCodePrefix::parse(&linter, code)
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
+
                 if is_single_rule_selector(&prefix) {
                     Ok(Self::Rule {
                         prefix,
@@ -89,7 +90,7 @@ impl FromStr for RuleSelector {
 
 /// Returns `true` if the [`RuleCodePrefix`] matches a single rule exactly
 /// (e.g., `E225`, as opposed to `E2`).
-fn is_single_rule_selector(prefix: &RuleCodePrefix) -> bool {
+pub(crate) fn is_single_rule_selector(prefix: &RuleCodePrefix) -> bool {
     let mut rules = prefix.rules();
 
     // The selector must match a single rule.
