@@ -1079,6 +1079,12 @@ dependencies = [
 
 [[package]]
 name = "indoc"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfa799dd5ed20a7e349f3b4639aa80d74549c81716d9ec4f994c9b5815598306"
+
+[[package]]
+name = "indoc"
 version = "2.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c785eefb63ebd0e33416dfcb8d6da0bf27ce752843a45632a67bf10d4d4b5c4"
@@ -1281,13 +1287,15 @@ checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 [[package]]
 name = "libcst"
 version = "0.1.0"
-source = "git+https://github.com/Instagram/LibCST.git?rev=9c263aa8977962a870ce2770d2aa18ee0dacb344#9c263aa8977962a870ce2770d2aa18ee0dacb344"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7773d520d4292e200ab1838f2daabe2feed7549f93b0a3c7582160a09e79ffde"
 dependencies = [
  "chic",
  "libcst_derive",
  "memchr",
  "paste",
  "peg",
+ "pyo3",
  "regex",
  "thiserror",
 ]
@@ -1295,7 +1303,8 @@ dependencies = [
 [[package]]
 name = "libcst_derive"
 version = "0.1.0"
-source = "git+https://github.com/Instagram/LibCST.git?rev=9c263aa8977962a870ce2770d2aa18ee0dacb344#9c263aa8977962a870ce2770d2aa18ee0dacb344"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "520197c50ba477f258cd7005ec5ed3a7393693ae6bec664990c7c8d9306a7c0d"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1857,6 +1866,66 @@ dependencies = [
 ]
 
 [[package]]
+name = "pyo3"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e681a6cfdc4adcc93b4d3cf993749a4552018ee0a9b65fc0ccfad74352c72a38"
+dependencies = [
+ "cfg-if",
+ "indoc 1.0.9",
+ "libc",
+ "memoffset",
+ "parking_lot",
+ "pyo3-build-config",
+ "pyo3-ffi",
+ "pyo3-macros",
+ "unindent",
+]
+
+[[package]]
+name = "pyo3-build-config"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "076c73d0bc438f7a4ef6fdd0c3bb4732149136abd952b110ac93e4edb13a6ba5"
+dependencies = [
+ "once_cell",
+ "target-lexicon",
+]
+
+[[package]]
+name = "pyo3-ffi"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e53cee42e77ebe256066ba8aa77eff722b3bb91f3419177cf4cd0f304d3284d9"
+dependencies = [
+ "libc",
+ "pyo3-build-config",
+]
+
+[[package]]
+name = "pyo3-macros"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfeb4c99597e136528c6dd7d5e3de5434d1ceaf487436a3f03b2d56b6fc9efd1"
+dependencies = [
+ "proc-macro2",
+ "pyo3-macros-backend",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "pyo3-macros-backend"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "947dc12175c254889edc0c02e399476c2f652b4b9ebd123aa655c224de259536"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "pyproject-toml"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2228,7 +2297,7 @@ dependencies = [
  "ignore",
  "imara-diff",
  "indicatif",
- "indoc",
+ "indoc 2.0.3",
  "itertools",
  "libcst",
  "once_cell",
@@ -2930,6 +2999,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "target-lexicon"
+version = "0.12.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d0e916b1148c8e263850e1ebcbd046f333e0683c724876bb0da63ea4373dc8a"
+
+[[package]]
 name = "tempfile"
 version = "3.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3358,6 +3433,12 @@ source = "git+https://github.com/youknowone/unicode_names2.git?rev=4ce16aa85cbcd
 dependencies = [
  "phf",
 ]
+
+[[package]]
+name = "unindent"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1766d682d402817b5ac4490b3c3002d91dfa0d22812f341609f97b08757359c"
 
 [[package]]
 name = "untrusted"
