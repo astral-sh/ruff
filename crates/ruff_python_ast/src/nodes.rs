@@ -622,7 +622,7 @@ pub enum Expr {
 /// Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
 ///
 /// For more information related to terminology and syntax of escape commands,
-/// see [StmtIpyEscapeCommand].
+/// see [`StmtIpyEscapeCommand`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
