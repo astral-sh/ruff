@@ -11,6 +11,7 @@ map(lambda _: 3.0, nums)
 _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 all(map(lambda v: isinstance(v, dict), nums))
 filter(func, map(lambda v: v, nums))
+list(map(lambda x, y: x * y, nums))
 
 # When inside f-string, then the fix should be surrounded by whitespace
 _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
