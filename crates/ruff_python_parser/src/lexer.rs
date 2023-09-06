@@ -518,7 +518,7 @@ impl<'source> Lexer<'source> {
         }
         if self.cursor.eat_char2(quote, quote) {
             flags |= FStringContextFlags::TRIPLE;
-        };
+        }
 
         self.fstrings.push(FStringContext::new(flags, self.nesting));
         Tok::FStringStart
@@ -763,16 +763,15 @@ impl<'source> Lexer<'source> {
             if !fstring.is_in_expression(self.nesting) {
                 self.cursor.start_token();
                 if let Some(tok) = self.lex_fstring_middle_or_end()? {
-                    if matches!(tok, Tok::FStringEnd) {
+                    if tok == Tok::FStringEnd {
                         self.fstrings.pop();
                     }
                     return Ok((tok, self.token_range()));
                 }
             }
         }
-
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
-        if let Some(indentation) = self.pending_indentation.take() {
+        else if let Some(indentation) = self.pending_indentation.take() {
             if let Ok(Ordering::Greater) = self.indentations.current().try_compare(indentation) {
                 self.pending_indentation = Some(indentation);
                 self.indentations.pop();

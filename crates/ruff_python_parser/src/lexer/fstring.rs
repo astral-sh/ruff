@@ -4,7 +4,7 @@ use ruff_text_size::TextSize;
 
 bitflags! {
     #[derive(Debug)]
-    pub(crate) struct FStringContextFlags: u32 {
+    pub(crate) struct FStringContextFlags: u8 {
         /// The current f-string is a triple-quoted f-string i.e., the number of
         /// opening quotes is 3. If this flag is not set, the number of opening
         /// quotes is 1.
@@ -35,7 +35,7 @@ pub(crate) struct FStringContext {
 }
 
 impl FStringContext {
-    pub(crate) fn new(flags: FStringContextFlags, nesting: u32) -> Self {
+    pub(crate) const fn new(flags: FStringContextFlags, nesting: u32) -> Self {
         Self {
             flags,
             format_spec_depth: 0,
@@ -44,7 +44,7 @@ impl FStringContext {
     }
 
     /// Returns the quote character for the current f-string.
-    pub(crate) fn quote_char(&self) -> char {
+    pub(crate) const fn quote_char(&self) -> char {
         if self.flags.contains(FStringContextFlags::DOUBLE) {
             '"'
         } else {
@@ -53,17 +53,17 @@ impl FStringContext {
     }
 
     /// Returns the number of quotes for the current f-string.
-    pub(crate) fn quote_size(&self) -> TextSize {
+    pub(crate) const fn quote_size(&self) -> TextSize {
         if self.is_triple_quoted() {
-            TextSize::from(3)
+            TextSize::new(3)
         } else {
-            TextSize::from(1)
+            TextSize::new(1)
         }
     }
 
     /// Returns the triple quotes for the current f-string if it is a triple-quoted
     /// f-string, `None` otherwise.
-    pub(crate) fn triple_quotes(&self) -> Option<&'static str> {
+    pub(crate) const fn triple_quotes(&self) -> Option<&'static str> {
         if self.is_triple_quoted() {
             if self.flags.contains(FStringContextFlags::DOUBLE) {
                 Some(r#"""""#)
@@ -76,32 +76,34 @@ impl FStringContext {
     }
 
     /// Returns `true` if the current f-string is a raw f-string.
-    pub(crate) fn is_raw_string(&self) -> bool {
+    pub(crate) const fn is_raw_string(&self) -> bool {
         self.flags.contains(FStringContextFlags::RAW)
     }
 
     /// Returns `true` if the current f-string is a triple-quoted f-string.
-    pub(crate) fn is_triple_quoted(&self) -> bool {
+    pub(crate) const fn is_triple_quoted(&self) -> bool {
         self.flags.contains(FStringContextFlags::TRIPLE)
     }
 
-    fn open_parentheses_count(&self, current_nesting: u32) -> u32 {
+    /// Calculates the number of open parentheses for the current f-string
+    /// based on the current level of nesting for the lexer.
+    const fn open_parentheses_count(&self, current_nesting: u32) -> u32 {
         current_nesting.saturating_sub(self.nesting)
     }
 
     /// Returns `true` if the current f-string has open parentheses.
-    pub(crate) fn has_open_parentheses(&self, current_nesting: u32) -> bool {
+    pub(crate) const fn has_open_parentheses(&self, current_nesting: u32) -> bool {
         self.open_parentheses_count(current_nesting) > 0
     }
 
     /// Returns `true` if the lexer is in a f-string expression i.e., between
     /// two curly braces.
-    pub(crate) fn is_in_expression(&self, current_nesting: u32) -> bool {
+    pub(crate) const fn is_in_expression(&self, current_nesting: u32) -> bool {
         self.open_parentheses_count(current_nesting) > self.format_spec_depth
     }
 
     /// Returns `true` if the lexer is in a f-string format spec i.e., after a colon.
-    pub(crate) fn is_in_format_spec(&self, current_nesting: u32) -> bool {
+    pub(crate) const fn is_in_format_spec(&self, current_nesting: u32) -> bool {
         self.format_spec_depth > 0 && !self.is_in_expression(current_nesting)
     }
 
