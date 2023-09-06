@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::iter::Peekable;
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
@@ -16,20 +17,35 @@ use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
 use crate::comments::{CommentLinePosition, CommentsMap, SourceComment};
 
+/// Collect the preceding, following and enclosing node for each comment without applying
+/// [`place_comment`] for debugging.
+pub(crate) fn collect_comments<'a>(
+    root: &'a Mod,
+    source_code: SourceCode<'a>,
+    comment_ranges: &'a CommentRanges,
+) -> Vec<DecoratedComment<'a>> {
+    let mut collector = CommentsVecBuilder::default();
+    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(root);
+    collector.comments
+}
+
 /// Visitor extracting the comments from an AST.
-#[derive(Debug, Clone)]
-pub(crate) struct CommentsVisitor<'a> {
-    builder: CommentsBuilder<'a>,
+pub(super) struct CommentsVisitor<'a, 'builder> {
+    builder: &'builder mut (dyn PushComment<'a> + 'a),
     source_code: SourceCode<'a>,
     parents: Vec<AnyNodeRef<'a>>,
     preceding_node: Option<AnyNodeRef<'a>>,
     comment_ranges: Peekable<std::slice::Iter<'a, TextRange>>,
 }
 
-impl<'a> CommentsVisitor<'a> {
-    pub(crate) fn new(source_code: SourceCode<'a>, comment_ranges: &'a CommentRanges) -> Self {
+impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
+    pub(super) fn new(
+        source_code: SourceCode<'a>,
+        comment_ranges: &'a CommentRanges,
+        builder: &'builder mut (dyn PushComment<'a> + 'a),
+    ) -> Self {
         Self {
-            builder: CommentsBuilder::default(),
+            builder,
             source_code,
             parents: Vec::new(),
             preceding_node: None,
@@ -37,10 +53,8 @@ impl<'a> CommentsVisitor<'a> {
         }
     }
 
-    pub(super) fn visit(mut self, root: &'a Mod) -> CommentsMap<'a> {
+    pub(super) fn visit(mut self, root: &'a Mod) {
         self.visit_mod(root);
-
-        self.finish()
     }
 
     // Try to skip the subtree if
@@ -51,13 +65,9 @@ impl<'a> CommentsVisitor<'a> {
             .peek()
             .map_or(true, |next_comment| next_comment.start() >= node_end)
     }
-
-    fn finish(self) -> CommentsMap<'a> {
-        self.builder.finish()
-    }
 }
 
-impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
+impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         let node_range = node.range();
 
@@ -81,10 +91,8 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder.add_comment(place_comment(
-                comment,
-                &Locator::new(self.source_code.as_str()),
-            ));
+            self.builder
+                .push_comment(comment, &Locator::new(self.source_code.as_str()));
             self.comment_ranges.next();
         }
 
@@ -124,10 +132,8 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder.add_comment(place_comment(
-                comment,
-                &Locator::new(self.source_code.as_str()),
-            ));
+            self.builder
+                .push_comment(comment, &Locator::new(self.source_code.as_str()));
 
             self.comment_ranges.next();
         }
@@ -176,7 +182,7 @@ fn text_position(comment_range: TextRange, source_code: SourceCode) -> CommentLi
 ///
 /// Used by [`CommentStyle::place_comment`] to determine if this should become a [leading](self#leading-comments), [dangling](self#dangling-comments), or [trailing](self#trailing-comments) comment.
 #[derive(Debug, Clone)]
-pub(super) struct DecoratedComment<'a> {
+pub(crate) struct DecoratedComment<'a> {
     enclosing: AnyNodeRef<'a>,
     preceding: Option<AnyNodeRef<'a>>,
     following: Option<AnyNodeRef<'a>>,
@@ -202,7 +208,7 @@ impl<'a> DecoratedComment<'a> {
     ///
     /// The enclosing node is the list expression and not the name `b` because
     /// `a` and `b` are children of the list expression and `comment` is between the two nodes.
-    pub(super) fn enclosing_node(&self) -> AnyNodeRef<'a> {
+    pub(crate) fn enclosing_node(&self) -> AnyNodeRef<'a> {
         self.enclosing
     }
 
@@ -251,7 +257,7 @@ impl<'a> DecoratedComment<'a> {
     ///
     ///  Returns `Some(a)` because `a` is the preceding node of `comment`. The presence of the `,` token
     /// doesn't change that.
-    pub(super) fn preceding_node(&self) -> Option<AnyNodeRef<'a>> {
+    pub(crate) fn preceding_node(&self) -> Option<AnyNodeRef<'a>> {
         self.preceding
     }
 
@@ -309,13 +315,18 @@ impl<'a> DecoratedComment<'a> {
     ///
     /// Returns `None` because `comment` is enclosed inside the parenthesized expression and it has no children
     /// following `# comment`.
-    pub(super) fn following_node(&self) -> Option<AnyNodeRef<'a>> {
+    pub(crate) fn following_node(&self) -> Option<AnyNodeRef<'a>> {
         self.following
     }
 
     /// The position of the comment in the text.
     pub(super) fn line_position(&self) -> CommentLinePosition {
         self.line_position
+    }
+
+    /// Returns the slice into the source code.
+    pub(crate) fn slice(&self) -> &SourceCodeSlice {
+        &self.slice
     }
 }
 
@@ -506,13 +517,33 @@ impl<'a> CommentPlacement<'a> {
     }
 }
 
+pub(super) trait PushComment<'a> {
+    fn push_comment(&mut self, placement: DecoratedComment<'a>, locator: &Locator);
+}
+
+/// A storage for the [`CommentsVisitor`] that just pushes the decorated comments to a [`Vec`] for
+/// debugging purposes.
+#[derive(Debug, Default)]
+struct CommentsVecBuilder<'a> {
+    comments: Vec<DecoratedComment<'a>>,
+}
+
+impl<'a> PushComment<'a> for CommentsVecBuilder<'a> {
+    fn push_comment(&mut self, placement: DecoratedComment<'a>, _: &Locator) {
+        self.comments.push(placement);
+    }
+}
+
+/// A storage for the [`CommentsVisitor`] that fixes the placement and stores the comments in a
+/// [`CommentsMap`].
 #[derive(Clone, Debug, Default)]
-struct CommentsBuilder<'a> {
+pub(super) struct CommentsMapBuilder<'a> {
     comments: CommentsMap<'a>,
 }
 
-impl<'a> CommentsBuilder<'a> {
-    fn add_comment(&mut self, placement: CommentPlacement<'a>) {
+impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
+    fn push_comment(&mut self, comment: DecoratedComment<'a>, locator: &Locator) {
+        let placement = place_comment(comment, locator);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -571,8 +602,10 @@ impl<'a> CommentsBuilder<'a> {
             }
         }
     }
+}
 
-    fn finish(self) -> CommentsMap<'a> {
+impl<'a> CommentsMapBuilder<'a> {
+    pub(crate) fn finish(self) -> CommentsMap<'a> {
         self.comments
     }
 

@@ -108,7 +108,8 @@ use ruff_python_trivia::PythonWhitespace;
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
 use crate::comments::node_key::NodeRefEqualityKey;
-use crate::comments::visitor::CommentsVisitor;
+use crate::comments::visitor::{CommentsMapBuilder, CommentsVisitor};
+pub(crate) use visitor::collect_comments;
 
 mod debug;
 pub(crate) mod format;
@@ -324,7 +325,9 @@ impl<'a> Comments<'a> {
         let map = if comment_ranges.is_empty() {
             CommentsMap::new()
         } else {
-            CommentsVisitor::new(source_code, comment_ranges).visit(root)
+            let mut builder = CommentsMapBuilder::default();
+            CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+            builder.finish()
         };
 
         Self::new(map)
