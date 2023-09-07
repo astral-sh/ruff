@@ -91,8 +91,7 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder
-                .push_comment(comment, &Locator::new(self.source_code.as_str()));
+            self.builder.push_comment(comment);
             self.comment_ranges.next();
         }
 
@@ -132,8 +131,7 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder
-                .push_comment(comment, &Locator::new(self.source_code.as_str()));
+            self.builder.push_comment(comment);
 
             self.comment_ranges.next();
         }
@@ -518,7 +516,7 @@ impl<'a> CommentPlacement<'a> {
 }
 
 pub(super) trait PushComment<'a> {
-    fn push_comment(&mut self, placement: DecoratedComment<'a>, locator: &Locator);
+    fn push_comment(&mut self, placement: DecoratedComment<'a>);
 }
 
 /// A storage for the [`CommentsVisitor`] that just pushes the decorated comments to a [`Vec`] for
@@ -529,21 +527,21 @@ struct CommentsVecBuilder<'a> {
 }
 
 impl<'a> PushComment<'a> for CommentsVecBuilder<'a> {
-    fn push_comment(&mut self, placement: DecoratedComment<'a>, _: &Locator) {
+    fn push_comment(&mut self, placement: DecoratedComment<'a>) {
         self.comments.push(placement);
     }
 }
 
 /// A storage for the [`CommentsVisitor`] that fixes the placement and stores the comments in a
 /// [`CommentsMap`].
-#[derive(Clone, Debug, Default)]
 pub(super) struct CommentsMapBuilder<'a> {
     comments: CommentsMap<'a>,
+    locator: Locator<'a>,
 }
 
 impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
-    fn push_comment(&mut self, comment: DecoratedComment<'a>, locator: &Locator) {
-        let placement = place_comment(comment, locator);
+    fn push_comment(&mut self, placement: DecoratedComment<'a>) {
+        let placement = place_comment(placement, &self.locator);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -605,6 +603,13 @@ impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
 }
 
 impl<'a> CommentsMapBuilder<'a> {
+    pub(crate) fn new(locator: Locator<'a>) -> Self {
+        Self {
+            comments: CommentsMap::default(),
+            locator,
+        }
+    }
+
     pub(crate) fn finish(self) -> CommentsMap<'a> {
         self.comments
     }
