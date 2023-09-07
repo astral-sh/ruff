@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use bitflags::bitflags;
+use smallvec::SmallVec;
 
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
@@ -142,7 +143,11 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
         match self.layout {
             StringLayout::Default => {
                 if self.string.is_implicit_concatenated() {
-                    in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
+                    in_parentheses_only_group(&StringContinuation::from_string(
+                        self.string,
+                        &locator,
+                    )?)
+                    .fmt(f)
                 } else {
                     StringPart::from_source(self.string.range(), &locator)
                         .normalize(
@@ -160,33 +165,22 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
                 format_docstring(&normalized, f)
             }
             StringLayout::ImplicitConcatenatedStringInBinaryLike => {
-                FormatStringContinuation::new(self.string).fmt(f)
+                StringContinuation::from_string(self.string, &locator)?.fmt(f)
             }
         }
     }
 }
 
-struct FormatStringContinuation<'a> {
+struct StringContinuation<'a> {
+    parts: SmallVec<[StringPart; 4]>,
     string: &'a AnyString<'a>,
 }
 
-impl<'a> FormatStringContinuation<'a> {
-    fn new(string: &'a AnyString<'a>) -> Self {
-        if let AnyString::Constant(constant) = string {
-            debug_assert!(constant.value.is_str() || constant.value.is_bytes());
-        }
-        Self { string }
-    }
-}
+impl<'a> StringContinuation<'a> {
+    fn from_string(string: &'a AnyString<'a>, locator: &Locator) -> FormatResult<Self> {
+        debug_assert!(string.is_implicit_concatenated());
 
-impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
-        let locator = f.context().locator();
-        let quote_style = f.options().quote_style();
-        let mut dangling_comments = comments.dangling(self.string);
-
-        let string_range = self.string.range();
+        let string_range = string.range();
         let string_content = locator.slice(string_range);
 
         // The AST parses implicit concatenation as a single string.
@@ -195,7 +189,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         // because this is a black preview style.
         let lexer = lex_starts_at(string_content, Mode::Expression, string_range.start());
 
-        let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
+        let mut parts = SmallVec::new();
 
         for token in lexer {
             let (token, token_range) = match token {
@@ -228,46 +222,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
 
             match token {
                 Tok::String { .. } => {
-                    // ```python
-                    // (
-                    //      "a"
-                    //      # leading
-                    //      "the comment above"
-                    // )
-                    // ```
-                    let leading_comments_end = dangling_comments
-                        .partition_point(|comment| comment.start() <= token_range.start());
-
-                    let (leading_part_comments, rest) =
-                        dangling_comments.split_at(leading_comments_end);
-
-                    // ```python
-                    // (
-                    //      "a" # trailing comment
-                    //      "the comment above"
-                    // )
-                    // ```
-                    let trailing_comments_end = rest.partition_point(|comment| {
-                        comment.line_position().is_end_of_line()
-                            && !locator.contains_line_break(TextRange::new(
-                                token_range.end(),
-                                comment.start(),
-                            ))
-                    });
-
-                    let (trailing_part_comments, rest) = rest.split_at(trailing_comments_end);
-                    let part = StringPart::from_source(token_range, &locator);
-                    let normalized =
-                        part.normalize(self.string.quoting(&locator), &locator, quote_style);
-
-                    joiner.entry(&format_args![
-                        line_suffix_boundary(),
-                        leading_comments(leading_part_comments),
-                        normalized,
-                        trailing_comments(trailing_part_comments)
-                    ]);
-
-                    dangling_comments = rest;
+                    parts.push(StringPart::from_source(token_range, locator));
                 }
                 Tok::Comment(_)
                 | Tok::NonLogicalNewline
@@ -276,6 +231,57 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                 | Tok::Dedent => continue,
                 token => unreachable!("Unexpected token {token:?}"),
             }
+        }
+
+        Ok(Self { parts, string })
+    }
+}
+
+impl Format<PyFormatContext<'_>> for StringContinuation<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let comments = f.context().comments().clone();
+        let locator = f.context().locator();
+        let quote_style = f.options().quote_style();
+        let quoting = self.string.quoting(&locator);
+
+        let mut dangling_comments = comments.dangling(self.string);
+        let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
+
+        for part in &self.parts {
+            // ```python
+            // (
+            //      "a"
+            //      # leading
+            //      "the comment above"
+            // )
+            // ```
+            let leading_comments_end =
+                dangling_comments.partition_point(|comment| comment.start() <= part.start());
+
+            let (leading_part_comments, rest) = dangling_comments.split_at(leading_comments_end);
+
+            // ```python
+            // (
+            //      "a" # trailing comment
+            //      "the comment above"
+            // )
+            // ```
+            let trailing_comments_end = rest.partition_point(|comment| {
+                comment.line_position().is_end_of_line()
+                    && !locator.contains_line_break(TextRange::new(part.end(), comment.start()))
+            });
+
+            let (trailing_part_comments, rest) = rest.split_at(trailing_comments_end);
+            let normalized = part.normalize(quoting, &locator, quote_style);
+
+            joiner.entry(&format_args![
+                line_suffix_boundary(),
+                leading_comments(leading_part_comments),
+                normalized,
+                trailing_comments(trailing_part_comments)
+            ]);
+
+            dangling_comments = rest;
         }
 
         debug_assert!(dangling_comments.is_empty());
@@ -320,7 +326,7 @@ impl StringPart {
 
     /// Computes the strings preferred quotes and normalizes its content.
     fn normalize<'a>(
-        self,
+        &self,
         quoting: Quoting,
         locator: &'a Locator,
         quote_style: QuoteStyle,
@@ -350,6 +356,12 @@ impl StringPart {
             text: normalized,
             quotes: preferred_quotes,
         }
+    }
+}
+
+impl Ranged for StringPart {
+    fn range(&self) -> TextRange {
+        self.content_range
     }
 }
 
