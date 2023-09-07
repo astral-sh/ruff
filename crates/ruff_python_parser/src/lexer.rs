@@ -36,8 +36,7 @@ use num_bigint::BigInt;
 use num_traits::{Num, Zero};
 use ruff_python_ast::IpyEscapeKind;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use unic_emoji_char::is_emoji_presentation;
-use unic_ucd_ident::{is_xid_continue, is_xid_start};
+use unicode_ident::{is_xid_continue, is_xid_start};
 
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::indentation::{Indentation, Indentations};
@@ -597,15 +596,6 @@ impl<'source> Lexer<'source> {
                 self.state = State::Other;
 
                 Ok((identifier, self.token_range()))
-            } else if is_emoji_presentation(c) {
-                self.state = State::Other;
-
-                Ok((
-                    Tok::Name {
-                        name: c.to_string(),
-                    },
-                    self.token_range(),
-                ))
             } else {
                 Err(LexicalError {
                     error: LexicalErrorType::UnrecognizedToken { tok: c },

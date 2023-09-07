@@ -1,4 +1,4 @@
-use unic_ucd_ident::{is_xid_continue, is_xid_start};
+use unicode_ident::{is_xid_continue, is_xid_start};
 
 use crate::keyword::is_keyword;
 
