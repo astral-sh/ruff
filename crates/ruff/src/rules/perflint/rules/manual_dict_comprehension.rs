@@ -169,7 +169,7 @@ pub(crate) fn manual_dict_comprehension(
                 let Expr::Dict(ast::ExprDict { keys, values, .. }) = value.as_ref() else {
                     return;
                 };
-                
+
                 if !keys.is_empty() || !values.is_empty() {
                     return;
                 }
