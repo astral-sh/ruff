@@ -1148,6 +1148,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn select_nursery() {
         // Backwards compatible behavior allows selection of nursery rules with the nursery selector
         // when preview is disabled
