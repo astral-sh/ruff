@@ -138,29 +138,26 @@ impl<'a> FormatString<'a> {
 
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let locator = f.context().locator();
         match self.layout {
             StringLayout::Default => {
                 if self.string.is_implicit_concatenated() {
                     in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
                 } else {
-                    FormatStringPart::new(
-                        self.string.range(),
-                        self.string.quoting(&f.context().locator()),
-                        &f.context().locator(),
-                        f.options().quote_style(),
-                    )
-                    .fmt(f)
+                    StringPart::from_source(self.string.range(), &locator)
+                        .normalize(
+                            self.string.quoting(&locator),
+                            &locator,
+                            f.options().quote_style(),
+                        )
+                        .fmt(f)
                 }
             }
             StringLayout::DocString => {
-                let string_part = FormatStringPart::new(
-                    self.string.range(),
-                    // f-strings can't be docstrings
-                    Quoting::CanChange,
-                    &f.context().locator(),
-                    f.options().quote_style(),
-                );
-                format_docstring(&string_part, f)
+                let string_part = StringPart::from_source(self.string.range(), &locator);
+                let normalized =
+                    string_part.normalize(Quoting::CanChange, &locator, f.options().quote_style());
+                format_docstring(&normalized, f)
             }
             StringLayout::ImplicitConcatenatedStringInBinaryLike => {
                 FormatStringContinuation::new(self.string).fmt(f)
@@ -259,16 +256,14 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                     });
 
                     let (trailing_part_comments, rest) = rest.split_at(trailing_comments_end);
+                    let part = StringPart::from_source(token_range, &locator);
+                    let normalized =
+                        part.normalize(self.string.quoting(&locator), &locator, quote_style);
 
                     joiner.entry(&format_args![
                         line_suffix_boundary(),
                         leading_comments(leading_part_comments),
-                        FormatStringPart::new(
-                            token_range,
-                            self.string.quoting(&locator),
-                            &locator,
-                            quote_style,
-                        ),
+                        normalized,
                         trailing_comments(trailing_part_comments)
                     ]);
 
@@ -289,21 +284,20 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     }
 }
 
-struct FormatStringPart {
+#[derive(Debug)]
+struct StringPart {
+    /// The prefix.
     prefix: StringPrefix,
-    preferred_quotes: StringQuotes,
-    range: TextRange,
-    is_raw_string: bool,
+
+    /// The actual quotes of the string in the source
+    quotes: StringQuotes,
+
+    /// The range of the string's content (full range minus quotes and prefix)
+    content_range: TextRange,
 }
 
-impl Ranged for FormatStringPart {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
-impl FormatStringPart {
-    fn new(range: TextRange, quoting: Quoting, locator: &Locator, quote_style: QuoteStyle) -> Self {
+impl StringPart {
+    fn from_source(range: TextRange, locator: &Locator) -> Self {
         let string_content = locator.slice(range);
 
         let prefix = StringPrefix::parse(string_content);
@@ -317,46 +311,80 @@ impl FormatStringPart {
         );
         let raw_content_range = relative_raw_content_range + range.start();
 
-        let raw_content = &string_content[relative_raw_content_range];
-        let is_raw_string = prefix.is_raw_string();
+        Self {
+            prefix,
+            content_range: raw_content_range,
+            quotes,
+        }
+    }
+
+    /// Computes the strings preferred quotes and normalizes its content.
+    fn normalize<'a>(
+        self,
+        quoting: Quoting,
+        locator: &'a Locator,
+        quote_style: QuoteStyle,
+    ) -> NormalizedString<'a> {
+        let raw_content = locator.slice(self.content_range);
+
         let preferred_quotes = match quoting {
-            Quoting::Preserve => quotes,
+            Quoting::Preserve => self.quotes,
             Quoting::CanChange => {
-                if is_raw_string {
-                    preferred_quotes_raw(raw_content, quotes, quote_style)
+                if self.prefix.is_raw_string() {
+                    preferred_quotes_raw(raw_content, self.quotes, quote_style)
                 } else {
-                    preferred_quotes(raw_content, quotes, quote_style)
+                    preferred_quotes(raw_content, self.quotes, quote_style)
                 }
             }
         };
 
-        Self {
-            prefix,
-            range: raw_content_range,
+        let normalized = normalize_string(
+            locator.slice(self.content_range),
             preferred_quotes,
-            is_raw_string,
+            self.prefix.is_raw_string(),
+        );
+
+        NormalizedString {
+            prefix: self.prefix,
+            content_range: self.content_range,
+            text: normalized,
+            quotes: preferred_quotes,
         }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatStringPart {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let normalized = normalize_string(
-            f.context().locator().slice(self.range),
-            self.preferred_quotes,
-            self.is_raw_string,
-        );
+#[derive(Debug)]
+struct NormalizedString<'a> {
+    prefix: StringPrefix,
 
-        write!(f, [self.prefix, self.preferred_quotes])?;
-        match normalized {
+    /// The quotes of the normalized string (preferred quotes)
+    quotes: StringQuotes,
+
+    /// The range of the string's content in the source (minus prefix and quotes).
+    content_range: TextRange,
+
+    /// The normalized text
+    text: Cow<'a, str>,
+}
+
+impl Ranged for NormalizedString<'_> {
+    fn range(&self) -> TextRange {
+        self.content_range
+    }
+}
+
+impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        write!(f, [self.prefix, self.quotes])?;
+        match &self.text {
             Cow::Borrowed(_) => {
                 source_text_slice(self.range()).fmt(f)?;
             }
             Cow::Owned(normalized) => {
-                text(&normalized, Some(self.start())).fmt(f)?;
+                text(normalized, Some(self.start())).fmt(f)?;
             }
         }
-        self.preferred_quotes.fmt(f)
+        self.quotes.fmt(f)
     }
 }
 
@@ -802,35 +830,30 @@ fn count_indentation_like_black(line: &str, tab_width: TabWidth) -> TextSize {
 ///         line c
 ///    """
 /// ```
-fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> FormatResult<()> {
-    let locator = f.context().locator();
+fn format_docstring(normalized: &NormalizedString, f: &mut PyFormatter) -> FormatResult<()> {
+    let docstring = &normalized.text;
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline
-    if locator.slice(string_part).contains("\\\n") {
-        return string_part.fmt(f);
+    if docstring.contains("\\\n") {
+        return normalized.fmt(f);
     }
 
-    let normalized = normalize_string(
-        locator.slice(string_part),
-        string_part.preferred_quotes,
-        string_part.is_raw_string,
-    );
     // is_borrowed is unstable :/
-    let already_normalized = matches!(normalized, Cow::Borrowed(_));
+    let already_normalized = matches!(docstring, Cow::Borrowed(_));
 
-    let mut lines = normalized.lines().peekable();
+    let mut lines = docstring.lines().peekable();
 
     // Start the string
     write!(
         f,
         [
-            source_position(string_part.start()),
-            string_part.prefix,
-            string_part.preferred_quotes
+            normalized.prefix,
+            normalized.quotes,
+            source_position(normalized.start()),
         ]
     )?;
     // We track where in the source docstring we are (in source code byte offsets)
-    let mut offset = string_part.start();
+    let mut offset = normalized.start();
 
     // The first line directly after the opening quotes has different rules than the rest, mainly
     // that we remove all leading whitespace as there's no indentation
@@ -844,7 +867,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
 
     // Edge case: The first line is `""" "content`, so we need to insert chaperone space that keep
     // inner quotes and closing quotes from getting to close to avoid `""""content`
-    if trim_both.starts_with(string_part.preferred_quotes.style.as_char()) {
+    if trim_both.starts_with(normalized.quotes.style.as_char()) {
         space().fmt(f)?;
     }
 
@@ -863,15 +886,15 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
     offset += first.text_len();
 
     // Check if we have a single line (or empty) docstring
-    if normalized[first.len()..].trim().is_empty() {
+    if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(string_part, trim_end)
-            || (trim_end.is_empty() && !normalized.is_empty())
+        if needs_chaperone_space(normalized, trim_end)
+            || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
         }
-        string_part.preferred_quotes.fmt(f)?;
+        normalized.quotes.fmt(f)?;
         return Ok(());
     }
 
@@ -906,27 +929,21 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
     }
 
     // Same special case in the last line as for the first line
-    let trim_end = normalized
+    let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(string_part, trim_end) {
+    if needs_chaperone_space(normalized, trim_end) {
         space().fmt(f)?;
     }
 
-    write!(
-        f,
-        [
-            string_part.preferred_quotes,
-            source_position(string_part.end())
-        ]
-    )
+    write!(f, [source_position(normalized.end()), normalized.quotes])
 }
 
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
-fn needs_chaperone_space(string_part: &FormatStringPart, trim_end: &str) -> bool {
-    trim_end.ends_with(string_part.preferred_quotes.style.as_char())
+fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
+    trim_end.ends_with(normalized.quotes.style.as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 
