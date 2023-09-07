@@ -669,11 +669,7 @@ LiteralPattern: ast::Pattern = {
         value: Box::new(value.into()),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <string:StringLiteralOrFString> <end_location:@R> => ast::PatternMatchValue {
-        value: Box::new(string.with_range((location..end_location).into()).into()),
-        range: (location..end_location).into()
-    }.into(),
-    <location:@L> <strings:TwoOrMoreConsecutive<StringLiteralOrFString>> <end_location:@L> =>? Ok(ast::PatternMatchValue {
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@L> =>? Ok(ast::PatternMatchValue {
         value: Box::new(concatenate_strings(strings, (location..end_location).into())?),
         range: (location..end_location).into()
     }.into()),
@@ -731,8 +727,7 @@ MappingKey: ast::Expr = {
         value: false.into(),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <string:StringLiteralOrFString> <end_location:@R> => string.with_range((location..end_location).into()).into(),
-    <location:@L> <strings:TwoOrMoreConsecutive<StringLiteralOrFString>> <end_location:@L> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@L> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
 }
 
 MatchMappingEntry: (ast::Expr, ast::Pattern) = {
@@ -1671,8 +1666,7 @@ FStringConversion: (TextSize, ast::ConversionFlag) = {
 };
 
 Atom<Goal>: ast::ParenthesizedExpr = {
-    <location:@L> <string:StringLiteralOrFString> <end_location:@R> => string.with_range((location..end_location).into()).into(),
-    <location:@L> <strings:TwoOrMoreConsecutive<StringLiteralOrFString>> <end_location:@L> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@L> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
     <location:@L> <value:Constant> <end_location:@R> => ast::ExprConstant {
         value,
         range: (location..end_location).into(),
@@ -1916,15 +1910,6 @@ OneOrMore<T>: Vec<T> = {
 TwoOrMore<T, Sep>: Vec<T> = {
     <e1:T> Sep <e2:T> => vec![e1, e2],
     <mut v: TwoOrMore<T, Sep>> Sep <e:T> => {
-        v.push(e);
-        v
-    }
-};
-
-/// Two or more consecutive items
-TwoOrMoreConsecutive<T>: Vec<T> = {
-    <e1:T> <e2:T> => vec![e1, e2],
-    <mut v: TwoOrMoreConsecutive<T>> <e:T> => {
         v.push(e);
         v
     }

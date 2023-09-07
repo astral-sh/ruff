@@ -47,63 +47,11 @@ impl Ranged for StringType {
     }
 }
 
-impl From<StringType> for Expr {
-    fn from(string: StringType) -> Self {
-        match string {
-            StringType::Str(StringConstantWithRange { value, range }) => {
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(value),
-                    range,
-                })
-            }
-            StringType::Bytes(BytesConstantWithRange { value, range }) => {
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bytes(value),
-                    range,
-                })
-            }
-            StringType::FString(node) => Expr::FString(node),
-        }
-    }
-}
-
-impl From<StringType> for ast::ParenthesizedExpr {
-    fn from(string: StringType) -> Self {
-        Expr::from(string).into()
-    }
-}
-
 impl StringType {
     fn is_unicode(&self) -> bool {
         match self {
             Self::Str(StringConstantWithRange { value, .. }) => value.unicode,
             _ => false,
-        }
-    }
-
-    pub(crate) fn with_range(self, new_range: TextRange) -> Self {
-        match self {
-            Self::Str(StringConstantWithRange { value, .. }) => {
-                Self::Str(StringConstantWithRange {
-                    value,
-                    range: new_range,
-                })
-            }
-            Self::Bytes(BytesConstantWithRange { value, .. }) => {
-                Self::Bytes(BytesConstantWithRange {
-                    value,
-                    range: new_range,
-                })
-            }
-            Self::FString(ast::ExprFString {
-                values,
-                implicit_concatenated,
-                ..
-            }) => Self::FString(ast::ExprFString {
-                values,
-                implicit_concatenated,
-                range: new_range,
-            }),
         }
     }
 }
@@ -387,16 +335,13 @@ pub(crate) fn parse_fstring_middle(
         .map(Some)
 }
 
-/// Concatenate a list of string expressions into a single string expression.
-///
-/// This is mainly used for implicit string concatenation and the possible
-/// expression values are strings, bytes, and f-strings.
+/// Concatenate a list of string literals into a single string expression.
 pub(crate) fn concatenate_strings(
     strings: Vec<StringType>,
     range: TextRange,
 ) -> Result<Expr, LexicalError> {
     #[cfg(debug_assertions)]
-    debug_assert!(strings.len() > 1);
+    debug_assert!(!strings.is_empty());
 
     let mut has_fstring = false;
     let mut byte_literal_count = 0;
@@ -408,6 +353,7 @@ pub(crate) fn concatenate_strings(
         }
     }
     let has_bytes = byte_literal_count > 0;
+    let implicit_concatenated = strings.len() > 1;
 
     if has_bytes && byte_literal_count < strings.len() {
         return Err(LexicalError {
@@ -426,13 +372,13 @@ pub(crate) fn concatenate_strings(
                     value: BytesConstant { value, .. },
                     ..
                 }) => content.extend(value),
-                _ => unreachable!("Unexpected non-bytes expression."),
+                _ => unreachable!("Unexpected non-bytes literal."),
             }
         }
         return Ok(ast::ExprConstant {
             value: Constant::Bytes(BytesConstant {
                 value: content,
-                implicit_concatenated: true,
+                implicit_concatenated,
             }),
             range,
         }
@@ -441,21 +387,21 @@ pub(crate) fn concatenate_strings(
 
     if !has_fstring {
         let mut content = String::new();
-        let is_unicode = strings.get(0).map_or(false, StringType::is_unicode);
+        let is_unicode = strings.first().map_or(false, StringType::is_unicode);
         for string in strings {
             match string {
                 StringType::Str(StringConstantWithRange {
                     value: StringConstant { value, .. },
                     ..
                 }) => content.push_str(&value),
-                _ => unreachable!("Unexpected non-string expression."),
+                _ => unreachable!("Unexpected non-string literal."),
             }
         }
         return Ok(ast::ExprConstant {
             value: Constant::Str(StringConstant {
                 value: content,
                 unicode: is_unicode,
-                implicit_concatenated: true,
+                implicit_concatenated,
             }),
             range,
         }
@@ -474,7 +420,7 @@ pub(crate) fn concatenate_strings(
             value: Constant::Str(StringConstant {
                 value: std::mem::take(current),
                 unicode,
-                implicit_concatenated: true,
+                implicit_concatenated,
             }),
             range: TextRange::new(start, end),
         })
@@ -510,7 +456,7 @@ pub(crate) fn concatenate_strings(
                             current_end = value_range.end();
                             current.push_str(&value);
                         }
-                        _ => unreachable!("Unexpected non-string expression."),
+                        _ => unreachable!("Expected `Expr::FormattedValue` or `Expr::Constant`"),
                     }
                 }
             }
@@ -525,7 +471,7 @@ pub(crate) fn concatenate_strings(
                 current_end = string_range.end();
                 current.push_str(&value);
             }
-            StringType::Bytes(_) => unreachable!("Unexpected non-string expression."),
+            StringType::Bytes(_) => unreachable!("Unexpected bytes literal."),
         }
     }
     if !current.is_empty() {
@@ -539,7 +485,7 @@ pub(crate) fn concatenate_strings(
 
     Ok(ast::ExprFString {
         values: deduped,
-        implicit_concatenated: true,
+        implicit_concatenated,
         range,
     }
     .into())
