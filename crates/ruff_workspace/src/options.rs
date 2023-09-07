@@ -1252,14 +1252,14 @@ pub struct Flake8SelfOptions {
 
 impl Flake8SelfOptions {
     pub fn into_settings(self) -> flake8_self::settings::Settings {
+        let defaults = flake8_self::settings::Settings::default();
         flake8_self::settings::Settings {
-            ignore_names: self.ignore_names.unwrap_or_else(|| {
-                flake8_self::settings::IGNORE_NAMES
-                    .map(String::from)
-                    .into_iter()
-                    .chain(self.extend_ignore_names.unwrap_or_default())
-                    .collect()
-            }),
+            ignore_names: self
+                .ignore_names
+                .unwrap_or(defaults.ignore_names)
+                .into_iter()
+                .chain(self.extend_ignore_names.unwrap_or_default())
+                .collect(),
         }
     }
 }
