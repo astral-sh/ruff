@@ -124,6 +124,41 @@ lambda a, /, c: a
     # 4
     None # 5
 )
+
+(
+    lambda
+    # comment
+    *x: x
+)
+
+(
+    lambda
+    # comment 1
+    *
+    # comment 2
+    x:
+    # comment 3
+    x
+)
+
+(
+    lambda # comment 1
+    * # comment 2
+    x: # comment 3
+    x
+)
+
+lambda *x\
+    :x
+
+(
+    lambda
+    # comment
+    *\
+        x: x
+)
+
+
 ```
 
 ## Output
@@ -185,7 +220,8 @@ lambda x: lambda y: lambda z: (
 # Trailing
 
 a = (
-    lambda: # Dangling
+    lambda: 
+    # Dangling
     1
 )
 
@@ -232,21 +268,50 @@ lambda a, /, c: a
 
 # Dangling comments without parameters.
 (
-    lambda: # 3
+    lambda: 
+    # 3
     None
 )
 
 (
-    lambda: # 3
+    lambda: 
+    # 3
     None
 )
 
 (
-    lambda: # 1
+    lambda: 
+    # 1
     # 2
     # 3
     # 4
     None  # 5
+)
+
+(
+    lambda # comment
+    *x: x
+)
+
+(
+    lambda # comment 1
+    # comment 2
+    *x: 
+    # comment 3
+    x
+)
+
+(
+    lambda # comment 1
+    # comment 2
+    *x: x  # comment 3
+)
+
+lambda *x: x
+
+(
+    lambda # comment
+    *x: x
 )
 ```
 

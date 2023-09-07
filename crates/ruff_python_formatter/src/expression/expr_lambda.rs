@@ -20,6 +20,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
+        let body_leading = comments.leading(body.as_ref());
 
         write!(f, [token("lambda")])?;
 
@@ -41,6 +42,11 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             write!(f, [space()])?;
         } else {
             write!(f, [dangling_comments(dangling)])?;
+        }
+
+        // Insert hard line break if body has leading comment to ensure consistent formatting
+        if !body_leading.is_empty() {
+            write!(f, [hard_line_break()])?;
         }
 
         write!(f, [body.format()])
