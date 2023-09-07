@@ -44,11 +44,9 @@ pub(crate) fn main(args: &Args) -> Result<()> {
             }
 
             if rule.is_preview() {
-                output.push_str(&format!(
-                    r#"This rule is in preview and is not stable. It may be enabled by explicitly selecting {}"
-" or providing the `--preview` flag."#,
-                    rule.noqa_code()
-                ));
+                output.push_str(
+                    r#"This rule is in preview and is not stable. The `--preview` flag is required for use."#,
+                );
                 output.push('\n');
                 output.push('\n');
             }
