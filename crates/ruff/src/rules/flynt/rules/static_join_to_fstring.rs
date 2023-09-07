@@ -1,5 +1,6 @@
 use itertools::Itertools;
 
+use crate::autofix::edits::pad;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
@@ -113,6 +114,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     Some(node.into())
 }
 
+/// FLY002
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
     let Expr::Call(ast::ExprCall {
         arguments: Arguments { args, keywords, .. },
@@ -154,7 +156,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            contents,
+            pad(contents, expr.range(), checker.locator()),
             expr.range(),
         )));
     }
