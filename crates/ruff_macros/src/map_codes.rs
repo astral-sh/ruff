@@ -315,6 +315,7 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 matches!(self.group(), RuleGroup::Preview)
             }
 
+            #[allow(deprecated)]
             pub fn is_nursery(&self) -> bool {
                 matches!(self.group(), RuleGroup::Nursery)
             }
