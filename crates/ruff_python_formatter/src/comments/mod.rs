@@ -104,6 +104,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_index::CommentRanges;
 use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::Locator;
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
@@ -325,7 +326,7 @@ impl<'a> Comments<'a> {
         let map = if comment_ranges.is_empty() {
             CommentsMap::new()
         } else {
-            let mut builder = CommentsMapBuilder::default();
+            let mut builder = CommentsMapBuilder::new(Locator::new(source_code.as_str()));
             CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
             builder.finish()
         };
