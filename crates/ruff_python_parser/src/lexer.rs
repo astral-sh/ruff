@@ -1716,4 +1716,22 @@ def f(arg=%timeit a = b):
         let source = "[1";
         let _ = lex(source, Mode::Module).collect::<Vec<_>>();
     }
+
+    /// Emoji identifiers are a non-standard python feature and are not supported by our lexer.
+    #[test]
+    fn test_emoji_identifier() {
+        let source = "🐦";
+
+        let lexed: Vec<_> = lex(source, Mode::Module).collect();
+
+        match lexed.as_slice() {
+            [Err(error)] => {
+                assert_eq!(
+                    error.error,
+                    LexicalErrorType::UnrecognizedToken { tok: '🐦' }
+                );
+            }
+            result => panic!("Expected an error token but found {result:?}"),
+        }
+    }
 }
