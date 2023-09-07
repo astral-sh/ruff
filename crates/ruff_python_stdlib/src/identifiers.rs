@@ -7,12 +7,12 @@ use crate::keyword::is_keyword;
 pub fn is_identifier(name: &str) -> bool {
     // Is the first character a letter or underscore?
     let mut chars = name.chars();
-    if !chars.next().is_some_and(|c| c == '_' || is_xid_start(c)) {
+    if !chars.next().is_some_and(is_identifier_start) {
         return false;
     }
 
     // Are the rest of the characters letters, digits, or underscores?
-    if !chars.all(|c| c == '_' || is_xid_continue(c)) {
+    if !chars.all(is_identifier_continuation) {
         return false;
     }
 
@@ -22,6 +22,21 @@ pub fn is_identifier(name: &str) -> bool {
     }
 
     true
+}
+
+// Checks if the character c is a valid starting character as described
+// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+fn is_identifier_start(c: char) -> bool {
+    matches!(c, 'a'..='z' | 'A'..='Z' | '_') || is_xid_start(c)
+}
+
+// Checks if the character c is a valid continuation character as described
+// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+fn is_identifier_continuation(c: char) -> bool {
+    match c {
+        'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => true,
+        c => is_xid_continue(c),
+    }
 }
 
 /// Returns `true` if a string is a private identifier, such that, when the
@@ -93,6 +108,7 @@ mod tests {
         assert!(is_identifier("العربية"));
         assert!(is_identifier("кириллица"));
         assert!(is_identifier("πr"));
+        assert!(!is_identifier(""));
         assert!(!is_identifier("percentile_co³t"));
         assert!(!is_identifier("HelloWorld❤️"));
     }
