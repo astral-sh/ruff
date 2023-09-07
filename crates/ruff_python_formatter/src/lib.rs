@@ -14,7 +14,7 @@ use crate::comments::{
     dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
-pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
+pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
 use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;

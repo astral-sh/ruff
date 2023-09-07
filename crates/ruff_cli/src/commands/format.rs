@@ -13,6 +13,7 @@ use tracing::{debug, warn};
 
 use ruff::fs;
 use ruff::logging::LogLevel;
+use ruff::settings::types::PreviewMode;
 use ruff::warn_user_once;
 use ruff_formatter::LineWidth;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -72,9 +73,15 @@ pub(crate) fn format(
                         return None;
                     };
 
+                    let preview = match pyproject_config.settings.lib.preview {
+                        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+                        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+                    };
+
                     let line_length = resolver.resolve(path, &pyproject_config).line_length;
                     let options = PyFormatOptions::from_source_type(source_type)
-                        .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
+                        .with_line_width(LineWidth::from(NonZeroU16::from(line_length)))
+                        .with_preview(preview);
                     debug!("Formatting {} with {:?}", path.display(), options);
                     Some(format_path(path, options, mode))
                 }

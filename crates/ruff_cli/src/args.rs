@@ -368,6 +368,12 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
+
+    /// Enable preview mode; checks will include unstable rules and fixes.
+    #[arg(long, overrides_with("no_preview"), hide = true)]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -496,6 +502,7 @@ impl FormatCommand {
                     self.respect_gitignore,
                     self.no_respect_gitignore,
                 ),
+                preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..Overrides::default()

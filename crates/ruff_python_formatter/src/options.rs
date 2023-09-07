@@ -39,6 +39,9 @@ pub struct PyFormatOptions {
     /// Should the formatter generate a source map that allows mapping source positions to positions
     /// in the formatted document.
     source_map_generation: SourceMapGeneration,
+
+    /// Whether preview style formatting is enabled or not
+    preview: PreviewMode,
 }
 
 fn default_line_width() -> LineWidth {
@@ -64,6 +67,7 @@ impl Default for PyFormatOptions {
             line_ending: LineEnding::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
+            preview: PreviewMode::default(),
         }
     }
 }
@@ -101,6 +105,10 @@ impl PyFormatOptions {
         self.line_ending
     }
 
+    pub fn preview(&self) -> PreviewMode {
+        self.preview
+    }
+
     #[must_use]
     pub fn with_tab_width(mut self, tab_width: TabWidth) -> Self {
         self.tab_width = tab_width;
@@ -134,6 +142,12 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_line_ending(mut self, line_ending: LineEnding) -> Self {
         self.line_ending = line_ending;
+        self
+    }
+
+    #[must_use]
+    pub fn with_preview(mut self, preview: PreviewMode) -> Self {
+        self.preview = preview;
         self
     }
 }
@@ -244,5 +258,20 @@ impl FromStr for MagicTrailingComma {
             // TODO: replace this error with a diagnostic
             _ => Err("Value not supported for MagicTrailingComma"),
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum PreviewMode {
+    #[default]
+    Disabled,
+
+    Enabled,
+}
+
+impl PreviewMode {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, PreviewMode::Enabled)
     }
 }
