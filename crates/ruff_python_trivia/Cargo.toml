@@ -18,7 +18,7 @@ ruff_source_file = { path = "../ruff_source_file" }
 
 memchr = { workspace = true }
 smallvec = { workspace = true }
-unic-ucd-ident = "0.9.0"
+unic-ucd-ident = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
