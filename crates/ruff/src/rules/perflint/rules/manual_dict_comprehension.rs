@@ -169,11 +169,11 @@ pub(crate) fn manual_dict_comprehension(
                 let Expr::Dict(ast::ExprDict { keys, values, .. }) = value.as_ref() else {
                     return;
                 };
+                
                 if !keys.is_empty() || !values.is_empty() {
                     return;
                 }
-                println!("END ASSIGN: {:?}", checker.locator().full_line_end(creation_range.end()));
-                println!("START FOR: {:?}", checker.locator().line_start(range.start()));
+
                 if checker.locator().full_line_end(creation_range.end())
                     == checker.locator().line_start(range.start())
                 {

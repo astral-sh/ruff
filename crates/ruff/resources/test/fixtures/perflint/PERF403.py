@@ -18,7 +18,7 @@ def foo():
     result = {}
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # PERF403
+            result[idx] = name  # Ok (false negative: edge case where `else` is same as `if`
         else:
             result[idx] = name
 
@@ -59,5 +59,3 @@ def foo():
     for idx, name in enumerate(fruit):
         if idx % 2:
             result[idx] = name  # Ok
-        else:
-            result[idx] = name
