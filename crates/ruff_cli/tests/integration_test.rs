@@ -305,6 +305,177 @@ fn nursery_direct() {
     "###);
 }
 
+#[test]
+fn nursery_group_selector() {
+    // Only nursery rules should be detected e.g. E225 and a warning should be displayed
+    let args = ["--select", "NURSERY"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: CPY001 Missing copyright notice at top of file
+    -:1:2: E225 Missing whitespace around operator
+    Found 2 errors.
+
+    ----- stderr -----
+    warning: The `NURSERY` selector has been deprecated. Use the `--preview` flag instead.
+    "###);
+}
+
+#[test]
+fn nursery_group_selector_preview_enabled() {
+    // Only nursery rules should be detected e.g. E225 and a warning should be displayed
+    let args = ["--select", "NURSERY", "--preview"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: CPY001 Missing copyright notice at top of file
+    -:1:2: E225 Missing whitespace around operator
+    Found 2 errors.
+
+    ----- stderr -----
+    warning: The `NURSERY` selector has been deprecated. Use the `PREVIEW` selector instead.
+    "###);
+}
+
+#[test]
+fn preview_enabled_prefix() {
+    // E741 and E225 (preview) should both be detected
+    let args = ["--select", "E", "--preview"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    -:1:2: E225 Missing whitespace around operator
+    Found 2 errors.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn preview_enabled_all() {
+    let args = ["--select", "ALL", "--preview"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    -:1:1: D100 Missing docstring in public module
+    -:1:1: CPY001 Missing copyright notice at top of file
+    -:1:2: E225 Missing whitespace around operator
+    Found 4 errors.
+
+    ----- stderr -----
+    warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
+    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
+    "###);
+}
+
+#[test]
+fn preview_enabled_direct() {
+    // E225 should be detected without warning
+    let args = ["--select", "E225", "--preview"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:2: E225 Missing whitespace around operator
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn preview_disabled_prefix_empty() {
+    // Warns that the selection is empty since all of the CPY rules are in preview
+    let args = ["--select", "CPY"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: Selection `CPY` has no effect because the `--preview` flag was not included.
+    "###);
+}
+
+#[test]
+fn preview_disabled_group_selector() {
+    // `--select PREVIEW` should warn without the `--preview` flag
+    let args = ["--select", "PREVIEW"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: Selection `PREVIEW` has no effect because the `--preview` flag was not included.
+    "###);
+}
+
+#[test]
+fn preview_enabled_group_selector() {
+    // `--select PREVIEW` is okay with the `--preview` flag and shouldn't warn
+    let args = ["--select", "PREVIEW", "--preview"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: CPY001 Missing copyright notice at top of file
+    -:1:2: E225 Missing whitespace around operator
+    Found 2 errors.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn preview_enabled_group_ignore() {
+    // `--select E --ignore PREVIEW` should detect E741 and E225, which is in preview but "E" is more specific.
+    let args = ["--select", "E", "--ignore", "PREVIEW", "--preview"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    -:1:2: E225 Missing whitespace around operator
+    Found 2 errors.
+
+    ----- stderr -----
+    "###);
+}
+
 /// An unreadable pyproject.toml in non-isolated mode causes ruff to hard-error trying to build up
 /// configuration globs
 #[cfg(unix)]
