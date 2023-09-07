@@ -23,6 +23,5 @@ SIM105_1.py:5:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `tr
 6 7 |     math.sqrt(-1)
 7   |-except ValueError:
 8   |-    pass
-  8 |+
 
 
