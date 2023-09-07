@@ -10,6 +10,8 @@ pub(crate) use mutable_class_default::*;
 pub(crate) use mutable_dataclass_default::*;
 pub(crate) use pairwise_over_zipped::*;
 pub(crate) use static_key_dict_comprehension::*;
+#[cfg(test)]
+pub(crate) use test_rules::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 #[cfg(feature = "unreachable-code")]
 pub(crate) use unreachable::*;
@@ -29,6 +31,8 @@ mod mutable_class_default;
 mod mutable_dataclass_default;
 mod pairwise_over_zipped;
 mod static_key_dict_comprehension;
+#[cfg(test)]
+mod test_rules;
 mod unnecessary_iterable_allocation_for_first_element;
 #[cfg(feature = "unreachable-code")]
 pub(crate) mod unreachable;

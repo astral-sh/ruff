@@ -213,6 +213,31 @@ pub fn check_path(
         ));
     }
 
+    // Raise violations for internal test rules
+    #[cfg(test)]
+    {
+        if settings.rules.enabled(Rule::StableTestRule) {
+            diagnostics.push(Diagnostic::new(
+                Rule::StableTestRule,
+                ruff_text_size::TextRange::default(),
+            ));
+        }
+
+        if settings.rules.enabled(Rule::PreviewTestRule) {
+            diagnostics.push(Diagnostic::new(
+                Rule::PreviewTestRule,
+                ruff_text_size::TextRange::default(),
+            ));
+        }
+
+        if settings.rules.enabled(Rule::NurseryTestRule) {
+            diagnostics.push(Diagnostic::new(
+                Rule::NurseryTestRule,
+                ruff_text_size::TextRange::default(),
+            ));
+        }
+    }
+
     // Ignore diagnostics based on per-file-ignores.
     if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
         let ignores = fs::ignores_from_path(path, &settings.per_file_ignores);

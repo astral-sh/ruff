@@ -865,6 +865,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "017") => (RuleGroup::Nursery, rules::ruff::rules::QuadraticListSummation),
         (Ruff, "100") => (RuleGroup::Unspecified, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidPyprojectToml),
+        #[cfg(test)]
+        (Ruff, "900") => (RuleGroup::Unspecified, rules::ruff::rules::StableTestRule),
+        #[cfg(test)]
+        (Ruff, "901") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
+        #[cfg(test)]
+        (Ruff, "902") => (RuleGroup::Preview, rules::ruff::rules::PreviewTestRule),
 
         // flake8-django
         (Flake8Django, "001") => (RuleGroup::Unspecified, rules::flake8_django::rules::DjangoNullableModelStringField),
