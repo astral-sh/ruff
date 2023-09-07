@@ -137,6 +137,15 @@ assert (
     in caplog.messages
 )
 
+(
+    b < c > d <
+    f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccccccc"
+    % aaaaaaaaaaaa
+    > x
+)
+
 c = (a >
      # test leading binary comment
      "a" "b" * b
@@ -354,6 +363,12 @@ c = (
 assert (
     "One or more packages has an associated PGP signature; these will "
     "be silently ignored by the index" in caplog.messages
+)
+
+(
+    b < c > d < f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccccccc" % aaaaaaaaaaaa > x
 )
 
 c = (
