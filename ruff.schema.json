@@ -1033,6 +1033,16 @@
     "Flake8SelfOptions": {
       "type": "object",
       "properties": {
+        "extend-ignore-names": {
+          "description": "Additional names to ignore when considering `flake8-self` violations, in addition to those included in `ignore-names`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "ignore-names": {
           "description": "A list of names to ignore when considering `flake8-self` violations.",
           "type": [
