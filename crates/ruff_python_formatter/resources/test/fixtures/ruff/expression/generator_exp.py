@@ -16,6 +16,11 @@ f((1) for _ in (a))
 # combination of the two above
 f(((1) for _ in (a)))
 
+bases = tuple(
+     (base._meta.label_lower if hasattr(base, "_meta") else base)
+     for base in flattened_bases
+)
+
 
 # black keeps these atm, but intends to remove them in the future:
 # https://github.com/psf/black/issues/2943
