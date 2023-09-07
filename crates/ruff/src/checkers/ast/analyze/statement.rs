@@ -1177,7 +1177,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 iter,
                 orelse,
                 is_async,
-                ..
+                range,
             },
         ) => {
             if checker.any_enabled(&[
@@ -1212,7 +1212,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 perflint::rules::manual_list_copy(checker, target, body);
             }
             if checker.enabled(Rule::ManualDictComprehension) {
-                perflint::rules::manual_dict_comprehension(checker, target, body);
+                perflint::rules::manual_dict_comprehension(checker, target, body, *range);
             }
             if checker.enabled(Rule::UnnecessaryListCast) {
                 perflint::rules::unnecessary_list_cast(checker, iter);

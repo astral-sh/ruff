@@ -4,6 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_python_semantic::Binding;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -46,7 +47,12 @@ impl Violation for ManualDictComprehension {
 }
 
 /// PERF403
-pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+pub(crate) fn manual_dict_comprehension(
+    checker: &mut Checker,
+    target: &Expr,
+    body: &[Stmt],
+    range: TextRange,
+) {
     // For a dictionary comprehension to be appropriate, the loop needs both an index
     // and a value, so the target must be a tuple.
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
@@ -92,7 +98,7 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
     let Stmt::Assign(ast::StmtAssign {
         targets,
         value,
-        range,
+        range: loop_assign_range,
     }) = stmt
     else {
         return;
@@ -140,7 +146,42 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ManualDictComprehension, *range));
+    // Only push diagnostic if Dict is created empty in the stmt right before the for loop
+    if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
+        if let Some(parent_id) = binding.source {
+            let parent = checker.semantic().statement(parent_id);
+            if let Stmt::Assign(ast::StmtAssign {
+                range: creation_range,
+                value,
+                ..
+            })
+            | Stmt::AnnAssign(ast::StmtAnnAssign {
+                range: creation_range,
+                value: Some(value),
+                ..
+            })
+            | Stmt::AugAssign(ast::StmtAugAssign {
+                range: creation_range,
+                value,
+                ..
+            }) = parent
+            {
+                let Expr::Dict(ast::ExprDict { keys, values, .. }) = value.as_ref() else {
+                    return;
+                };
+                if !keys.is_empty() || !values.is_empty() {
+                    return;
+                }
+                println!("END ASSIGN: {:?}", checker.locator().full_line_end(creation_range.end()));
+                println!("START FOR: {:?}", checker.locator().line_start(range.start()));
+                if checker.locator().full_line_end(creation_range.end())
+                    == checker.locator().line_start(range.start())
+                {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(ManualDictComprehension, *loop_assign_range));
+                }
+            }
+        }
+    }
 }
