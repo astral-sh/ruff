@@ -2226,3 +2226,56 @@ impl PyUpgradeOptions {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::options::Flake8SelfOptions;
+    use ruff::rules::flake8_self;
+
+    #[test]
+    fn flake8_self_options() {
+        let default_settings = flake8_self::settings::Settings::default();
+
+        // Uses defaults if no options are specified.
+        let options = Flake8SelfOptions {
+            ignore_names: None,
+            extend_ignore_names: None,
+        };
+        let settings = options.into_settings();
+        assert_eq!(settings.ignore_names, default_settings.ignore_names);
+
+        // Uses ignore_names if specified.
+        let options = Flake8SelfOptions {
+            ignore_names: Some(vec!["_foo".to_string()]),
+            extend_ignore_names: None,
+        };
+        let settings = options.into_settings();
+        assert_eq!(settings.ignore_names, vec!["_foo".to_string()]);
+
+        // Appends extend_ignore_names to defaults if only extend_ignore_names is specified.
+        let options = Flake8SelfOptions {
+            ignore_names: None,
+            extend_ignore_names: Some(vec!["_bar".to_string()]),
+        };
+        let settings = options.into_settings();
+        assert_eq!(
+            settings.ignore_names,
+            default_settings
+                .ignore_names
+                .into_iter()
+                .chain(["_bar".to_string()])
+                .collect::<Vec<String>>()
+        );
+
+        // Appends extend_ignore_names to ignore_names if both are specified.
+        let options = Flake8SelfOptions {
+            ignore_names: Some(vec!["_foo".to_string()]),
+            extend_ignore_names: Some(vec!["_bar".to_string()]),
+        };
+        let settings = options.into_settings();
+        assert_eq!(
+            settings.ignore_names,
+            vec!["_foo".to_string(), "_bar".to_string()]
+        );
+    }
+}
