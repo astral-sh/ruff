@@ -550,6 +550,7 @@ impl<'source> Lexer<'source> {
         let mut in_named_unicode = false;
         let mut end_format_spec = false;
 
+        self.cursor.start_token();
         loop {
             match self.cursor.first() {
                 EOF_CHAR => {
@@ -558,18 +559,12 @@ impl<'source> Lexer<'source> {
                     } else {
                         FStringErrorType::UnterminatedString
                     };
-                    // This is to avoid infinite loop where the lexer keeps returning
-                    // the error token because the f-string is still on the stack.
-                    self.fstrings.pop();
                     return Err(LexicalError {
                         error: LexicalErrorType::FStringError(error),
                         location: self.offset(),
                     });
                 }
                 '\n' if !fstring.is_triple_quoted() => {
-                    // This is to avoid infinite loop where the lexer keeps returning
-                    // the error token because the f-string is still on the stack.
-                    self.fstrings.pop();
                     return Err(LexicalError {
                         error: LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
                         location: self.offset(),
@@ -623,9 +618,7 @@ impl<'source> Lexer<'source> {
                         self.cursor.bump(); // Skip the second `}`
                         last_offset = self.offset();
                     } else {
-                        // The lexer can only be in a format spec if we encounter a `}` token
-                        // while scanning for `FStringMiddle` tokens.
-                        end_format_spec = true;
+                        end_format_spec = fstring.is_in_format_spec(self.nesting);
                         break;
                     }
                 }
@@ -634,7 +627,6 @@ impl<'source> Lexer<'source> {
                 }
             }
         }
-
         let range = self.token_range();
 
         // Avoid emitting the empty `FStringMiddle` token for anything other than
@@ -660,7 +652,7 @@ impl<'source> Lexer<'source> {
             // loop where the lexer keeps on emitting an empty `FStringMiddle` token.
             // This is because the lexer still thinks that we're in a f-string expression
             // but as we've encountered a `}` token, we need to decrement the depth so
-            // that the lexer can go forward with the `Rbrace` token.
+            // that the lexer can go forward with the next token.
             //
             // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
             self.fstrings.current_mut().unwrap().end_format_spec();
@@ -761,12 +753,21 @@ impl<'source> Lexer<'source> {
     pub fn next_token(&mut self) -> LexResult {
         if let Some(fstring) = self.fstrings.current() {
             if !fstring.is_in_expression(self.nesting) {
-                self.cursor.start_token();
-                if let Some(tok) = self.lex_fstring_middle_or_end()? {
-                    if tok == Tok::FStringEnd {
-                        self.fstrings.pop();
+                match self.lex_fstring_middle_or_end() {
+                    Ok(Some(tok)) => {
+                        if tok == Tok::FStringEnd {
+                            self.fstrings.pop();
+                        }
+                        return Ok((tok, self.token_range()));
                     }
-                    return Ok((tok, self.token_range()));
+                    Err(e) => {
+                        // This is to prevent an infinite loop in which the lexer
+                        // continuously returns an error token because the f-string
+                        // remains on the stack.
+                        self.fstrings.pop();
+                        return Err(e);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -1103,7 +1104,7 @@ impl<'source> Lexer<'source> {
             }
             '}' => {
                 if let Some(fstring) = self.fstrings.current() {
-                    if !fstring.has_open_parentheses(self.nesting) {
+                    if fstring.nesting() == self.nesting {
                         return Err(LexicalError {
                             error: LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
                             location: self.token_start(),
@@ -2042,11 +2043,20 @@ f"{(lambda x:{x})}"
     #[test]
     fn test_fstring_error() {
         use FStringErrorType::{
-            UnclosedLbrace, UnterminatedString, UnterminatedTripleQuotedString,
+            SingleRbrace, UnclosedLbrace, UnterminatedString, UnterminatedTripleQuotedString,
         };
 
-        assert_eq!(lex_fstring_error(r#"f"{""#), UnclosedLbrace);
-        assert_eq!(lex_fstring_error(r#"f"{foo!r""#), UnclosedLbrace);
+        assert_eq!(lex_fstring_error("f'}'"), SingleRbrace);
+        assert_eq!(lex_fstring_error("f'{{}'"), SingleRbrace);
+        assert_eq!(lex_fstring_error("f'{{}}}'"), SingleRbrace);
+        assert_eq!(lex_fstring_error("f'foo}'"), SingleRbrace);
+        assert_eq!(lex_fstring_error(r"f'\u007b}'"), SingleRbrace);
+        assert_eq!(lex_fstring_error("f'{a:b}}'"), SingleRbrace);
+        assert_eq!(lex_fstring_error("f'{3:}}>10}'"), SingleRbrace);
+
+        assert_eq!(lex_fstring_error("f'{'"), UnclosedLbrace);
+        assert_eq!(lex_fstring_error("f'{foo!r'"), UnclosedLbrace);
+        assert_eq!(lex_fstring_error("f'{foo='"), UnclosedLbrace);
         assert_eq!(
             lex_fstring_error(
                 r#"f"{"
@@ -2055,8 +2065,10 @@ f"{(lambda x:{x})}"
             UnclosedLbrace
         );
         assert_eq!(lex_fstring_error(r#"f"""{""""#), UnclosedLbrace);
+
         assert_eq!(lex_fstring_error(r#"f""#), UnterminatedString);
         assert_eq!(lex_fstring_error(r#"f'"#), UnterminatedString);
+
         assert_eq!(lex_fstring_error(r#"f""""#), UnterminatedTripleQuotedString);
         assert_eq!(lex_fstring_error(r#"f'''"#), UnterminatedTripleQuotedString);
         assert_eq!(

@@ -26,6 +26,8 @@ pub(crate) struct FStringContext {
     flags: FStringContextFlags,
 
     /// The level of nesting for the lexer when it entered the current f-string.
+    /// The nesting level includes all kinds of parentheses i.e., round, square,
+    /// and curly.
     nesting: u32,
 
     /// The current depth of format spec for the current f-string. This is because
@@ -38,9 +40,13 @@ impl FStringContext {
     pub(crate) const fn new(flags: FStringContextFlags, nesting: u32) -> Self {
         Self {
             flags,
-            format_spec_depth: 0,
             nesting,
+            format_spec_depth: 0,
         }
+    }
+
+    pub(crate) const fn nesting(&self) -> u32 {
+        self.nesting
     }
 
     /// Returns the quote character for the current f-string.
@@ -89,11 +95,6 @@ impl FStringContext {
     /// based on the current level of nesting for the lexer.
     const fn open_parentheses_count(&self, current_nesting: u32) -> u32 {
         current_nesting.saturating_sub(self.nesting)
-    }
-
-    /// Returns `true` if the current f-string has open parentheses.
-    pub(crate) const fn has_open_parentheses(&self, current_nesting: u32) -> bool {
-        self.open_parentheses_count(current_nesting) > 0
     }
 
     /// Returns `true` if the lexer is in a f-string expression i.e., between
