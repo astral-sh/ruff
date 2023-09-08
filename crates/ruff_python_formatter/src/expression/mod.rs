@@ -388,10 +388,10 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
         // Only use the layout if the first or last expression has parentheses of some sort, and
         // those parentheses are non-empty.
         let first_parenthesized = visitor.first.is_some_and(|first| {
-            has_parentheses(first, context).is_some_and(|parentheses| parentheses.is_non_empty())
+            has_parentheses(first, context).is_some_and(OwnParentheses::is_non_empty)
         });
         let last_parenthesized = visitor.last.is_some_and(|last| {
-            has_parentheses(last, context).is_some_and(|parentheses| parentheses.is_non_empty())
+            has_parentheses(last, context).is_some_and(OwnParentheses::is_non_empty)
         });
         first_parenthesized || last_parenthesized
     }
@@ -706,12 +706,18 @@ impl CallChainLayout {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, is_macro::Is)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum OwnParentheses {
     /// The node has parentheses, but they are empty (e.g., `[]` or `f()`).
     Empty,
     /// The node has parentheses, and they are non-empty (e.g., `[1]` or `f(1)`).
     NonEmpty,
+}
+
+impl OwnParentheses {
+    const fn is_non_empty(self) -> bool {
+        matches!(self, OwnParentheses::NonEmpty)
+    }
 }
 
 /// Returns the [`OwnParentheses`] value for a given [`Expr`], to indicate whether it has its

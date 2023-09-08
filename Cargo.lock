@@ -2367,7 +2367,6 @@ dependencies = [
  "clap",
  "countme",
  "insta",
- "is-macro",
  "itertools",
  "memchr",
  "once_cell",
