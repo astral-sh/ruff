@@ -330,13 +330,13 @@ pub enum Specificity {
     LinterGroup,
     /// The specificity when selecting a linter (e.g., `--select PLE` or `--select UP`).
     Linter,
-    /// The specificity when selecting via a rule prefix at one-character depth (e.g., `--select PLE1`).
+    /// The specificity when selecting via a rule prefix with a one-character code (e.g., `--select PLE1`).
     Prefix1Char,
-    /// The specificity when selecting via a rule prefix at two-character depth (e.g., `--select PLE12`).
+    /// The specificity when selecting via a rule prefix with a two-character code (e.g., `--select PLE12`).
     Prefix2Chars,
-    /// The specificity when selecting via a rule prefix at one-character depth (e.g., `--select PLE120`).
+    /// The specificity when selecting via a rule prefix with a three-character code (e.g., `--select PLE123`).
     Prefix3Chars,
-    /// The specificity when selecting via a rule prefix at one-character depth (e.g., `--select PLE120`).
+    /// The specificity when selecting via a rule prefix with a four-character code (e.g., `--select PLE1234`).
     Prefix4Chars,
     /// The specificity when selecting an individual rule (e.g., `--select PLE1205`).
     Rule,
