@@ -1,5 +1,9 @@
 use ruff::linter::lint_only;
+<<<<<<< HEAD
 use ruff::settings::rule_table::RuleTable;
+=======
+use ruff::settings::types::PreviewMode;
+>>>>>>> f3dc0b455 (Disable preview mode during benchmarks)
 use ruff::settings::{flags, Settings};
 use ruff::source_kind::SourceKind;
 use ruff::{registry::Rule, RuleSelector};
@@ -79,7 +83,7 @@ fn benchmark_default_rules(criterion: &mut Criterion) {
 }
 
 fn benchmark_all_rules(criterion: &mut Criterion) {
-    let mut rules: RuleTable = RuleSelector::All.all_rules().collect();
+    let mut rules: RuleTable = RuleSelector::All.rules(PreviewMode::Disabled).collect();
 
     // Disable IO based rules because it is a source of flakiness
     rules.disable(Rule::ShebangMissingExecutableFile);
