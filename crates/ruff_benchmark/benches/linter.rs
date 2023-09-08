@@ -79,7 +79,7 @@ fn benchmark_default_rules(criterion: &mut Criterion) {
 }
 
 fn benchmark_all_rules(criterion: &mut Criterion) {
-    let mut rules: RuleTable = RuleSelector::All.into_iter().collect();
+    let mut rules: RuleTable = RuleSelector::All.all_rules().collect();
 
     // Disable IO based rules because it is a source of flakiness
     rules.disable(Rule::ShebangMissingExecutableFile);
