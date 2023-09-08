@@ -926,6 +926,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "009") => (RuleGroup::Preview, rules::flake8_logging::rules::UndocumentedWarn),
 
         // flake8-logging
+        (Flake8Logging, "007") => (RuleGroup::Nursery, rules::flake8_logging::rules::ExcInfoFalseInException),
         (Flake8Logging, "009") => (RuleGroup::Nursery, rules::flake8_logging::rules::UndocumentedWarn),
 
         _ => return None,
