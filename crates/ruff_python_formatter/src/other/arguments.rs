@@ -37,7 +37,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                             generator_exp,
                             &generator_exp
                                 .format()
-                                .with_options(GeneratorExpParentheses::StripIfOnlyFunctionArg),
+                                .with_options(GeneratorExpParentheses::Preserve),
                         ),
                         other => {
                             let parentheses =

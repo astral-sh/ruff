@@ -386,10 +386,10 @@ threshold_date = datetime.datetime.now() - datetime.timedelta(  # comment
 )
 
 # Parenthesized and opening-parenthesis comments
-func(x for x in y)
+func((x for x in y))
 
 func(  # outer comment
-    x for x in y
+    (x for x in y)
 )
 
 func(
@@ -399,9 +399,11 @@ func(
 )
 
 func(
-    # inner comment
-    x
-    for x in y
+    (
+        # inner comment
+        x
+        for x in y
+    )
 )
 
 func(  # outer comment
