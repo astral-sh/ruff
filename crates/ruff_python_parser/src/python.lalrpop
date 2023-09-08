@@ -669,7 +669,7 @@ LiteralPattern: ast::Pattern = {
         value: Box::new(value.into()),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <strings:StringLiteralOrFString+> <end_location:@L> =>? Ok(ast::PatternMatchValue {
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
         value: Box::new(concatenate_strings(strings, (location..end_location).into())?),
         range: (location..end_location).into()
     }.into()),
@@ -727,7 +727,7 @@ MappingKey: ast::Expr = {
         value: false.into(),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <strings:StringLiteralOrFString+> <end_location:@L> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
 }
 
 MatchMappingEntry: (ast::Expr, ast::Pattern) = {
@@ -1666,7 +1666,7 @@ FStringConversion: (TextSize, ast::ConversionFlag) = {
 };
 
 Atom<Goal>: ast::ParenthesizedExpr = {
-    <location:@L> <strings:StringLiteralOrFString+> <end_location:@L> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
     <location:@L> <value:Constant> <end_location:@R> => ast::ExprConstant {
         value,
         range: (location..end_location).into(),
