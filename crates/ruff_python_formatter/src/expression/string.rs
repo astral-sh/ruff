@@ -4,7 +4,7 @@ use bitflags::bitflags;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, TabWidth};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, ExprConstant, ExprFString};
+use ruff_python_ast::{self as ast, Constant, ExprConstant, ExprFString, ExpressionRef};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
 use ruff_source_file::Locator;
@@ -24,12 +24,26 @@ enum Quoting {
     Preserve,
 }
 
+#[derive(Clone, Debug)]
 pub(super) enum AnyString<'a> {
     Constant(&'a ExprConstant),
     FString(&'a ExprFString),
 }
 
 impl<'a> AnyString<'a> {
+    pub(crate) fn from_expression(expression: &'a Expr) -> Option<AnyString<'a>> {
+        match expression {
+            Expr::Constant(
+                constant @ ExprConstant {
+                    value: Constant::Str(_) | Constant::Bytes(_),
+                    ..
+                },
+            ) => Some(AnyString::Constant(constant)),
+            Expr::FString(fstring) => Some(AnyString::FString(fstring)),
+            _ => None,
+        }
+    }
+
     fn quoting(&self, locator: &Locator) -> Quoting {
         match self {
             Self::Constant(_) => Quoting::CanChange,
@@ -50,7 +64,7 @@ impl<'a> AnyString<'a> {
     }
 
     /// Returns `true` if the string is implicitly concatenated.
-    fn implicit_concatenated(&self) -> bool {
+    pub(super) fn is_implicit_concatenated(&self) -> bool {
         match self {
             Self::Constant(ExprConstant { value, .. }) => value.is_implicit_concatenated(),
             Self::FString(ExprFString {
@@ -79,6 +93,15 @@ impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
+    fn from(value: &AnyString<'a>) -> Self {
+        match value {
+            AnyString::Constant(expr) => ExpressionRef::Constant(expr),
+            AnyString::FString(expr) => ExpressionRef::FString(expr),
+        }
+    }
+}
+
 pub(super) struct FormatString<'a> {
     string: &'a AnyString<'a>,
     layout: StringLayout,
@@ -97,7 +120,7 @@ pub enum StringLayout {
 }
 
 impl<'a> FormatString<'a> {
-    pub(super) fn new(string: &'a AnyString) -> Self {
+    pub(super) fn new(string: &'a AnyString<'a>) -> Self {
         if let AnyString::Constant(constant) = string {
             debug_assert!(constant.value.is_str() || constant.value.is_bytes());
         }
@@ -117,7 +140,7 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.layout {
             StringLayout::Default => {
-                if self.string.implicit_concatenated() {
+                if self.string.is_implicit_concatenated() {
                     in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
                 } else {
                     FormatStringPart::new(
@@ -972,8 +995,9 @@ fn format_docstring_line(
 
 #[cfg(test)]
 mod tests {
-    use crate::expression::string::count_indentation_like_black;
     use ruff_formatter::TabWidth;
+
+    use crate::expression::string::count_indentation_like_black;
 
     #[test]
     fn test_indentation_like_black() {

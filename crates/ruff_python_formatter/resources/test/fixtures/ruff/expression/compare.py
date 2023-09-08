@@ -131,6 +131,15 @@ assert (
     in caplog.messages
 )
 
+(
+    b < c > d <
+    f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccccccc"
+    % aaaaaaaaaaaa
+    > x
+)
+
 c = (a >
      # test leading binary comment
      "a" "b" * b

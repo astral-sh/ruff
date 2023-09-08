@@ -85,6 +85,15 @@ self._assert_skipping(
 )
 
 (
+    b + c + d +
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    f"bbbbbb{z}bbbbbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccccccc"
+    % aaaaaaaaaaaa
+    + x
+)
+
+(
     b < c > d <
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"

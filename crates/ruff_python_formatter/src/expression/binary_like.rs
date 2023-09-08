@@ -5,18 +5,16 @@ use smallvec::SmallVec;
 
 use ruff_formatter::write;
 use ruff_python_ast::{
-    BytesConstant, Constant, Expr, ExprAttribute, ExprBinOp, ExprCompare, ExprConstant,
-    ExprUnaryOp, StringConstant, UnaryOp,
+    Constant, Expr, ExprAttribute, ExprBinOp, ExprCompare, ExprConstant, ExprUnaryOp, UnaryOp,
 };
 
 use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
-use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break,
     in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized,
     write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
 };
-use crate::expression::string::StringLayout;
+use crate::expression::string::{AnyString, FormatString, StringLayout};
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
 
@@ -197,29 +195,12 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
         let mut string_operands = flat_binary
             .operands()
             .filter_map(|(index, operand)| {
-                if let Expr::Constant(
-                    constant @ ExprConstant {
-                        value:
-                            Constant::Str(StringConstant {
-                                implicit_concatenated: true,
-                                ..
-                            })
-                            | Constant::Bytes(BytesConstant {
-                                implicit_concatenated: true,
-                                ..
-                            }),
-                        ..
-                    },
-                ) = operand.expression()
-                {
-                    if is_expression_parenthesized(constant.into(), source) {
-                        None
-                    } else {
-                        Some((index, constant, operand))
-                    }
-                } else {
-                    None
-                }
+                AnyString::from_expression(operand.expression())
+                    .filter(|string| {
+                        string.is_implicit_concatenated()
+                            && !is_expression_parenthesized(string.into(), source)
+                    })
+                    .map(|string| (index, string, operand))
             })
             .peekable();
 
@@ -296,11 +277,11 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                             f,
                             [
                                 operand.leading_binary_comments().map(leading_comments),
-                                string_constant
-                                    .format()
-                                    .with_options(ExprConstantLayout::String(
-                                        StringLayout::ImplicitConcatenatedStringInBinaryLike,
-                                    )),
+                                leading_comments(comments.leading(&string_constant)),
+                                FormatString::new(&string_constant).with_layout(
+                                    StringLayout::ImplicitConcatenatedStringInBinaryLike,
+                                ),
+                                trailing_comments(comments.trailing(&string_constant)),
                                 operand.trailing_binary_comments().map(trailing_comments),
                                 line_suffix_boundary(),
                             ]
@@ -311,12 +292,16 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                         // "a" "b" + c
                         // ^^^^^^^-- format the first operand of a binary expression
                         // ```
-                        string_constant
-                            .format()
-                            .with_options(ExprConstantLayout::String(
-                                StringLayout::ImplicitConcatenatedStringInBinaryLike,
-                            ))
-                            .fmt(f)?;
+                        write!(
+                            f,
+                            [
+                                leading_comments(comments.leading(&string_constant)),
+                                FormatString::new(&string_constant).with_layout(
+                                    StringLayout::ImplicitConcatenatedStringInBinaryLike
+                                ),
+                                trailing_comments(comments.trailing(&string_constant)),
+                            ]
+                        )?;
                     }
 
                     // Write the right operator and start the group for the right side (if any)
