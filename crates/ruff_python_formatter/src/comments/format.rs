@@ -102,84 +102,60 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
     }
 }
 
-/// Formats the trailing comments of `node`
-pub(crate) fn trailing_node_comments<T>(node: &T) -> FormatTrailingComments
-where
-    T: AstNode,
-{
-    FormatTrailingComments::Node(node.as_any_node_ref())
-}
-
 /// Formats the passed comments as trailing comments
 pub(crate) fn trailing_comments(comments: &[SourceComment]) -> FormatTrailingComments {
-    FormatTrailingComments::Comments(comments)
+    FormatTrailingComments(comments)
 }
 
-pub(crate) enum FormatTrailingComments<'a> {
-    Node(AnyNodeRef<'a>),
-    Comments(&'a [SourceComment]),
-}
+pub(crate) struct FormatTrailingComments<'a>(&'a [SourceComment]);
 
 impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        fn write_trailing_comments(
-            comments: &[SourceComment],
-            f: &mut PyFormatter,
-        ) -> FormatResult<()> {
-            let mut has_trailing_own_line_comment = false;
+        let mut has_trailing_own_line_comment = false;
 
-            for trailing in comments.iter().filter(|comment| comment.is_unformatted()) {
-                has_trailing_own_line_comment |= trailing.line_position().is_own_line();
+        for trailing in self.0.iter().filter(|comment| comment.is_unformatted()) {
+            has_trailing_own_line_comment |= trailing.line_position().is_own_line();
 
-                if has_trailing_own_line_comment {
-                    let lines_before_comment = lines_before(trailing.start(), f.context().source());
+            if has_trailing_own_line_comment {
+                let lines_before_comment = lines_before(trailing.start(), f.context().source());
 
-                    // A trailing comment at the end of a body or list
-                    // ```python
-                    // def test():
-                    //      pass
-                    //
-                    //      # Some comment
-                    // ```
-                    write!(
-                        f,
-                        [
-                            line_suffix(
-                                &format_args![
-                                    empty_lines(lines_before_comment),
-                                    format_comment(trailing)
-                                ],
-                                // Reserving width isn't necessary because we don't split
-                                // comments and the empty lines expand any enclosing group.
-                                0
-                            ),
-                            expand_parent()
-                        ]
-                    )?;
-                } else {
-                    // A trailing comment at the end of a line has a reserved width to
-                    // consider during line measurement.
-                    // ```python
-                    // tup = (
-                    //     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                    // )  # Some comment
-                    // ```
-                    trailing_end_of_line_comment(trailing).fmt(f)?;
-                }
-
-                trailing.mark_formatted();
+                // A trailing comment at the end of a body or list
+                // ```python
+                // def test():
+                //      pass
+                //
+                //      # Some comment
+                // ```
+                write!(
+                    f,
+                    [
+                        line_suffix(
+                            &format_args![
+                                empty_lines(lines_before_comment),
+                                format_comment(trailing)
+                            ],
+                            // Reserving width isn't necessary because we don't split
+                            // comments and the empty lines expand any enclosing group.
+                            0
+                        ),
+                        expand_parent()
+                    ]
+                )?;
+            } else {
+                // A trailing comment at the end of a line has a reserved width to
+                // consider during line measurement.
+                // ```python
+                // tup = (
+                //     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                // )  # Some comment
+                // ```
+                trailing_end_of_line_comment(trailing).fmt(f)?;
             }
 
-            Ok(())
+            trailing.mark_formatted();
         }
 
-        match self {
-            FormatTrailingComments::Node(node) => {
-                let comments = f.context().comments().clone();
-                write_trailing_comments(comments.trailing(*node), f)
-            }
-            FormatTrailingComments::Comments(comments) => write_trailing_comments(comments, f),
-        }
+        Ok(())
     }
 }
 

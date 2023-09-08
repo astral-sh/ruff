@@ -40,6 +40,7 @@ serde_json = { version = "1.0.93" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1", features = ["inline"] }
 smallvec = { version = "1.10.0" }
+static_assertions = "1.1.0"
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 syn = { version = "2.0.15" }

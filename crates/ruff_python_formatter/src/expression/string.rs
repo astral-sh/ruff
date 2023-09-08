@@ -89,7 +89,11 @@ pub enum StringLayout {
     #[default]
     Default,
     DocString,
-    ImplicitConcatenatedBinaryLeftSide,
+    /// An implicit concatenated string in a binary like (e.g. `a + b` or `a < b`) expression.
+    ///
+    /// Formats the implicit concatenated string parts without the enclosing group because the group
+    /// is added by the binary like formatting.
+    ImplicitConcatenatedStringInBinaryLike,
 }
 
 impl<'a> FormatString<'a> {
@@ -135,7 +139,7 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
                 );
                 format_docstring(&string_part, f)
             }
-            StringLayout::ImplicitConcatenatedBinaryLeftSide => {
+            StringLayout::ImplicitConcatenatedStringInBinaryLike => {
                 FormatStringContinuation::new(self.string).fmt(f)
             }
         }

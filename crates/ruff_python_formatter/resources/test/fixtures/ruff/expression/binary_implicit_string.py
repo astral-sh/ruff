@@ -118,3 +118,45 @@ def test3():
                "(CASE WHEN JSON_TYPE(%s, %%s) IN (%s) "
                "THEN JSON_TYPE(%s, %%s) ELSE JSON_EXTRACT(%s, %%s) END)"
            ) % (lhs, datatype_values, lhs, lhs), (tuple(params) + (json_path,)) * 3
+
+c = (a +
+    # test leading binary comment
+    "a" "b" * b
+)
+
+c = (a *
+     # test leading comment
+     "a" "b" + b
+     )
+
+c = (a
+     + # test trailing comment
+     "a" "b" * b
+     )
+
+c = (a
+     +
+     "a" "b" # test trailing comment
+     * b
+     )
+
+c = (a
+     *
+     "a" "b" # test trailing binary comment
+     + b
+     )
+
+c = (a
+     *
+     "a" "b"
+     + # test trailing operator comment
+     b
+     )
+
+c = (a
+     *
+     "a" "b"
+     +
+     # test trailing operator comment
+     b
+     )

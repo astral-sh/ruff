@@ -222,8 +222,7 @@ b"Let's" b"start" b"with" b"a" b"simple" b"example" b"now repeat after me:" b"I 
 )
 
 if (
-    a
-    + b"Let's"
+    a + b"Let's"
     b"start"
     b"with"
     b"a"
@@ -371,8 +370,7 @@ b"Let's" b'start' b'with' b'a' b'simple' b'example' b'now repeat after me:' b'I 
 )
 
 if (
-    a
-    + b"Let's"
+    a + b"Let's"
     b'start'
     b'with'
     b'a'

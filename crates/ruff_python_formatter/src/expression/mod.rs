@@ -19,6 +19,7 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 
+mod binary_like;
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
@@ -48,6 +49,7 @@ pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
 pub(crate) mod number;
+mod operator;
 pub(crate) mod parentheses;
 pub(crate) mod string;
 
@@ -784,7 +786,7 @@ pub(crate) fn has_own_parentheses(
 }
 
 /// The precedence of [python operators](https://docs.python.org/3/reference/expressions.html#operator-precedence) from
-/// lowest to highest priority.
+/// highest to lowest priority.
 ///
 /// Ruff uses the operator precedence to decide in which order to split operators:
 /// Operators with a lower precedence split before higher-precedence operators.
