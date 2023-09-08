@@ -925,6 +925,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "002") => (RuleGroup::Preview, rules::flake8_logging::rules::InvalidGetLoggerArgument),
         (Flake8Logging, "009") => (RuleGroup::Preview, rules::flake8_logging::rules::UndocumentedWarn),
 
+        // flake8-logging
+        (Flake8Logging, "009") => (RuleGroup::Nursery, rules::flake8_logging::rules::UndocumentedWarn),
+
         _ => return None,
     })
 }
