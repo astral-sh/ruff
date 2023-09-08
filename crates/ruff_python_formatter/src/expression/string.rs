@@ -140,22 +140,131 @@ impl<'a> FormatString<'a> {
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let locator = f.context().locator();
+        let quote_style = f.options().quote_style();
         match self.layout {
             StringLayout::Default => {
                 if self.string.is_implicit_concatenated() {
-                    in_parentheses_only_group(&StringContinuation::from_string(
-                        self.string,
-                        &locator,
-                    )?)
-                    .fmt(f)
+                    let continuation = StringContinuation::from_string(self.string, &locator)?;
+                    if f.options().preview().is_enabled() {
+                        if let Some((first, rest)) = continuation.parts.split_first() {
+                            let first_normalized =
+                                first.normalize(Quoting::CanChange, &locator, quote_style);
+
+                            let quotes = first_normalized.quotes;
+                            let mut normalized = SmallVec::with_capacity(continuation.parts.len());
+                            normalized.push(first_normalized);
+
+                            for part in rest {
+                                normalized.push(part.normalize_with_quotes(&locator, quotes));
+                            }
+
+                            let continuation = NormalizedStringContinuation {
+                                string: self.string,
+                                parts: normalized,
+                            };
+
+                            let format_flat = format_with(|f| {
+                                quotes.fmt(f)?;
+
+                                // TODO comments
+                                for part in &continuation.parts {
+                                    match &part.text {
+                                        Cow::Borrowed(_) => {
+                                            source_text_slice(part.range()).fmt(f)?
+                                        }
+                                        Cow::Owned(content) => {
+                                            text(&content, Some(part.start())).fmt(f)?
+                                        }
+                                    }
+                                }
+
+                                quotes.fmt(f)
+                            });
+
+                            let format_multiline = format_with(|f| {
+                                // TODO won't format comments again
+                                group(&continuation).should_expand(true).fmt(f)
+                            });
+
+                            let format_joined = format_with(|f| {
+                                quotes.fmt(f)?;
+
+                                let mut fill = f.fill();
+
+                                let separator = format_with(|f| {
+                                    group(&format_args![
+                                        if_group_breaks(&quotes),
+                                        soft_line_break_or_space(),
+                                        if_group_breaks(&format_args![quotes, space()])
+                                    ])
+                                    .fmt(f)
+                                });
+
+                                for part in &continuation.parts {
+                                    let mut words = part.text.split(' ').peekable();
+
+                                    while let Some(word) = words.next() {
+                                        let is_last = words.peek().is_none();
+                                        let format_word =
+                                            format_with(|f| write!(f, [text(word, None)]));
+
+                                        fill.entry(&separator, &format_word);
+                                    }
+                                }
+
+                                fill.finish()?;
+
+                                quotes.fmt(f)
+                            });
+                            best_fitting![format_flat, format_multiline, format_joined]
+                                .with_mode(BestFittingMode::AllLines)
+                                .fmt(f)?;
+                        }
+
+                        Ok(())
+                    } else {
+                        in_parentheses_only_group(&continuation.normalize(quote_style, &locator))
+                            .fmt(f)
+                    }
                 } else {
-                    StringPart::from_source(self.string.range(), &locator)
-                        .normalize(
-                            self.string.quoting(&locator),
-                            &locator,
-                            f.options().quote_style(),
-                        )
-                        .fmt(f)
+                    // Joining/ splitting does not apply to triple quoted strings or expression statement strings
+                    // Splitting only applies in parenthesized contexts
+                    // Joins strings in non parenthesized contexts
+                    // Does not join/split if string has a prefix other than `u` or `f`.
+                    if f.options().preview().is_enabled() {
+                        let normalized = StringPart::from_source(self.string.range(), &locator)
+                            .normalize(self.string.quoting(&locator), &locator, quote_style);
+
+                        // TODO how to optimize to avoid allocating a string for every word?
+                        write!(f, [normalized.prefix, normalized.quotes])?;
+
+                        // TODO split by words longer with a length of at least 6 characters.
+                        let mut words = normalized.text.split(' ');
+                        let mut fill = f.fill();
+
+                        let separator = format_with(|f| {
+                            group(&format_args![
+                                if_group_breaks(&normalized.quotes),
+                                soft_line_break_or_space(),
+                                if_group_breaks(&format_args![normalized.quotes, space()])
+                            ])
+                            .fmt(f)
+                        });
+
+                        while let Some(word) = words.next() {
+                            let format_word = format_with(|f| write!(f, [text(word, None)]));
+
+                            fill.entry(&separator, &format_word);
+                        }
+
+                        fill.finish()?;
+
+                        normalized.quotes.fmt(f)
+                    } else {
+                        StringPart::from_source(self.string.range(), &locator)
+                            .normalize(self.string.quoting(&locator), &locator, quote_style)
+                            .fmt(f)
+                    }
                 }
             }
             StringLayout::DocString => {
@@ -165,7 +274,9 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
                 format_docstring(&normalized, f)
             }
             StringLayout::ImplicitConcatenatedStringInBinaryLike => {
-                StringContinuation::from_string(self.string, &locator)?.fmt(f)
+                StringContinuation::from_string(self.string, &locator)?
+                    .normalize(f.options().quote_style(), &locator)
+                    .fmt(f)
             }
         }
     }
@@ -235,9 +346,32 @@ impl<'a> StringContinuation<'a> {
 
         Ok(Self { parts, string })
     }
+
+    fn normalize(
+        self,
+        quote_style: QuoteStyle,
+        locator: &Locator<'a>,
+    ) -> NormalizedStringContinuation<'a> {
+        let quoting = self.string.quoting(locator);
+        let normalized = self
+            .parts
+            .into_iter()
+            .map(|part| part.normalize(quoting, &locator, quote_style))
+            .collect();
+
+        NormalizedStringContinuation {
+            parts: normalized,
+            string: self.string,
+        }
+    }
 }
 
-impl Format<PyFormatContext<'_>> for StringContinuation<'_> {
+struct NormalizedStringContinuation<'a> {
+    parts: SmallVec<[NormalizedString<'a>; 4]>,
+    string: &'a AnyString<'a>,
+}
+
+impl Format<PyFormatContext<'_>> for NormalizedStringContinuation<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
@@ -272,12 +406,11 @@ impl Format<PyFormatContext<'_>> for StringContinuation<'_> {
             });
 
             let (trailing_part_comments, rest) = rest.split_at(trailing_comments_end);
-            let normalized = part.normalize(quoting, &locator, quote_style);
 
             joiner.entry(&format_args![
                 line_suffix_boundary(),
                 leading_comments(leading_part_comments),
-                normalized,
+                part,
                 trailing_comments(trailing_part_comments)
             ]);
 
@@ -328,8 +461,8 @@ impl StringPart {
     fn normalize<'a>(
         &self,
         quoting: Quoting,
-        locator: &'a Locator,
-        quote_style: QuoteStyle,
+        locator: &Locator<'a>,
+        configured_quote_style: QuoteStyle,
     ) -> NormalizedString<'a> {
         let raw_content = locator.slice(self.content_range);
 
@@ -337,24 +470,30 @@ impl StringPart {
             Quoting::Preserve => self.quotes,
             Quoting::CanChange => {
                 if self.prefix.is_raw_string() {
-                    preferred_quotes_raw(raw_content, self.quotes, quote_style)
+                    preferred_quotes_raw(raw_content, self.quotes, configured_quote_style)
                 } else {
-                    preferred_quotes(raw_content, self.quotes, quote_style)
+                    preferred_quotes(raw_content, self.quotes, configured_quote_style)
                 }
             }
         };
 
-        let normalized = normalize_string(
-            locator.slice(self.content_range),
-            preferred_quotes,
-            self.prefix.is_raw_string(),
-        );
+        self.normalize_with_quotes(locator, preferred_quotes)
+    }
+
+    fn normalize_with_quotes<'a>(
+        &self,
+        locator: &Locator<'a>,
+        quotes: StringQuotes,
+    ) -> NormalizedString<'a> {
+        let raw_content = locator.slice(self.content_range);
+
+        let normalized = normalize_string(raw_content, quotes, self.prefix.is_raw_string());
 
         NormalizedString {
             prefix: self.prefix,
             content_range: self.content_range,
             text: normalized,
-            quotes: preferred_quotes,
+            quotes,
         }
     }
 }

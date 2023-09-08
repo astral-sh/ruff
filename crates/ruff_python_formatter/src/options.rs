@@ -268,9 +268,9 @@ impl FromStr for MagicTrailingComma {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum PreviewMode {
-    #[default]
     Disabled,
 
+    #[default]
     Enabled,
 }
 

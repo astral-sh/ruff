@@ -1,4 +1,4 @@
-use ruff_formatter::FormatRuleWithOptions;
+use ruff_formatter::{FormatContext, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, ExprConstant};
 use ruff_text_size::{Ranged, TextLen, TextRange};
@@ -78,6 +78,8 @@ impl NeedsParentheses for ExprConstant {
             OptionalParentheses::Multiline
         } else if is_multiline_string(self, context.source()) {
             OptionalParentheses::Never
+        } else if context.options().preview().is_enabled() {
+            OptionalParentheses::Multiline
         } else {
             OptionalParentheses::BestFit
         }
