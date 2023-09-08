@@ -5,8 +5,8 @@ use smallvec::SmallVec;
 
 use ruff_formatter::write;
 use ruff_python_ast::{
-    BytesConstant, Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp,
-    StringConstant, UnaryOp,
+    BytesConstant, Constant, Expr, ExprAttribute, ExprBinOp, ExprCompare, ExprConstant,
+    ExprUnaryOp, StringConstant, UnaryOp,
 };
 
 use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
@@ -20,13 +20,178 @@ use crate::expression::string::StringLayout;
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
 
-pub(super) struct BinaryLike<'a>(pub(super) &'a ExprBinOp);
+#[derive(Copy, Clone, Debug)]
+pub(super) enum BinaryLike<'a> {
+    BinaryExpression(&'a ExprBinOp),
+    CompareExpression(&'a ExprCompare),
+}
+
+impl<'a> BinaryLike<'a> {
+    /// Flattens the hierarchical binary expression into a flat operand, operator, operand... sequence.
+    ///
+    /// See [`FlatBinaryExpressionSlice`] for an in depth explanation.
+    fn flatten(self, comments: &'a Comments<'a>, source: &str) -> FlatBinaryExpression<'a> {
+        fn recurse_compare<'a>(
+            compare: &'a ExprCompare,
+            leading_comments: &'a [SourceComment],
+            trailing_comments: &'a [SourceComment],
+            comments: &'a Comments,
+            source: &str,
+            parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
+        ) {
+            parts.reserve(compare.comparators.len() * 2 + 1);
+
+            rec(
+                Operand::Left {
+                    expression: &compare.left,
+                    leading_comments,
+                },
+                comments,
+                source,
+                parts,
+            );
+
+            assert_eq!(
+                compare.comparators.len(),
+                compare.ops.len(),
+                "Compare expression with an unbalanced number of comparators and operations."
+            );
+
+            if let Some((last_expression, middle_expressions)) = compare.comparators.split_last() {
+                let (last_operator, middle_operators) = compare.ops.split_last().unwrap();
+
+                for (operator, expression) in middle_operators.iter().zip(middle_expressions) {
+                    parts.push(OperandOrOperator::Operator(Operator {
+                        symbol: OperatorSymbol::Comparator(*operator),
+                        trailing_comments: &[],
+                    }));
+
+                    rec(Operand::Middle { expression }, comments, source, parts);
+                }
+
+                parts.push(OperandOrOperator::Operator(Operator {
+                    symbol: OperatorSymbol::Comparator(*last_operator),
+                    trailing_comments: &[],
+                }));
+
+                rec(
+                    Operand::Right {
+                        expression: last_expression,
+                        trailing_comments,
+                    },
+                    comments,
+                    source,
+                    parts,
+                );
+            }
+        }
+
+        fn recurse_binary<'a>(
+            binary: &'a ExprBinOp,
+            leading_comments: &'a [SourceComment],
+            trailing_comments: &'a [SourceComment],
+            comments: &'a Comments,
+            source: &str,
+            parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
+        ) {
+            rec(
+                Operand::Left {
+                    leading_comments,
+                    expression: &binary.left,
+                },
+                comments,
+                source,
+                parts,
+            );
+
+            parts.push(OperandOrOperator::Operator(Operator {
+                symbol: OperatorSymbol::Binary(binary.op),
+                trailing_comments: comments.dangling(binary),
+            }));
+
+            rec(
+                Operand::Right {
+                    expression: binary.right.as_ref(),
+                    trailing_comments,
+                },
+                comments,
+                source,
+                parts,
+            );
+        }
+
+        fn rec<'a>(
+            operand: Operand<'a>,
+            comments: &'a Comments,
+            source: &str,
+            parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
+        ) {
+            let expression = operand.expression();
+            match expression {
+                Expr::BinOp(binary) if !is_expression_parenthesized(expression.into(), source) => {
+                    let leading_comments = operand
+                        .leading_binary_comments()
+                        .unwrap_or_else(|| comments.leading(binary));
+
+                    let trailing_comments = operand
+                        .trailing_binary_comments()
+                        .unwrap_or_else(|| comments.trailing(binary));
+
+                    recurse_binary(
+                        binary,
+                        leading_comments,
+                        trailing_comments,
+                        comments,
+                        source,
+                        parts,
+                    );
+                }
+                Expr::Compare(compare)
+                    if !is_expression_parenthesized(expression.into(), source) =>
+                {
+                    let leading_comments = operand
+                        .leading_binary_comments()
+                        .unwrap_or_else(|| comments.leading(compare));
+
+                    let trailing_comments = operand
+                        .trailing_binary_comments()
+                        .unwrap_or_else(|| comments.trailing(compare));
+
+                    recurse_compare(
+                        compare,
+                        leading_comments,
+                        trailing_comments,
+                        comments,
+                        source,
+                        parts,
+                    );
+                }
+                _ => {
+                    parts.push(OperandOrOperator::Operand(operand));
+                }
+            }
+        }
+
+        let mut parts = SmallVec::new();
+        match self {
+            BinaryLike::BinaryExpression(binary) => {
+                // Leading and trailing comments are handled by the binary's ``FormatNodeRule` implementation.
+                recurse_binary(binary, &[], &[], comments, source, &mut parts);
+            }
+            BinaryLike::CompareExpression(compare) => {
+                // Leading and trailing comments are handled by the compare's ``FormatNodeRule` implementation.
+                recurse_compare(compare, &[], &[], comments, source, &mut parts);
+            }
+        }
+
+        FlatBinaryExpression(parts)
+    }
+}
 
 impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let flat_binary =
-            FlatBinaryExpression::from_binary_expression(self.0, &comments, f.context().source());
+        let flat_binary = self.flatten(&comments, f.context().source());
 
         let source = f.context().source();
         let mut string_operands = flat_binary
@@ -236,89 +401,6 @@ const fn is_simple_power_operand(expr: &Expr) -> bool {
 /// Owned [`FlatBinaryExpressionSlice`]. Read the [`FlatBinaryExpressionSlice`] documentation for more details about the data structure.
 #[derive(Debug)]
 struct FlatBinaryExpression<'a>(SmallVec<[OperandOrOperator<'a>; 8]>);
-
-impl<'a> FlatBinaryExpression<'a> {
-    /// Flattens parenthesized binary expression recursively (left and right)
-    fn from_binary_expression(
-        binary: &'a ExprBinOp,
-        comments: &'a Comments,
-        source: &'a str,
-    ) -> Self {
-        fn rec<'a>(
-            operand: Operand<'a>,
-            comments: &'a Comments,
-            source: &'a str,
-            parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
-        ) {
-            let expression = operand.expression();
-            match expression {
-                Expr::BinOp(binary) if !is_expression_parenthesized(expression.into(), source) => {
-                    let leading_comments = operand
-                        .leading_binary_comments()
-                        .unwrap_or_else(|| comments.leading(binary));
-
-                    rec(
-                        Operand::Left {
-                            leading_comments,
-                            expression: &binary.left,
-                        },
-                        comments,
-                        source,
-                        parts,
-                    );
-
-                    parts.push(OperandOrOperator::Operator(Operator {
-                        symbol: binary.op,
-                        trailing_comments: comments.dangling(binary),
-                    }));
-
-                    let trailing_comments = operand
-                        .trailing_binary_comments()
-                        .unwrap_or_else(|| comments.trailing(binary));
-
-                    rec(
-                        Operand::Right {
-                            expression: binary.right.as_ref(),
-                            trailing_comments,
-                        },
-                        comments,
-                        source,
-                        parts,
-                    );
-                }
-                _ => {
-                    parts.push(OperandOrOperator::Operand(operand));
-                }
-            }
-        }
-
-        let mut parts = SmallVec::new();
-        rec(
-            Operand::Left {
-                expression: &binary.left,
-                leading_comments: &[], // Already handled by `FormatNodeRule`
-            },
-            comments,
-            source,
-            &mut parts,
-        );
-        parts.push(OperandOrOperator::Operator(Operator {
-            symbol: binary.op,
-            trailing_comments: comments.dangling(binary),
-        }));
-        rec(
-            Operand::Right {
-                expression: &binary.right,
-                trailing_comments: &[], // Already handled by `FormatNodeRule`.
-            },
-            comments,
-            source,
-            &mut parts,
-        );
-
-        Self(parts)
-    }
-}
 
 impl<'a> Deref for FlatBinaryExpression<'a> {
     type Target = FlatBinaryExpressionSlice<'a>;
@@ -569,11 +651,36 @@ impl<'a> OperandOrOperator<'a> {
 #[derive(Debug)]
 enum Operand<'a> {
     /// Operand that used to be on the left side of a binary operation.
+    ///
+    /// For example `a` in the following code
+    ///
+    /// ```python
+    /// a + b + c
+    /// ```
     Left {
         expression: &'a Expr,
         /// Leading comments of the outer most binary expression that starts at this node.
         leading_comments: &'a [SourceComment],
     },
+    /// Operand that is neither at the start nor the end of a binary like expression.
+    /// Only applies to compare expression.
+    ///
+    /// `b` and `c` are *middle* operands whereas `a` is a left and `d` a right operand.
+    ///
+    /// ```python
+    /// a > b > c > d
+    /// ```
+    ///
+    /// Middle have no leading or trailing comments from the enclosing binary like expression.
+    Middle { expression: &'a Expr },
+
+    /// Operand that is on the right side of a binary operation.
+    ///
+    /// For example `b` and `c` are right sides of the binary expressions.
+    ///
+    /// ```python
+    /// a + b + c
+    /// ```
     Right {
         expression: &'a Expr,
         /// Trailing comments of the outer most binary expression that ends at this operand.
@@ -586,6 +693,7 @@ impl<'a> Operand<'a> {
         match self {
             Operand::Left { expression, .. } => expression,
             Operand::Right { expression, .. } => expression,
+            Operand::Middle { expression } => expression,
         }
     }
 
@@ -594,7 +702,9 @@ impl<'a> Operand<'a> {
             Operand::Left {
                 leading_comments, ..
             } => !leading_comments.is_empty(),
-            Operand::Right { expression, .. } => comments.has_leading(*expression),
+            Operand::Middle { expression } | Operand::Right { expression, .. } => {
+                comments.has_leading(*expression)
+            }
         }
     }
 
@@ -604,13 +714,13 @@ impl<'a> Operand<'a> {
             Operand::Left {
                 leading_comments, ..
             } => Some(leading_comments),
-            Operand::Right { .. } => None,
+            Operand::Middle { .. } | Operand::Right { .. } => None,
         }
     }
 
     fn trailing_binary_comments(&self) -> Option<&'a [SourceComment]> {
         match self {
-            Operand::Left { .. } => None,
+            Operand::Middle { .. } | Operand::Left { .. } => None,
             Operand::Right {
                 trailing_comments, ..
             } => Some(trailing_comments),
@@ -620,13 +730,13 @@ impl<'a> Operand<'a> {
 
 #[derive(Debug)]
 struct Operator<'a> {
-    symbol: ruff_python_ast::Operator,
+    symbol: OperatorSymbol,
     trailing_comments: &'a [SourceComment],
 }
 
 impl Operator<'_> {
     fn precedence(&self) -> OperatorPrecedence {
-        OperatorPrecedence::from(self.symbol)
+        self.symbol.precedence()
     }
 
     fn has_trailing_comments(&self) -> bool {
@@ -636,13 +746,35 @@ impl Operator<'_> {
 
 impl Format<PyFormatContext<'_>> for Operator<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        write!(
-            f,
-            [
-                self.symbol.format(),
-                trailing_comments(self.trailing_comments)
-            ]
-        )
+        write!(f, [self.symbol, trailing_comments(self.trailing_comments)])
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum OperatorSymbol {
+    Binary(ruff_python_ast::Operator),
+    Comparator(ruff_python_ast::CmpOp),
+}
+
+impl OperatorSymbol {
+    const fn is_pow(self) -> bool {
+        matches!(self, OperatorSymbol::Binary(ruff_python_ast::Operator::Pow))
+    }
+
+    fn precedence(self) -> OperatorPrecedence {
+        match self {
+            OperatorSymbol::Binary(operator) => OperatorPrecedence::from(operator),
+            OperatorSymbol::Comparator(_) => OperatorPrecedence::Comparator,
+        }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for OperatorSymbol {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        match self {
+            OperatorSymbol::Binary(operator) => operator.format().fmt(f),
+            OperatorSymbol::Comparator(operator) => operator.format().fmt(f),
+        }
     }
 }
 
