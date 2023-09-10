@@ -51,7 +51,9 @@ pub enum Command {
         format: HelpFormat,
     },
     /// List or describe the available configuration options.
-    Config { option: Option<String> },
+    Config {
+        option: Option<String>,
+    },
     /// List all supported upstream linters.
     Linter {
         /// Output format
@@ -63,11 +65,15 @@ pub enum Command {
     Clean,
     /// Generate shell completion.
     #[clap(alias = "--generate-shell-completion", hide = true)]
-    GenerateShellCompletion { shell: clap_complete_command::Shell },
+    GenerateShellCompletion {
+        shell: clap_complete_command::Shell,
+    },
     /// Run the Ruff formatter on the given files or directories.
     #[doc(hidden)]
     #[clap(hide = true)]
     Format(FormatCommand),
+
+    Lsp(LspCommand),
 }
 
 // The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
@@ -397,6 +403,32 @@ pub struct FormatCommand {
     no_preview: bool,
 }
 
+#[derive(Clone, Debug, clap::Parser)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct LspCommand {
+    /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
+    #[arg(long, conflicts_with = "isolated")]
+    pub config: Option<PathBuf>,
+    /// Ignore all configuration files.
+    #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
+    pub isolated: bool,
+    /// Respect file exclusions via `.gitignore` and other standard ignore files.
+    #[arg(
+        long,
+        overrides_with("no_respect_gitignore"),
+        help_heading = "File selection"
+    )]
+    respect_gitignore: bool,
+    #[clap(long, overrides_with("respect_gitignore"), hide = true)]
+    no_respect_gitignore: bool,
+
+    /// Enable preview mode; checks will include unstable rules and fixes.
+    #[arg(long, overrides_with("no_preview"), hide = true)]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
+}
+
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum HelpFormat {
     Text,
@@ -565,13 +597,17 @@ pub struct CheckArguments {
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
-#[allow(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
     pub stdin_filename: Option<PathBuf>,
+}
+
+pub struct LspArguments {
+    pub config: Option<PathBuf>,
+    pub isolated: bool,
 }
 
 /// CLI settings that function as configuration overrides.

@@ -1,0 +1,94 @@
+{
+  "name": "ruff",
+  "publisher": "astral",
+  "description": "Ruff LSP Client",
+  "author": "Astral Inc",
+  "license": "MIT",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Formatters",
+    "Linters"
+  ],
+  "keywords": [
+    "Formatter",
+    "Linter"
+  ],
+  "repository": {
+    "type": "git",
+    "directory": "editors/vscode",
+    "url": "https://github.com/astral-sh/ruff.git"
+  },
+  "activationEvents": [
+    "onLanguage:python"
+  ],
+  "main": "./out/main.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "restrictedConfigurations": [
+        "ruff.lspBin"
+      ]
+    }
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Ruff",
+      "type": "object",
+      "properties": {
+        "ruff.trace.server": {
+          "type": "string",
+          "scope": "window",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "enumDescriptions": [
+            "No traces",
+            "Error only",
+            "Full log"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        },
+        "ruff.lspBin": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "markdownDescription": "The ruff lsp server executable. If the path is relative, the workspace folder will be used as base path"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "esbuild src/main.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node --target=node14",
+    "watch": "npm run compile -- --sourcemap --watch",
+    "package": "vsce package -o ruff.vsix",
+    "build": "npm run compile -- --minify && npm run package",
+    "install-extension": "code --install-extension ruff.vsix --force",
+    "pack:dev": "npm run compile && npm run package && npm run install-extension",
+    "check": "tsc && eslint src",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "resolve": "^1.22.1",
+    "vscode-languageclient": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.6.0",
+    "@types/resolve": "^1.20.2",
+    "@types/vscode": "^1.82.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.2",
+    "@typescript-eslint/parser": "^6.7.2",
+    "esbuild": "^0.14.47",
+    "eslint": "^8.50.0",
+    "prettier": "^3.0.3",
+    "typescript": "^4.8.2",
+    "vsce": "^2.11.0"
+  }
+}

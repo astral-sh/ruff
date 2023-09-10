@@ -6,18 +6,17 @@ use log::warn;
 
 use ruff_python_ast::PySourceType;
 use ruff_python_formatter::format_module_source;
-use ruff_workspace::resolver::python_file_at_path;
+use ruff_workspace::resolver::{python_file_at_path, PyprojectConfig};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
 use crate::commands::format::{FormatCommandError, FormatCommandResult, FormatMode};
-use crate::resolve::resolve;
 use crate::stdin::read_from_stdin;
 use crate::ExitStatus;
 
 /// Run the formatter over a single file, read from `stdin`.
 pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> Result<ExitStatus> {
-    let pyproject_config = resolve(
+    let pyproject_config = PyprojectConfig::resolve(
         cli.isolated,
         cli.config.as_deref(),
         overrides,

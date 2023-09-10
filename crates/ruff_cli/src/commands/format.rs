@@ -16,12 +16,11 @@ use ruff_linter::logging::LogLevel;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError};
-use ruff_workspace::resolver::python_files_in_path;
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
 use crate::panic::{catch_unwind, PanicError};
-use crate::resolve::resolve;
 use crate::ExitStatus;
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
@@ -38,7 +37,7 @@ pub(crate) fn format(
     overrides: &CliOverrides,
     log_level: LogLevel,
 ) -> Result<ExitStatus> {
-    let pyproject_config = resolve(
+    let pyproject_config = PyprojectConfig::resolve(
         cli.isolated,
         cli.config.as_deref(),
         overrides,

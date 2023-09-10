@@ -13,9 +13,11 @@ use ruff_linter::logging::{set_up_logging, LogLevel};
 use ruff_linter::settings::flags;
 use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
+use ruff_workspace::resolver::PyprojectConfig;
 use ruff_workspace::Settings;
 
 use crate::args::{Args, CheckCommand, Command, FormatCommand};
+use crate::commands::lsp::lsp;
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -24,7 +26,6 @@ mod commands;
 mod diagnostics;
 mod panic;
 mod printer;
-pub mod resolve;
 mod stdin;
 
 #[derive(Copy, Clone)]
@@ -162,6 +163,7 @@ pub fn run(
         }
         Command::Check(args) => check(args, log_level),
         Command::Format(args) => format(args, log_level),
+        Command::Lsp(args) => lsp(args, log_level),
     }
 }
 
@@ -193,7 +195,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_config = resolve::resolve(
+    let pyproject_config = PyprojectConfig::resolve(
         cli.isolated,
         cli.config.as_deref(),
         &overrides,
@@ -333,7 +335,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     };
 
                     if matches!(change_kind, ChangeKind::Configuration) {
-                        pyproject_config = resolve::resolve(
+                        pyproject_config = PyprojectConfig::resolve(
                             cli.isolated,
                             cli.config.as_deref(),
                             &overrides,

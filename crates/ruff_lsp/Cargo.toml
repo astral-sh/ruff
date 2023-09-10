@@ -1,0 +1,37 @@
+[package]
+name = "ruff_lsp"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_linter = { path = "../ruff_linter" }
+ruff_cache = { path = "../ruff_cache" }
+ruff_diagnostics = { path = "../ruff_diagnostics" }
+ruff_formatter = { path = "../ruff_formatter" }
+ruff_notebook = { path = "../ruff_notebook" }
+ruff_macros = { path = "../ruff_macros" }
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_source_file = { path = "../ruff_source_file" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
+ruff_workspace = { path = "../ruff_workspace" }
+ruff_text_size = { path = "../ruff_text_size" }
+
+anyhow = { workspace = true }
+similar = { workspace = true }
+serde_json = { workspace = true }
+tower-lsp = "0.20.0"
+tracing = {workspace = true}
+tokio = { version = "1.31.0", features = ["io-std", "rt", "rt-multi-thread", "tracing"] }
+serde = { version = "1.0.188", features = ["derive"] }
+
+[dev-dependencies]
+
+

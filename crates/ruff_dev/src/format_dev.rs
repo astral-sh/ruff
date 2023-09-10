@@ -29,7 +29,6 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
 use ruff_cli::args::{FormatCommand, LogLevelArgs};
-use ruff_cli::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_linter::logging::LogLevel;
 use ruff_linter::settings::types::{FilePattern, FilePatternSet};
@@ -52,7 +51,7 @@ fn ruff_check_paths(
         .get_matches_from(dirs);
     let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
     let (cli, overrides) = arguments.partition();
-    let mut pyproject_config = resolve(
+    let mut pyproject_config = PyprojectConfig::resolve(
         cli.isolated,
         cli.config.as_deref(),
         &overrides,
