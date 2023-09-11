@@ -13,7 +13,7 @@ GitLab uses fingerprints to identify new, existing, or fixed violations. Previou
 
 Ruff now uses a more stable location-agnostic fingerprint to minimize that existing violations incorrectly get marked as fixed and re-reported as new violations.
 
-Expect that GitLab reports each pre-existing violation in your project as fixed and a new violation in your Ruff upgrade PR.
+Expect GitLab to report each pre-existing violation in your project as fixed and a new violation in your Ruff upgrade PR.
 
 ## 0.0.283 / 0.284
 
