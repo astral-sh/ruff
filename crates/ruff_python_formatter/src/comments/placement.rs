@@ -38,7 +38,7 @@ pub(super) fn place_comment<'a>(
 /// ):
 ///     ...
 /// ```
-/// The parentheses enclose `True`, but the range of `True`doesn't include the `# comment`.
+/// The parentheses enclose `True`, but the range of `True` doesn't include the `# comment`.
 ///
 /// Default handling can get parenthesized comments wrong in a number of ways. For example, the
 /// comment here is marked (by default) as a trailing comment of `x`, when it should be a leading
@@ -120,10 +120,8 @@ fn handle_parenthesized_comment<'a>(
     // For now, we _can_ assert, but to do so, we stop lexing when we hit a token that precedes an
     // identifier.
     if comment.line_position().is_end_of_line() {
-        let tokenizer = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(preceding.end(), comment.start()),
-        );
+        let range = TextRange::new(preceding.end(), comment.start());
+        let tokenizer = SimpleTokenizer::new(locator.contents(), range);
         if tokenizer
             .skip_trivia()
             .take_while(|token| {
@@ -136,7 +134,7 @@ fn handle_parenthesized_comment<'a>(
                 debug_assert!(
                     !matches!(token.kind, SimpleTokenKind::Bogus),
                     "Unexpected token between nodes: `{:?}`",
-                    locator.slice(TextRange::new(preceding.end(), comment.start()),)
+                    locator.slice(range)
                 );
 
                 token.kind() == SimpleTokenKind::LParen
@@ -145,10 +143,8 @@ fn handle_parenthesized_comment<'a>(
             return CommentPlacement::leading(following, comment);
         }
     } else {
-        let tokenizer = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(comment.end(), following.start()),
-        );
+        let range = TextRange::new(comment.end(), following.start());
+        let tokenizer = SimpleTokenizer::new(locator.contents(), range);
         if tokenizer
             .skip_trivia()
             .take_while(|token| {
@@ -161,7 +157,7 @@ fn handle_parenthesized_comment<'a>(
                 debug_assert!(
                     !matches!(token.kind, SimpleTokenKind::Bogus),
                     "Unexpected token between nodes: `{:?}`",
-                    locator.slice(TextRange::new(comment.end(), following.start()))
+                    locator.slice(range)
                 );
                 token.kind() == SimpleTokenKind::RParen
             })
