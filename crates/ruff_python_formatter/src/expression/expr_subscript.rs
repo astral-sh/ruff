@@ -1,12 +1,11 @@
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::{Expr, ExprSubscript};
 
-use crate::comments::{trailing_comments, SourceComment};
-
+use crate::comments::SourceComment;
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
 
@@ -67,15 +66,19 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             }
         });
 
-        write!(
-            f,
-            [group(&format_args![
-                token("["),
-                trailing_comments(dangling_comments),
-                soft_block_indent(&format_slice),
-                token("]")
-            ])]
-        )
+        parenthesized("[", &format_slice, "]")
+            .with_dangling_comments(dangling_comments)
+            .fmt(f)
+
+        // write!(
+        //     f,
+        //     [group(&format_args![
+        //         token("["),
+        //         trailing_comments(dangling_comments),
+        //         soft_block_indent(&format_slice),
+        //         token("]")
+        //     ])]
+        // )
     }
 
     fn fmt_dangling_comments(

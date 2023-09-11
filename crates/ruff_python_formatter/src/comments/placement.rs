@@ -205,6 +205,8 @@ fn handle_enclosed_comment<'a>(
                 locator,
             )
         }
+        AnyNodeRef::ExprBoolOp(_) => handle_trailing_bool_expression_comment(comment, locator),
+        AnyNodeRef::ExprCompare(_) => handle_trailing_bool_expression_comment(comment, locator),
         AnyNodeRef::Keyword(keyword) => handle_keyword_comment(comment, keyword, locator),
         AnyNodeRef::PatternKeyword(pattern_keyword) => {
             handle_pattern_keyword_comment(comment, pattern_keyword, locator)
@@ -832,6 +834,48 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
         //      3
         // )
         // ```
+        CommentPlacement::Default(comment)
+    }
+}
+
+/// Handles comments between two bool or compare expression operands. It makes own line comments
+/// coming before the operator trailing comments of the preceding operand.
+///
+/// ```python
+/// a = (
+///     5 > 3
+///     # trailing comment
+///     and 3 == 3
+/// )
+/// ```
+fn handle_trailing_bool_expression_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    debug_assert!(
+        comment.enclosing_node().is_expr_bool_op() || comment.enclosing_node().is_expr_compare()
+    );
+
+    // Only if there's a preceding node (in which case, the preceding node is `left` or middle node).
+    let (Some(left_operand), Some(right_operand)) =
+        (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let between_operands_range = TextRange::new(left_operand.end(), right_operand.start());
+
+    let mut tokens = SimpleTokenizer::new(locator.contents(), between_operands_range)
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+    let operator_offset = tokens
+        .next()
+        .expect("Expected a token for the operator")
+        .start();
+
+    if comment.end() < operator_offset {
+        CommentPlacement::trailing(left_operand, comment)
+    } else {
         CommentPlacement::Default(comment)
     }
 }

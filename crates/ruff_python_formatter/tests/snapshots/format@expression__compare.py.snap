@@ -339,13 +339,13 @@ ct_match = (
     == self.get_content_type[obj, rel_obj, using, instance._state.db].id
 )
 
-ct_match = {
-    aaaaaaaaaaaaaaaa
-} == self.get_content_type[obj, rel_obj, using, instance._state.db].id
+ct_match = {aaaaaaaaaaaaaaaa} == self.get_content_type[
+    obj, rel_obj, using, instance._state.db
+].id
 
-ct_match = (
-    aaaaaaaaaaaaaaaa
-) == self.get_content_type[obj, rel_obj, using, instance._state.db].id
+ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type[
+    obj, rel_obj, using, instance._state.db
+].id
 
 # comments
 
