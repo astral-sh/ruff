@@ -24,9 +24,9 @@ use crate::prelude::*;
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
-    BinaryExpression(&'a ExprBinOp),
-    CompareExpression(&'a ExprCompare),
-    BoolExpression(&'a ExprBoolOp),
+    Binary(&'a ExprBinOp),
+    Compare(&'a ExprCompare),
+    Bool(&'a ExprBoolOp),
 }
 
 impl<'a> BinaryLike<'a> {
@@ -102,7 +102,7 @@ impl<'a> BinaryLike<'a> {
             if let Some((left, rest)) = bool_expression.values.split_first() {
                 rec(
                     Operand::Left {
-                        expression: &left,
+                        expression: left,
                         leading_comments,
                     },
                     comments,
@@ -245,15 +245,15 @@ impl<'a> BinaryLike<'a> {
 
         let mut parts = SmallVec::new();
         match self {
-            BinaryLike::BinaryExpression(binary) => {
+            BinaryLike::Binary(binary) => {
                 // Leading and trailing comments are handled by the binary's ``FormatNodeRule` implementation.
                 recurse_binary(binary, &[], &[], comments, source, &mut parts);
             }
-            BinaryLike::CompareExpression(compare) => {
+            BinaryLike::Compare(compare) => {
                 // Leading and trailing comments are handled by the compare's ``FormatNodeRule` implementation.
                 recurse_compare(compare, &[], &[], comments, source, &mut parts);
             }
-            BinaryLike::BoolExpression(bool) => {
+            BinaryLike::Bool(bool) => {
                 recurse_bool(bool, &[], &[], comments, source, &mut parts);
             }
         }
@@ -262,7 +262,7 @@ impl<'a> BinaryLike<'a> {
     }
 
     const fn is_bool_op(self) -> bool {
-        matches!(self, BinaryLike::BoolExpression(_))
+        matches!(self, BinaryLike::Bool(_))
     }
 }
 
@@ -633,86 +633,7 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         // Single operand slice
         if let [OperandOrOperator::Operand(operand)] = &self.0 {
-            let expression = operand.expression();
-
-            return if is_expression_parenthesized(expression.into(), f.context().source()) {
-                let comments = f.context().comments().clone();
-                let expression_comments = comments.leading_dangling_trailing(expression);
-
-                // Format leading comments that are before any `(` outside of the expression-parentheses.
-                let leading = expression_comments.leading;
-                let leading_before_parentheses_end = leading
-                    .iter()
-                    .rposition(|comment| {
-                        !comment.is_formatted()
-                            && matches!(
-                                SimpleTokenizer::new(
-                                    f.context().source(),
-                                    TextRange::new(comment.end(), expression.start()),
-                                )
-                                .skip_trivia()
-                                .next(),
-                                Some(SimpleToken {
-                                    kind: SimpleTokenKind::LParen,
-                                    ..
-                                })
-                            )
-                    })
-                    .map_or(0, |position| position + 1);
-
-                let leading_before_parentheses = &leading[..leading_before_parentheses_end];
-
-                // Format trailing comments that are outside of the `)` outside of the parentheses.
-                let trailing = expression_comments.trailing;
-
-                let trailing_after_parentheses_start = trailing
-                    .iter()
-                    .position(|comment| {
-                        comment.is_unformatted()
-                            && matches!(
-                                SimpleTokenizer::new(
-                                    f.context().source(),
-                                    TextRange::new(expression.end(), comment.start()),
-                                )
-                                .skip_trivia()
-                                .next(),
-                                Some(SimpleToken {
-                                    kind: SimpleTokenKind::RParen,
-                                    ..
-                                })
-                            )
-                    })
-                    .unwrap_or(trailing.len());
-
-                let trailing_after_parentheses = &trailing[trailing_after_parentheses_start..];
-
-                // Mark the comment as formatted to avoid that the formatting of the expression
-                // formats the trailing comment inside of the parentheses.
-                for comment in trailing_after_parentheses {
-                    comment.mark_formatted();
-                }
-
-                if !leading_before_parentheses.is_empty() {
-                    leading_comments(leading_before_parentheses).fmt(f)?;
-                }
-
-                expression
-                    .format()
-                    .with_options(Parentheses::Always)
-                    .fmt(f)?;
-
-                for comment in trailing_after_parentheses {
-                    comment.mark_unformatted();
-                }
-
-                if !trailing_after_parentheses.is_empty() {
-                    trailing_comments(trailing_after_parentheses).fmt(f)?;
-                }
-
-                Ok(())
-            } else {
-                expression.format().with_options(Parentheses::Never).fmt(f)
-            };
+            return operand.fmt(f);
         }
 
         let mut last_operator: Option<OperatorIndex> = None;
@@ -903,6 +824,146 @@ impl<'a> Operand<'a> {
                 trailing_comments, ..
             } => Some(trailing_comments),
         }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for Operand<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let expression = self.expression();
+
+        return if is_expression_parenthesized(expression.into(), f.context().source()) {
+            let comments = f.context().comments().clone();
+            let expression_comments = comments.leading_dangling_trailing(expression);
+
+            // Format leading comments that are before the inner most `(` outside of the expression's parentheses.
+            // ```python
+            // z = (
+            //      a
+            //      +
+            //      # a: extracts this comment
+            //      (
+            //          # b: and this comment
+            //          (
+            //              # c: formats it as part of the expression
+            //              x and y
+            //          )
+            //      )
+            // )
+            // ```
+            //
+            // Gets formatted as
+            // ```python
+            // z = (
+            //      a
+            //      +
+            //      # a: extracts this comment
+            //      # b: and this comment
+            //      (
+            //          # c: formats it as part of the expression
+            //          x and y
+            //      )
+            // )
+            // ```
+            let leading = expression_comments.leading;
+            let leading_before_parentheses_end = leading
+                .iter()
+                .rposition(|comment| {
+                    comment.is_unformatted()
+                        && matches!(
+                            SimpleTokenizer::new(
+                                f.context().source(),
+                                TextRange::new(comment.end(), expression.start()),
+                            )
+                            .skip_trivia()
+                            .next(),
+                            Some(SimpleToken {
+                                kind: SimpleTokenKind::LParen,
+                                ..
+                            })
+                        )
+                })
+                .map_or(0, |position| position + 1);
+
+            let leading_before_parentheses = &leading[..leading_before_parentheses_end];
+
+            // Format trailing comments that are outside of the inner most `)` outside of the parentheses.
+            // ```python
+            // z = (
+            //     (
+            //
+            //         (
+            //
+            //             x and y
+            //             # a: extracts this comment
+            //         )
+            //         # b: and this comment
+            //     )
+            //     # c: formats it as part of the expression
+            //     + a
+            //  )
+            // ```
+            // Gets formatted as
+            // ```python
+            // z = (
+            //     (
+            //         x and y
+            //         # a: extracts this comment
+            //     )
+            //     # b: and this comment
+            //     # c: formats it as part of the expression
+            //     + a
+            // )
+            // ```
+            let trailing = expression_comments.trailing;
+
+            let trailing_after_parentheses_start = trailing
+                .iter()
+                .position(|comment| {
+                    comment.is_unformatted()
+                        && matches!(
+                            SimpleTokenizer::new(
+                                f.context().source(),
+                                TextRange::new(expression.end(), comment.start()),
+                            )
+                            .skip_trivia()
+                            .next(),
+                            Some(SimpleToken {
+                                kind: SimpleTokenKind::RParen,
+                                ..
+                            })
+                        )
+                })
+                .unwrap_or(trailing.len());
+
+            let trailing_after_parentheses = &trailing[trailing_after_parentheses_start..];
+
+            // Mark the comment as formatted to avoid that the formatting of the expression
+            // formats the trailing comment inside of the parentheses.
+            for comment in trailing_after_parentheses {
+                comment.mark_formatted();
+            }
+
+            if !leading_before_parentheses.is_empty() {
+                leading_comments(leading_before_parentheses).fmt(f)?;
+            }
+
+            expression
+                .format()
+                .with_options(Parentheses::Always)
+                .fmt(f)?;
+
+            for comment in trailing_after_parentheses {
+                comment.mark_unformatted();
+            }
+
+            if !trailing_after_parentheses.is_empty() {
+                trailing_comments(trailing_after_parentheses).fmt(f)?;
+            }
+
+            Ok(())
+        } else {
+            expression.format().with_options(Parentheses::Never).fmt(f)
+        };
     }
 }
 

@@ -216,18 +216,12 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-return (
-    # pypiserver (https://pypi.org/project/pypiserver)
-    status == 409
-    # PyPI / TestPyPI / GCP Artifact Registry
-    or (status == 400 and any("already exist" in x for x in [reason, text]))
-    # Nexus Repository OSS (https://www.sonatype.com/nexus-repository-oss)
-    or (status == 400 and any("updating asset" in x for x in [reason, text]))
-    # Artifactory (https://jfrog.com/artifactory/)
-    or (status == 403 and "overwrite artifact" in text)
-    # Gitlab Enterprise Edition (https://about.gitlab.com)
-    or (status == 400 and "already been taken" in text)
-)
+(header.timecnt * 5  # Transition times and types
+  + header.typecnt * 6  # Local time type records
+  + header.charcnt  # Time zone designations
+  + header.leapcnt * 8  # Leap second records
+  + header.isstdcnt  # Standard/wall indicators
+  + header.isutcnt)  # UT/local indicators
 "#;
         // Tokenize once
         let mut tokens = Vec::new();

@@ -111,17 +111,7 @@ if "_continue" in request.POST or (
     and self.save_as_continue
     and self.has_change_permission(request, obj)
 ):
-    msg = _("The {name} “{obj}” was added successfully.")
-    if self.has_change_permission(request, obj):
-        msg += " " + _("You may edit it again below.")
-    self.message_user(request, format_html(msg, **msg_dict), messages.SUCCESS)
-    if post_url_continue is None:
-        post_url_continue = obj_url
-    post_url_continue = add_preserved_filters(
-        {"preserved_filters": preserved_filters, "opts": opts},
-        post_url_continue,
-    )
-    return HttpResponseRedirect(post_url_continue)
+    pass
 
 
 if True:
@@ -133,14 +123,10 @@ if True:
             ) or self.management_form.cleaned_data[
                 TOTAL_FORM_COUNT
             ] > self.absolute_max:
-                raise ValidationError(
-                    self.error_messages["too_many_forms"] % {"num": self.max_num},
-                    code="too_many_forms",
-                    )
+                pass
 
 
-if resolve_relation(remote_field.model, *model_tuple) == reference_model_tuple:
-    to_fields = getattr(field, "to_fields", None)
+if True:
     if (
         reference_field_name is None
         or
@@ -166,10 +152,10 @@ if (
     # Generic foreign keys OR reverse relations
     ((field.many_to_one and not field.related_model) or field.one_to_many)
 ):
-    raise FieldDoesNotExist()
+    pass
 
 
-if self._meta.select_on_save and not forced_update:
+if True:
     return (
         filtered.exists()
         and

@@ -69,16 +69,6 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         parenthesized("[", &format_slice, "]")
             .with_dangling_comments(dangling_comments)
             .fmt(f)
-
-        // write!(
-        //     f,
-        //     [group(&format_args![
-        //         token("["),
-        //         trailing_comments(dangling_comments),
-        //         soft_block_indent(&format_slice),
-        //         token("]")
-        //     ])]
-        // )
     }
 
     fn fmt_dangling_comments(

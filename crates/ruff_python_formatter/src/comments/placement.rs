@@ -205,8 +205,9 @@ fn handle_enclosed_comment<'a>(
                 locator,
             )
         }
-        AnyNodeRef::ExprBoolOp(_) => handle_trailing_bool_expression_comment(comment, locator),
-        AnyNodeRef::ExprCompare(_) => handle_trailing_bool_expression_comment(comment, locator),
+        AnyNodeRef::ExprBoolOp(_) | AnyNodeRef::ExprCompare(_) => {
+            handle_trailing_binary_like_comment(comment, locator)
+        }
         AnyNodeRef::Keyword(keyword) => handle_keyword_comment(comment, keyword, locator),
         AnyNodeRef::PatternKeyword(pattern_keyword) => {
             handle_pattern_keyword_comment(comment, pattern_keyword, locator)
@@ -838,8 +839,7 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
     }
 }
 
-/// Handles comments between two bool or compare expression operands. It makes own line comments
-/// coming before the operator trailing comments of the preceding operand.
+/// Attaches comments between two bool or compare expression operands to the preceding operand if the comment is before the operator.
 ///
 /// ```python
 /// a = (
@@ -848,7 +848,7 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
 ///     and 3 == 3
 /// )
 /// ```
-fn handle_trailing_bool_expression_comment<'a>(
+fn handle_trailing_binary_like_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {

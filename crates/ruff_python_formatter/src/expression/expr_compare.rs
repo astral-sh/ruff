@@ -15,7 +15,7 @@ pub struct FormatExprCompare;
 impl FormatNodeRule<ExprCompare> for FormatExprCompare {
     #[inline]
     fn fmt_fields(&self, item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
-        BinaryLike::CompareExpression(item).fmt(f)
+        BinaryLike::Compare(item).fmt(f)
     }
 
     fn fmt_dangling_comments(

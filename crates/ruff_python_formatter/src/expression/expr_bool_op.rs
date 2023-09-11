@@ -12,7 +12,7 @@ pub struct FormatExprBoolOp;
 impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
     #[inline]
     fn fmt_fields(&self, item: &ExprBoolOp, f: &mut PyFormatter) -> FormatResult<()> {
-        BinaryLike::BoolExpression(item).fmt(f)
+        BinaryLike::Bool(item).fmt(f)
     }
 }
 
