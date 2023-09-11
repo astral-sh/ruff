@@ -30,7 +30,7 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -56,7 +56,7 @@ jobs:
   macos-x86_64:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -94,7 +94,7 @@ jobs:
   macos-universal:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -140,7 +140,7 @@ jobs:
           - target: aarch64-pc-windows-msvc
             arch: x64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -186,7 +186,7 @@ jobs:
           - x86_64-unknown-linux-gnu
           - i686-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -243,7 +243,7 @@ jobs:
             arch: ppc64
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -296,7 +296,7 @@ jobs:
           - x86_64-unknown-linux-musl
           - i686-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -350,7 +350,7 @@ jobs:
             arch: armv7
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -398,7 +398,7 @@ jobs:
     # If you don't set an input tag, it's a dry run (no uploads).
     if: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check tag consistency
         run: |
           version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
@@ -464,7 +464,7 @@ jobs:
       # For git tag
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: git tag
         run: |
           git config user.email "hey@astral.sh"
