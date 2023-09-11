@@ -280,12 +280,12 @@ impl<'source> Lexer<'source> {
 
         let mut number = LexedText::new(self.token_start(), self.source);
         if first_digit_or_dot != '.' {
-            number.push_matching(first_digit_or_dot);
+            number.push(first_digit_or_dot);
             self.radix_run(&mut number, Radix::Decimal);
         };
 
         let is_float = if first_digit_or_dot == '.' || self.cursor.eat_char('.') {
-            number.push_matching('.');
+            number.push('.');
 
             if self.cursor.eat_char('_') {
                 return Err(LexicalError {
@@ -303,15 +303,11 @@ impl<'source> Lexer<'source> {
 
         let is_float = match self.cursor.rest().as_bytes() {
             [b'e' | b'E', b'0'..=b'9', ..] | [b'e' | b'E', b'-' | b'+', b'0'..=b'9', ..] => {
-                if self.cursor.bump() == Some('e') {
-                    number.push_matching('e');
-                } else {
-                    // 'E'
-                    number.push_different('e');
-                }
+                // 'e' | 'E'
+                number.push(self.cursor.bump().unwrap());
 
                 if let Some(sign) = self.cursor.eat_if(|c| matches!(c, '+' | '-')) {
-                    number.push_matching(sign);
+                    number.push(sign);
                 }
 
                 self.radix_run(&mut number, Radix::Decimal);
@@ -362,7 +358,7 @@ impl<'source> Lexer<'source> {
     fn radix_run(&mut self, number: &mut LexedText, radix: Radix) {
         loop {
             if let Some(c) = self.cursor.eat_if(|c| radix.is_digit(c)) {
-                number.push_matching(c);
+                number.push(c);
             }
             // Number that contains `_` separators. Remove them from the parsed text.
             else if self.cursor.first() == '_' && radix.is_digit(self.cursor.second()) {
@@ -1237,22 +1233,14 @@ impl<'a> LexedText<'a> {
         }
     }
 
-    fn push_matching(&mut self, c: char) {
-        match self {
-            LexedText::Source { range, .. } => *range = range.add_end(c.text_len()),
-            LexedText::Owned(owned) => owned.push(c),
-        }
-    }
-
-    fn push_different(&mut self, c: char) {
+    fn push(&mut self, c: char) {
         match self {
             LexedText::Source { range, source } => {
-                let mut text = source[*range].to_string();
-                text.push(c);
-                *self = LexedText::Owned(text);
+                *range = range.add_end(c.text_len());
+                debug_assert!(source[*range].ends_with(c));
             }
-            LexedText::Owned(text) => text.push(c),
-        };
+            LexedText::Owned(owned) => owned.push(c),
+        }
     }
 
     fn as_str<'b>(&'b self) -> &'b str
