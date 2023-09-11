@@ -3,11 +3,20 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(&source)
 ---
 [
-    Int {
-        value: 99232,
-    },
-    Comment(
-        "#",
+    (
+        Int {
+            value: 99232,
+        },
+        0..5,
     ),
-    Newline,
+    (
+        Comment(
+            "#",
+        ),
+        7..8,
+    ),
+    (
+        Newline,
+        8..8,
+    ),
 ]
