@@ -662,5 +662,27 @@ UP036_0.py:179:8: UP036 [*] Version block is outdated for minimum Python version
 178 178 | if True:
 179     |-    if sys.version_info > (3, 0): \
 180 179 |     expected_error = []
+181 180 | 
+182 181 | if sys.version_info < (3,12):
+
+UP036_0.py:182:4: UP036 [*] Version block is outdated for minimum Python version
+    |
+180 |     expected_error = []
+181 | 
+182 | if sys.version_info < (3,12):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+183 |     print("py3")
+    |
+    = help: Remove outdated version block
+
+ℹ Suggested fix
+179 179 |     if sys.version_info > (3, 0): \
+180 180 |     expected_error = []
+181 181 | 
+182     |-if sys.version_info < (3,12):
+183     |-    print("py3")
+184 182 | 
+185 183 | if sys.version_info <= (3,12):
+186 184 |     print("py3")
 
 
