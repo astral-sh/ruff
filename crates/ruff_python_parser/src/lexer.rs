@@ -528,6 +528,7 @@ impl<'source> Lexer<'source> {
     fn lex_fstring_middle_or_end(&mut self) -> Result<Option<Tok>, LexicalError> {
         // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
         let fstring = self.fstrings.current().unwrap();
+        self.cursor.start_token();
 
         // Check if we're at the end of the f-string.
         if fstring.is_triple_quoted() {
@@ -550,7 +551,6 @@ impl<'source> Lexer<'source> {
         let mut in_named_unicode = false;
         let mut end_format_spec = false;
 
-        self.cursor.start_token();
         loop {
             match self.cursor.first() {
                 EOF_CHAR => {
