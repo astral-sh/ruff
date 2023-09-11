@@ -585,6 +585,7 @@ impl Configuration {
                 .chain(selection.unfixable.iter())
                 .chain(selection.extend_fixable.iter())
             {
+                #[allow(deprecated)]
                 if matches!(selector, RuleSelector::Nursery) {
                     let suggestion = if preview.is_disabled() {
                         "Use the `--preview` flag instead."
