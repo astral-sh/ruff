@@ -4,9 +4,9 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Binding;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{is_python_whitespace, Cursor, SimpleTokenizer};
 use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::cst::matchers::{match_call_mut, match_dict, transform_expression};
 
@@ -91,28 +91,40 @@ pub(crate) fn remove_exception_handler_assignment(
     bound_exception: &Binding,
     locator: &Locator,
 ) -> Result<Edit> {
-    // Lex backwards, to the token just before the `as`.
-    let mut tokenizer =
-        SimpleTokenizer::up_to_without_back_comment(bound_exception.start(), locator.contents())
-            .skip_trivia();
+    // Find the position just after the exception name. This is a late pass so we only have the
+    // binding and can't look its parent in the AST up anymore.
+    // ```
+    // except ZeroDivisionError as err:
+    //                             ^^^ This is the bound_exception range
+    //                         ^^^^ lex this range
+    //                         ^ preceding_end (we want to remove from here)
+    // ```
+    let mut cursor = Cursor::new(&locator.contents()[TextRange::up_to(bound_exception.start())]);
 
-    // Eat the `as` token.
-    let preceding = tokenizer
-        .next_back()
-        .context("expected the exception name to be preceded by `as`")?;
-    debug_assert!(matches!(preceding.kind, SimpleTokenKind::As));
+    assert!(
+        is_python_whitespace(cursor.last()),
+        "expected whitespace before the binding"
+    );
+    cursor.eat_back_while(is_python_whitespace);
 
-    // Lex to the end of the preceding token, which should be the exception value.
-    let preceding = tokenizer
-        .next_back()
-        .context("expected the exception name to be preceded by a token")?;
+    let token_as = cursor.eat_char_back('s') && cursor.eat_char_back('a');
+    assert!(
+        token_as,
+        "expected the exception name to be preceded by `as`"
+    );
+    assert!(
+        is_python_whitespace(cursor.last()),
+        "expected whitespace before the `as`"
+    );
+    cursor.eat_back_while(is_python_whitespace);
+
+    let preceding_end = bound_exception.start() - cursor.token_len();
 
     // Lex forwards, to the `:` token.
     let following = SimpleTokenizer::starts_at(bound_exception.end(), locator.contents())
         .skip_trivia()
         .next()
         .context("expected the exception name to be followed by a colon")?;
-    debug_assert!(matches!(following.kind, SimpleTokenKind::Colon));
 
-    Ok(Edit::deletion(preceding.end(), following.start()))
+    Ok(Edit::deletion(preceding_end, following.start()))
 }

@@ -773,9 +773,14 @@ fn is_short_circuit(
             edit = Some(get_short_circuit_edit(
                 value,
                 TextRange::new(
-                    parenthesized_range(furthest.into(), expr.into(), checker.locator().contents())
-                        .unwrap_or(furthest.range())
-                        .start(),
+                    parenthesized_range(
+                        furthest.into(),
+                        expr.into(),
+                        checker.indexer().comment_ranges(),
+                        checker.locator().contents(),
+                    )
+                    .unwrap_or(furthest.range())
+                    .start(),
                     expr.end(),
                 ),
                 short_circuit_truthiness,
@@ -796,9 +801,14 @@ fn is_short_circuit(
             edit = Some(get_short_circuit_edit(
                 next_value,
                 TextRange::new(
-                    parenthesized_range(furthest.into(), expr.into(), checker.locator().contents())
-                        .unwrap_or(furthest.range())
-                        .start(),
+                    parenthesized_range(
+                        furthest.into(),
+                        expr.into(),
+                        checker.indexer().comment_ranges(),
+                        checker.locator().contents(),
+                    )
+                    .unwrap_or(furthest.range())
+                    .start(),
                     expr.end(),
                 ),
                 short_circuit_truthiness,

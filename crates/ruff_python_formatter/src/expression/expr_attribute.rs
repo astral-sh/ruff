@@ -45,7 +45,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                         value: Constant::Int(_) | Constant::Float(_),
                         ..
                     })
-                ) || is_expression_parenthesized(value.into(), f.context().source());
+                ) || is_expression_parenthesized(value.into(), f.context().comments().ranges(), f.context().source());
 
             if call_chain_layout == CallChainLayout::Fluent {
                 if parenthesize_value {
@@ -142,8 +142,11 @@ impl NeedsParentheses for ExprAttribute {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Checks if there are any own line comments in an attribute chain (a.b.c).
-        if CallChainLayout::from_expression(self.into(), context.source())
-            == CallChainLayout::Fluent
+        if CallChainLayout::from_expression(
+            self.into(),
+            context.comments().ranges(),
+            context.source(),
+        ) == CallChainLayout::Fluent
         {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {

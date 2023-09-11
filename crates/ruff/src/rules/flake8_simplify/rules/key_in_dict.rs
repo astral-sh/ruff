@@ -88,10 +88,20 @@ fn key_in_dict(
     }
 
     // Extract the exact range of the left and right expressions.
-    let left_range = parenthesized_range(left.into(), parent, checker.locator().contents())
-        .unwrap_or(left.range());
-    let right_range = parenthesized_range(right.into(), parent, checker.locator().contents())
-        .unwrap_or(right.range());
+    let left_range = parenthesized_range(
+        left.into(),
+        parent,
+        checker.indexer().comment_ranges(),
+        checker.locator().contents(),
+    )
+    .unwrap_or(left.range());
+    let right_range = parenthesized_range(
+        right.into(),
+        parent,
+        checker.indexer().comment_ranges(),
+        checker.locator().contents(),
+    )
+    .unwrap_or(right.range());
 
     let mut diagnostic = Diagnostic::new(
         InDictKeys {

@@ -101,7 +101,11 @@ impl Format<PyFormatContext<'_>> for FormatOrElse<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self.orelse {
             Expr::IfExp(expr)
-                if !is_expression_parenthesized(expr.into(), f.context().source()) =>
+                if !is_expression_parenthesized(
+                    expr.into(),
+                    f.context().comments().ranges(),
+                    f.context().source(),
+                ) =>
             {
                 write!(f, [expr.format().with_options(ExprIfExpLayout::Nested)])
             }

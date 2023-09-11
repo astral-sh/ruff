@@ -82,8 +82,11 @@ impl NeedsParentheses for ExprCall {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if CallChainLayout::from_expression(self.into(), context.source())
-            == CallChainLayout::Fluent
+        if CallChainLayout::from_expression(
+            self.into(),
+            context.comments().ranges(),
+            context.source(),
+        ) == CallChainLayout::Fluent
         {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {

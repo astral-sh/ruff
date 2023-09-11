@@ -470,6 +470,174 @@ impl<'a> SimpleTokenizer<'a> {
         tokenizer
     }
 
+    /// Returns the previous token, skipping all trivia. Note that this doesn't support PEP 701
+    /// f-string lexing at the moment.
+    pub fn previous_token(
+        &mut self,
+        // Not `&CommentRanges` to avoid a circular dependency
+        comment_ranges: &[TextRange],
+    ) -> SimpleToken {
+        self.skip_trivia_back(comment_ranges);
+        self.cursor.start_token();
+        self.back_offset = self.cursor.text_len();
+
+        let Some(last) = self.cursor.bump_back() else {
+            return SimpleToken {
+                kind: SimpleTokenKind::EndOfFile,
+                range: TextRange::empty(self.back_offset),
+            };
+        };
+
+        let kind = self.next_token_back_inner(last);
+
+        let token_len = self.cursor.token_len();
+        let start = self.back_offset - token_len;
+        SimpleToken {
+            kind,
+            range: TextRange::at(start, token_len),
+        }
+    }
+
+    fn skip_trivia_back(&mut self, comment_ranges: &[TextRange]) {
+        // ```python
+        // (
+        //  ^ 5. eat back the newline
+        // ^ 6. eat back all whitespace (none) and no more newline, break
+        //     # leading
+        //              ^ 2. eat back the newline
+        //     ^^^^^^^^ 3. skip the comment
+        // ^^^^ 4. eat back the whitespace
+        //     b"a"
+        // ^^^^ 1. eat back the whitespace
+        // )
+        // ```
+        loop {
+            self.cursor.eat_back_while(is_python_whitespace);
+            if self.cursor.eat_char_back('\n') || self.cursor.eat_char_back('\r') {
+                self.cursor.eat_back_while(|c| matches!(c, '\n' | '\r'));
+                // Skip comments. This is easy in python since comments always end at the end of
+                // the line.
+                if let Ok(comment_idx) = comment_ranges
+                    .binary_search_by(|range| range.end().cmp(&self.cursor.text_len()))
+                {
+                    let comment = comment_ranges[comment_idx];
+                    while self.cursor.text_len() > comment.start() {
+                        self.cursor.bump_back();
+                    }
+                    assert_eq!(self.cursor.text_len(), comment.start());
+                    continue;
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// Helper to parser the previous token once we skipped all whitespace
+    fn next_token_back_inner(&mut self, last: char) -> SimpleTokenKind {
+        match last {
+            // Keywords and identifiers
+            c if is_identifier_continuation(c) => {
+                // if we only have identifier continuations but no start (e.g. 555) we
+                // don't want to consume the chars, so in that case, we want to rewind the
+                // cursor to here
+                let savepoint = self.cursor.clone();
+                self.cursor.eat_back_while(is_identifier_continuation);
+
+                let token_len = self.cursor.token_len();
+                let range = TextRange::at(self.back_offset - token_len, token_len);
+
+                if self.source[range]
+                    .chars()
+                    .next()
+                    .is_some_and(is_identifier_start)
+                {
+                    self.to_keyword_or_other(range)
+                } else {
+                    self.cursor = savepoint;
+                    self.bogus = true;
+                    SimpleTokenKind::Other
+                }
+            }
+
+            // Non-trivia tokens that are unambiguous when lexing backwards.
+            // In other words: these are characters that _don't_ appear at the
+            // end of a multi-character token (like `!=`).
+            '\\' => SimpleTokenKind::Continuation,
+            ':' => SimpleTokenKind::Colon,
+            '~' => SimpleTokenKind::Tilde,
+            '%' => SimpleTokenKind::Percent,
+            '|' => SimpleTokenKind::Vbar,
+            ',' => SimpleTokenKind::Comma,
+            ';' => SimpleTokenKind::Semi,
+            '(' => SimpleTokenKind::LParen,
+            ')' => SimpleTokenKind::RParen,
+            '[' => SimpleTokenKind::LBracket,
+            ']' => SimpleTokenKind::RBracket,
+            '{' => SimpleTokenKind::LBrace,
+            '}' => SimpleTokenKind::RBrace,
+            '&' => SimpleTokenKind::Ampersand,
+            '^' => SimpleTokenKind::Circumflex,
+            '+' => SimpleTokenKind::Plus,
+            '-' => SimpleTokenKind::Minus,
+
+            // Non-trivia tokens that _are_ ambiguous when lexing backwards.
+            // In other words: these are characters that _might_ mark the end
+            // of a multi-character token (like `!=` or `->` or `//` or `**`).
+            '=' | '*' | '/' | '@' | '!' | '<' | '>' | '.' => {
+                // This could be a single-token token, like `+` in `x + y`, or a
+                // multi-character token, like `+=` in `x += y`. It could also be a sequence
+                // of multi-character tokens, like `x ==== y`, which is invalid, _but_ it's
+                // important that we produce the same token stream when lexing backwards as
+                // we do when lexing forwards. So, identify the range of the sequence, lex
+                // forwards, and return the last token.
+                let mut cursor = self.cursor.clone();
+                cursor.eat_back_while(|c| {
+                    matches!(
+                        c,
+                        ':' | '~'
+                            | '%'
+                            | '|'
+                            | '&'
+                            | '^'
+                            | '+'
+                            | '-'
+                            | '='
+                            | '*'
+                            | '/'
+                            | '@'
+                            | '!'
+                            | '<'
+                            | '>'
+                            | '.'
+                    )
+                });
+
+                let token_len = cursor.token_len();
+                let range = TextRange::at(self.back_offset - token_len, token_len);
+
+                let forward_lexer = Self::new(self.source, range);
+                if let Some(token) = forward_lexer.last() {
+                    // If the token spans multiple characters, bump the cursor. Note,
+                    // though, that we already bumped the cursor to past the last character
+                    // in the token at the very start of `next_token_back`.
+                    for _ in self.source[token.range].chars().rev().skip(1) {
+                        self.cursor.bump_back().unwrap();
+                    }
+                    token.kind()
+                } else {
+                    self.bogus = true;
+                    SimpleTokenKind::Other
+                }
+            }
+
+            _ => {
+                self.bogus = true;
+                SimpleTokenKind::Other
+            }
+        }
+    }
+
     fn to_keyword_or_other(&self, range: TextRange) -> SimpleTokenKind {
         let source = &self.source[range];
         match source {
@@ -1146,6 +1314,7 @@ impl QuoteKind {
 mod tests {
     use insta::assert_debug_snapshot;
 
+    use crate::SimpleTokenKind;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::tokenizer::{lines_after, lines_before, SimpleToken, SimpleTokenizer};
@@ -1494,5 +1663,21 @@ mod tests {
             lines_after(TextSize::new(6), "a = 20\n# some comment\nb = 10"),
             1
         );
+    }
+
+    #[test]
+    fn test_previous_token_simple() {
+        let cases = &["x = (", "x = ( ", "x = (\n"];
+        for source in cases {
+            let token = SimpleTokenizer::up_to_without_back_comment(source.text_len(), source)
+                .previous_token(&Vec::default());
+            assert_eq!(
+                token,
+                SimpleToken {
+                    kind: SimpleTokenKind::LParen,
+                    range: TextRange::new(TextSize::new(4), TextSize::new(5)),
+                }
+            );
+        }
     }
 }

@@ -1,5 +1,5 @@
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::node::AnyNodeRef;
 use crate::ExpressionRef;
@@ -9,6 +9,7 @@ use crate::ExpressionRef;
 pub fn parenthesized_range(
     expr: ExpressionRef,
     parent: AnyNodeRef,
+    comment_ranges: &[TextRange],
     source: &str,
 ) -> Option<TextRange> {
     // If the parent is a node that brings its own parentheses, exclude the closing parenthesis
@@ -23,7 +24,7 @@ pub fn parenthesized_range(
     // - `Tuple`: The elements of a tuple. The only risk is a single-element tuple (e.g., `(x,)`),
     //    which must have a trailing comma anyway.
     let exclusive_parent_end = if parent.is_arguments() {
-        parent.end() - TextSize::new(1)
+        parent.end() - ")".text_len()
     } else {
         parent.end()
     };
@@ -33,10 +34,15 @@ pub fn parenthesized_range(
             .skip_trivia()
             .take_while(|token| token.kind == SimpleTokenKind::RParen);
 
-    let left_tokenizer = SimpleTokenizer::up_to_without_back_comment(expr.start(), source)
-        .skip_trivia()
-        .rev()
-        .take_while(|token| token.kind == SimpleTokenKind::LParen);
+    let mut left_cursor = SimpleTokenizer::up_to_without_back_comment(expr.start(), source);
+    let left_tokenizer = std::iter::from_fn(move || {
+        let token = left_cursor.previous_token(comment_ranges);
+        if token.kind() == SimpleTokenKind::LParen {
+            Some(token.range())
+        } else {
+            None
+        }
+    });
 
     // Zip closing parenthesis with opening parenthesis. The order is intentional, as testing for
     // closing parentheses is cheaper, and `zip` will avoid progressing the `left_tokenizer` if

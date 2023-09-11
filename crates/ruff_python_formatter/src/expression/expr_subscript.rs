@@ -89,8 +89,11 @@ impl NeedsParentheses for ExprSubscript {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         {
-            if CallChainLayout::from_expression(self.into(), context.source())
-                == CallChainLayout::Fluent
+            if CallChainLayout::from_expression(
+                self.into(),
+                context.comments().ranges(),
+                context.source(),
+            ) == CallChainLayout::Fluent
             {
                 OptionalParentheses::Multiline
             } else if is_expression_parenthesized(self.value.as_ref().into(), context.source()) {

@@ -163,8 +163,13 @@ pub(crate) fn if_expr_with_true_false(
                 checker
                     .locator()
                     .slice(
-                        parenthesized_range(test.into(), expr.into(), checker.locator().contents())
-                            .unwrap_or(test.range()),
+                        parenthesized_range(
+                            test.into(),
+                            expr.into(),
+                            checker.indexer().comment_ranges(),
+                            checker.locator().contents(),
+                        )
+                        .unwrap_or(test.range()),
                     )
                     .to_string(),
                 expr.range(),

@@ -2,6 +2,7 @@ use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments, FormatContext, FormatOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExpressionRef;
+use ruff_python_index::CommentRanges;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
@@ -100,7 +101,11 @@ pub enum Parentheses {
     Never,
 }
 
-pub(crate) fn is_expression_parenthesized(expr: ExpressionRef, contents: &str) -> bool {
+pub(crate) fn is_expression_parenthesized(
+    expr: ExpressionRef,
+    comment_ranges: &CommentRanges,
+    contents: &str,
+) -> bool {
     // First test if there's a closing parentheses because it tends to be cheaper.
     if matches!(
         first_non_trivia_token(expr.end(), contents),
@@ -109,15 +114,13 @@ pub(crate) fn is_expression_parenthesized(expr: ExpressionRef, contents: &str) -
             ..
         })
     ) {
-        let mut tokenizer =
-            SimpleTokenizer::up_to_without_back_comment(expr.start(), contents).skip_trivia();
-
         matches!(
-            tokenizer.next_back(),
-            Some(SimpleToken {
+            SimpleTokenizer::up_to_without_back_comment(expr.start(), contents)
+                .previous_token(comment_ranges),
+            SimpleToken {
                 kind: SimpleTokenKind::LParen,
                 ..
-            })
+            }
         )
     } else {
         false
@@ -417,6 +420,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::ExpressionRef;
+    use ruff_python_index::CommentRanges;
     use ruff_python_parser::parse_expression;
 
     use crate::expression::parentheses::is_expression_parenthesized;
@@ -427,6 +431,7 @@ mod tests {
         let expr = parse_expression(expression, "<filename>").unwrap();
         assert!(!is_expression_parenthesized(
             ExpressionRef::from(&expr),
+            &CommentRanges::default(),
             expression
         ));
     }

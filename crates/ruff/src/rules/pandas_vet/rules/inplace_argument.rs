@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Keyword, Stmt};
+use ruff_python_index::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -85,6 +86,7 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                             call,
                             keyword,
                             statement,
+                            checker.indexer().comment_ranges(),
                             checker.locator(),
                         ) {
                             diagnostic.set_fix(fix);
@@ -107,15 +109,21 @@ fn convert_inplace_argument_to_assignment(
     call: &ast::ExprCall,
     keyword: &Keyword,
     statement: &Stmt,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) -> Option<Fix> {
     // Add the assignment.
     let attr = call.func.as_attribute_expr()?;
     let insert_assignment = Edit::insertion(
         format!("{name} = ", name = locator.slice(attr.value.range())),
-        parenthesized_range(call.into(), statement.into(), locator.contents())
-            .unwrap_or(call.range())
-            .start(),
+        parenthesized_range(
+            call.into(),
+            statement.into(),
+            comment_ranges,
+            locator.contents(),
+        )
+        .unwrap_or(call.range())
+        .start(),
     );
 
     // Remove the `inplace` argument.
