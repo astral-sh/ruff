@@ -1166,6 +1166,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::RedefinedLoopName) {
                 pylint::rules::redefined_loop_name(checker, stmt);
             }
+            if checker.enabled(Rule::ReadWholeFile) {
+                refurb::rules::read_whole_file(checker, with_stmt);
+            }
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {

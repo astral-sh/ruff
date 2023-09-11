@@ -14,6 +14,7 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101.py"))]
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
     #[test_case(Rule::DeleteFullSlice, Path::new("FURB131.py"))]
     #[test_case(Rule::CheckAndRemoveFromSet, Path::new("FURB132.py"))]
