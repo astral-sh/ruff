@@ -363,7 +363,7 @@ fn stub_file_empty_lines(
 }
 
 /// Only a function to compute it lazily
-fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &mut PyFormatter) -> bool {
+fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyFormatter) -> bool {
     // Two subsequent class definitions that both have an ellipsis only body
     // ```python
     // class A: ...
