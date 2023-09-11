@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::PySourceType;
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
@@ -485,11 +486,22 @@ fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
 ///
 /// This builder will insert two empty lines before the comment.
 /// ```
-pub(crate) const fn empty_lines_before_trailing_comments(
-    comments: &[SourceComment],
-    expected: u32,
-) -> FormatEmptyLinesBeforeTrailingComments {
-    FormatEmptyLinesBeforeTrailingComments { comments, expected }
+pub(crate) fn empty_lines_before_trailing_comments<'a>(
+    f: &PyFormatter,
+    comments: &'a [SourceComment],
+) -> FormatEmptyLinesBeforeTrailingComments<'a> {
+    // Black has different rules for stub vs. non-stub and top level vs. indented
+    let empty_lines = match (f.options().source_type(), f.context().node_level()) {
+        (PySourceType::Stub, NodeLevel::TopLevel) => 1,
+        (PySourceType::Stub, _) => 0,
+        (_, NodeLevel::TopLevel) => 2,
+        (_, _) => 1,
+    };
+
+    FormatEmptyLinesBeforeTrailingComments {
+        comments,
+        empty_lines,
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -497,7 +509,7 @@ pub(crate) struct FormatEmptyLinesBeforeTrailingComments<'a> {
     /// The trailing comments of the node.
     comments: &'a [SourceComment],
     /// The expected number of empty lines before the trailing comments.
-    expected: u32,
+    empty_lines: u32,
 }
 
 impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> {
@@ -508,7 +520,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> 
             .find(|comment| comment.line_position().is_own_line())
         {
             let actual = lines_before(comment.start(), f.context().source()).saturating_sub(1);
-            for _ in actual..self.expected {
+            for _ in actual..self.empty_lines {
                 write!(f, [empty_line()])?;
             }
         }

@@ -5,7 +5,6 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::comments::SourceComment;
-use crate::context::NodeLevel;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
@@ -156,7 +155,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         // # comment
         // ```
         //
-        // At the top-level, reformat as:
+        // At the top-level in a non-stub file, reformat as:
         // ```python
         // def func():
         //     ...
@@ -164,15 +163,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         //
         // # comment
         // ```
-        empty_lines_before_trailing_comments(
-            comments.trailing(item),
-            if f.context().node_level() == NodeLevel::TopLevel {
-                2
-            } else {
-                1
-            },
-        )
-        .fmt(f)
+        empty_lines_before_trailing_comments(f, comments.trailing(item)).fmt(f)
     }
 
     fn fmt_dangling_comments(
