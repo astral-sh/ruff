@@ -104,6 +104,8 @@ D.py:645:5: D200 One-line docstring should fit on one line
     |  _____^
 646 | |     "
     | |_____^ D200
+647 |   
+648 |   class StatementOnSameLineAsDocstring:
     |
     = help: Reformat to one line
 
