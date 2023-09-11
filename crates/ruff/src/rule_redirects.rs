@@ -3,17 +3,28 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 
 /// Returns the redirect target for the given code.
-pub(crate) fn get_redirect_target(code: &str) -> Option<&'static str> {
-    REDIRECTS.get(code).copied()
+pub(crate) fn get_code_redirect_target(code: &str) -> Option<&'static str> {
+    CODE_REDIRECTS.get(code).copied()
 }
 
 /// Returns the code and the redirect target if the given code is a redirect.
 /// (The same code is returned to obtain it with a static lifetime).
-pub(crate) fn get_redirect(code: &str) -> Option<(&'static str, &'static str)> {
-    REDIRECTS.get_key_value(code).map(|(k, v)| (*k, *v))
+pub(crate) fn get_code_redirect(code: &str) -> Option<(&'static str, &'static str)> {
+    CODE_REDIRECTS.get_key_value(code).map(|(k, v)| (*k, *v))
 }
 
-static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+/// Returns the redirect target for the given rule name.
+pub(crate) fn get_name_redirect_target(name: &str) -> Option<&'static str> {
+    NAME_REDIRECTS.get(name).copied()
+}
+
+/// Returns the name and the redirect target if the given rule name is a redirect.
+/// (The same name is returned to obtain it with a static lifetime).
+pub(crate) fn get_name_redirect(name: &str) -> Option<(&'static str, &'static str)> {
+    NAME_REDIRECTS.get_key_value(name).map(|(k, v)| (*k, *v))
+}
+
+static CODE_REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     HashMap::from_iter([
         // The following are here because we don't yet have the many-to-one mapping enabled.
         ("SIM111", "SIM110"),
@@ -100,3 +111,5 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("T004", "FIX004"),
     ])
 });
+
+static NAME_REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(HashMap::new);

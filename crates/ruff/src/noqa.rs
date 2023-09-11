@@ -17,7 +17,6 @@ use ruff_source_file::{LineEnding, Locator};
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule, RuleSet};
-use crate::rule_redirects::get_redirect_target;
 
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
 /// `# noqa: F401, F841`).
@@ -84,7 +83,9 @@ impl<'a> Directive<'a> {
                     let mut codes = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
-                    while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
+                    while let Some(code) = Self::lex_code(&text[codes_end + leading_space..])
+                        .or_else(|| Self::lex_name(&text[codes_end + leading_space..]))
+                    {
                         codes.push(code);
                         codes_end += leading_space;
                         codes_end += code.len();
@@ -161,6 +162,22 @@ impl<'a> Directive<'a> {
             None
         }
     }
+
+    /// Lex a human-readable name (e.g., `unused-import`).
+    #[inline]
+    fn lex_name(line: &str) -> Option<&str> {
+        // According to https://beta.ruff.rs/docs/rules/, all rule names are lowercase + at least 1 dash
+        let length = line
+            .chars()
+            .take_while(|c| c.is_ascii_lowercase() || *c == '-')
+            .count();
+        let has_dash = line[..length].chars().any(|c| c == '-');
+        if has_dash && length > 0 {
+            Some(&line[..length])
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -198,10 +215,9 @@ impl Ranged for Codes<'_> {
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
 pub(crate) fn includes(needle: Rule, haystack: &[&str]) -> bool {
-    let needle = needle.noqa_code();
     haystack
         .iter()
-        .any(|candidate| needle == get_redirect_target(candidate).unwrap_or(candidate))
+        .any(|candidate| Rule::from_code_or_name(candidate, true).is_ok_and(|rule| rule == needle))
 }
 
 /// Returns `true` if the given [`Rule`] is ignored at the specified `lineno`.
@@ -262,15 +278,14 @@ impl FileExemption {
                             return Some(Self::All);
                         }
                         ParsedFileExemption::Codes(codes) => {
-                            exempt_codes.extend(codes.into_iter().filter_map(|code| {
-                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
-                                {
+                            exempt_codes.extend(codes.into_iter().filter_map(|code_or_name| {
+                                if let Ok(rule) = Rule::from_code_or_name(code_or_name, true) {
                                     Some(rule.noqa_code())
                                 } else {
                                     #[allow(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
-                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
+                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code_or_name}");
                                     None
                                 }
                             }));
@@ -336,7 +351,7 @@ impl<'a> ParsedFileExemption<'a> {
             // Extract the codes from the line (e.g., `F401, F841`).
             let mut codes = vec![];
             let mut line = line;
-            while let Some(code) = Self::lex_code(line) {
+            while let Some(code) = Self::lex_code(line).or_else(|| Self::lex_name(line)) {
                 codes.push(code);
                 line = &line[code.len()..];
 
@@ -427,12 +442,28 @@ impl<'a> ParsedFileExemption<'a> {
             None
         }
     }
+
+    /// Lex a human-readable name (e.g., `unused-import`).
+    #[inline]
+    fn lex_name(line: &str) -> Option<&str> {
+        // According to https://beta.ruff.rs/docs/rules/, all rule names are lowercase + at least 1 dash
+        let length = line
+            .chars()
+            .take_while(|c| c.is_ascii_lowercase() || *c == '-')
+            .count();
+        let has_dash = line[..length].chars().any(|c| c == '-');
+        if has_dash && length > 0 {
+            Some(&line[..length])
+        } else {
+            None
+        }
+    }
 }
 
 /// The result of an [`Importer::get_or_import_symbol`] call.
 #[derive(Debug)]
 pub(crate) enum ParseError {
-    /// The `noqa` directive was missing valid codes (e.g., `# noqa: unused-import` instead of `# noqa: F401`).
+    /// The `noqa` directive was missing valid codes (e.g., `# noqa: _F401_` instead of `# noqa: F401`).
     MissingCodes,
     /// The `noqa` directive used an invalid suffix (e.g., `# noqa; F401` instead of `# noqa: F401`).
     InvalidSuffix,
@@ -640,8 +671,8 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) range: TextRange,
     /// The noqa directive.
     pub(crate) directive: Directive<'a>,
-    /// The codes that are ignored by the directive.
-    pub(crate) matches: Vec<NoqaCode>,
+    /// The rules that are ignored by the directive.
+    pub(crate) matches: Vec<Rule>,
 }
 
 impl Ranged for NoqaDirectiveLine<'_> {
@@ -928,7 +959,7 @@ mod tests {
 
     #[test]
     fn noqa_invalid_codes() {
-        let source = "# noqa: unused-import, F401, some other code";
+        let source = "# noqa: unused-import-invalid, F401, some other code";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 

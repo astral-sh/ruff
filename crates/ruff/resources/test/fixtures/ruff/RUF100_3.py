@@ -16,10 +16,10 @@ print(a)  # noqa  comment
 print()  # noqa: E501, F821
 print()  # noqa: E501, F821 # comment
 print()  # noqa: E501, F821  # comment
-print()  # noqa: E501, F821 comment
-print()  # noqa: E501, F821  comment
+print()  # noqa: E501, F821 invalid-code
+print()  # noqa: E501, F821  invalid-code
 print(a)  # noqa: E501, F821
 print(a)  # noqa: E501, F821 # comment
 print(a)  # noqa: E501, F821  # comment
-print(a)  # noqa: E501, F821 comment
-print(a)  # noqa: E501, F821  comment
+print(a)  # noqa: E501, F821 invalid-code
+print(a)  # noqa: E501, F821  invalid-code

@@ -11,7 +11,6 @@ use ruff_source_file::Locator;
 use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule};
-use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::Settings;
 
@@ -67,17 +66,13 @@ pub(crate) fn check_noqa(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
-                        directive_line
-                            .matches
-                            .push(diagnostic.kind.rule().noqa_code());
+                        directive_line.matches.push(diagnostic.kind.rule());
                         ignored_diagnostics.push(index);
                         true
                     }
                     Directive::Codes(directive) => {
                         if noqa::includes(diagnostic.kind.rule(), directive.codes()) {
-                            directive_line
-                                .matches
-                                .push(diagnostic.kind.rule().noqa_code());
+                            directive_line.matches.push(diagnostic.kind.rule());
                             ignored_diagnostics.push(index);
                             true
                         } else {
@@ -122,26 +117,23 @@ pub(crate) fn check_noqa(
                     let mut valid_codes = vec![];
                     let mut self_ignore = false;
                     for code in directive.codes() {
-                        let code = get_redirect_target(code).unwrap_or(code);
-                        if Rule::UnusedNOQA.noqa_code() == code {
-                            self_ignore = true;
-                            break;
-                        }
-
-                        if line.matches.iter().any(|match_| *match_ == code)
-                            || settings.external.contains(code)
-                        {
-                            valid_codes.push(code);
-                        } else {
-                            if let Ok(rule) = Rule::from_code(code) {
-                                if settings.rules.enabled(rule) {
-                                    unmatched_codes.push(code);
-                                } else {
-                                    disabled_codes.push(code);
-                                }
-                            } else {
-                                unknown_codes.push(code);
+                        if let Ok(rule) = Rule::from_code_or_name(code, true) {
+                            if rule == Rule::UnusedNOQA {
+                                self_ignore = true;
+                                break;
                             }
+
+                            if line.matches.iter().any(|r| *r == rule) {
+                                valid_codes.push(*code);
+                            } else if settings.rules.enabled(rule) {
+                                unmatched_codes.push(*code);
+                            } else {
+                                disabled_codes.push(*code);
+                            }
+                        } else if settings.external.contains(*code) {
+                            valid_codes.push(*code);
+                        } else {
+                            unknown_codes.push(*code);
                         }
                     }
 

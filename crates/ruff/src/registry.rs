@@ -1,6 +1,7 @@
 //! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
 //! with some helper symbols
 
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -8,6 +9,7 @@ use ruff_macros::RuleNamespace;
 pub use rule_set::{RuleSet, RuleSetIterator};
 
 use crate::codes::{self};
+use crate::rule_redirects;
 
 mod rule_set;
 
@@ -22,6 +24,31 @@ impl Rule {
             .all_rules()
             .find(|rule| rule.noqa_code().suffix() == code)
             .ok_or(FromCodeError::Unknown)
+    }
+
+    pub fn from_name(name: &str) -> Result<Self, FromCodeError> {
+        Self::iter()
+            .find(|rule| rule.as_ref() == name)
+            .ok_or(FromCodeError::Unknown)
+    }
+
+    /// Convert a code or name to a rule
+    pub fn from_code_or_name(
+        code_or_name: &str,
+        check_redirects: bool,
+    ) -> Result<Self, FromCodeError> {
+        Rule::from_code(if check_redirects {
+            rule_redirects::get_code_redirect_target(code_or_name).unwrap_or(code_or_name)
+        } else {
+            code_or_name
+        })
+        .or_else(|_| {
+            Rule::from_name(if check_redirects {
+                rule_redirects::get_name_redirect_target(code_or_name).unwrap_or(code_or_name)
+            } else {
+                code_or_name
+            })
+        })
     }
 }
 
