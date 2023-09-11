@@ -1,0 +1,11 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_jupyter_source(&source)
+---
+[
+    IpyEscapeCommand {
+        value: "matplotlib ",
+        kind: Magic,
+    },
+    Newline,
+]

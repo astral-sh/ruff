@@ -1,0 +1,31 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(&source)
+---
+[
+    Def,
+    Name {
+        name: "foo",
+    },
+    Lpar,
+    Rpar,
+    Colon,
+    Newline,
+    Indent,
+    If,
+    Name {
+        name: "x",
+    },
+    Colon,
+    Newline,
+    NonLogicalNewline,
+    Indent,
+    Return,
+    Int {
+        value: 99,
+    },
+    Newline,
+    NonLogicalNewline,
+    Dedent,
+    Dedent,
+]
