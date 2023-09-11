@@ -2400,7 +2400,6 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "static_assertions",
- "test-case",
  "tiny-keccak",
  "unicode-ident",
  "unicode_names2",
