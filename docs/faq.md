@@ -386,38 +386,7 @@ alone.
 
 Preview enables a collection of newer rules and fixes that are considered experimental or unstable.
 
-If a rule is marked as preview, it can only be enabled if the `--preview` flag is toggled. For example, consider a
-hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enabled by adding following to your
-`pyproject.toml`:
-
-```toml
-[tool.ruff]
-extend-select = ["HYP001"]
-```
-
-It also would _not_ be enabled by selecting the `HYP` category, like so:
-
-```toml
-[tool.ruff]
-extend-select = ["HYP"]
-```
-
-Similarly, it would _not_ be enabled via the `ALL` selector:
-
-```toml
-[tool.ruff]
-select = ["ALL"]
-```
-
-However, it would be enabled in any of the above cases if you you enabled `preview`:
-
-```toml
-[tool.ruff]
-extend-select = ["HYP"]
-preview = true
-```
-
-Preview can also be enabled via the CLI with the `--preview` flag.
+See the [preview documentation](https://beta.ruff.rs/docs/preview/) for more details..
 
 To see which rules are currently in preview, visit the [rules reference](https://beta.ruff.rs/docs/rules/).
 
