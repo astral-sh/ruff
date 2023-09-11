@@ -3,84 +3,180 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_jupyter_source(source)
 ---
 [
-    IpyEscapeCommand {
-        value: "foo",
-        kind: Help,
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        range: 0..5,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo",
-        kind: Help,
+    Token {
+        value: Newline,
+        range: 5..6,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "   foo  ?",
-        kind: Help2,
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        range: 6..15,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo",
-        kind: Help2,
+    Token {
+        value: Newline,
+        range: 15..16,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo",
-        kind: Help2,
+    Token {
+        value: IpyEscapeCommand {
+            value: "   foo  ?",
+            kind: Help2,
+        },
+        range: 16..27,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo",
-        kind: Help,
+    Token {
+        value: Newline,
+        range: 27..28,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo",
-        kind: Help2,
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo",
+            kind: Help2,
+        },
+        range: 28..34,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo???",
-        kind: Help2,
+    Token {
+        value: Newline,
+        range: 34..35,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "?foo???",
-        kind: Help2,
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo",
+            kind: Help2,
+        },
+        range: 35..42,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo",
-        kind: Help,
+    Token {
+        value: Newline,
+        range: 42..43,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: " ?",
-        kind: Help2,
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        range: 43..50,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "??",
-        kind: Help2,
+    Token {
+        value: Newline,
+        range: 50..51,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "%foo",
-        kind: Help,
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo",
+            kind: Help2,
+        },
+        range: 51..59,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "%foo",
-        kind: Help2,
+    Token {
+        value: Newline,
+        range: 59..60,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo???",
-        kind: Magic2,
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo???",
+            kind: Help2,
+        },
+        range: 60..68,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "pwd",
-        kind: Help,
+    Token {
+        value: Newline,
+        range: 68..69,
     },
-    Newline,
+    Token {
+        value: IpyEscapeCommand {
+            value: "?foo???",
+            kind: Help2,
+        },
+        range: 69..78,
+    },
+    Token {
+        value: Newline,
+        range: 78..79,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        range: 79..92,
+    },
+    Token {
+        value: Newline,
+        range: 92..93,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: " ?",
+            kind: Help2,
+        },
+        range: 93..99,
+    },
+    Token {
+        value: Newline,
+        range: 99..100,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "??",
+            kind: Help2,
+        },
+        range: 100..104,
+    },
+    Token {
+        value: Newline,
+        range: 104..105,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "%foo",
+            kind: Help,
+        },
+        range: 105..110,
+    },
+    Token {
+        value: Newline,
+        range: 110..111,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "%foo",
+            kind: Help2,
+        },
+        range: 111..117,
+    },
+    Token {
+        value: Newline,
+        range: 117..118,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo???",
+            kind: Magic2,
+        },
+        range: 118..126,
+    },
+    Token {
+        value: Newline,
+        range: 126..127,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "pwd",
+            kind: Help,
+        },
+        range: 127..132,
+    },
+    Token {
+        value: Newline,
+        range: 132..132,
+    },
 ]

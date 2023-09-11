@@ -3,50 +3,80 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
 [
-    String {
-        value: "double",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "double",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 0..8,
     },
-    String {
-        value: "single",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "single",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 9..17,
     },
-    String {
-        value: "can\\'t",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "can\\'t",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 18..26,
     },
-    String {
-        value: "\\\\\\\"",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "\\\\\\\"",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 27..33,
     },
-    String {
-        value: "\\t\\r\\n",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "\\t\\r\\n",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 34..42,
     },
-    String {
-        value: "\\g",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "\\g",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 43..47,
     },
-    String {
-        value: "raw\\'",
-        kind: RawString,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "raw\\'",
+            kind: RawString,
+            triple_quoted: false,
+        },
+        range: 48..56,
     },
-    String {
-        value: "\\420",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "\\420",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 57..63,
     },
-    String {
-        value: "\\200\\0a",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "\\200\\0a",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 64..73,
     },
-    Newline,
+    Token {
+        value: Newline,
+        range: 73..73,
+    },
 ]

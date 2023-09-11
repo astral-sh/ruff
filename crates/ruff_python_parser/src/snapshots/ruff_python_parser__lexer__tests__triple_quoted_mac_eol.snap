@@ -3,10 +3,16 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(&source)
 ---
 [
-    String {
-        value: "\r test string\r ",
-        kind: String,
-        triple_quoted: true,
+    Token {
+        value: String {
+            value: "\r test string\r ",
+            kind: String,
+            triple_quoted: true,
+        },
+        range: 0..21,
     },
-    Newline,
+    Token {
+        value: Newline,
+        range: 21..21,
+    },
 ]

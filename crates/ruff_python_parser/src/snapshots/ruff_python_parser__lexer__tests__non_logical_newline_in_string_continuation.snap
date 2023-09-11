@@ -3,32 +3,68 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
 [
-    Lpar,
-    NonLogicalNewline,
-    String {
-        value: "a",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: Lpar,
+        range: 0..1,
     },
-    NonLogicalNewline,
-    String {
-        value: "b",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: NonLogicalNewline,
+        range: 1..2,
     },
-    NonLogicalNewline,
-    NonLogicalNewline,
-    String {
-        value: "c",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: String {
+            value: "a",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 6..9,
     },
-    String {
-        value: "d",
-        kind: String,
-        triple_quoted: false,
+    Token {
+        value: NonLogicalNewline,
+        range: 9..10,
     },
-    NonLogicalNewline,
-    Rpar,
-    Newline,
+    Token {
+        value: String {
+            value: "b",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 14..17,
+    },
+    Token {
+        value: NonLogicalNewline,
+        range: 17..18,
+    },
+    Token {
+        value: NonLogicalNewline,
+        range: 18..19,
+    },
+    Token {
+        value: String {
+            value: "c",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 23..26,
+    },
+    Token {
+        value: String {
+            value: "d",
+            kind: String,
+            triple_quoted: false,
+        },
+        range: 33..36,
+    },
+    Token {
+        value: NonLogicalNewline,
+        range: 36..37,
+    },
+    Token {
+        value: Rpar,
+        range: 37..38,
+    },
+    Token {
+        value: Newline,
+        range: 38..38,
+    },
 ]

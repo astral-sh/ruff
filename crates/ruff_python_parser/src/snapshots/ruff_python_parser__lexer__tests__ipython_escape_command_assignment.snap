@@ -3,40 +3,88 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_jupyter_source(source)
 ---
 [
-    Name {
-        name: "pwd",
+    Token {
+        value: Name {
+            name: "pwd",
+        },
+        range: 0..3,
     },
-    Equal,
-    IpyEscapeCommand {
-        value: "pwd",
-        kind: Shell,
+    Token {
+        value: Equal,
+        range: 4..5,
     },
-    Newline,
-    Name {
-        name: "foo",
+    Token {
+        value: IpyEscapeCommand {
+            value: "pwd",
+            kind: Shell,
+        },
+        range: 6..10,
     },
-    Equal,
-    IpyEscapeCommand {
-        value: "timeit a = b",
-        kind: Magic,
+    Token {
+        value: Newline,
+        range: 10..11,
     },
-    Newline,
-    Name {
-        name: "bar",
+    Token {
+        value: Name {
+            name: "foo",
+        },
+        range: 11..14,
     },
-    Equal,
-    IpyEscapeCommand {
-        value: "timeit a % 3",
-        kind: Magic,
+    Token {
+        value: Equal,
+        range: 15..16,
     },
-    Newline,
-    Name {
-        name: "baz",
+    Token {
+        value: IpyEscapeCommand {
+            value: "timeit a = b",
+            kind: Magic,
+        },
+        range: 17..30,
     },
-    Equal,
-    IpyEscapeCommand {
-        value: "matplotlib         inline",
-        kind: Magic,
+    Token {
+        value: Newline,
+        range: 30..31,
     },
-    Newline,
+    Token {
+        value: Name {
+            name: "bar",
+        },
+        range: 31..34,
+    },
+    Token {
+        value: Equal,
+        range: 35..36,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "timeit a % 3",
+            kind: Magic,
+        },
+        range: 37..50,
+    },
+    Token {
+        value: Newline,
+        range: 50..51,
+    },
+    Token {
+        value: Name {
+            name: "baz",
+        },
+        range: 51..54,
+    },
+    Token {
+        value: Equal,
+        range: 55..56,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "matplotlib         inline",
+            kind: Magic,
+        },
+        range: 57..85,
+    },
+    Token {
+        value: Newline,
+        range: 85..85,
+    },
 ]

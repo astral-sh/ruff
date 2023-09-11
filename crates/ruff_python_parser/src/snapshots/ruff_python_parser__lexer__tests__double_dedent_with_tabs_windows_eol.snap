@@ -3,29 +3,86 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(&source)
 ---
 [
-    Def,
-    Name {
-        name: "foo",
+    Token {
+        value: Def,
+        range: 0..3,
     },
-    Lpar,
-    Rpar,
-    Colon,
-    Newline,
-    Indent,
-    If,
-    Name {
-        name: "x",
+    Token {
+        value: Name {
+            name: "foo",
+        },
+        range: 4..7,
     },
-    Colon,
-    Newline,
-    NonLogicalNewline,
-    Indent,
-    Return,
-    Int {
-        value: 99,
+    Token {
+        value: Lpar,
+        range: 7..8,
     },
-    Newline,
-    NonLogicalNewline,
-    Dedent,
-    Dedent,
+    Token {
+        value: Rpar,
+        range: 8..9,
+    },
+    Token {
+        value: Colon,
+        range: 9..10,
+    },
+    Token {
+        value: Newline,
+        range: 10..12,
+    },
+    Token {
+        value: Indent,
+        range: 12..13,
+    },
+    Token {
+        value: If,
+        range: 13..15,
+    },
+    Token {
+        value: Name {
+            name: "x",
+        },
+        range: 16..17,
+    },
+    Token {
+        value: Colon,
+        range: 17..18,
+    },
+    Token {
+        value: Newline,
+        range: 18..20,
+    },
+    Token {
+        value: NonLogicalNewline,
+        range: 20..22,
+    },
+    Token {
+        value: Indent,
+        range: 22..25,
+    },
+    Token {
+        value: Return,
+        range: 25..31,
+    },
+    Token {
+        value: Int {
+            value: 99,
+        },
+        range: 32..34,
+    },
+    Token {
+        value: Newline,
+        range: 34..36,
+    },
+    Token {
+        value: NonLogicalNewline,
+        range: 36..38,
+    },
+    Token {
+        value: Dedent,
+        range: 38..38,
+    },
+    Token {
+        value: Dedent,
+        range: 38..38,
+    },
 ]

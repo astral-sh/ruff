@@ -3,15 +3,39 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_jupyter_source(source)
 ---
 [
-    If,
-    True,
-    Colon,
-    Newline,
-    Indent,
-    IpyEscapeCommand {
-        value: "matplotlib         --inline",
-        kind: Magic,
+    Token {
+        value: If,
+        range: 0..2,
     },
-    Newline,
-    Dedent,
+    Token {
+        value: True,
+        range: 3..7,
+    },
+    Token {
+        value: Colon,
+        range: 7..8,
+    },
+    Token {
+        value: Newline,
+        range: 8..9,
+    },
+    Token {
+        value: Indent,
+        range: 9..13,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "matplotlib         --inline",
+            kind: Magic,
+        },
+        range: 13..43,
+    },
+    Token {
+        value: Newline,
+        range: 43..43,
+    },
+    Token {
+        value: Dedent,
+        range: 43..43,
+    },
 ]

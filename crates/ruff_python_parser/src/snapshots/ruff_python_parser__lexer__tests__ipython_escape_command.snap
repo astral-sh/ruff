@@ -3,59 +3,125 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_jupyter_source(source)
 ---
 [
-    IpyEscapeCommand {
-        value: "foo",
-        kind: Help,
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        range: 0..4,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo",
-        kind: Help2,
+    Token {
+        value: Newline,
+        range: 4..5,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "timeit a = b",
-        kind: Magic,
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo",
+            kind: Help2,
+        },
+        range: 5..10,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "timeit a % 3",
-        kind: Magic,
+    Token {
+        value: Newline,
+        range: 10..11,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "matplotlib     --inline",
-        kind: Magic,
+    Token {
+        value: IpyEscapeCommand {
+            value: "timeit a = b",
+            kind: Magic,
+        },
+        range: 11..24,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "pwd   && ls -a | sed 's/^/\\\\    /'",
-        kind: Shell,
+    Token {
+        value: Newline,
+        range: 24..25,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "cd /Users/foo/Library/Application\\ Support/",
-        kind: ShCap,
+    Token {
+        value: IpyEscapeCommand {
+            value: "timeit a % 3",
+            kind: Magic,
+        },
+        range: 25..38,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo 1 2",
-        kind: Paren,
+    Token {
+        value: Newline,
+        range: 38..39,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo 1 2",
-        kind: Quote,
+    Token {
+        value: IpyEscapeCommand {
+            value: "matplotlib     --inline",
+            kind: Magic,
+        },
+        range: 39..65,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "foo 1 2",
-        kind: Quote2,
+    Token {
+        value: Newline,
+        range: 65..66,
     },
-    Newline,
-    IpyEscapeCommand {
-        value: "ls",
-        kind: Shell,
+    Token {
+        value: IpyEscapeCommand {
+            value: "pwd   && ls -a | sed 's/^/\\\\    /'",
+            kind: Shell,
+        },
+        range: 66..103,
     },
-    Newline,
+    Token {
+        value: Newline,
+        range: 103..104,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "cd /Users/foo/Library/Application\\ Support/",
+            kind: ShCap,
+        },
+        range: 104..149,
+    },
+    Token {
+        value: Newline,
+        range: 149..150,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo 1 2",
+            kind: Paren,
+        },
+        range: 150..158,
+    },
+    Token {
+        value: Newline,
+        range: 158..159,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo 1 2",
+            kind: Quote,
+        },
+        range: 159..167,
+    },
+    Token {
+        value: Newline,
+        range: 167..168,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "foo 1 2",
+            kind: Quote2,
+        },
+        range: 168..176,
+    },
+    Token {
+        value: Newline,
+        range: 176..177,
+    },
+    Token {
+        value: IpyEscapeCommand {
+            value: "ls",
+            kind: Shell,
+        },
+        range: 177..180,
+    },
+    Token {
+        value: Newline,
+        range: 180..180,
+    },
 ]
