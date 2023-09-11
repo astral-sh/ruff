@@ -9,7 +9,7 @@ use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for uses of `WARN`
+/// Checks for uses of `logging.WARN`.
 ///
 /// ## Why is this bad?
 /// The WARN constant is an undocumented alias for WARNING. Whilst it’s not deprecated, it’s not
@@ -31,11 +31,11 @@ impl Violation for UndocumentedWarn {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of undocumented logging.WARN constant")
+        format!("Use of undocumented `logging.WARN` constant")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        Some(format!("Replace logging.WARN with logging.WARNING"))
+        Some(format!("Replace `logging.WARN` with `logging.WARNING`"))
     }
 }
 
