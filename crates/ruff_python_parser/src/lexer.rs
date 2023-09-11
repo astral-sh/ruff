@@ -28,7 +28,6 @@
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
-use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::{char, cmp::Ordering, str::FromStr};
 
@@ -263,9 +262,10 @@ impl<'source> Lexer<'source> {
             'x' | 'o' | 'b'
         ));
 
-        let value_text = self.radix_run(None, radix);
+        let mut number = LexedText::new(self.offset(), self.source);
+        self.radix_run(&mut number, radix);
         let value =
-            BigInt::from_str_radix(&value_text, radix.as_u32()).map_err(|e| LexicalError {
+            BigInt::from_str_radix(number.as_str(), radix.as_u32()).map_err(|e| LexicalError {
                 error: LexicalErrorType::OtherError(format!("{e:?}")),
                 location: self.token_range().start(),
             })?;
@@ -278,15 +278,14 @@ impl<'source> Lexer<'source> {
         debug_assert!(self.cursor.previous().is_ascii_digit() || self.cursor.previous() == '.');
         let start_is_zero = first_digit_or_dot == '0';
 
-        let mut value_text = if first_digit_or_dot == '.' {
-            String::new()
-        } else {
-            self.radix_run(Some(first_digit_or_dot), Radix::Decimal)
-                .into_owned()
+        let mut number = LexedText::new(self.token_start(), self.source);
+        if first_digit_or_dot != '.' {
+            number.push(first_digit_or_dot);
+            self.radix_run(&mut number, Radix::Decimal);
         };
 
         let is_float = if first_digit_or_dot == '.' || self.cursor.eat_char('.') {
-            value_text.push('.');
+            number.push('.');
 
             if self.cursor.eat_char('_') {
                 return Err(LexicalError {
@@ -295,7 +294,7 @@ impl<'source> Lexer<'source> {
                 });
             }
 
-            value_text.push_str(&self.radix_run(None, Radix::Decimal));
+            self.radix_run(&mut number, Radix::Decimal);
             true
         } else {
             // Normal number:
@@ -304,14 +303,14 @@ impl<'source> Lexer<'source> {
 
         let is_float = match self.cursor.rest().as_bytes() {
             [b'e' | b'E', b'0'..=b'9', ..] | [b'e' | b'E', b'-' | b'+', b'0'..=b'9', ..] => {
-                value_text.push('e');
-                self.cursor.bump(); // e | E
+                // 'e' | 'E'
+                number.push(self.cursor.bump().unwrap());
 
                 if let Some(sign) = self.cursor.eat_if(|c| matches!(c, '+' | '-')) {
-                    value_text.push(sign);
+                    number.push(sign);
                 }
 
-                value_text.push_str(&self.radix_run(None, Radix::Decimal));
+                self.radix_run(&mut number, Radix::Decimal);
 
                 true
             }
@@ -320,7 +319,7 @@ impl<'source> Lexer<'source> {
 
         if is_float {
             // Improvement: Use `Cow` instead of pushing to value text
-            let value = f64::from_str(&value_text).map_err(|_| LexicalError {
+            let value = f64::from_str(number.as_str()).map_err(|_| LexicalError {
                 error: LexicalErrorType::OtherError("Invalid decimal literal".to_owned()),
                 location: self.token_start(),
             })?;
@@ -337,10 +336,10 @@ impl<'source> Lexer<'source> {
         } else {
             // Parse trailing 'j':
             if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
-                let imag = f64::from_str(&value_text).unwrap();
+                let imag = f64::from_str(number.as_str()).unwrap();
                 Ok(Tok::Complex { real: 0.0, imag })
             } else {
-                let value = value_text.parse::<BigInt>().unwrap();
+                let value = number.as_str().parse::<BigInt>().unwrap();
                 if start_is_zero && !value.is_zero() {
                     // leading zeros in decimal integer literals are not permitted
                     return Err(LexicalError {
@@ -356,34 +355,19 @@ impl<'source> Lexer<'source> {
     /// Consume a sequence of numbers with the given radix,
     /// the digits can be decorated with underscores
     /// like this: '`1_2_3_4`' == '1234'
-    fn radix_run(&mut self, first: Option<char>, radix: Radix) -> Cow<'source, str> {
-        let start = if let Some(first) = first {
-            self.offset() - first.text_len()
-        } else {
-            self.offset()
-        };
-        self.cursor.eat_while(|c| radix.is_digit(c));
-
-        let number = &self.source[TextRange::new(start, self.offset())];
-
-        // Number that contains `_` separators. Remove them from the parsed text.
-        if radix.is_digit(self.cursor.second()) && self.cursor.eat_char('_') {
-            let mut value_text = number.to_string();
-
-            loop {
-                if let Some(c) = self.cursor.eat_if(|c| radix.is_digit(c)) {
-                    value_text.push(c);
-                } else if self.cursor.first() == '_' && radix.is_digit(self.cursor.second()) {
-                    // Skip over `_`
-                    self.cursor.bump();
-                } else {
-                    break;
-                }
+    fn radix_run(&mut self, number: &mut LexedText, radix: Radix) {
+        loop {
+            if let Some(c) = self.cursor.eat_if(|c| radix.is_digit(c)) {
+                number.push(c);
             }
-
-            Cow::Owned(value_text)
-        } else {
-            Cow::Borrowed(number)
+            // Number that contains `_` separators. Remove them from the parsed text.
+            else if self.cursor.first() == '_' && radix.is_digit(self.cursor.second()) {
+                // Skip over `_`
+                self.cursor.bump();
+                number.skip_char();
+            } else {
+                break;
+            }
         }
     }
 
@@ -1234,6 +1218,49 @@ const fn is_python_whitespace(c: char) -> bool {
         // Space, tab, or form-feed
         ' ' | '\t' | '\x0C'
     )
+}
+
+enum LexedText<'a> {
+    Source { source: &'a str, range: TextRange },
+    Owned(String),
+}
+
+impl<'a> LexedText<'a> {
+    fn new(start: TextSize, source: &'a str) -> Self {
+        Self::Source {
+            range: TextRange::empty(start),
+            source,
+        }
+    }
+
+    fn push(&mut self, c: char) {
+        match self {
+            LexedText::Source { range, source } => {
+                *range = range.add_end(c.text_len());
+                debug_assert!(source[*range].ends_with(c));
+            }
+            LexedText::Owned(owned) => owned.push(c),
+        }
+    }
+
+    fn as_str<'b>(&'b self) -> &'b str
+    where
+        'b: 'a,
+    {
+        match self {
+            LexedText::Source { range, source } => &source[*range],
+            LexedText::Owned(owned) => owned,
+        }
+    }
+
+    fn skip_char(&mut self) {
+        match self {
+            LexedText::Source { range, source } => {
+                *self = LexedText::Owned(source[*range].to_string());
+            }
+            LexedText::Owned(_) => {}
+        }
+    }
 }
 
 #[cfg(test)]
