@@ -1275,7 +1275,7 @@ mod tests {
 
     fn lex_source_with_mode(source: &str, mode: Mode) -> Vec<Spanned> {
         let lexer = lex(source, mode);
-        lexer.map(|result| result.unwrap()).collect()
+        lexer.map(std::result::Result::unwrap).collect()
     }
 
     fn lex_source(source: &str) -> Vec<Spanned> {
@@ -1409,7 +1409,7 @@ baz = %matplotlib \
     fn assert_no_ipython_escape_command(tokens: &[Spanned]) {
         for (tok, _) in tokens {
             if let Tok::IpyEscapeCommand { .. } = tok {
-                panic!("Unexpected escape command token: {:?}", tok)
+                panic!("Unexpected escape command token: {tok:?}")
             }
         }
     }
