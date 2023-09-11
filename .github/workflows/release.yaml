@@ -7,7 +7,7 @@ on:
         description: "The version to tag, without the leading 'v'. If omitted, will initiate a dry run (no uploads)."
         type: string
       sha:
-        description: "The full sha of the commit to be released. If ommitted, the latest commit on the default branch will be used."
+        description: "The full sha of the commit to be released. If omitted, the latest commit on the default branch will be used."
         default: ""
         type: string
   pull_request:
