@@ -1,6 +1,5 @@
 use ruff::linter::lint_only;
 use ruff::settings::rule_table::RuleTable;
-use ruff::settings::types::PreviewMode;
 use ruff::settings::{flags, Settings};
 use ruff::source_kind::SourceKind;
 use ruff::{registry::Rule, RuleSelector};
@@ -80,7 +79,7 @@ fn benchmark_default_rules(criterion: &mut Criterion) {
 }
 
 fn benchmark_all_rules(criterion: &mut Criterion) {
-    let mut rules: RuleTable = RuleSelector::All.rules(PreviewMode::Disabled).collect();
+    let mut rules: RuleTable = RuleSelector::All.all_rules().collect();
 
     // Disable IO based rules because it is a source of flakiness
     rules.disable(Rule::ShebangMissingExecutableFile);
