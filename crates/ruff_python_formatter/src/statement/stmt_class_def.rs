@@ -1,11 +1,10 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Decorator, PySourceType, StmtClassDef};
+use ruff_python_ast::{Decorator, StmtClassDef};
 use ruff_python_trivia::lines_after_ignoring_trivia;
 use ruff_text_size::Ranged;
 
 use crate::comments::format::empty_lines_before_trailing_comments;
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
-use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::suite::SuiteKind;
@@ -120,7 +119,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         // # comment
         // ```
         //
-        // At the top-level, reformat as:
+        // At the top-level in a non-stub file, reformat as:
         // ```python
         // class Class:
         //     ...
@@ -128,13 +127,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         //
         // # comment
         // ```
-        let empty_lines = match (f.options().source_type(), f.context().node_level()) {
-            (PySourceType::Stub, NodeLevel::TopLevel) => 1,
-            (PySourceType::Stub, _) => 0,
-            (_, NodeLevel::TopLevel) => 2,
-            (_, _) => 1,
-        };
-        empty_lines_before_trailing_comments(comments.trailing(item), empty_lines).fmt(f)
+        empty_lines_before_trailing_comments(f, comments.trailing(item)).fmt(f)
     }
 
     fn fmt_dangling_comments(

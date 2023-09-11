@@ -1,11 +1,10 @@
 use crate::comments::format::empty_lines_before_trailing_comments;
 use ruff_formatter::write;
-use ruff_python_ast::{Parameters, PySourceType, StmtFunctionDef};
+use ruff_python_ast::{Parameters, StmtFunctionDef};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::comments::SourceComment;
-use crate::context::NodeLevel;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
@@ -156,7 +155,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         // # comment
         // ```
         //
-        // At the top-level, reformat as:
+        // At the top-level in a non-stub file, reformat as:
         // ```python
         // def func():
         //     ...
@@ -164,13 +163,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         //
         // # comment
         // ```
-        let empty_lines = match (f.options().source_type(), f.context().node_level()) {
-            (PySourceType::Stub, NodeLevel::TopLevel) => 1,
-            (PySourceType::Stub, _) => 0,
-            (_, NodeLevel::TopLevel) => 2,
-            (_, _) => 1,
-        };
-        empty_lines_before_trailing_comments(comments.trailing(item), empty_lines).fmt(f)
+        empty_lines_before_trailing_comments(f, comments.trailing(item)).fmt(f)
     }
 
     fn fmt_dangling_comments(
