@@ -44,4 +44,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages publish site --project-name=ruff-docs --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}
+          command: pages deploy site --project-name=ruff-docs --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}
