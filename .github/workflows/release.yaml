@@ -7,7 +7,8 @@ on:
         description: "The version to tag, without the leading 'v'. If omitted, will initiate a dry run (no uploads)."
         type: string
       sha:
-        description: "Optionally, the full sha of the commit to be released"
+        description: "The full sha of the commit to be released. If ommitted, the latest commit on the default branch will be used."
+        default: ""
         type: string
   pull_request:
     paths:
@@ -31,6 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -57,6 +60,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -95,6 +100,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -141,6 +148,8 @@ jobs:
             arch: x64
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -187,6 +196,8 @@ jobs:
           - i686-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -244,6 +255,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -297,6 +310,8 @@ jobs:
           - i686-unknown-linux-musl
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -351,6 +366,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -399,6 +416,8 @@ jobs:
     if: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - name: Check tag consistency
         run: |
           version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
@@ -465,6 +484,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - name: git tag
         run: |
           git config user.email "hey@astral.sh"
