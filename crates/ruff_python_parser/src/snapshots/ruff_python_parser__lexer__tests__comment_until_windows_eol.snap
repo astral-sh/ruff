@@ -1,32 +1,32 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
-expression: lex_source(&source)
+expression: comment_until_eol(WINDOWS_EOL)
 ---
 [
-    Token {
-        value: Int {
+    (
+        Int {
             value: 123,
         },
-        range: 0..3,
-    },
-    Token {
-        value: Comment(
+        0..3,
+    ),
+    (
+        Comment(
             "# Foo",
         ),
-        range: 5..10,
-    },
-    Token {
-        value: Newline,
-        range: 10..12,
-    },
-    Token {
-        value: Int {
+        5..10,
+    ),
+    (
+        Newline,
+        10..12,
+    ),
+    (
+        Int {
             value: 456,
         },
-        range: 12..15,
-    },
-    Token {
-        value: Newline,
-        range: 15..15,
-    },
+        12..15,
+    ),
+    (
+        Newline,
+        15..15,
+    ),
 ]

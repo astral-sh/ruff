@@ -3,44 +3,44 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
 [
-    Token {
-        value: Name {
+    (
+        Name {
             name: "a_variable",
         },
-        range: 0..10,
-    },
-    Token {
-        value: Equal,
-        range: 11..12,
-    },
-    Token {
-        value: Int {
+        0..10,
+    ),
+    (
+        Equal,
+        11..12,
+    ),
+    (
+        Int {
             value: 99,
         },
-        range: 13..15,
-    },
-    Token {
-        value: Plus,
-        range: 16..17,
-    },
-    Token {
-        value: Int {
+        13..15,
+    ),
+    (
+        Plus,
+        16..17,
+    ),
+    (
+        Int {
             value: 2,
         },
-        range: 18..19,
-    },
-    Token {
-        value: Minus,
-        range: 19..20,
-    },
-    Token {
-        value: Int {
+        18..19,
+    ),
+    (
+        Minus,
+        19..20,
+    ),
+    (
+        Int {
             value: 0,
         },
-        range: 20..21,
-    },
-    Token {
-        value: Newline,
-        range: 21..21,
-    },
+        20..21,
+    ),
+    (
+        Newline,
+        21..21,
+    ),
 ]

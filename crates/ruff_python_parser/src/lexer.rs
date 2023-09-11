@@ -1273,32 +1273,20 @@ mod tests {
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
-    #[derive(Debug, PartialEq)]
-    struct Token {
-        value: Tok,
-        range: TextRange,
-    }
-
-    impl From<Spanned> for Token {
-        fn from((value, range): Spanned) -> Self {
-            Self { value, range }
-        }
-    }
-
-    fn lex_source_with_mode(source: &str, mode: Mode) -> Vec<Token> {
+    fn lex_source_with_mode(source: &str, mode: Mode) -> Vec<Spanned> {
         let lexer = lex(source, mode);
-        lexer.map(|result| Token::from(result.unwrap())).collect()
+        lexer.map(|result| result.unwrap()).collect()
     }
 
-    fn lex_source(source: &str) -> Vec<Token> {
+    fn lex_source(source: &str) -> Vec<Spanned> {
         lex_source_with_mode(source, Mode::Module)
     }
 
-    fn lex_jupyter_source(source: &str) -> Vec<Token> {
+    fn lex_jupyter_source(source: &str) -> Vec<Spanned> {
         lex_source_with_mode(source, Mode::Ipython)
     }
 
-    fn ipython_escape_command_line_continuation_eol(eol: &str) -> Vec<Token> {
+    fn ipython_escape_command_line_continuation_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("%matplotlib \\{eol}  --inline");
         lex_jupyter_source(&source)
     }
@@ -1318,7 +1306,7 @@ mod tests {
         assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(WINDOWS_EOL));
     }
 
-    fn ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) -> Vec<Token> {
+    fn ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) -> Vec<Spanned> {
         let source = format!("%matplotlib \\{eol}");
         lex_jupyter_source(&source)
     }
@@ -1418,10 +1406,10 @@ baz = %matplotlib \
         assert_debug_snapshot!(lex_jupyter_source(source));
     }
 
-    fn assert_no_ipython_escape_command(tokens: &[Token]) {
-        for token in tokens {
-            if let Tok::IpyEscapeCommand { .. } = token.value {
-                panic!("Unexpected escape command token: {:?}", token.value)
+    fn assert_no_ipython_escape_command(tokens: &[Spanned]) {
+        for (tok, _) in tokens {
+            if let Tok::IpyEscapeCommand { .. } = tok {
+                panic!("Unexpected escape command token: {:?}", tok)
             }
         }
     }
@@ -1473,7 +1461,7 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(&source));
     }
 
-    fn comment_until_eol(eol: &str) -> Vec<Token> {
+    fn comment_until_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("123  # Foo{eol}456");
         lex_source(&source)
     }
@@ -1499,7 +1487,7 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(source));
     }
 
-    fn indentation_with_eol(eol: &str) -> Vec<Token> {
+    fn indentation_with_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("def foo():{eol}    return 99{eol}{eol}");
         lex_source(&source)
     }
@@ -1519,7 +1507,7 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(indentation_with_eol(WINDOWS_EOL));
     }
 
-    fn double_dedent_with_eol(eol: &str) -> Vec<Token> {
+    fn double_dedent_with_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("def foo():{eol} if x:{eol}{eol}  return 99{eol}{eol}");
         lex_source(&source)
     }
@@ -1539,7 +1527,7 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(double_dedent_with_eol(WINDOWS_EOL));
     }
 
-    fn double_dedent_with_tabs_eol(eol: &str) -> Vec<Token> {
+    fn double_dedent_with_tabs_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("def foo():{eol}\tif x:{eol}{eol}\t\t return 99{eol}{eol}");
         lex_source(&source)
     }
@@ -1559,7 +1547,7 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(double_dedent_with_tabs_eol(WINDOWS_EOL));
     }
 
-    fn newline_in_brackets_eol(eol: &str) -> Vec<Token> {
+    fn newline_in_brackets_eol(eol: &str) -> Vec<Spanned> {
         let source = r"x = [
 
     1,2
@@ -1619,7 +1607,7 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(source));
     }
 
-    fn string_continuation_with_eol(eol: &str) -> Vec<Token> {
+    fn string_continuation_with_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("\"abc\\{eol}def\"");
         lex_source(&source)
     }
@@ -1645,7 +1633,7 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(source));
     }
 
-    fn triple_quoted_eol(eol: &str) -> Vec<Token> {
+    fn triple_quoted_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("\"\"\"{eol} test string{eol} \"\"\"");
         lex_source(&source)
     }

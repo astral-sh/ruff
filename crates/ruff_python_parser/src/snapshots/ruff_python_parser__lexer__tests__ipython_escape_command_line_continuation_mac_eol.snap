@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
-expression: lex_jupyter_source(&source)
+expression: ipython_escape_command_line_continuation_eol(MAC_EOL)
 ---
 [
-    Token {
-        value: IpyEscapeCommand {
+    (
+        IpyEscapeCommand {
             value: "matplotlib   --inline",
             kind: Magic,
         },
-        range: 0..24,
-    },
-    Token {
-        value: Newline,
-        range: 24..24,
-    },
+        0..24,
+    ),
+    (
+        Newline,
+        24..24,
+    ),
 ]

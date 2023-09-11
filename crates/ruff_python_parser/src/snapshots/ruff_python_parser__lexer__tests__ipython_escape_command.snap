@@ -3,125 +3,125 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_jupyter_source(source)
 ---
 [
-    Token {
-        value: IpyEscapeCommand {
+    (
+        IpyEscapeCommand {
             value: "foo",
             kind: Help,
         },
-        range: 0..4,
-    },
-    Token {
-        value: Newline,
-        range: 4..5,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        0..4,
+    ),
+    (
+        Newline,
+        4..5,
+    ),
+    (
+        IpyEscapeCommand {
             value: "foo",
             kind: Help2,
         },
-        range: 5..10,
-    },
-    Token {
-        value: Newline,
-        range: 10..11,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        5..10,
+    ),
+    (
+        Newline,
+        10..11,
+    ),
+    (
+        IpyEscapeCommand {
             value: "timeit a = b",
             kind: Magic,
         },
-        range: 11..24,
-    },
-    Token {
-        value: Newline,
-        range: 24..25,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        11..24,
+    ),
+    (
+        Newline,
+        24..25,
+    ),
+    (
+        IpyEscapeCommand {
             value: "timeit a % 3",
             kind: Magic,
         },
-        range: 25..38,
-    },
-    Token {
-        value: Newline,
-        range: 38..39,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        25..38,
+    ),
+    (
+        Newline,
+        38..39,
+    ),
+    (
+        IpyEscapeCommand {
             value: "matplotlib     --inline",
             kind: Magic,
         },
-        range: 39..65,
-    },
-    Token {
-        value: Newline,
-        range: 65..66,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        39..65,
+    ),
+    (
+        Newline,
+        65..66,
+    ),
+    (
+        IpyEscapeCommand {
             value: "pwd   && ls -a | sed 's/^/\\\\    /'",
             kind: Shell,
         },
-        range: 66..103,
-    },
-    Token {
-        value: Newline,
-        range: 103..104,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        66..103,
+    ),
+    (
+        Newline,
+        103..104,
+    ),
+    (
+        IpyEscapeCommand {
             value: "cd /Users/foo/Library/Application\\ Support/",
             kind: ShCap,
         },
-        range: 104..149,
-    },
-    Token {
-        value: Newline,
-        range: 149..150,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        104..149,
+    ),
+    (
+        Newline,
+        149..150,
+    ),
+    (
+        IpyEscapeCommand {
             value: "foo 1 2",
             kind: Paren,
         },
-        range: 150..158,
-    },
-    Token {
-        value: Newline,
-        range: 158..159,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        150..158,
+    ),
+    (
+        Newline,
+        158..159,
+    ),
+    (
+        IpyEscapeCommand {
             value: "foo 1 2",
             kind: Quote,
         },
-        range: 159..167,
-    },
-    Token {
-        value: Newline,
-        range: 167..168,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        159..167,
+    ),
+    (
+        Newline,
+        167..168,
+    ),
+    (
+        IpyEscapeCommand {
             value: "foo 1 2",
             kind: Quote2,
         },
-        range: 168..176,
-    },
-    Token {
-        value: Newline,
-        range: 176..177,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        168..176,
+    ),
+    (
+        Newline,
+        176..177,
+    ),
+    (
+        IpyEscapeCommand {
             value: "ls",
             kind: Shell,
         },
-        range: 177..180,
-    },
-    Token {
-        value: Newline,
-        range: 180..180,
-    },
+        177..180,
+    ),
+    (
+        Newline,
+        180..180,
+    ),
 ]

@@ -1,18 +1,18 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
-expression: lex_source(&source)
+expression: string_continuation_with_eol(WINDOWS_EOL)
 ---
 [
-    Token {
-        value: String {
+    (
+        String {
             value: "abc\\\r\ndef",
             kind: String,
             triple_quoted: false,
         },
-        range: 0..11,
-    },
-    Token {
-        value: Newline,
-        range: 11..11,
-    },
+        0..11,
+    ),
+    (
+        Newline,
+        11..11,
+    ),
 ]

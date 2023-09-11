@@ -3,103 +3,103 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_jupyter_source(source)
 ---
 [
-    Token {
-        value: IpyEscapeCommand {
+    (
+        IpyEscapeCommand {
             value: "",
             kind: Magic,
         },
-        range: 0..1,
-    },
-    Token {
-        value: Newline,
-        range: 1..2,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        0..1,
+    ),
+    (
+        Newline,
+        1..2,
+    ),
+    (
+        IpyEscapeCommand {
             value: "",
             kind: Magic2,
         },
-        range: 2..4,
-    },
-    Token {
-        value: Newline,
-        range: 4..5,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        2..4,
+    ),
+    (
+        Newline,
+        4..5,
+    ),
+    (
+        IpyEscapeCommand {
             value: "",
             kind: Shell,
         },
-        range: 5..6,
-    },
-    Token {
-        value: Newline,
-        range: 6..7,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        5..6,
+    ),
+    (
+        Newline,
+        6..7,
+    ),
+    (
+        IpyEscapeCommand {
             value: "",
             kind: ShCap,
         },
-        range: 7..9,
-    },
-    Token {
-        value: Newline,
-        range: 9..10,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        7..9,
+    ),
+    (
+        Newline,
+        9..10,
+    ),
+    (
+        IpyEscapeCommand {
             value: "",
             kind: Help,
         },
-        range: 10..11,
-    },
-    Token {
-        value: Newline,
-        range: 11..12,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        10..11,
+    ),
+    (
+        Newline,
+        11..12,
+    ),
+    (
+        IpyEscapeCommand {
             value: "",
             kind: Help2,
         },
-        range: 12..14,
-    },
-    Token {
-        value: Newline,
-        range: 14..15,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        12..14,
+    ),
+    (
+        Newline,
+        14..15,
+    ),
+    (
+        IpyEscapeCommand {
             value: "",
             kind: Paren,
         },
-        range: 15..16,
-    },
-    Token {
-        value: Newline,
-        range: 16..17,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        15..16,
+    ),
+    (
+        Newline,
+        16..17,
+    ),
+    (
+        IpyEscapeCommand {
             value: "",
             kind: Quote,
         },
-        range: 17..18,
-    },
-    Token {
-        value: Newline,
-        range: 18..19,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        17..18,
+    ),
+    (
+        Newline,
+        18..19,
+    ),
+    (
+        IpyEscapeCommand {
             value: "",
             kind: Quote2,
         },
-        range: 19..20,
-    },
-    Token {
-        value: Newline,
-        range: 20..20,
-    },
+        19..20,
+    ),
+    (
+        Newline,
+        20..20,
+    ),
 ]

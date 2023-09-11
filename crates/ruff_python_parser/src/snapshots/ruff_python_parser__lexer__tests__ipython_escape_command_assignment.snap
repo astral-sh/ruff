@@ -3,88 +3,88 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_jupyter_source(source)
 ---
 [
-    Token {
-        value: Name {
+    (
+        Name {
             name: "pwd",
         },
-        range: 0..3,
-    },
-    Token {
-        value: Equal,
-        range: 4..5,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        0..3,
+    ),
+    (
+        Equal,
+        4..5,
+    ),
+    (
+        IpyEscapeCommand {
             value: "pwd",
             kind: Shell,
         },
-        range: 6..10,
-    },
-    Token {
-        value: Newline,
-        range: 10..11,
-    },
-    Token {
-        value: Name {
+        6..10,
+    ),
+    (
+        Newline,
+        10..11,
+    ),
+    (
+        Name {
             name: "foo",
         },
-        range: 11..14,
-    },
-    Token {
-        value: Equal,
-        range: 15..16,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        11..14,
+    ),
+    (
+        Equal,
+        15..16,
+    ),
+    (
+        IpyEscapeCommand {
             value: "timeit a = b",
             kind: Magic,
         },
-        range: 17..30,
-    },
-    Token {
-        value: Newline,
-        range: 30..31,
-    },
-    Token {
-        value: Name {
+        17..30,
+    ),
+    (
+        Newline,
+        30..31,
+    ),
+    (
+        Name {
             name: "bar",
         },
-        range: 31..34,
-    },
-    Token {
-        value: Equal,
-        range: 35..36,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        31..34,
+    ),
+    (
+        Equal,
+        35..36,
+    ),
+    (
+        IpyEscapeCommand {
             value: "timeit a % 3",
             kind: Magic,
         },
-        range: 37..50,
-    },
-    Token {
-        value: Newline,
-        range: 50..51,
-    },
-    Token {
-        value: Name {
+        37..50,
+    ),
+    (
+        Newline,
+        50..51,
+    ),
+    (
+        Name {
             name: "baz",
         },
-        range: 51..54,
-    },
-    Token {
-        value: Equal,
-        range: 55..56,
-    },
-    Token {
-        value: IpyEscapeCommand {
+        51..54,
+    ),
+    (
+        Equal,
+        55..56,
+    ),
+    (
+        IpyEscapeCommand {
             value: "matplotlib         inline",
             kind: Magic,
         },
-        range: 57..85,
-    },
-    Token {
-        value: Newline,
-        range: 85..85,
-    },
+        57..85,
+    ),
+    (
+        Newline,
+        85..85,
+    ),
 ]

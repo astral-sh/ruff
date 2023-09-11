@@ -1,142 +1,142 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
-expression: lex_source(&source)
+expression: newline_in_brackets_eol(WINDOWS_EOL)
 ---
 [
-    Token {
-        value: Name {
+    (
+        Name {
             name: "x",
         },
-        range: 0..1,
-    },
-    Token {
-        value: Equal,
-        range: 2..3,
-    },
-    Token {
-        value: Lsqb,
-        range: 4..5,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 5..7,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 7..9,
-    },
-    Token {
-        value: Int {
+        0..1,
+    ),
+    (
+        Equal,
+        2..3,
+    ),
+    (
+        Lsqb,
+        4..5,
+    ),
+    (
+        NonLogicalNewline,
+        5..7,
+    ),
+    (
+        NonLogicalNewline,
+        7..9,
+    ),
+    (
+        Int {
             value: 1,
         },
-        range: 13..14,
-    },
-    Token {
-        value: Comma,
-        range: 14..15,
-    },
-    Token {
-        value: Int {
+        13..14,
+    ),
+    (
+        Comma,
+        14..15,
+    ),
+    (
+        Int {
             value: 2,
         },
-        range: 15..16,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 16..18,
-    },
-    Token {
-        value: Comma,
-        range: 18..19,
-    },
-    Token {
-        value: Lpar,
-        range: 19..20,
-    },
-    Token {
-        value: Int {
+        15..16,
+    ),
+    (
+        NonLogicalNewline,
+        16..18,
+    ),
+    (
+        Comma,
+        18..19,
+    ),
+    (
+        Lpar,
+        19..20,
+    ),
+    (
+        Int {
             value: 3,
         },
-        range: 20..21,
-    },
-    Token {
-        value: Comma,
-        range: 21..22,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 22..24,
-    },
-    Token {
-        value: Int {
+        20..21,
+    ),
+    (
+        Comma,
+        21..22,
+    ),
+    (
+        NonLogicalNewline,
+        22..24,
+    ),
+    (
+        Int {
             value: 4,
         },
-        range: 24..25,
-    },
-    Token {
-        value: Comma,
-        range: 25..26,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 26..28,
-    },
-    Token {
-        value: Rpar,
-        range: 28..29,
-    },
-    Token {
-        value: Comma,
-        range: 29..30,
-    },
-    Token {
-        value: Lbrace,
-        range: 31..32,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 32..34,
-    },
-    Token {
-        value: Int {
+        24..25,
+    ),
+    (
+        Comma,
+        25..26,
+    ),
+    (
+        NonLogicalNewline,
+        26..28,
+    ),
+    (
+        Rpar,
+        28..29,
+    ),
+    (
+        Comma,
+        29..30,
+    ),
+    (
+        Lbrace,
+        31..32,
+    ),
+    (
+        NonLogicalNewline,
+        32..34,
+    ),
+    (
+        Int {
             value: 5,
         },
-        range: 34..35,
-    },
-    Token {
-        value: Comma,
-        range: 35..36,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 36..38,
-    },
-    Token {
-        value: Int {
+        34..35,
+    ),
+    (
+        Comma,
+        35..36,
+    ),
+    (
+        NonLogicalNewline,
+        36..38,
+    ),
+    (
+        Int {
             value: 6,
         },
-        range: 38..39,
-    },
-    Token {
-        value: Comma,
-        range: 39..40,
-    },
-    Token {
-        value: Int {
+        38..39,
+    ),
+    (
+        Comma,
+        39..40,
+    ),
+    (
+        Int {
             value: 7,
         },
-        range: 43..44,
-    },
-    Token {
-        value: Rbrace,
-        range: 44..45,
-    },
-    Token {
-        value: Rsqb,
-        range: 45..46,
-    },
-    Token {
-        value: Newline,
-        range: 46..48,
-    },
+        43..44,
+    ),
+    (
+        Rbrace,
+        44..45,
+    ),
+    (
+        Rsqb,
+        45..46,
+    ),
+    (
+        Newline,
+        46..48,
+    ),
 ]

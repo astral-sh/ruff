@@ -3,24 +3,24 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
 [
-    Token {
-        value: Comment(
+    (
+        Comment(
             "#Hello",
         ),
-        range: 0..6,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 6..7,
-    },
-    Token {
-        value: Comment(
+        0..6,
+    ),
+    (
+        NonLogicalNewline,
+        6..7,
+    ),
+    (
+        Comment(
             "#World",
         ),
-        range: 7..13,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 13..14,
-    },
+        7..13,
+    ),
+    (
+        NonLogicalNewline,
+        13..14,
+    ),
 ]

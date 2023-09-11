@@ -1,18 +1,18 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
-expression: lex_source(&source)
+expression: triple_quoted_eol(WINDOWS_EOL)
 ---
 [
-    Token {
-        value: String {
+    (
+        String {
             value: "\r\n test string\r\n ",
             kind: String,
             triple_quoted: true,
         },
-        range: 0..23,
-    },
-    Token {
-        value: Newline,
-        range: 23..23,
-    },
+        0..23,
+    ),
+    (
+        Newline,
+        23..23,
+    ),
 ]

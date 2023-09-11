@@ -1,88 +1,88 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
-expression: lex_source(&source)
+expression: double_dedent_with_eol(MAC_EOL)
 ---
 [
-    Token {
-        value: Def,
-        range: 0..3,
-    },
-    Token {
-        value: Name {
+    (
+        Def,
+        0..3,
+    ),
+    (
+        Name {
             name: "foo",
         },
-        range: 4..7,
-    },
-    Token {
-        value: Lpar,
-        range: 7..8,
-    },
-    Token {
-        value: Rpar,
-        range: 8..9,
-    },
-    Token {
-        value: Colon,
-        range: 9..10,
-    },
-    Token {
-        value: Newline,
-        range: 10..11,
-    },
-    Token {
-        value: Indent,
-        range: 11..12,
-    },
-    Token {
-        value: If,
-        range: 12..14,
-    },
-    Token {
-        value: Name {
+        4..7,
+    ),
+    (
+        Lpar,
+        7..8,
+    ),
+    (
+        Rpar,
+        8..9,
+    ),
+    (
+        Colon,
+        9..10,
+    ),
+    (
+        Newline,
+        10..11,
+    ),
+    (
+        Indent,
+        11..12,
+    ),
+    (
+        If,
+        12..14,
+    ),
+    (
+        Name {
             name: "x",
         },
-        range: 15..16,
-    },
-    Token {
-        value: Colon,
-        range: 16..17,
-    },
-    Token {
-        value: Newline,
-        range: 17..18,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 18..19,
-    },
-    Token {
-        value: Indent,
-        range: 19..21,
-    },
-    Token {
-        value: Return,
-        range: 21..27,
-    },
-    Token {
-        value: Int {
+        15..16,
+    ),
+    (
+        Colon,
+        16..17,
+    ),
+    (
+        Newline,
+        17..18,
+    ),
+    (
+        NonLogicalNewline,
+        18..19,
+    ),
+    (
+        Indent,
+        19..21,
+    ),
+    (
+        Return,
+        21..27,
+    ),
+    (
+        Int {
             value: 99,
         },
-        range: 28..30,
-    },
-    Token {
-        value: Newline,
-        range: 30..31,
-    },
-    Token {
-        value: NonLogicalNewline,
-        range: 31..32,
-    },
-    Token {
-        value: Dedent,
-        range: 32..32,
-    },
-    Token {
-        value: Dedent,
-        range: 32..32,
-    },
+        28..30,
+    ),
+    (
+        Newline,
+        30..31,
+    ),
+    (
+        NonLogicalNewline,
+        31..32,
+    ),
+    (
+        Dedent,
+        32..32,
+    ),
+    (
+        Dedent,
+        32..32,
+    ),
 ]
