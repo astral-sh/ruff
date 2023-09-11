@@ -4,7 +4,7 @@
 
 ### Remove support for emoji identifiers ([#7212](https://github.com/astral-sh/ruff/pull/7212))
 
-Previously, Ruff supported the non-standard compliant emoji identifiers `📦.show()`.
+Previously, Ruff supported the non-standard compliant emoji identifiers e.g. `📦 = 1`.
 We decided to remove this non-standard language extension, and Ruff now reports syntax errors for emoji identifiers in your code, the same as CPython.
 
 ### Improved GitLab fingerprints ([#7203](https://github.com/astral-sh/ruff/pull/7203))
