@@ -30,7 +30,6 @@ static_assertions = "1.1.0"
 
 [dev-dependencies]
 insta = { workspace = true }
-test-case = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }

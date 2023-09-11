@@ -1266,7 +1266,6 @@ impl<'a> LexedText<'a> {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use test_case::test_case;
 
     use super::*;
 
@@ -1284,23 +1283,50 @@ mod tests {
         lexer.map(|x| x.unwrap().0).collect()
     }
 
-    #[test_case(UNIX_EOL, "unix")]
-    #[test_case(MAC_EOL, "mac")]
-    #[test_case(WINDOWS_EOL, "windows")]
-    fn test_ipython_escape_command_line_continuation_eol(eol: &str, platform: &str) {
-        let snapshot = format!("ipython_escape_command_line_continuation_{platform}_eol");
+    fn ipython_escape_command_line_continuation_eol(eol: &str) -> Vec<Tok> {
         let source = format!("%matplotlib \\{eol}  --inline");
-        assert_debug_snapshot!(snapshot, lex_jupyter_source(&source));
+        lex_jupyter_source(&source)
     }
 
-    #[test_case(UNIX_EOL, "unix")]
-    #[test_case(MAC_EOL, "mac")]
-    #[test_case(WINDOWS_EOL, "windows")]
-    fn test_ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str, platform: &str) {
-        let snapshot =
-            format!("ipython_escape_command_line_continuation_with_{platform}_eol_and_eof",);
+    #[test]
+    fn test_ipython_escape_command_line_continuation_unix_eol() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_mac_eol() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_windows_eol() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(WINDOWS_EOL));
+    }
+
+    fn ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) -> Vec<Tok> {
         let source = format!("%matplotlib \\{eol}");
-        assert_debug_snapshot!(snapshot, lex_jupyter_source(&source));
+        lex_jupyter_source(&source)
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_with_unix_eol_and_eof() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
+            UNIX_EOL
+        ));
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_with_mac_eol_and_eof() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
+            MAC_EOL
+        ));
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_with_windows_eol_and_eof() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
+            WINDOWS_EOL
+        ));
     }
 
     #[test]
@@ -1432,13 +1458,24 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(&source));
     }
 
-    #[test_case(UNIX_EOL, "unix")]
-    #[test_case(MAC_EOL, "mac")]
-    #[test_case(WINDOWS_EOL, "windows")]
-    fn test_comment_until_eol(eol: &str, platform: &str) {
-        let snapshot = format!("comment_until_{platform}_eol");
+    fn comment_until_eol(eol: &str) -> Vec<Tok> {
         let source = format!("123  # Foo{eol}456");
-        assert_debug_snapshot!(snapshot, lex_source(&source));
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_comment_until_unix_eol() {
+        assert_debug_snapshot!(comment_until_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_comment_until_mac_eol() {
+        assert_debug_snapshot!(comment_until_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_comment_until_windows_eol() {
+        assert_debug_snapshot!(comment_until_eol(WINDOWS_EOL));
     }
 
     #[test]
@@ -1447,38 +1484,67 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(source));
     }
 
-    #[test_case(UNIX_EOL, "unix")]
-    #[test_case(MAC_EOL, "mac")]
-    #[test_case(WINDOWS_EOL, "windows")]
-    fn test_indentation_with_eol(eol: &str, platform: &str) {
-        let snapshot = format!("indentation_with_{platform}_eol");
+    fn indentation_with_eol(eol: &str) -> Vec<Tok> {
         let source = format!("def foo():{eol}    return 99{eol}{eol}");
-        assert_debug_snapshot!(snapshot, lex_source(&source));
+        lex_source(&source)
     }
 
-    #[test_case(UNIX_EOL, "unix")]
-    #[test_case(MAC_EOL, "mac")]
-    #[test_case(WINDOWS_EOL, "windows")]
-    fn test_double_dedent_with_eol(eol: &str, platform: &str) {
-        let snapshot = format!("double_dedent_with_{platform}_eol");
+    #[test]
+    fn test_indentation_with_unix_eol() {
+        assert_debug_snapshot!(indentation_with_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_indentation_with_mac_eol() {
+        assert_debug_snapshot!(indentation_with_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_indentation_with_windows_eol() {
+        assert_debug_snapshot!(indentation_with_eol(WINDOWS_EOL));
+    }
+
+    fn double_dedent_with_eol(eol: &str) -> Vec<Tok> {
         let source = format!("def foo():{eol} if x:{eol}{eol}  return 99{eol}{eol}");
-        assert_debug_snapshot!(snapshot, lex_source(&source));
+        lex_source(&source)
     }
 
-    #[test_case(UNIX_EOL, "unix")]
-    #[test_case(MAC_EOL, "mac")]
-    #[test_case(WINDOWS_EOL, "windows")]
-    fn test_double_dedent_with_tabs(eol: &str, platform: &str) {
-        let snapshot = format!("double_dedent_with_tabs_{platform}_eol");
+    #[test]
+    fn test_double_dedent_with_unix_eol() {
+        assert_debug_snapshot!(double_dedent_with_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_double_dedent_with_mac_eol() {
+        assert_debug_snapshot!(double_dedent_with_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_double_dedent_with_windows_eol() {
+        assert_debug_snapshot!(double_dedent_with_eol(WINDOWS_EOL));
+    }
+
+    fn double_dedent_with_tabs_eol(eol: &str) -> Vec<Tok> {
         let source = format!("def foo():{eol}\tif x:{eol}{eol}\t\t return 99{eol}{eol}");
-        assert_debug_snapshot!(snapshot, lex_source(&source));
+        lex_source(&source)
     }
 
-    #[test_case(UNIX_EOL, "unix")]
-    #[test_case(MAC_EOL, "mac")]
-    #[test_case(WINDOWS_EOL, "windows")]
-    fn test_newline_in_brackets(eol: &str, platform: &str) {
-        let snapshot = format!("newline_in_brackets_{platform}_eol");
+    #[test]
+    fn test_double_dedent_with_tabs_unix_eol() {
+        assert_debug_snapshot!(double_dedent_with_tabs_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_double_dedent_with_tabs_mac_eol() {
+        assert_debug_snapshot!(double_dedent_with_tabs_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_double_dedent_with_tabs_windows_eol() {
+        assert_debug_snapshot!(double_dedent_with_tabs_eol(WINDOWS_EOL));
+    }
+
+    fn newline_in_brackets_eol(eol: &str) -> Vec<Tok> {
         let source = r"x = [
 
     1,2
@@ -1490,7 +1556,22 @@ def f(arg=%timeit a = b):
 7}]
 "
         .replace('\n', eol);
-        assert_debug_snapshot!(snapshot, lex_source(&source));
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_newline_in_brackets_unix_eol() {
+        assert_debug_snapshot!(newline_in_brackets_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_newline_in_brackets_mac_eol() {
+        assert_debug_snapshot!(newline_in_brackets_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_newline_in_brackets_windows_eol() {
+        assert_debug_snapshot!(newline_in_brackets_eol(WINDOWS_EOL));
     }
 
     #[test]
@@ -1523,13 +1604,24 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(source));
     }
 
-    #[test_case(UNIX_EOL, "unix")]
-    #[test_case(MAC_EOL, "mac")]
-    #[test_case(WINDOWS_EOL, "windows")]
-    fn test_string_continuation_with_eol(eol: &str, platform: &str) {
-        let snapshot = format!("string_continuation_with_{platform}_eol");
+    fn string_continuation_with_eol(eol: &str) -> Vec<Tok> {
         let source = format!("\"abc\\{eol}def\"");
-        assert_debug_snapshot!(snapshot, lex_source(&source));
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_string_continuation_with_unix_eol() {
+        assert_debug_snapshot!(string_continuation_with_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_string_continuation_with_mac_eol() {
+        assert_debug_snapshot!(string_continuation_with_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_string_continuation_with_windows_eol() {
+        assert_debug_snapshot!(string_continuation_with_eol(WINDOWS_EOL));
     }
 
     #[test]
@@ -1538,13 +1630,24 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(source));
     }
 
-    #[test_case(UNIX_EOL, "unix")]
-    #[test_case(MAC_EOL, "mac")]
-    #[test_case(WINDOWS_EOL, "windows")]
-    fn test_triple_quoted(eol: &str, platform: &str) {
-        let snapshot = format!("triple_quoted_{platform}_eol");
+    fn triple_quoted_eol(eol: &str) -> Vec<Tok> {
         let source = format!("\"\"\"{eol} test string{eol} \"\"\"");
-        assert_debug_snapshot!(snapshot, lex_source(&source));
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_triple_quoted_unix_eol() {
+        assert_debug_snapshot!(triple_quoted_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_triple_quoted_mac_eol() {
+        assert_debug_snapshot!(triple_quoted_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_triple_quoted_windows_eol() {
+        assert_debug_snapshot!(triple_quoted_eol(WINDOWS_EOL));
     }
 
     // This test case is to just make sure that the lexer doesn't go into
