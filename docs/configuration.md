@@ -212,6 +212,8 @@ Options:
           Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
+      --preview
+          Enable preview mode; checks will include unstable rules and fixes
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
       --statistics
