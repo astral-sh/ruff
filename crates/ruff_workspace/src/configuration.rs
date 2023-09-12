@@ -592,7 +592,7 @@ impl Configuration {
                     } else {
                         "Use the `PREVIEW` selector instead."
                     };
-                    warn_user_once!("The `NURSERY` selector has been deprecated. {}", suggestion);
+                    warn_user_once!("The `NURSERY` selector has been deprecated. {suggestion}");
                 }
 
                 if preview.is_disabled() {
