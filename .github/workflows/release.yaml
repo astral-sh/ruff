@@ -431,6 +431,13 @@ jobs:
           else
             echo "Releasing ${version}"
           fi
+      - name: Check main branch
+        if: ${{ inputs.sha }}
+        run: |
+          if git branch --contains ${{ inputs.sha }} | grep -E '(^|\s)main$'; then
+            echo "The specified sha is not on the main branch" >&2
+            exit 1
+          fi
       - name: Check SHA consistency
         if: ${{ inputs.sha }}
         run: |
