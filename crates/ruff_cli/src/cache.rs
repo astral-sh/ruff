@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use ruff::message::Message;
@@ -15,6 +16,7 @@ use ruff::settings::Settings;
 use ruff::warn_user;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
+use ruff_notebook::NotebookIndex;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
@@ -193,6 +195,7 @@ impl Cache {
         key: T,
         messages: &[Message],
         imports: &ImportMap,
+        notebook_index: Option<&NotebookIndex>,
     ) {
         let source = if let Some(msg) = messages.first() {
             msg.file.source_text().to_owned()
@@ -226,6 +229,7 @@ impl Cache {
             imports: imports.clone(),
             messages,
             source,
+            notebook_index: notebook_index.cloned(),
         };
         self.new_files.lock().unwrap().insert(path, file);
     }
@@ -263,6 +267,8 @@ pub(crate) struct FileCache {
     ///
     /// This will be empty if `messages` is empty.
     source: String,
+    /// Notebook index if this file is a Jupyter Notebook.
+    notebook_index: Option<NotebookIndex>,
 }
 
 impl FileCache {
@@ -283,7 +289,12 @@ impl FileCache {
                 })
                 .collect()
         };
-        Diagnostics::new(messages, self.imports.clone())
+        let notebook_indexes = if let Some(notebook_index) = self.notebook_index.as_ref() {
+            FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook_index.clone())])
+        } else {
+            FxHashMap::default()
+        };
+        Diagnostics::new(messages, self.imports.clone(), notebook_indexes)
     }
 }
 
@@ -350,16 +361,19 @@ mod tests {
     use anyhow::Result;
     use ruff_python_ast::imports::ImportMap;
 
-    #[test]
-    fn same_results() {
+    use test_case::test_case;
+
+    #[test_case("../ruff/resources/test/fixtures", "ruff_tests/cache_same_results_ruff"; "ruff_fixtures")]
+    #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
+    fn same_results(package_root: &str, cache_dir_path: &str) {
         let mut cache_dir = temp_dir();
-        cache_dir.push("ruff_tests/cache_same_results");
+        cache_dir.push(cache_dir_path);
         let _ = fs::remove_dir_all(&cache_dir);
         cache::init(&cache_dir).unwrap();
 
         let settings = AllSettings::default();
 
-        let package_root = fs::canonicalize("../ruff/resources/test/fixtures").unwrap();
+        let package_root = fs::canonicalize(package_root).unwrap();
         let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
@@ -444,9 +458,6 @@ mod tests {
             .unwrap();
         }
 
-        // Not stored in the cache.
-        expected_diagnostics.notebooks.clear();
-        got_diagnostics.notebooks.clear();
         assert_eq!(expected_diagnostics, got_diagnostics);
     }
 
@@ -614,6 +625,7 @@ mod tests {
                 imports: ImportMap::new(),
                 messages: Vec::new(),
                 source: String::new(),
+                notebook_index: None,
             },
         );
 

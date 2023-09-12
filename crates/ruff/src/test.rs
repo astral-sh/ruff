@@ -297,7 +297,7 @@ pub(crate) fn print_jupyter_messages(
             messages,
             &EmitterContext::new(&FxHashMap::from_iter([(
                 path.file_name().unwrap().to_string_lossy().to_string(),
-                notebook.clone(),
+                notebook.index().clone(),
             )])),
         )
         .unwrap();
