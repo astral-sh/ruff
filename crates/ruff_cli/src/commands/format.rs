@@ -73,12 +73,14 @@ pub(crate) fn format(
                         return None;
                     };
 
-                    let preview = match pyproject_config.settings.lib.preview {
+                    let resolved_settings = resolver.resolve(path, &pyproject_config);
+
+                    let preview = match resolved_settings.preview {
                         PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
                         PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
                     };
+                    let line_length = resolved_settings.line_length;
 
-                    let line_length = resolver.resolve(path, &pyproject_config).line_length;
                     let options = PyFormatOptions::from_source_type(source_type)
                         .with_line_width(LineWidth::from(NonZeroU16::from(line_length)))
                         .with_preview(preview);
