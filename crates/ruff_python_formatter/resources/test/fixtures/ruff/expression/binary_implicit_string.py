@@ -169,3 +169,23 @@ c = (a
      # test trailing operator comment
      b
      )
+
+c = ("a" "b" +
+     # test leading binary comment
+     "a" "b"
+ )
+
+(
+    b + c + d +
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" +
+    "cccccccccccccccccccccccccc"
+    "dddddddddddddddddddddddddd"
+    % aaaaaaaaaaaa
+    + x
+)
+
+"a" "b" "c" + "d" "e" + "f" "g" + "h" "i" "j"
+class EC2REPATH:
+    f.write ("Pathway name" + "\t" "Database Identifier" + "\t" "Source database" + "\n")
+
