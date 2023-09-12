@@ -384,11 +384,7 @@ alone.
 
 ## What is preview?
 
-Preview enables a collection of newer rules and fixes that are considered experimental or unstable.
-
-See the [preview documentation](https://beta.ruff.rs/docs/preview/) for more details..
-
-To see which rules are currently in preview, visit the [rules reference](https://beta.ruff.rs/docs/rules/).
+Preview enables a collection of newer rules and fixes that are considered experimental or unstable. See the [preview documentation](https://beta.ruff.rs/docs/preview/) for more details; or, to see which rules are currently in preview, visit the [rules reference](https://beta.ruff.rs/docs/rules/).
 
 ## How can I tell what settings Ruff is using to check my code?
 
