@@ -5,14 +5,18 @@ use smallvec::SmallVec;
 
 use ruff_formatter::write;
 use ruff_python_ast::{
-    Constant, Expr, ExprAttribute, ExprBinOp, ExprCompare, ExprConstant, ExprUnaryOp, UnaryOp,
+    Constant, Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprConstant, ExprUnaryOp,
+    UnaryOp,
 };
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break,
     in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized,
     write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
+    Parentheses,
 };
 use crate::expression::string::{AnyString, FormatString, StringLayout};
 use crate::expression::OperatorPrecedence;
@@ -20,8 +24,9 @@ use crate::prelude::*;
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
-    BinaryExpression(&'a ExprBinOp),
-    CompareExpression(&'a ExprCompare),
+    Binary(&'a ExprBinOp),
+    Compare(&'a ExprCompare),
+    Bool(&'a ExprBoolOp),
 }
 
 impl<'a> BinaryLike<'a> {
@@ -81,6 +86,54 @@ impl<'a> BinaryLike<'a> {
                     source,
                     parts,
                 );
+            }
+        }
+
+        fn recurse_bool<'a>(
+            bool_expression: &'a ExprBoolOp,
+            leading_comments: &'a [SourceComment],
+            trailing_comments: &'a [SourceComment],
+            comments: &'a Comments,
+            source: &str,
+            parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
+        ) {
+            parts.reserve(bool_expression.values.len() * 2 - 1);
+
+            if let Some((left, rest)) = bool_expression.values.split_first() {
+                rec(
+                    Operand::Left {
+                        expression: left,
+                        leading_comments,
+                    },
+                    comments,
+                    source,
+                    parts,
+                );
+
+                parts.push(OperandOrOperator::Operator(Operator {
+                    symbol: OperatorSymbol::Bool(bool_expression.op),
+                    trailing_comments: &[],
+                }));
+
+                if let Some((right, middle)) = rest.split_last() {
+                    for expression in middle {
+                        rec(Operand::Middle { expression }, comments, source, parts);
+                        parts.push(OperandOrOperator::Operator(Operator {
+                            symbol: OperatorSymbol::Bool(bool_expression.op),
+                            trailing_comments: &[],
+                        }));
+                    }
+
+                    rec(
+                        Operand::Right {
+                            expression: right,
+                            trailing_comments,
+                        },
+                        comments,
+                        source,
+                        parts,
+                    );
+                }
             }
         }
 
@@ -164,6 +217,26 @@ impl<'a> BinaryLike<'a> {
                         parts,
                     );
                 }
+                Expr::BoolOp(bool_op)
+                    if !is_expression_parenthesized(expression.into(), source) =>
+                {
+                    let leading_comments = operand
+                        .leading_binary_comments()
+                        .unwrap_or_else(|| comments.leading(bool_op));
+
+                    let trailing_comments = operand
+                        .trailing_binary_comments()
+                        .unwrap_or_else(|| comments.trailing(bool_op));
+
+                    recurse_bool(
+                        bool_op,
+                        leading_comments,
+                        trailing_comments,
+                        comments,
+                        source,
+                        parts,
+                    );
+                }
                 _ => {
                     parts.push(OperandOrOperator::Operand(operand));
                 }
@@ -172,17 +245,24 @@ impl<'a> BinaryLike<'a> {
 
         let mut parts = SmallVec::new();
         match self {
-            BinaryLike::BinaryExpression(binary) => {
+            BinaryLike::Binary(binary) => {
                 // Leading and trailing comments are handled by the binary's ``FormatNodeRule` implementation.
                 recurse_binary(binary, &[], &[], comments, source, &mut parts);
             }
-            BinaryLike::CompareExpression(compare) => {
+            BinaryLike::Compare(compare) => {
                 // Leading and trailing comments are handled by the compare's ``FormatNodeRule` implementation.
                 recurse_compare(compare, &[], &[], comments, source, &mut parts);
+            }
+            BinaryLike::Bool(bool) => {
+                recurse_bool(bool, &[], &[], comments, source, &mut parts);
             }
         }
 
         FlatBinaryExpression(parts)
+    }
+
+    const fn is_bool_op(self) -> bool {
+        matches!(self, BinaryLike::Bool(_))
     }
 }
 
@@ -190,6 +270,10 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let flat_binary = self.flatten(&comments, f.context().source());
+
+        if self.is_bool_op() {
+            return in_parentheses_only_group(&&*flat_binary).fmt(f);
+        }
 
         let source = f.context().source();
         let mut string_operands = flat_binary
@@ -265,8 +349,10 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                         // previous iteration)
                         write_in_parentheses_only_group_end_tag(f);
 
-                        if operand.has_leading_comments(f.context().comments())
-                            || left_operator.has_trailing_comments()
+                        if operand.has_unparenthesized_leading_comments(
+                            f.context().comments(),
+                            f.context().source(),
+                        ) || left_operator.has_trailing_comments()
                         {
                             hard_line_break().fmt(f)?;
                         } else {
@@ -314,8 +400,11 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                     if let Some(right_operator) = flat_binary.get_operator(index.right_operator()) {
                         write_in_parentheses_only_group_start_tag(f);
                         let right_operand = &flat_binary[right_operator_index.right_operand()];
-                        let right_operand_has_leading_comments =
-                            right_operand.has_leading_comments(f.context().comments());
+                        let right_operand_has_leading_comments = right_operand
+                            .has_unparenthesized_leading_comments(
+                                f.context().comments(),
+                                f.context().source(),
+                            );
 
                         // Keep the operator on the same line if the right side has leading comments (and thus, breaks)
                         if right_operand_has_leading_comments {
@@ -326,7 +415,11 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
 
                         right_operator.fmt(f)?;
 
-                        if right_operand_has_leading_comments
+                        if (right_operand_has_leading_comments
+                            && !is_expression_parenthesized(
+                                right_operand.expression().into(),
+                                f.context().source(),
+                            ))
                             || right_operator.has_trailing_comments()
                         {
                             hard_line_break().fmt(f)?;
@@ -540,7 +633,7 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         // Single operand slice
         if let [OperandOrOperator::Operand(operand)] = &self.0 {
-            return operand.expression().format().fmt(f);
+            return operand.fmt(f);
         }
 
         let mut last_operator: Option<OperatorIndex> = None;
@@ -577,10 +670,11 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                 operator_part.fmt(f)?;
 
                 // Format the operator on its own line if the right side has any leading comments.
-                if right
-                    .first_operand()
-                    .has_leading_comments(f.context().comments())
-                    || operator_part.has_trailing_comments()
+                if operator_part.has_trailing_comments()
+                    || right.first_operand().has_unparenthesized_leading_comments(
+                        f.context().comments(),
+                        f.context().source(),
+                    )
                 {
                     hard_line_break().fmt(f)?;
                 } else if !is_pow {
@@ -682,13 +776,33 @@ impl<'a> Operand<'a> {
         }
     }
 
-    fn has_leading_comments(&self, comments: &Comments) -> bool {
+    /// Returns `true` if the operand has any leading comments that are not parenthesized.
+    fn has_unparenthesized_leading_comments(&self, comments: &Comments, source: &str) -> bool {
         match self {
             Operand::Left {
                 leading_comments, ..
             } => !leading_comments.is_empty(),
             Operand::Middle { expression } | Operand::Right { expression, .. } => {
-                comments.has_leading(*expression)
+                let leading = comments.leading(*expression);
+                if is_expression_parenthesized((*expression).into(), source) {
+                    leading.iter().any(|comment| {
+                        !comment.is_formatted()
+                            && matches!(
+                                SimpleTokenizer::new(
+                                    source,
+                                    TextRange::new(comment.end(), expression.start()),
+                                )
+                                .skip_trivia()
+                                .next(),
+                                Some(SimpleToken {
+                                    kind: SimpleTokenKind::LParen,
+                                    ..
+                                })
+                            )
+                    })
+                } else {
+                    !leading.is_empty()
+                }
             }
         }
     }
@@ -710,6 +824,146 @@ impl<'a> Operand<'a> {
                 trailing_comments, ..
             } => Some(trailing_comments),
         }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for Operand<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let expression = self.expression();
+
+        return if is_expression_parenthesized(expression.into(), f.context().source()) {
+            let comments = f.context().comments().clone();
+            let expression_comments = comments.leading_dangling_trailing(expression);
+
+            // Format leading comments that are before the inner most `(` outside of the expression's parentheses.
+            // ```python
+            // z = (
+            //      a
+            //      +
+            //      # a: extracts this comment
+            //      (
+            //          # b: and this comment
+            //          (
+            //              # c: formats it as part of the expression
+            //              x and y
+            //          )
+            //      )
+            // )
+            // ```
+            //
+            // Gets formatted as
+            // ```python
+            // z = (
+            //      a
+            //      +
+            //      # a: extracts this comment
+            //      # b: and this comment
+            //      (
+            //          # c: formats it as part of the expression
+            //          x and y
+            //      )
+            // )
+            // ```
+            let leading = expression_comments.leading;
+            let leading_before_parentheses_end = leading
+                .iter()
+                .rposition(|comment| {
+                    comment.is_unformatted()
+                        && matches!(
+                            SimpleTokenizer::new(
+                                f.context().source(),
+                                TextRange::new(comment.end(), expression.start()),
+                            )
+                            .skip_trivia()
+                            .next(),
+                            Some(SimpleToken {
+                                kind: SimpleTokenKind::LParen,
+                                ..
+                            })
+                        )
+                })
+                .map_or(0, |position| position + 1);
+
+            let leading_before_parentheses = &leading[..leading_before_parentheses_end];
+
+            // Format trailing comments that are outside of the inner most `)` outside of the parentheses.
+            // ```python
+            // z = (
+            //     (
+            //
+            //         (
+            //
+            //             x and y
+            //             # a: extracts this comment
+            //         )
+            //         # b: and this comment
+            //     )
+            //     # c: formats it as part of the expression
+            //     + a
+            //  )
+            // ```
+            // Gets formatted as
+            // ```python
+            // z = (
+            //     (
+            //         x and y
+            //         # a: extracts this comment
+            //     )
+            //     # b: and this comment
+            //     # c: formats it as part of the expression
+            //     + a
+            // )
+            // ```
+            let trailing = expression_comments.trailing;
+
+            let trailing_after_parentheses_start = trailing
+                .iter()
+                .position(|comment| {
+                    comment.is_unformatted()
+                        && matches!(
+                            SimpleTokenizer::new(
+                                f.context().source(),
+                                TextRange::new(expression.end(), comment.start()),
+                            )
+                            .skip_trivia()
+                            .next(),
+                            Some(SimpleToken {
+                                kind: SimpleTokenKind::RParen,
+                                ..
+                            })
+                        )
+                })
+                .unwrap_or(trailing.len());
+
+            let trailing_after_parentheses = &trailing[trailing_after_parentheses_start..];
+
+            // Mark the comment as formatted to avoid that the formatting of the expression
+            // formats the trailing comment inside of the parentheses.
+            for comment in trailing_after_parentheses {
+                comment.mark_formatted();
+            }
+
+            if !leading_before_parentheses.is_empty() {
+                leading_comments(leading_before_parentheses).fmt(f)?;
+            }
+
+            expression
+                .format()
+                .with_options(Parentheses::Always)
+                .fmt(f)?;
+
+            for comment in trailing_after_parentheses {
+                comment.mark_unformatted();
+            }
+
+            if !trailing_after_parentheses.is_empty() {
+                trailing_comments(trailing_after_parentheses).fmt(f)?;
+            }
+
+            Ok(())
+        } else {
+            expression.format().with_options(Parentheses::Never).fmt(f)
+        };
     }
 }
 
@@ -739,6 +993,7 @@ impl Format<PyFormatContext<'_>> for Operator<'_> {
 enum OperatorSymbol {
     Binary(ruff_python_ast::Operator),
     Comparator(ruff_python_ast::CmpOp),
+    Bool(ruff_python_ast::BoolOp),
 }
 
 impl OperatorSymbol {
@@ -750,6 +1005,7 @@ impl OperatorSymbol {
         match self {
             OperatorSymbol::Binary(operator) => OperatorPrecedence::from(operator),
             OperatorSymbol::Comparator(_) => OperatorPrecedence::Comparator,
+            OperatorSymbol::Bool(_) => OperatorPrecedence::BooleanOperation,
         }
     }
 }
@@ -759,6 +1015,7 @@ impl Format<PyFormatContext<'_>> for OperatorSymbol {
         match self {
             OperatorSymbol::Binary(operator) => operator.format().fmt(f),
             OperatorSymbol::Comparator(operator) => operator.format().fmt(f),
+            OperatorSymbol::Bool(bool) => bool.format().fmt(f),
         }
     }
 }
