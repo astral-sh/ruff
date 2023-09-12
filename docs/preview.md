@@ -1,6 +1,6 @@
 # Preview
 
-Ruff includes an opt-in preview mode to provide an opportunity for community feedback and increase confidence that 
+Ruff includes an opt-in preview mode to provide an opportunity for community feedback and increase confidence that
 changes are a net-benefit before enabling them for everyone.
 
 Preview mode enables a collection of newer rules and fixes that are considered experimental or unstable.
