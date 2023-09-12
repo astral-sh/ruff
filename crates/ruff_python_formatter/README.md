@@ -1,10 +1,14 @@
 # Ruff Formatter
 
 The Ruff formatter is an extremely fast Python code formatter that ships as part of the `ruff`
-CLI (as of Ruff v0.0.287).
+CLI (as of Ruff v0.0.289).
 
-The formatter is currently in an **alpha** state. As such, it's not yet recommended for production
-use, but it _is_ ready for experimentation and testing. _We'd love to have your feedback._
+The formatter is currently in an **Alpha** state. The Alpha is primarily intended for
+experimentation: our focus is on collecting feedback that we can address prior to a production-ready
+Beta release later this year. (While we're using the formatter in production on our own projects,
+the CLI, configuration options, and code style may change arbitrarily between the Alpha and Beta.)
+
+[_We'd love to hear your feedback._](https://github.com/astral-sh/ruff/discussions/7310)
 
 ## Goals
 
@@ -26,7 +30,7 @@ For details, see [Black compatibility](#black-compatibility).
 
 ## Getting started
 
-The Ruff formatter shipped in an alpha state as part of Ruff v0.0.287.
+The Ruff formatter shipped in an Alpha state as part of Ruff v0.0.289.
 
 ### CLI
 
@@ -69,8 +73,7 @@ instead exiting with a non-zero status code if any files are not already formatt
 
 ### VS Code
 
-As of `v2023.34.0`,
-the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
+As of `v2023.36.0`, the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
 ships with support for the Ruff formatter. To enable formatting capabilities, set the
 `ruff.enableExperimentalFormatter` setting to `true` in your `settings.json`, and mark the Ruff
 extension as your default Python formatter:
