@@ -10,6 +10,24 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_text_size::Ranged;
 
+/// ## What it does
+/// Checks for duplicate union members.
+///
+/// ## Why is this bad?
+/// Duplicate union members are redundant and should be removed.
+///
+/// ## Example
+/// ```python
+/// foo: str | str
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: str
+/// ```
+///
+/// ## References
+/// - [Python documentation: `typing.Union`](https://docs.python.org/3/library/typing.html#typing.Union)
 #[violation]
 pub struct DuplicateUnionMember {
     duplicate_name: String,
