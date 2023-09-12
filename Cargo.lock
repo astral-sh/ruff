@@ -2303,6 +2303,7 @@ dependencies = [
  "bitflags 2.4.0",
  "insta",
  "is-macro",
+ "itertools",
  "memchr",
  "num-bigint",
  "num-traits",

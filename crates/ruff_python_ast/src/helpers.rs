@@ -9,7 +9,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::call_path::CallPath;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
+    self as ast, ArgOrKeyword, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt,
+    TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -203,14 +204,16 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
         Expr::Call(ast::ExprCall {
             func: call_func,
-            arguments: Arguments { args, keywords, .. },
+            arguments,
             range: _,
         }) => {
             any_over_expr(call_func, func)
-                || args.iter().any(|expr| any_over_expr(expr, func))
-                || keywords
-                    .iter()
-                    .any(|keyword| any_over_expr(&keyword.value, func))
+                || arguments
+                    .arguments_as_declared()
+                    .any(|arg_or_keyword| match arg_or_keyword {
+                        ArgOrKeyword::Arg(arg) => any_over_expr(arg, func),
+                        ArgOrKeyword::Keyword(keyword) => any_over_expr(&keyword.value, func),
+                    })
         }
         Expr::FormattedValue(ast::ExprFormattedValue {
             value, format_spec, ..
@@ -347,20 +350,20 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             decorator_list,
             ..
         }) => {
-            arguments
-                .as_deref()
-                .is_some_and(|Arguments { args, keywords, .. }| {
-                    args.iter().any(|expr| any_over_expr(expr, func))
-                        || keywords
-                            .iter()
-                            .any(|keyword| any_over_expr(&keyword.value, func))
-                })
-                || type_params.as_ref().is_some_and(|type_params| {
-                    type_params
-                        .iter()
-                        .any(|type_param| any_over_type_param(type_param, func))
-                })
-                || body.iter().any(|stmt| any_over_stmt(stmt, func))
+            // Note that e.g. `class A(*args, a=2, *args2, **kwargs): pass` is a valid class
+            // definition
+            arguments.as_deref().is_some_and(|arguments| {
+                arguments
+                    .arguments_as_declared()
+                    .any(|arg_or_keyword| match arg_or_keyword {
+                        ArgOrKeyword::Arg(arg) => any_over_expr(arg, func),
+                        ArgOrKeyword::Keyword(keyword) => any_over_expr(&keyword.value, func),
+                    })
+            }) || type_params.as_ref().is_some_and(|type_params| {
+                type_params
+                    .iter()
+                    .any(|type_param| any_over_type_param(type_param, func))
+            }) || body.iter().any(|stmt| any_over_stmt(stmt, func))
                 || decorator_list
                     .iter()
                     .any(|decorator| any_over_expr(&decorator.expression, func))

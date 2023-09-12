@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, Keyword, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::{
@@ -92,10 +92,8 @@ pub(crate) fn remove_argument<T: Ranged>(
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
-        .args
-        .iter()
-        .map(Expr::range)
-        .chain(arguments.keywords.iter().map(Keyword::range))
+        .arguments_as_declared()
+        .map(|arg| arg.range())
         .filter(|range| argument.range() != *range)
         .partition(|range| range.start() < argument.start());
 

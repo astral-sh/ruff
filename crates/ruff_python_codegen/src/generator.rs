@@ -3,9 +3,10 @@
 use std::ops::Deref;
 
 use ruff_python_ast::{
-    self as ast, Alias, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag, DebugText,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern, Stmt,
-    Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
+    DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters,
+    Pattern, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -265,19 +266,23 @@ impl<'a> Generator<'a> {
                     if let Some(arguments) = arguments {
                         self.p("(");
                         let mut first = true;
-                        for base in &arguments.args {
-                            self.p_delim(&mut first, ", ");
-                            self.unparse_expr(base, precedence::MAX);
-                        }
-                        for keyword in &arguments.keywords {
-                            self.p_delim(&mut first, ", ");
-                            if let Some(arg) = &keyword.arg {
-                                self.p_id(arg);
-                                self.p("=");
-                            } else {
-                                self.p("**");
+                        for arg_or_keyword in arguments.arguments_as_declared() {
+                            match arg_or_keyword {
+                                ArgOrKeyword::Arg(arg) => {
+                                    self.p_delim(&mut first, ", ");
+                                    self.unparse_expr(arg, precedence::MAX);
+                                }
+                                ArgOrKeyword::Keyword(keyword) => {
+                                    self.p_delim(&mut first, ", ");
+                                    if let Some(arg) = &keyword.arg {
+                                        self.p_id(arg);
+                                        self.p("=");
+                                    } else {
+                                        self.p("**");
+                                    }
+                                    self.unparse_expr(&keyword.value, precedence::MAX);
+                                }
                             }
-                            self.unparse_expr(&keyword.value, precedence::MAX);
                         }
                         self.p(")");
                     }
@@ -1045,19 +1050,24 @@ impl<'a> Generator<'a> {
                     self.unparse_comp(generators);
                 } else {
                     let mut first = true;
-                    for arg in &arguments.args {
-                        self.p_delim(&mut first, ", ");
-                        self.unparse_expr(arg, precedence::COMMA);
-                    }
-                    for kw in &arguments.keywords {
-                        self.p_delim(&mut first, ", ");
-                        if let Some(arg) = &kw.arg {
-                            self.p_id(arg);
-                            self.p("=");
-                            self.unparse_expr(&kw.value, precedence::COMMA);
-                        } else {
-                            self.p("**");
-                            self.unparse_expr(&kw.value, precedence::MAX);
+
+                    for arg_or_keyword in arguments.arguments_as_declared() {
+                        match arg_or_keyword {
+                            ArgOrKeyword::Arg(arg) => {
+                                self.p_delim(&mut first, ", ");
+                                self.unparse_expr(arg, precedence::COMMA);
+                            }
+                            ArgOrKeyword::Keyword(keyword) => {
+                                self.p_delim(&mut first, ", ");
+                                if let Some(arg) = &keyword.arg {
+                                    self.p_id(arg);
+                                    self.p("=");
+                                    self.unparse_expr(&keyword.value, precedence::COMMA);
+                                } else {
+                                    self.p("**");
+                                    self.unparse_expr(&keyword.value, precedence::MAX);
+                                }
+                            }
                         }
                     }
                 }
@@ -1649,6 +1659,11 @@ class Foo:
         assert_round_trip!(r#"type Foo[*Ts] = ..."#);
         assert_round_trip!(r#"type Foo[**P] = ..."#);
         assert_round_trip!(r#"type Foo[T, U, *Ts, **P] = ..."#);
+        // https://github.com/astral-sh/ruff/issues/6498
+        assert_round_trip!(r#"f(a=1, *args, **kwargs)"#);
+        assert_round_trip!(r#"f(*args, a=1, **kwargs)"#);
+        assert_round_trip!(r#"f(*args, a=1, *args2, **kwargs)"#);
+        assert_round_trip!("class A(*args, a=2, *args2, **kwargs):\n    pass");
     }
 
     #[test]
