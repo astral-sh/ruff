@@ -317,46 +317,58 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                     //     ^^^^^^ this part or ^^^^^^^ this part
                     // ```
                     if let Some(left_operator_index) = index.left_operator() {
-                        // Everything between the last implicit concatenated string and the left operator
-                        // right before the implicit concatenated string:
+                        // Handles the case where the left and right side of a binary expression are both
+                        // implicit concatenated strings. In this case, the left operator has already been written
+                        // by the preceding implicit concatenated string. It is only necessary to finish the group,
+                        // wrapping the soft line break and operator.
+                        //
                         // ```python
-                        // a + b + "c" "d"
-                        //       ^--- left_operator
-                        // ^^^^^-- left
+                        // "a" "b" + "c" "d"
                         // ```
-                        let left =
-                            flat_binary.between_operators(last_operator_index, left_operator_index);
-                        let left_operator = &flat_binary[left_operator_index];
-
-                        if let Some(leading) = left.first_operand().leading_binary_comments() {
-                            leading_comments(leading).fmt(f)?;
-                        }
-
-                        // Write the left, the left operator, and the space before the right side
-                        write!(
-                            f,
-                            [
-                                left,
-                                left.last_operand()
-                                    .trailing_binary_comments()
-                                    .map(trailing_comments),
-                                in_parentheses_only_soft_line_break_or_space(),
-                                left_operator,
-                            ]
-                        )?;
-
-                        // Finish the left-side group (the group was started before the loop or by the
-                        // previous iteration)
-                        write_in_parentheses_only_group_end_tag(f);
-
-                        if operand.has_unparenthesized_leading_comments(
-                            f.context().comments(),
-                            f.context().source(),
-                        ) || left_operator.has_trailing_comments()
-                        {
-                            hard_line_break().fmt(f)?;
+                        if last_operator_index == Some(left_operator_index) {
+                            write_in_parentheses_only_group_end_tag(f);
                         } else {
-                            space().fmt(f)?;
+                            // Everything between the last implicit concatenated string and the left operator
+                            // right before the implicit concatenated string:
+                            // ```python
+                            // a + b + "c" "d"
+                            //       ^--- left_operator
+                            // ^^^^^-- left
+                            // ```
+                            let left = flat_binary
+                                .between_operators(last_operator_index, left_operator_index);
+                            let left_operator = &flat_binary[left_operator_index];
+
+                            if let Some(leading) = left.first_operand().leading_binary_comments() {
+                                leading_comments(leading).fmt(f)?;
+                            }
+
+                            // Write the left, the left operator, and the space before the right side
+                            write!(
+                                f,
+                                [
+                                    left,
+                                    left.last_operand()
+                                        .trailing_binary_comments()
+                                        .map(trailing_comments),
+                                    in_parentheses_only_soft_line_break_or_space(),
+                                    left_operator,
+                                ]
+                            )?;
+
+                            // Finish the left-side group (the group was started before the loop or by the
+                            // previous iteration)
+                            write_in_parentheses_only_group_end_tag(f);
+
+                            if operand.has_unparenthesized_leading_comments(
+                                f.context().comments(),
+                                f.context().source(),
+                            ) || left_operator.has_trailing_comments()
+                            {
+                                hard_line_break().fmt(f)?;
+                            } else {
+                                space().fmt(f)?;
+                            }
                         }
 
                         write!(
