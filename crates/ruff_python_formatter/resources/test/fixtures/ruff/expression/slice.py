@@ -91,3 +91,18 @@ f = "f"[:,]
 g1 = "g"[(1):(2)]
 g2 = "g"[(1):(2):(3)]
 
+# https://github.com/astral-sh/ruff/issues/7316
+section_header_data = byte_array[
+    byte_begin_index
+    + byte_step_index * event_index : byte_begin_index
+    + byte_step_index * (event_index + 1)
+]
+
+section_header_data2 = byte_array[
+    byte_begin_index
+    + byte_step_index * event_index : byte_begin_index
+    + byte_step_index : section_size
+]
+
+
+

@@ -91,7 +91,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         if !all_simple && lower.is_some() {
             space().fmt(f)?;
         }
-        token(":").fmt(f)?;
+        write!(f, [soft_line_break(), token(":")])?;
         // No upper node, no need for a space, e.g. `x[a() :]`
         if !all_simple && upper.is_some() {
             space().fmt(f)?;
@@ -125,7 +125,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
             if !all_simple && (upper.is_some() || step.is_none()) {
                 space().fmt(f)?;
             }
-            token(":").fmt(f)?;
+            write!(f, [soft_line_break(), token(":")])?;
             // No step node, no need for a space
             if !all_simple && step.is_some() {
                 space().fmt(f)?;

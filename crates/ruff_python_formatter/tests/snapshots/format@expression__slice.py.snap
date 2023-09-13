@@ -97,6 +97,21 @@ f = "f"[:,]
 g1 = "g"[(1):(2)]
 g2 = "g"[(1):(2):(3)]
 
+# https://github.com/astral-sh/ruff/issues/7316
+section_header_data = byte_array[
+    byte_begin_index
+    + byte_step_index * event_index : byte_begin_index
+    + byte_step_index * (event_index + 1)
+]
+
+section_header_data2 = byte_array[
+    byte_begin_index
+    + byte_step_index * event_index : byte_begin_index
+    + byte_step_index : section_size
+]
+
+
+
 ```
 
 ## Output
@@ -132,21 +147,25 @@ b1 = "b"[  # a
 
 # Handle the spacing from the colon correctly with upper leading comments
 c1 = "c"[
-    1:  # e
+    1
+    :  # e
     # f
     2
 ]
 c2 = "c"[
-    1:  # e
+    1
+    :  # e
     2
 ]
 c3 = "c"[
-    1:
+    1
+    :
     # f
     2
 ]
 c4 = "c"[
-    1:  # f
+    1
+    :  # f
     2
 ]
 
@@ -155,7 +174,8 @@ d1 = "d"[  # comment
     :
 ]
 d2 = "d"[  # comment
-    1:
+    1
+    :
 ]
 d3 = "d"[
     1  # comment
@@ -191,6 +211,18 @@ f = "f"[:,]
 # Regression test for https://github.com/astral-sh/ruff/issues/5733
 g1 = "g"[(1):(2)]
 g2 = "g"[(1):(2):(3)]
+
+# https://github.com/astral-sh/ruff/issues/7316
+section_header_data = byte_array[
+    byte_begin_index + byte_step_index * event_index 
+    : byte_begin_index + byte_step_index * (event_index + 1)
+]
+
+section_header_data2 = byte_array[
+    byte_begin_index + byte_step_index * event_index 
+    : byte_begin_index + byte_step_index 
+    : section_size
+]
 ```
 
 
