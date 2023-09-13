@@ -1,3 +1,4 @@
+use std::num::NonZeroU16;
 use std::path::Path;
 
 use js_sys::Error;
@@ -8,10 +9,10 @@ use ruff::directives;
 use ruff::line_width::{LineLength, TabSize};
 use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
-use ruff::settings::types::PythonVersion;
+use ruff::settings::types::{PreviewMode, PythonVersion};
 use ruff::settings::{defaults, flags, Settings};
 use ruff::source_kind::SourceKind;
-use ruff_formatter::{FormatResult, Formatted};
+use ruff_formatter::{FormatResult, Formatted, LineWidth};
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_node, pretty_comments, PyFormatContext, PyFormatOptions};
@@ -237,7 +238,7 @@ impl Workspace {
 
     pub fn format(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
-        let formatted = parsed.format().map_err(into_error)?;
+        let formatted = parsed.format(&self.settings).map_err(into_error)?;
         let printed = formatted.print().map_err(into_error)?;
 
         Ok(printed.into_code())
@@ -245,7 +246,7 @@ impl Workspace {
 
     pub fn format_ir(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
-        let formatted = parsed.format().map_err(into_error)?;
+        let formatted = parsed.format(&self.settings).map_err(into_error)?;
 
         Ok(format!("{formatted}"))
     }
@@ -298,9 +299,14 @@ impl<'a> ParsedModule<'a> {
         })
     }
 
-    fn format(&self) -> FormatResult<Formatted<PyFormatContext>> {
+    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext>> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
-        let options = PyFormatOptions::from_source_type(PySourceType::default());
+        let options = PyFormatOptions::from_source_type(PySourceType::default())
+            .with_preview(match settings.preview {
+                PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+                PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+            })
+            .with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
 
         format_node(
             &self.module,
