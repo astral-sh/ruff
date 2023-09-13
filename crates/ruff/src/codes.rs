@@ -868,6 +868,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         #[cfg(feature = "test-rules")]
         (Ruff, "900") => (RuleGroup::Unspecified, rules::ruff::rules::StableTestRule),
         #[cfg(feature = "test-rules")]
+        #[allow(deprecated)]
         (Ruff, "901") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
         #[cfg(feature = "test-rules")]
         (Ruff, "902") => (RuleGroup::Preview, rules::ruff::rules::PreviewTestRule),

@@ -8,16 +8,6 @@ use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::PySourceType;
-use ruff_python_codegen::Stylist;
-use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{AsMode, ParseError};
-use ruff_source_file::{Locator, SourceFileBuilder};
-use ruff_text_size::Ranged;
-
 use crate::autofix::{fix_file, FixResult};
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
@@ -35,6 +25,15 @@ use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs};
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::imports::ImportMap;
+use ruff_python_ast::PySourceType;
+use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::{AsMode, ParseError};
+use ruff_source_file::{Locator, SourceFileBuilder};
+use ruff_text_size::Ranged;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -218,21 +217,21 @@ pub fn check_path(
     {
         if settings.rules.enabled(Rule::StableTestRule) {
             diagnostics.push(Diagnostic::new(
-                Rule::StableTestRule,
+                crate::rules::ruff::rules::StableTestRule,
                 ruff_text_size::TextRange::default(),
             ));
         }
 
         if settings.rules.enabled(Rule::PreviewTestRule) {
             diagnostics.push(Diagnostic::new(
-                Rule::PreviewTestRule,
+                crate::rules::ruff::rules::PreviewTestRule,
                 ruff_text_size::TextRange::default(),
             ));
         }
 
         if settings.rules.enabled(Rule::NurseryTestRule) {
             diagnostics.push(Diagnostic::new(
-                Rule::NurseryTestRule,
+                crate::rules::ruff::rules::NurseryTestRule,
                 ruff_text_size::TextRange::default(),
             ));
         }
