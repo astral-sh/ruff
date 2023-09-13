@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::refurb::helpers::make_name_method_call_suggestion;
+use crate::rules::refurb::helpers::generate_method_call;
 
 /// ## What it does
 /// Checks for unbounded slice expressions to copy a list.
@@ -17,7 +17,9 @@ use crate::rules::refurb::helpers::make_name_method_call_suggestion;
 /// types.
 ///
 /// ## Known problems
-/// Prone to false negatives due to type inference limitations.
+/// This rule is prone to false negatives due to type inference limitations,
+/// as it will only detect lists that are instantiated as literals or annotated
+/// with a type annotation.
 ///
 /// ## Example
 /// ```python
@@ -43,6 +45,7 @@ impl Violation for SliceCopy {
     fn message(&self) -> String {
         format!("Prefer `copy` method over slicing")
     }
+
     fn autofix_title(&self) -> Option<String> {
         Some("Replace with `copy()`".to_string())
     }
@@ -59,8 +62,7 @@ pub(crate) fn slice_copy(checker: &mut Checker, value: &Expr) {
             };
             let mut diagnostic = Diagnostic::new(SliceCopy, value.range());
             if checker.patch(diagnostic.kind.rule()) {
-                let replacement =
-                    make_name_method_call_suggestion(name, "copy", checker.generator());
+                let replacement = generate_method_call(name, "copy", checker.generator());
                 diagnostic.set_fix(Fix::suggested(Edit::replacement(
                     replacement,
                     value.start(),
@@ -73,7 +75,7 @@ pub(crate) fn slice_copy(checker: &mut Checker, value: &Expr) {
     check(value, checker);
 }
 
-// Matches `obj[:]` where `obj` is a list.
+/// Matches `obj[:]` where `obj` is a list.
 fn match_list_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a str> {
     // Check that it is `obj[:]`.
     let subscript = expr.as_subscript_expr()?;
@@ -91,7 +93,6 @@ fn match_list_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option
     let ast::ExprName { id: name, .. } = subscript.value.as_name_expr()?;
 
     // Check that `obj` is a list.
-    // TODO(tjkuson): Improve type inference.
     let scope = semantic.current_scope();
     let bindings: Vec<&Binding> = scope
         .get_all(name)
@@ -100,7 +101,7 @@ fn match_list_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option
     let [binding] = bindings.as_slice() else {
         return None;
     };
-    if !(is_list(binding, semantic)) {
+    if !is_list(binding, semantic) {
         return None;
     }
 

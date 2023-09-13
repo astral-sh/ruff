@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::refurb::helpers::make_name_method_call_suggestion;
+use crate::rules::refurb::helpers::generate_method_call;
 
 /// ## What it does
 /// Checks for `del` statements that delete the entire slice of a list or
@@ -16,6 +16,11 @@ use crate::rules::refurb::helpers::make_name_method_call_suggestion;
 /// ## Why is this bad?
 /// It's is faster and more succinct to remove all items via the `clear()`
 /// method.
+///
+/// ## Known problems
+/// This rule is prone to false negatives due to type inference limitations,
+/// as it will only detect lists and dictionaries that are instantiated as
+/// literals or annotated with a type annotation.
 ///
 /// ## Example
 /// ```python
@@ -65,7 +70,7 @@ pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete)
 
         // Fix is only supported for single-target deletions.
         if checker.patch(diagnostic.kind.rule()) && delete.targets.len() == 1 {
-            let replacement = make_name_method_call_suggestion(name, "clear", checker.generator());
+            let replacement = generate_method_call(name, "clear", checker.generator());
             diagnostic.set_fix(Fix::suggested(Edit::replacement(
                 replacement,
                 delete.start(),

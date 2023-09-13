@@ -2,12 +2,8 @@ use ruff_python_ast as ast;
 use ruff_python_codegen::Generator;
 use ruff_text_size::TextRange;
 
-// Construct a suggestion for `name.method()`.
-pub(super) fn make_name_method_call_suggestion(
-    name: &str,
-    method: &str,
-    generator: Generator,
-) -> String {
+/// Format a code snippet to call `name.method()`.
+pub(super) fn generate_method_call(name: &str, method: &str, generator: Generator) -> String {
     // Construct `name`.
     let var = ast::ExprName {
         id: name.to_string(),
