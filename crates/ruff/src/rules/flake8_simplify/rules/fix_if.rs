@@ -2,17 +2,18 @@ use std::borrow::Cow;
 
 use anyhow::{bail, Result};
 use libcst_native::{
-    BooleanOp, BooleanOperation, CompoundStatement, Expression, If, LeftParen,
-    ParenthesizableWhitespace, ParenthesizedNode, RightParen, SimpleWhitespace, Statement, Suite,
+    BooleanOp, BooleanOperation, CompoundStatement, Expression, If, LeftParen, ParenthesizedNode,
+    RightParen, Statement, Suite,
 };
-use ruff_text_size::TextRange;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::whitespace;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 use crate::autofix::codemods::CodegenStylist;
+use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 
 fn parenthesize_and_operand(expr: Expression) -> Expression {
@@ -102,8 +103,8 @@ pub(crate) fn fix_nested_if_statements(
     outer_if.test = Expression::BooleanOperation(Box::new(BooleanOperation {
         left: Box::new(parenthesize_and_operand(outer_if.test.clone())),
         operator: BooleanOp::And {
-            whitespace_before: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
-            whitespace_after: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
+            whitespace_before: space(),
+            whitespace_after: space(),
         },
         right: Box::new(parenthesize_and_operand(inner_if.test.clone())),
         lpar: vec![],

@@ -26,11 +26,11 @@ jobs:
       linter: ${{ steps.changed.outputs.linter_any_changed }}
       formatter: ${{ steps.changed.outputs.formatter_any_changed }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v38
+      - uses: tj-actions/changed-files@v39
         id: changed
         with:
           files_yaml: |
@@ -62,7 +62,7 @@ jobs:
     name: "cargo fmt"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       - run: cargo fmt --all --check
@@ -71,7 +71,7 @@ jobs:
     name: "cargo clippy"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: |
           rustup component add clippy
@@ -89,7 +89,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: "cargo test | ${{ matrix.os }}"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo insta"
@@ -125,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     name: "cargo fuzz"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
@@ -141,7 +141,7 @@ jobs:
     runs-on: ubuntu-latest
     name: "cargo test (wasm)"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v3
@@ -160,7 +160,7 @@ jobs:
     name: "test scripts"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       - uses: Swatinem/rust-cache@v2
@@ -182,7 +182,7 @@ jobs:
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: github.event_name == 'pull_request' && needs.determine_changes.outputs.linter == 'true'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -227,7 +227,7 @@ jobs:
     name: "cargo udeps"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install nightly Rust toolchain"
         # Only pinned to make caching work, update freely
         run: rustup toolchain install nightly-2023-06-08
@@ -241,7 +241,7 @@ jobs:
     name: "python package"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -265,7 +265,7 @@ jobs:
     name: "pre-commit"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -295,7 +295,7 @@ jobs:
     env:
       MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
       - name: "Add SSH key"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
@@ -330,7 +330,7 @@ jobs:
     needs: determine_changes
     if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Cache rust"
@@ -346,7 +346,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout Branch"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: "Install Rust toolchain"
         run: rustup show

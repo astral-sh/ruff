@@ -156,7 +156,7 @@ pub fn parse_expression_starts_at(
 /// ?str.replace
 /// !ls
 /// "#;
-/// let program = parse(source, Mode::Jupyter, "<embedded>");
+/// let program = parse(source, Mode::Ipython, "<embedded>");
 /// assert!(program.is_ok());
 /// ```
 pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
@@ -639,6 +639,30 @@ with (0 as a): pass
 with (0 as a,): pass
 with (0 as a, 1 as b): pass
 with (0 as a, 1 as b,): pass
+";
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+    }
+
+    #[test]
+    fn test_parenthesized_with_statement() {
+        let source = "\
+with ((a), (b)): pass
+with ((a), (b), c as d, (e)): pass
+with (a, b): pass
+with (a, b) as c: pass
+with ((a, b) as c): pass
+with (a as b): pass
+with (a): pass
+with (a := 0): pass
+with (a := 0) as x: pass
+with ((a)): pass
+with ((a := 0)): pass
+with (a as b, (a := 0)): pass
+with (a, (a := 0)): pass
+with (yield): pass
+with (yield from a): pass
+with ((yield)): pass
+with ((yield from a)): pass
 ";
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
@@ -1198,7 +1222,7 @@ foo.bar[0].baz[1]??
 foo.bar[0].baz[2].egg??
 "
             .trim(),
-            Mode::Jupyter,
+            Mode::Ipython,
             "<test>",
         )
         .unwrap();
@@ -1212,11 +1236,12 @@ a = 1
 %timeit a == 1
     "#
         .trim();
-        let lxr = lexer::lex_starts_at(source, Mode::Jupyter, TextSize::default());
+        let lxr = lexer::lex_starts_at(source, Mode::Ipython, TextSize::default());
         let parse_err = parse_tokens(lxr, Mode::Module, "<test>").unwrap_err();
         assert_eq!(
             parse_err.to_string(),
-            "IPython escape commands are only allowed in Jupyter mode at byte offset 6".to_string()
+            "IPython escape commands are only allowed in `Mode::Ipython` at byte offset 6"
+                .to_string()
         );
     }
 }

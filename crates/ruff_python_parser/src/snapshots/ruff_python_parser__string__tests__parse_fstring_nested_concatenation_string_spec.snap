@@ -29,10 +29,10 @@ expression: parse_ast
                                             value: Str(
                                                 StringConstant {
                                                     value: "",
+                                                    unicode: false,
                                                     implicit_concatenated: true,
                                                 },
                                             ),
-                                            kind: None,
                                         },
                                     ),
                                     debug_text: None,

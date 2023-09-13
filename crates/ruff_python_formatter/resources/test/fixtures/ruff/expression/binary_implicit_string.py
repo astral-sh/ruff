@@ -85,6 +85,15 @@ self._assert_skipping(
 )
 
 (
+    b + c + d +
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    f"bbbbbb{z}bbbbbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccccccc"
+    % aaaaaaaaaaaa
+    + x
+)
+
+(
     b < c > d <
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -118,3 +127,65 @@ def test3():
                "(CASE WHEN JSON_TYPE(%s, %%s) IN (%s) "
                "THEN JSON_TYPE(%s, %%s) ELSE JSON_EXTRACT(%s, %%s) END)"
            ) % (lhs, datatype_values, lhs, lhs), (tuple(params) + (json_path,)) * 3
+
+c = (a +
+    # test leading binary comment
+    "a" "b" * b
+)
+
+c = (a *
+     # test leading comment
+     "a" "b" + b
+     )
+
+c = (a
+     + # test trailing comment
+     "a" "b" * b
+     )
+
+c = (a
+     +
+     "a" "b" # test trailing comment
+     * b
+     )
+
+c = (a
+     *
+     "a" "b" # test trailing binary comment
+     + b
+     )
+
+c = (a
+     *
+     "a" "b"
+     + # test trailing operator comment
+     b
+     )
+
+c = (a
+     *
+     "a" "b"
+     +
+     # test trailing operator comment
+     b
+     )
+
+c = ("a" "b" +
+     # test leading binary comment
+     "a" "b"
+ )
+
+(
+    b + c + d +
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" +
+    "cccccccccccccccccccccccccc"
+    "dddddddddddddddddddddddddd"
+    % aaaaaaaaaaaa
+    + x
+)
+
+"a" "b" "c" + "d" "e" + "f" "g" + "h" "i" "j"
+class EC2REPATH:
+    f.write ("Pathway name" + "\t" "Database Identifier" + "\t" "Source database" + "\n")
+

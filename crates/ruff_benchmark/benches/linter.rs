@@ -1,7 +1,8 @@
 use ruff::linter::lint_only;
+use ruff::settings::rule_table::RuleTable;
 use ruff::settings::{flags, Settings};
 use ruff::source_kind::SourceKind;
-use ruff::RuleSelector;
+use ruff::{registry::Rule, RuleSelector};
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
 };
@@ -78,8 +79,14 @@ fn benchmark_default_rules(criterion: &mut Criterion) {
 }
 
 fn benchmark_all_rules(criterion: &mut Criterion) {
+    let mut rules: RuleTable = RuleSelector::All.all_rules().collect();
+
+    // Disable IO based rules because it is a source of flakiness
+    rules.disable(Rule::ShebangMissingExecutableFile);
+    rules.disable(Rule::ShebangNotExecutable);
+
     let settings = Settings {
-        rules: RuleSelector::All.into_iter().collect(),
+        rules,
         ..Settings::default()
     };
 

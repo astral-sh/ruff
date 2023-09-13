@@ -138,3 +138,12 @@ def scope():
 class TemperatureScales(Enum):
     CELSIUS = (lambda deg_c: deg_c)
     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7141
+def scope():
+    # E731
+
+    f = lambda: (
+        i := 1,
+    )

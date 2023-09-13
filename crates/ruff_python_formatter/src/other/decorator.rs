@@ -19,7 +19,7 @@ impl FormatNodeRule<Decorator> for FormatDecorator {
         write!(
             f,
             [
-                text("@"),
+                token("@"),
                 maybe_parenthesize_expression(expression, item, Parenthesize::Optional)
             ]
         )

@@ -308,3 +308,7 @@ def single_line_func_wrong(value: dict[str, str] = {
 def single_line_func_wrong(value: dict[str, str] = {}) \
     : \
     """Docstring"""
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring without newline"""

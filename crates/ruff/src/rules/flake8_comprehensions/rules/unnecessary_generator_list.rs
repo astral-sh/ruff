@@ -62,7 +62,7 @@ pub(crate) fn unnecessary_generator_list(
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorList, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_generator_list(checker.locator(), checker.stylist(), expr)
+                fixes::fix_unnecessary_generator_list(expr, checker.locator(), checker.stylist())
                     .map(Fix::suggested)
             });
         }

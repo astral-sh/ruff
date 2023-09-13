@@ -10,9 +10,9 @@ pub struct FormatPatternMatchSingleton;
 impl FormatNodeRule<PatternMatchSingleton> for FormatPatternMatchSingleton {
     fn fmt_fields(&self, item: &PatternMatchSingleton, f: &mut PyFormatter) -> FormatResult<()> {
         match item.value {
-            Constant::None => text("None").fmt(f),
-            Constant::Bool(true) => text("True").fmt(f),
-            Constant::Bool(false) => text("False").fmt(f),
+            Constant::None => token("None").fmt(f),
+            Constant::Bool(true) => token("True").fmt(f),
+            Constant::Bool(false) => token("False").fmt(f),
             _ => unreachable!(),
         }
     }

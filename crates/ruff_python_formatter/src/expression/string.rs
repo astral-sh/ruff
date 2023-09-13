@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use bitflags::bitflags;
 
-use ruff_formatter::{format_args, write, FormatError, FormatOptions, TabWidth};
+use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, ExprConstant, ExprFString};
+use ruff_python_ast::{self as ast, Constant, ExprConstant, ExprFString, ExpressionRef};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
 use ruff_source_file::Locator;
@@ -24,12 +24,26 @@ enum Quoting {
     Preserve,
 }
 
+#[derive(Clone, Debug)]
 pub(super) enum AnyString<'a> {
     Constant(&'a ExprConstant),
     FString(&'a ExprFString),
 }
 
 impl<'a> AnyString<'a> {
+    pub(crate) fn from_expression(expression: &'a Expr) -> Option<AnyString<'a>> {
+        match expression {
+            Expr::Constant(
+                constant @ ExprConstant {
+                    value: Constant::Str(_) | Constant::Bytes(_),
+                    ..
+                },
+            ) => Some(AnyString::Constant(constant)),
+            Expr::FString(fstring) => Some(AnyString::FString(fstring)),
+            _ => None,
+        }
+    }
+
     fn quoting(&self, locator: &Locator) -> Quoting {
         match self {
             Self::Constant(_) => Quoting::CanChange,
@@ -50,7 +64,7 @@ impl<'a> AnyString<'a> {
     }
 
     /// Returns `true` if the string is implicitly concatenated.
-    fn implicit_concatenated(&self) -> bool {
+    pub(super) fn is_implicit_concatenated(&self) -> bool {
         match self {
             Self::Constant(ExprConstant { value, .. }) => value.is_implicit_concatenated(),
             Self::FString(ExprFString {
@@ -79,6 +93,15 @@ impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
+    fn from(value: &AnyString<'a>) -> Self {
+        match value {
+            AnyString::Constant(expr) => ExpressionRef::Constant(expr),
+            AnyString::FString(expr) => ExpressionRef::FString(expr),
+        }
+    }
+}
+
 pub(super) struct FormatString<'a> {
     string: &'a AnyString<'a>,
     layout: StringLayout,
@@ -89,11 +112,15 @@ pub enum StringLayout {
     #[default]
     Default,
     DocString,
-    ImplicitConcatenatedBinaryLeftSide,
+    /// An implicit concatenated string in a binary like (e.g. `a + b` or `a < b`) expression.
+    ///
+    /// Formats the implicit concatenated string parts without the enclosing group because the group
+    /// is added by the binary like formatting.
+    ImplicitConcatenatedStringInBinaryLike,
 }
 
 impl<'a> FormatString<'a> {
-    pub(super) fn new(string: &'a AnyString) -> Self {
+    pub(super) fn new(string: &'a AnyString<'a>) -> Self {
         if let AnyString::Constant(constant) = string {
             debug_assert!(constant.value.is_str() || constant.value.is_bytes());
         }
@@ -111,31 +138,28 @@ impl<'a> FormatString<'a> {
 
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let locator = f.context().locator();
         match self.layout {
             StringLayout::Default => {
-                if self.string.implicit_concatenated() {
+                if self.string.is_implicit_concatenated() {
                     in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
                 } else {
-                    FormatStringPart::new(
-                        self.string.range(),
-                        self.string.quoting(&f.context().locator()),
-                        &f.context().locator(),
-                        f.options().quote_style(),
-                    )
-                    .fmt(f)
+                    StringPart::from_source(self.string.range(), &locator)
+                        .normalize(
+                            self.string.quoting(&locator),
+                            &locator,
+                            f.options().quote_style(),
+                        )
+                        .fmt(f)
                 }
             }
             StringLayout::DocString => {
-                let string_part = FormatStringPart::new(
-                    self.string.range(),
-                    // f-strings can't be docstrings
-                    Quoting::CanChange,
-                    &f.context().locator(),
-                    f.options().quote_style(),
-                );
-                format_docstring(&string_part, f)
+                let string_part = StringPart::from_source(self.string.range(), &locator);
+                let normalized =
+                    string_part.normalize(Quoting::CanChange, &locator, f.options().quote_style());
+                format_docstring(&normalized, f)
             }
-            StringLayout::ImplicitConcatenatedBinaryLeftSide => {
+            StringLayout::ImplicitConcatenatedStringInBinaryLike => {
                 FormatStringContinuation::new(self.string).fmt(f)
             }
         }
@@ -232,16 +256,14 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                     });
 
                     let (trailing_part_comments, rest) = rest.split_at(trailing_comments_end);
+                    let part = StringPart::from_source(token_range, &locator);
+                    let normalized =
+                        part.normalize(self.string.quoting(&locator), &locator, quote_style);
 
                     joiner.entry(&format_args![
                         line_suffix_boundary(),
                         leading_comments(leading_part_comments),
-                        FormatStringPart::new(
-                            token_range,
-                            self.string.quoting(&locator),
-                            &locator,
-                            quote_style,
-                        ),
+                        normalized,
                         trailing_comments(trailing_part_comments)
                     ]);
 
@@ -262,21 +284,20 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     }
 }
 
-struct FormatStringPart {
+#[derive(Debug)]
+struct StringPart {
+    /// The prefix.
     prefix: StringPrefix,
-    preferred_quotes: StringQuotes,
-    range: TextRange,
-    is_raw_string: bool,
+
+    /// The actual quotes of the string in the source
+    quotes: StringQuotes,
+
+    /// The range of the string's content (full range minus quotes and prefix)
+    content_range: TextRange,
 }
 
-impl Ranged for FormatStringPart {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
-impl FormatStringPart {
-    fn new(range: TextRange, quoting: Quoting, locator: &Locator, quote_style: QuoteStyle) -> Self {
+impl StringPart {
+    fn from_source(range: TextRange, locator: &Locator) -> Self {
         let string_content = locator.slice(range);
 
         let prefix = StringPrefix::parse(string_content);
@@ -290,46 +311,80 @@ impl FormatStringPart {
         );
         let raw_content_range = relative_raw_content_range + range.start();
 
-        let raw_content = &string_content[relative_raw_content_range];
-        let is_raw_string = prefix.is_raw_string();
+        Self {
+            prefix,
+            content_range: raw_content_range,
+            quotes,
+        }
+    }
+
+    /// Computes the strings preferred quotes and normalizes its content.
+    fn normalize<'a>(
+        self,
+        quoting: Quoting,
+        locator: &'a Locator,
+        quote_style: QuoteStyle,
+    ) -> NormalizedString<'a> {
+        let raw_content = locator.slice(self.content_range);
+
         let preferred_quotes = match quoting {
-            Quoting::Preserve => quotes,
+            Quoting::Preserve => self.quotes,
             Quoting::CanChange => {
-                if is_raw_string {
-                    preferred_quotes_raw(raw_content, quotes, quote_style)
+                if self.prefix.is_raw_string() {
+                    preferred_quotes_raw(raw_content, self.quotes, quote_style)
                 } else {
-                    preferred_quotes(raw_content, quotes, quote_style)
+                    preferred_quotes(raw_content, self.quotes, quote_style)
                 }
             }
         };
 
-        Self {
-            prefix,
-            range: raw_content_range,
+        let normalized = normalize_string(
+            locator.slice(self.content_range),
             preferred_quotes,
-            is_raw_string,
+            self.prefix.is_raw_string(),
+        );
+
+        NormalizedString {
+            prefix: self.prefix,
+            content_range: self.content_range,
+            text: normalized,
+            quotes: preferred_quotes,
         }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatStringPart {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let (normalized, contains_newlines) = normalize_string(
-            f.context().locator().slice(self.range),
-            self.preferred_quotes,
-            self.is_raw_string,
-        );
+#[derive(Debug)]
+struct NormalizedString<'a> {
+    prefix: StringPrefix,
 
-        write!(f, [self.prefix, self.preferred_quotes])?;
-        match normalized {
+    /// The quotes of the normalized string (preferred quotes)
+    quotes: StringQuotes,
+
+    /// The range of the string's content in the source (minus prefix and quotes).
+    content_range: TextRange,
+
+    /// The normalized text
+    text: Cow<'a, str>,
+}
+
+impl Ranged for NormalizedString<'_> {
+    fn range(&self) -> TextRange {
+        self.content_range
+    }
+}
+
+impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        write!(f, [self.prefix, self.quotes])?;
+        match &self.text {
             Cow::Borrowed(_) => {
-                source_text_slice(self.range(), contains_newlines).fmt(f)?;
+                source_text_slice(self.range()).fmt(f)?;
             }
             Cow::Owned(normalized) => {
-                dynamic_text(&normalized, Some(self.start())).fmt(f)?;
+                text(normalized, Some(self.start())).fmt(f)?;
             }
         }
-        self.preferred_quotes.fmt(f)
+        self.quotes.fmt(f)
     }
 }
 
@@ -386,17 +441,17 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
         // Retain the casing for the raw prefix:
         // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
         if self.contains(StringPrefix::RAW) {
-            text("r").fmt(f)?;
+            token("r").fmt(f)?;
         } else if self.contains(StringPrefix::RAW_UPPER) {
-            text("R").fmt(f)?;
+            token("R").fmt(f)?;
         }
 
         if self.contains(StringPrefix::BYTE) {
-            text("b").fmt(f)?;
+            token("b").fmt(f)?;
         }
 
         if self.contains(StringPrefix::F_STRING) {
-            text("f").fmt(f)?;
+            token("f").fmt(f)?;
         }
 
         // Remove the unicode prefix `u` if any because it is meaningless in Python 3+.
@@ -596,7 +651,7 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
             (QuoteStyle::Double, true) => "\"\"\"",
         };
 
-        text(quotes).fmt(f)
+        token(quotes).fmt(f)
     }
 }
 
@@ -604,19 +659,13 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
 /// with the provided `style`.
 ///
 /// Returns the normalized string and whether it contains new lines.
-fn normalize_string(
-    input: &str,
-    quotes: StringQuotes,
-    is_raw: bool,
-) -> (Cow<str>, ContainsNewlines) {
+fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
     // Tracks the last index of `input` that has been written to `output`.
     // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
     let mut last_index = 0;
-
-    let mut newlines = ContainsNewlines::No;
 
     let style = quotes.style;
     let preferred_quote = style.as_char();
@@ -638,9 +687,6 @@ fn normalize_string(
             }
 
             last_index = index + '\r'.len_utf8();
-            newlines = ContainsNewlines::Yes;
-        } else if c == '\n' {
-            newlines = ContainsNewlines::Yes;
         } else if !quotes.triple && !is_raw {
             if c == '\\' {
                 if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
@@ -675,28 +721,26 @@ fn normalize_string(
         Cow::Owned(output)
     };
 
-    (normalized, newlines)
+    normalized
 }
 
 /// For docstring indentation, black counts spaces as 1 and tabs by increasing the indentation up
 /// to the next multiple of 8. This is effectively a port of
 /// [`str.expandtabs`](https://docs.python.org/3/library/stdtypes.html#str.expandtabs),
-/// which black [calls with the default tab width of 8](https://github.com/psf/black/blob/c36e468794f9256d5e922c399240d49782ba04f1/src/black/strings.py#L61)
-fn count_indentation_like_black(line: &str, tab_width: TabWidth) -> TextSize {
-    let mut indentation = TextSize::default();
+/// which black [calls with the default tab width of 8](https://github.com/psf/black/blob/c36e468794f9256d5e922c399240d49782ba04f1/src/black/strings.py#L61).
+fn indentation_length(line: &str) -> TextSize {
+    let mut indentation = 0u32;
     for char in line.chars() {
         if char == '\t' {
             // Pad to the next multiple of tab_width
-            indentation += TextSize::from(
-                tab_width.value() - (indentation.to_u32().rem_euclid(tab_width.value())),
-            );
+            indentation += 8 - (indentation.rem_euclid(8));
         } else if char.is_whitespace() {
-            indentation += char.text_len();
+            indentation += u32::from(char.text_len());
         } else {
-            return indentation;
+            break;
         }
     }
-    indentation
+    TextSize::new(indentation)
 }
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
@@ -784,35 +828,30 @@ fn count_indentation_like_black(line: &str, tab_width: TabWidth) -> TextSize {
 ///         line c
 ///    """
 /// ```
-fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> FormatResult<()> {
-    let locator = f.context().locator();
+fn format_docstring(normalized: &NormalizedString, f: &mut PyFormatter) -> FormatResult<()> {
+    let docstring = &normalized.text;
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline
-    if locator.slice(string_part).contains("\\\n") {
-        return string_part.fmt(f);
+    if docstring.contains("\\\n") {
+        return normalized.fmt(f);
     }
 
-    let (normalized, _) = normalize_string(
-        locator.slice(string_part),
-        string_part.preferred_quotes,
-        string_part.is_raw_string,
-    );
     // is_borrowed is unstable :/
-    let already_normalized = matches!(normalized, Cow::Borrowed(_));
+    let already_normalized = matches!(docstring, Cow::Borrowed(_));
 
-    let mut lines = normalized.lines().peekable();
+    let mut lines = docstring.lines().peekable();
 
     // Start the string
     write!(
         f,
         [
-            source_position(string_part.start()),
-            string_part.prefix,
-            string_part.preferred_quotes
+            normalized.prefix,
+            normalized.quotes,
+            source_position(normalized.start()),
         ]
     )?;
     // We track where in the source docstring we are (in source code byte offsets)
-    let mut offset = string_part.start();
+    let mut offset = normalized.start();
 
     // The first line directly after the opening quotes has different rules than the rest, mainly
     // that we remove all leading whitespace as there's no indentation
@@ -826,7 +865,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
 
     // Edge case: The first line is `""" "content`, so we need to insert chaperone space that keep
     // inner quotes and closing quotes from getting to close to avoid `""""content`
-    if trim_both.starts_with(string_part.preferred_quotes.style.as_char()) {
+    if trim_both.starts_with(normalized.quotes.style.as_char()) {
         space().fmt(f)?;
     }
 
@@ -837,23 +876,23 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
         let trimmed_line_range =
             TextRange::at(offset, trim_end.text_len()).add_start(leading_whitespace);
         if already_normalized {
-            source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+            source_text_slice(trimmed_line_range).fmt(f)?;
         } else {
-            dynamic_text(trim_both, Some(trimmed_line_range.start())).fmt(f)?;
+            text(trim_both, Some(trimmed_line_range.start())).fmt(f)?;
         }
     }
     offset += first.text_len();
 
     // Check if we have a single line (or empty) docstring
-    if normalized[first.len()..].trim().is_empty() {
+    if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(string_part, trim_end)
-            || (trim_end.is_empty() && !normalized.is_empty())
+        if needs_chaperone_space(normalized, trim_end)
+            || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
         }
-        string_part.preferred_quotes.fmt(f)?;
+        normalized.quotes.fmt(f)?;
         return Ok(());
     }
 
@@ -869,7 +908,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
         .clone()
         // We don't want to count whitespace-only lines as miss-indented
         .filter(|line| !line.trim().is_empty())
-        .map(|line| count_indentation_like_black(line, f.options().tab_width()))
+        .map(indentation_length)
         .min()
         .unwrap_or_default();
 
@@ -888,27 +927,21 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
     }
 
     // Same special case in the last line as for the first line
-    let trim_end = normalized
+    let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(string_part, trim_end) {
+    if needs_chaperone_space(normalized, trim_end) {
         space().fmt(f)?;
     }
 
-    write!(
-        f,
-        [
-            string_part.preferred_quotes,
-            source_position(string_part.end())
-        ]
-    )
+    write!(f, [source_position(normalized.end()), normalized.quotes])
 }
 
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
-fn needs_chaperone_space(string_part: &FormatStringPart, trim_end: &str) -> bool {
-    trim_end.ends_with(string_part.preferred_quotes.style.as_char())
+fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
+    trim_end.ends_with(normalized.quotes.style.as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 
@@ -917,7 +950,7 @@ fn format_docstring_line(
     line: &str,
     is_last: bool,
     offset: TextSize,
-    stripped_indentation: TextSize,
+    stripped_indentation_length: TextSize,
     already_normalized: bool,
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
@@ -944,21 +977,20 @@ fn format_docstring_line(
         // overindented, in which case we strip the additional whitespace (see example in
         // [`format_docstring`] doc comment). We then prepend the in-docstring indentation to the
         // string.
-        let indent_len =
-            count_indentation_like_black(trim_end, f.options().tab_width()) - stripped_indentation;
-        let in_docstring_indent = " ".repeat(indent_len.to_usize()) + trim_end.trim_start();
-        dynamic_text(&in_docstring_indent, Some(offset)).fmt(f)?;
+        let indent_len = indentation_length(trim_end) - stripped_indentation_length;
+        let in_docstring_indent = " ".repeat(usize::from(indent_len)) + trim_end.trim_start();
+        text(&in_docstring_indent, Some(offset)).fmt(f)?;
     } else {
         // Take the string with the trailing whitespace removed, then also skip the leading
         // whitespace
         let trimmed_line_range =
-            TextRange::at(offset, trim_end.text_len()).add_start(stripped_indentation);
+            TextRange::at(offset, trim_end.text_len()).add_start(stripped_indentation_length);
         if already_normalized {
-            source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+            source_text_slice(trimmed_line_range).fmt(f)?;
         } else {
             // All indents are ascii spaces, so the slicing is correct
-            dynamic_text(
-                &trim_end[stripped_indentation.to_usize()..],
+            text(
+                &trim_end[usize::from(stripped_indentation_length)..],
                 Some(trimmed_line_range.start()),
             )
             .fmt(f)?;
@@ -977,24 +1009,14 @@ fn format_docstring_line(
 
 #[cfg(test)]
 mod tests {
-    use crate::expression::string::count_indentation_like_black;
-    use ruff_formatter::TabWidth;
+    use crate::expression::string::indentation_length;
+    use ruff_text_size::TextSize;
 
     #[test]
     fn test_indentation_like_black() {
-        let tab_width = TabWidth::try_from(8).unwrap();
-        assert_eq!(
-            count_indentation_like_black("\t \t  \t", tab_width).to_u32(),
-            24
-        );
-        assert_eq!(
-            count_indentation_like_black("\t        \t", tab_width).to_u32(),
-            24
-        );
-        assert_eq!(
-            count_indentation_like_black("\t\t\t", tab_width).to_u32(),
-            24
-        );
-        assert_eq!(count_indentation_like_black("    ", tab_width).to_u32(), 4);
+        assert_eq!(indentation_length("\t \t  \t"), TextSize::new(24));
+        assert_eq!(indentation_length("\t        \t"), TextSize::new(24));
+        assert_eq!(indentation_length("\t\t\t"), TextSize::new(24));
+        assert_eq!(indentation_length("    "), TextSize::new(4));
     }
 }

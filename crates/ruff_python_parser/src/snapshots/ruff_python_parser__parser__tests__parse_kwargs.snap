@@ -25,10 +25,10 @@ expression: parse_ast
                                     value: Str(
                                         StringConstant {
                                             value: "positional",
+                                            unicode: false,
                                             implicit_concatenated: false,
                                         },
                                     ),
-                                    kind: None,
                                 },
                             ),
                         ],
@@ -47,7 +47,6 @@ expression: parse_ast
                                         value: Int(
                                             2,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },

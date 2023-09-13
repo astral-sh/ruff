@@ -2,6 +2,11 @@ name: mkdocs
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "The commit SHA, tag, or branch to publish. Uses the default branch if not specified."
+        default: ""
+        type: string
   release:
     types: [published]
 
@@ -12,7 +17,9 @@ jobs:
       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
       MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-python@v4
       - name: "Add SSH key"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
@@ -40,8 +47,9 @@ jobs:
         run: mkdocs build --strict -f mkdocs.generated.yml
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        uses: cloudflare/wrangler-action@v3.1.0
+        uses: cloudflare/wrangler-action@v3.1.1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages publish site --project-name=ruff-docs --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}
+          # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
+          command: pages deploy site --project-name=ruff-docs --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}

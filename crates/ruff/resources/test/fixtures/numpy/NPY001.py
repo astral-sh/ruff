@@ -18,3 +18,8 @@ pdf = pd.DataFrame(
 )
 
 _ = arr.astype(np.int)
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/6952
+from numpy import float
+
+float(1)

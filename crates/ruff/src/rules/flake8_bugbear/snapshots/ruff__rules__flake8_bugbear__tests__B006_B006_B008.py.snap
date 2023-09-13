@@ -476,4 +476,23 @@ B006_B008.py:308:52: B006 Do not use mutable data structures for argument defaul
     |
     = help: Replace with `None`; initialize within function
 
+B006_B008.py:313:52: B006 [*] Do not use mutable data structures for argument defaults
+    |
+313 | def single_line_func_wrong(value: dict[str, str] = {}):
+    |                                                    ^^ B006
+314 |     """Docstring without newline"""
+    |
+    = help: Replace with `None`; initialize within function
+
+ℹ Possible fix
+310 310 |     """Docstring"""
+311 311 | 
+312 312 | 
+313     |-def single_line_func_wrong(value: dict[str, str] = {}):
+314     |-    """Docstring without newline"""
+    313 |+def single_line_func_wrong(value: dict[str, str] = None):
+    314 |+    """Docstring without newline"""
+    315 |+    if value is None:
+    316 |+        value = {}
+
 

@@ -12,10 +12,10 @@ expression: parse_ast
                     value: Str(
                         StringConstant {
                             value: "\u{1b}",
+                            unicode: false,
                             implicit_concatenated: false,
                         },
                     ),
-                    kind: None,
                 },
             ),
         },

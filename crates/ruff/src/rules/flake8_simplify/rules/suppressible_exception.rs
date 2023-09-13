@@ -1,11 +1,10 @@
-use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, Stmt};
-use ruff_text_size::{TextLen, TextRange};
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
+use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, Stmt};
 use ruff_text_size::Ranged;
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -136,6 +135,8 @@ pub(crate) fn suppressible_exception(
     if checker.patch(diagnostic.kind.rule()) {
         if !checker.indexer().has_comments(stmt, checker.locator()) {
             diagnostic.try_set_fix(|| {
+                // let range = statement_range(stmt, checker.locator(), checker.indexer());
+
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import("contextlib", "suppress"),
                     stmt.start(),
@@ -145,8 +146,8 @@ pub(crate) fn suppressible_exception(
                     format!("with {binding}({exception})"),
                     TextRange::at(stmt.start(), "try".text_len()),
                 );
-                let handler_line_begin = checker.locator().line_start(range.start());
-                let remove_handler = Edit::deletion(handler_line_begin, range.end());
+                let remove_handler =
+                    Edit::range_deletion(checker.locator().full_lines_range(*range));
                 Ok(Fix::suggested_edits(
                     import_edit,
                     [replace_try, remove_handler],

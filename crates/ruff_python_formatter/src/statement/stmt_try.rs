@@ -136,7 +136,7 @@ fn format_case<'a>(
         write!(
             f,
             [
-                clause_header(header, trailing_case_comments, &text(kind.keyword()))
+                clause_header(header, trailing_case_comments, &token(kind.keyword()))
                     .with_leading_comments(leading_case_comments, previous_node),
                 clause_body(body, trailing_case_comments),
             ]

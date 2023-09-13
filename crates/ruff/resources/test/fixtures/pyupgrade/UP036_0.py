@@ -178,3 +178,9 @@ if True:
 if True:
     if sys.version_info > (3, 0): \
     expected_error = []
+
+if sys.version_info < (3,12):
+    print("py3")
+
+if sys.version_info <= (3,12):
+    print("py3")

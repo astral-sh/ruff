@@ -1195,7 +1195,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. },
-            kind: _,
             range: _,
         }) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::NumericLiteralTooLong) {
@@ -1204,7 +1203,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }
         Expr::Constant(ast::ExprConstant {
             value: Constant::Bytes(_),
-            kind: _,
             range: _,
         }) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::StringOrBytesTooLong) {
@@ -1213,7 +1211,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(value),
-            kind,
             range: _,
         }) => {
             if checker.enabled(Rule::HardcodedBindAllInterfaces) {
@@ -1227,7 +1224,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bandit::rules::hardcoded_tmp_directory(checker, expr, value);
             }
             if checker.enabled(Rule::UnicodeKindPrefix) {
-                pyupgrade::rules::unicode_kind_prefix(checker, expr, kind.as_deref());
+                pyupgrade::rules::unicode_kind_prefix(checker, expr, value.unicode);
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StringOrBytesTooLong) {
@@ -1253,14 +1250,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             range: _,
         }) => {
             if checker.enabled(Rule::IfExprWithTrueFalse) {
-                flake8_simplify::rules::explicit_true_false_in_ifexpr(
-                    checker, expr, test, body, orelse,
-                );
+                flake8_simplify::rules::if_expr_with_true_false(checker, expr, test, body, orelse);
             }
             if checker.enabled(Rule::IfExprWithFalseTrue) {
-                flake8_simplify::rules::explicit_false_true_in_ifexpr(
-                    checker, expr, test, body, orelse,
-                );
+                flake8_simplify::rules::if_expr_with_false_true(checker, expr, test, body, orelse);
             }
             if checker.enabled(Rule::IfExprWithTwistedArms) {
                 flake8_simplify::rules::twisted_arms_in_ifexpr(checker, expr, test, body, orelse);
@@ -1358,8 +1351,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ExprAndFalse) {
                 flake8_simplify::rules::expr_and_false(checker, expr);
             }
-            if checker.enabled(Rule::RepeatedEqualityComparisonTarget) {
-                pylint::rules::repeated_equality_comparison_target(checker, bool_op);
+            if checker.enabled(Rule::RepeatedEqualityComparison) {
+                pylint::rules::repeated_equality_comparison(checker, bool_op);
             }
         }
         _ => {}

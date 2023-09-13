@@ -1,11 +1,10 @@
 use std::borrow::Cow;
-use unicode_width::UnicodeWidthChar;
-
-use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::PySourceType;
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::{CommentLinePosition, SourceComment};
 use crate::context::NodeLevel;
@@ -32,27 +31,30 @@ pub(crate) enum FormatLeadingComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
+        fn write_leading_comments(
+            comments: &[SourceComment],
+            f: &mut PyFormatter,
+        ) -> FormatResult<()> {
+            for comment in comments.iter().filter(|comment| comment.is_unformatted()) {
+                let lines_after_comment = lines_after(comment.end(), f.context().source());
+                write!(
+                    f,
+                    [format_comment(comment), empty_lines(lines_after_comment)]
+                )?;
 
-        let leading_comments = match self {
-            FormatLeadingComments::Node(node) => comments.leading(*node),
-            FormatLeadingComments::Comments(comments) => comments,
-        };
+                comment.mark_formatted();
+            }
 
-        for comment in leading_comments
-            .iter()
-            .filter(|comment| comment.is_unformatted())
-        {
-            let lines_after_comment = lines_after(comment.end(), f.context().source());
-            write!(
-                f,
-                [format_comment(comment), empty_lines(lines_after_comment)]
-            )?;
-
-            comment.mark_formatted();
+            Ok(())
         }
 
-        Ok(())
+        match self {
+            FormatLeadingComments::Node(node) => {
+                let comments = f.context().comments().clone();
+                write_leading_comments(comments.leading(*node), f)
+            }
+            FormatLeadingComments::Comments(comments) => write_leading_comments(comments, f),
+        }
     }
 }
 
@@ -101,39 +103,18 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
     }
 }
 
-/// Formats the trailing comments of `node`
-pub(crate) fn trailing_node_comments<T>(node: &T) -> FormatTrailingComments
-where
-    T: AstNode,
-{
-    FormatTrailingComments::Node(node.as_any_node_ref())
-}
-
 /// Formats the passed comments as trailing comments
 pub(crate) fn trailing_comments(comments: &[SourceComment]) -> FormatTrailingComments {
-    FormatTrailingComments::Comments(comments)
+    FormatTrailingComments(comments)
 }
 
-pub(crate) enum FormatTrailingComments<'a> {
-    Node(AnyNodeRef<'a>),
-    Comments(&'a [SourceComment]),
-}
+pub(crate) struct FormatTrailingComments<'a>(&'a [SourceComment]);
 
 impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
-
-        let trailing_comments = match self {
-            FormatTrailingComments::Node(node) => comments.trailing(*node),
-            FormatTrailingComments::Comments(comments) => comments,
-        };
-
         let mut has_trailing_own_line_comment = false;
 
-        for trailing in trailing_comments
-            .iter()
-            .filter(|comment| comment.is_unformatted())
-        {
+        for trailing in self.0.iter().filter(|comment| comment.is_unformatted()) {
             has_trailing_own_line_comment |= trailing.line_position().is_own_line();
 
             if has_trailing_own_line_comment {
@@ -299,10 +280,10 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
     }
 }
 
-// Helper that inserts the appropriate number of empty lines before a comment, depending on the node level.
-// Top level: Up to two empty lines
-// parenthesized: A single empty line
-// other: Up to a single empty line
+/// Helper that inserts the appropriate number of empty lines before a comment, depending on the node level:
+/// - Top-level: Up to two empty lines.
+/// - Parenthesized: A single empty line.
+/// - Otherwise: Up to a single empty line.
 pub(crate) const fn empty_lines(lines: u32) -> FormatEmptyLines {
     FormatEmptyLines { lines }
 }
@@ -357,17 +338,29 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
-        // Start with 2 because of the two leading spaces.
-        let mut reserved_width = 2;
+        // Trim the normalized comment to detect excluded pragmas (strips NBSP).
+        let trimmed = strip_comment_prefix(&normalized_comment)?.trim_start();
 
-        // SAFE: The formatted file is <= 4GB, and each comment should as well.
-        #[allow(clippy::cast_possible_truncation)]
-        for c in normalized_comment.chars() {
-            reserved_width += match c {
-                '\t' => f.options().tab_width().value(),
-                c => c.width().unwrap_or(0) as u32,
-            }
-        }
+        let is_pragma = if let Some((maybe_pragma, _)) = trimmed.split_once(':') {
+            matches!(maybe_pragma, "noqa" | "type" | "pyright" | "pylint")
+        } else {
+            trimmed.starts_with("noqa")
+        };
+
+        // Don't reserve width for excluded pragma comments.
+        let reserved_width = if is_pragma {
+            0
+        } else {
+            // Start with 2 because of the two leading spaces.
+            let width = 2u32.saturating_add(
+                TextWidth::from_text(&normalized_comment, f.options().indent_width())
+                    .width()
+                    .expect("Expected comment not to contain any newlines")
+                    .value(),
+            );
+
+            width
+        };
 
         write!(
             f,
@@ -408,17 +401,15 @@ pub(crate) struct FormatNormalizedComment<'a> {
 impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         match self.comment {
-            Cow::Borrowed(borrowed) => source_text_slice(
-                TextRange::at(self.range.start(), borrowed.text_len()),
-                ContainsNewlines::No,
-            )
-            .fmt(f),
+            Cow::Borrowed(borrowed) => {
+                source_text_slice(TextRange::at(self.range.start(), borrowed.text_len())).fmt(f)
+            }
 
             Cow::Owned(ref owned) => {
                 write!(
                     f,
                     [
-                        dynamic_text(owned, Some(self.range.start())),
+                        text(owned, Some(self.range.start())),
                         source_position(self.range.end())
                     ]
                 )
@@ -442,11 +433,7 @@ fn normalize_comment<'a>(
 
     let trimmed = comment_text.trim_end();
 
-    let Some(content) = trimmed.strip_prefix('#') else {
-        return Err(FormatError::syntax_error(
-            "Didn't find expected comment token `#`",
-        ));
-    };
+    let content = strip_comment_prefix(trimmed)?;
 
     if content.is_empty() {
         return Ok(Cow::Borrowed("#"));
@@ -462,16 +449,81 @@ fn normalize_comment<'a>(
     if content.starts_with('\u{A0}') {
         let trimmed = content.trim_start_matches('\u{A0}');
 
-        // Black adds a space before the non-breaking space if part of a type pragma.
         if trimmed.trim_start().starts_with("type:") {
-            return Ok(Cow::Owned(std::format!("# \u{A0}{trimmed}")));
+            // Black adds a space before the non-breaking space if part of a type pragma.
+            Ok(Cow::Owned(std::format!("# {content}")))
+        } else if trimmed.starts_with(' ') {
+            // Black replaces the non-breaking space with a space if followed by a space.
+            Ok(Cow::Owned(std::format!("# {trimmed}")))
+        } else {
+            // Otherwise we replace the first non-breaking space with a regular space.
+            Ok(Cow::Owned(std::format!("# {}", &content["\u{A0}".len()..])))
         }
-
-        // Black replaces the non-breaking space with a space if followed by a space.
-        if trimmed.starts_with(' ') {
-            return Ok(Cow::Owned(std::format!("# {trimmed}")));
-        }
+    } else {
+        Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
     }
+}
 
-    Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
+/// A helper for stripping '#' from comments.
+fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
+    let Some(content) = comment_text.strip_prefix('#') else {
+        return Err(FormatError::syntax_error(
+            "Didn't find expected comment token `#`",
+        ));
+    };
+
+    Ok(content)
+}
+
+/// Format the empty lines between a node and its trailing comments.
+///
+/// For example, given:
+/// ```python
+/// def func():
+///     ...
+/// # comment
+/// ```
+///
+/// This builder will insert two empty lines before the comment.
+/// ```
+pub(crate) fn empty_lines_before_trailing_comments<'a>(
+    f: &PyFormatter,
+    comments: &'a [SourceComment],
+) -> FormatEmptyLinesBeforeTrailingComments<'a> {
+    // Black has different rules for stub vs. non-stub and top level vs. indented
+    let empty_lines = match (f.options().source_type(), f.context().node_level()) {
+        (PySourceType::Stub, NodeLevel::TopLevel) => 1,
+        (PySourceType::Stub, _) => 0,
+        (_, NodeLevel::TopLevel) => 2,
+        (_, _) => 1,
+    };
+
+    FormatEmptyLinesBeforeTrailingComments {
+        comments,
+        empty_lines,
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct FormatEmptyLinesBeforeTrailingComments<'a> {
+    /// The trailing comments of the node.
+    comments: &'a [SourceComment],
+    /// The expected number of empty lines before the trailing comments.
+    empty_lines: u32,
+}
+
+impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        if let Some(comment) = self
+            .comments
+            .iter()
+            .find(|comment| comment.line_position().is_own_line())
+        {
+            let actual = lines_before(comment.start(), f.context().source()).saturating_sub(1);
+            for _ in actual..self.empty_lines {
+                write!(f, [empty_line()])?;
+            }
+        }
+        Ok(())
+    }
 }

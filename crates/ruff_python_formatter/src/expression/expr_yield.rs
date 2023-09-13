@@ -87,14 +87,14 @@ impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
             write!(
                 f,
                 [
-                    text(keyword),
+                    token(keyword),
                     space(),
                     maybe_parenthesize_expression(val, self, Parenthesize::Optional)
                 ]
             )?;
         } else {
             // ExprYieldFrom always has Some(value) so we should never get a bare `yield from`
-            write!(f, [&text(keyword)])?;
+            write!(f, [&token(keyword)])?;
         }
         Ok(())
     }

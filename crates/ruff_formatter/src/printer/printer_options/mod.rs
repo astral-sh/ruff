@@ -1,19 +1,19 @@
-use crate::{FormatOptions, IndentStyle, LineWidth, TabWidth};
+use crate::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 
 /// Options that affect how the [`crate::Printer`] prints the format tokens
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct PrinterOptions {
     /// Width of a single tab character (does it equal 2, 4, ... spaces?)
-    pub tab_width: TabWidth,
+    pub indent_width: IndentWidth,
+
+    /// Whether the printer should use tabs or spaces to indent code.
+    pub indent_style: IndentStyle,
 
     /// What's the max width of a line. Defaults to 80
     pub line_width: LineWidth,
 
     /// The type of line ending to apply to the printed input
     pub line_ending: LineEnding,
-
-    /// Whether the printer should use tabs or spaces to indent code and if spaces, by how many.
-    pub indent_style: IndentStyle,
 
     /// Whether the printer should build a source map that allows mapping positions in the source document
     /// to positions in the formatted document.
@@ -46,8 +46,8 @@ impl PrinterOptions {
     }
 
     #[must_use]
-    pub fn with_tab_width(mut self, width: TabWidth) -> Self {
-        self.tab_width = width;
+    pub fn with_tab_width(mut self, width: IndentWidth) -> Self {
+        self.indent_width = width;
 
         self
     }
@@ -58,10 +58,7 @@ impl PrinterOptions {
 
     /// Width of an indent in characters.
     pub(super) const fn indent_width(&self) -> u32 {
-        match self.indent_style {
-            IndentStyle::Tab => self.tab_width.value(),
-            IndentStyle::Space(count) => count as u32,
-        }
+        self.indent_width.value()
     }
 }
 
@@ -124,7 +121,8 @@ impl SourceMapGeneration {
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug, Eq, PartialEq, Default)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LineEnding {
     ///  Line Feed only (\n), common on Linux and macOS as well as inside git repos
     #[default]

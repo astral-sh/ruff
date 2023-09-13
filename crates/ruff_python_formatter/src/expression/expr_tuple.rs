@@ -140,12 +140,12 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 TupleParentheses::Preserve
                     if !is_tuple_parenthesized(item, f.context().source()) =>
                 {
-                    write!(f, [single.format(), text(",")])
+                    write!(f, [single.format(), token(",")])
                 }
                 _ =>
                 // A single element tuple always needs parentheses and a trailing comma, except when inside of a subscript
                 {
-                    parenthesized("(", &format_args![single.format(), text(",")], ")")
+                    parenthesized("(", &format_args![single.format(), token(",")], ")")
                         .with_dangling_comments(dangling)
                         .fmt(f)
                 }
@@ -166,7 +166,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             _ => match self.parentheses {
                 TupleParentheses::Never => {
                     let separator =
-                        format_with(|f| group(&format_args![text(","), space()]).fmt(f));
+                        format_with(|f| group(&format_args![token(","), space()]).fmt(f));
                     f.join_with(separator)
                         .entries(elts.iter().formatted())
                         .finish()

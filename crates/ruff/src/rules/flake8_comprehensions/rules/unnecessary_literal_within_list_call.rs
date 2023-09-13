@@ -96,9 +96,9 @@ pub(crate) fn unnecessary_literal_within_list_call(
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_literal_within_list_call(
+                expr,
                 checker.locator(),
                 checker.stylist(),
-                expr,
             )
             .map(Fix::suggested)
         });

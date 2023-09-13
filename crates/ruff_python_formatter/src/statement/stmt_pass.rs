@@ -8,7 +8,7 @@ pub struct FormatStmtPass;
 
 impl FormatNodeRule<StmtPass> for FormatStmtPass {
     fn fmt_fields(&self, _item: &StmtPass, f: &mut PyFormatter) -> FormatResult<()> {
-        text("pass").fmt(f)
+        token("pass").fmt(f)
     }
 
     fn is_suppressed(

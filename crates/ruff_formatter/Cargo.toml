@@ -17,7 +17,7 @@ drop_bomb = { version = "0.1.5" }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-static_assertions = "1.1.0"
+static_assertions = { workspace = true }
 tracing = { version = "0.1.37", default-features = false, features = ["std"] }
 unicode-width = { workspace = true }
 

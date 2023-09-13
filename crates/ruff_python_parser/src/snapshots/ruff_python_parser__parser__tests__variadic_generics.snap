@@ -80,7 +80,6 @@ expression: parse_ast
                             ExprConstant {
                                 range: 46..49,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },

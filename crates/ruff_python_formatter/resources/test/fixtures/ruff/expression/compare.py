@@ -111,3 +111,70 @@ ct_match = (
 ct_match = (
     (aaaaaaaaaaaaaaaa) == self.get_content_type[obj, rel_obj, using, instance._state.db].id
 )
+
+# comments
+
+c = (
+    1 > # 1
+    # 2
+    3 # 3
+    > # 4
+    5 # 5
+    # 6
+)
+
+# Implicit strings and comments
+
+assert (
+    "One or more packages has an associated PGP signature; these will "
+    "be silently ignored by the index"
+    in caplog.messages
+)
+
+(
+    b < c > d <
+    f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccccccc"
+    % aaaaaaaaaaaa
+    > x
+)
+
+c = (a >
+     # test leading binary comment
+     "a" "b" * b
+     )
+
+c = (a *
+     # test leading comment
+     "a" "b" > b
+     )
+
+c = (a
+     > # test trailing comment
+     "a" "b" * b
+     )
+
+c = (a
+     >
+     "a" "b" # test trailing comment
+     * b
+     )
+
+c = (a
+     >
+     "a" "b" # test trailing binary comment
+     + b
+     )
+
+
+c = (a >
+     # test leading binary comment
+     "a" "b" * b
+     )
+
+c = (a *
+     # test leading comment
+     "a" "b" > b
+     )
+

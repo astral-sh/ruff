@@ -115,6 +115,8 @@ C404.py:12:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
 12    |-f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
    12 |+f'{ {s: s for s in "ab"} | dict([(s,s) for s in "ab"])}'
 13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
+14 14 | 
+15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 
 C404.py:12:34: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
@@ -133,12 +135,16 @@ C404.py:12:34: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
 12    |-f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
    12 |+f'{dict([(s,s) for s in "ab"]) | {s: s for s in "ab"} }'
 13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
+14 14 | 
+15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 
 C404.py:13:5: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+14 | 
+15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
    |
    = help: Rewrite as a `dict` comprehension
 
@@ -148,12 +154,17 @@ C404.py:13:5: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13    |-f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
    13 |+f'{ {s: s for s in "ab"} | dict([(s,s) for s in "ab"]) }'
+14 14 | 
+15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
+16 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
 
 C404.py:13:35: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+14 | 
+15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
    |
    = help: Rewrite as a `dict` comprehension
 
@@ -163,5 +174,23 @@ C404.py:13:35: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13    |-f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
    13 |+f'{ dict([(s,s) for s in "ab"]) | {s: s for s in "ab"} }'
+14 14 | 
+15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
+16 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
+
+C404.py:16:14: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+   |
+15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
+16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
+14 14 | 
+15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
+16    |-saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
+   16 |+saved.append({k: v for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]})
 
 

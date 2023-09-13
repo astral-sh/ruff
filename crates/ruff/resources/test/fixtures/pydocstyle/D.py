@@ -639,3 +639,22 @@ def starts_with_space_then_this():
 class SameLine: """This is a docstring on the same line"""
 
 def same_line(): """This is a docstring on the same line"""
+
+
+def single_line_docstring_with_an_escaped_backslash():
+    "\
+    "
+
+class StatementOnSameLineAsDocstring:
+    "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
+    def sort_services(self):
+        pass
+
+class StatementOnSameLineAsDocstring:
+    "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
+
+
+class CommentAfterDocstring:
+    "After this docstring there's a comment."  # priorities=1
+    def sort_services(self):
+        pass

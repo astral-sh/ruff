@@ -15,7 +15,6 @@ expression: parse_ast
                             value: Int(
                                 1,
                             ),
-                            kind: None,
                         },
                     ),
                     ops: [
@@ -28,7 +27,6 @@ expression: parse_ast
                                 value: Int(
                                     2,
                                 ),
-                                kind: None,
                             },
                         ),
                     ],

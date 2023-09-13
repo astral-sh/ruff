@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use rustc_hash::FxHashMap;
 
 use ruff::message::Message;
 use ruff::registry::Rule;
@@ -156,6 +157,7 @@ pub(crate) fn check(
                                 TextSize::default(),
                             )],
                             ImportMap::default(),
+                            FxHashMap::default(),
                         )
                     } else {
                         warn!(

@@ -14,11 +14,10 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use text::TextEmitter;
-
-use crate::jupyter::Notebook;
 
 mod azure;
 mod diff;
@@ -128,21 +127,21 @@ pub trait Emitter {
 
 /// Context passed to [`Emitter`].
 pub struct EmitterContext<'a> {
-    notebooks: &'a FxHashMap<String, Notebook>,
+    notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
 }
 
 impl<'a> EmitterContext<'a> {
-    pub fn new(notebooks: &'a FxHashMap<String, Notebook>) -> Self {
-        Self { notebooks }
+    pub fn new(notebook_indexes: &'a FxHashMap<String, NotebookIndex>) -> Self {
+        Self { notebook_indexes }
     }
 
     /// Tests if the file with `name` is a jupyter notebook.
     pub fn is_notebook(&self, name: &str) -> bool {
-        self.notebooks.contains_key(name)
+        self.notebook_indexes.contains_key(name)
     }
 
-    pub fn notebook(&self, name: &str) -> Option<&Notebook> {
-        self.notebooks.get(name)
+    pub fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {
+        self.notebook_indexes.get(name)
     }
 }
 
@@ -226,8 +225,8 @@ def fibonacci(n):
         emitter: &mut dyn Emitter,
         messages: &[Message],
     ) -> String {
-        let source_kinds = FxHashMap::default();
-        let context = EmitterContext::new(&source_kinds);
+        let notebook_indexes = FxHashMap::default();
+        let context = EmitterContext::new(&notebook_indexes);
         let mut output: Vec<u8> = Vec::new();
         emitter.emit(&mut output, messages, &context).unwrap();
 

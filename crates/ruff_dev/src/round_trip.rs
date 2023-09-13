@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use ruff::jupyter;
 use ruff_python_codegen::round_trip;
 use ruff_python_stdlib::path::is_jupyter_notebook;
 
@@ -20,7 +19,7 @@ pub(crate) struct Args {
 pub(crate) fn main(args: &Args) -> Result<()> {
     let path = args.file.as_path();
     if is_jupyter_notebook(path) {
-        println!("{}", jupyter::round_trip(path)?);
+        println!("{}", ruff_notebook::round_trip(path)?);
     } else {
         let contents = fs::read_to_string(&args.file)?;
         println!("{}", round_trip(&contents, &args.file.to_string_lossy())?);

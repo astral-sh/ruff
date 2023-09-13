@@ -38,7 +38,7 @@ pub(super) fn place_comment<'a>(
 /// ):
 ///     ...
 /// ```
-/// The parentheses enclose `True`, but the range of `True`doesn't include the `# comment`.
+/// The parentheses enclose `True`, but the range of `True` doesn't include the `# comment`.
 ///
 /// Default handling can get parenthesized comments wrong in a number of ways. For example, the
 /// comment here is marked (by default) as a trailing comment of `x`, when it should be a leading
@@ -70,6 +70,20 @@ fn handle_parenthesized_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
+    // As a special-case, ignore comments within f-strings, like:
+    // ```python
+    // (
+    //     f'{1}' # comment
+    //     f'{2}'
+    // )
+    // ```
+    // These can't be parenthesized, as they must fall between two string tokens in an implicit
+    // concatenation. But the expression ranges only include the `1` and `2` above, so we also
+    // can't lex the contents between them.
+    if comment.enclosing_node().is_expr_f_string() {
+        return CommentPlacement::Default(comment);
+    }
+
     let Some(preceding) = comment.preceding_node() else {
         return CommentPlacement::Default(comment);
     };
@@ -106,10 +120,8 @@ fn handle_parenthesized_comment<'a>(
     // For now, we _can_ assert, but to do so, we stop lexing when we hit a token that precedes an
     // identifier.
     if comment.line_position().is_end_of_line() {
-        let tokenizer = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(preceding.end(), comment.start()),
-        );
+        let range = TextRange::new(preceding.end(), comment.start());
+        let tokenizer = SimpleTokenizer::new(locator.contents(), range);
         if tokenizer
             .skip_trivia()
             .take_while(|token| {
@@ -122,7 +134,7 @@ fn handle_parenthesized_comment<'a>(
                 debug_assert!(
                     !matches!(token.kind, SimpleTokenKind::Bogus),
                     "Unexpected token between nodes: `{:?}`",
-                    locator.slice(TextRange::new(preceding.end(), comment.start()),)
+                    locator.slice(range)
                 );
 
                 token.kind() == SimpleTokenKind::LParen
@@ -131,10 +143,8 @@ fn handle_parenthesized_comment<'a>(
             return CommentPlacement::leading(following, comment);
         }
     } else {
-        let tokenizer = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(comment.end(), following.start()),
-        );
+        let range = TextRange::new(comment.end(), following.start());
+        let tokenizer = SimpleTokenizer::new(locator.contents(), range);
         if tokenizer
             .skip_trivia()
             .take_while(|token| {
@@ -147,7 +157,7 @@ fn handle_parenthesized_comment<'a>(
                 debug_assert!(
                     !matches!(token.kind, SimpleTokenKind::Bogus),
                     "Unexpected token between nodes: `{:?}`",
-                    locator.slice(TextRange::new(comment.end(), following.start()))
+                    locator.slice(range)
                 );
                 token.kind() == SimpleTokenKind::RParen
             })
@@ -191,7 +201,13 @@ fn handle_enclosed_comment<'a>(
                 locator,
             )
         }
-        AnyNodeRef::Keyword(_) => handle_dict_unpacking_comment(comment, locator),
+        AnyNodeRef::ExprBoolOp(_) | AnyNodeRef::ExprCompare(_) => {
+            handle_trailing_binary_like_comment(comment, locator)
+        }
+        AnyNodeRef::Keyword(keyword) => handle_keyword_comment(comment, keyword, locator),
+        AnyNodeRef::PatternKeyword(pattern_keyword) => {
+            handle_pattern_keyword_comment(comment, pattern_keyword, locator)
+        }
         AnyNodeRef::ExprNamedExpr(_) => handle_named_expr_comment(comment, locator),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
@@ -422,7 +438,7 @@ fn handle_own_line_comment_around_body<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    // If there's any non-trivia token between the preceding node and the comment, than it means
+    // If there's any non-trivia token between the preceding node and the comment, then it means
     // we're past the case of the alternate branch, defer to the default rules
     // ```python
     // if a:
@@ -443,11 +459,78 @@ fn handle_own_line_comment_around_body<'a>(
     }
 
     // Check if we're between bodies and should attach to the following body.
-    handle_own_line_comment_between_branches(comment, preceding, locator).or_else(|comment| {
-        // Otherwise, there's no following branch or the indentation is too deep, so attach to the
-        // recursively last statement in the preceding body with the matching indentation.
-        handle_own_line_comment_after_branch(comment, preceding, locator)
-    })
+    handle_own_line_comment_between_branches(comment, preceding, locator)
+        .or_else(|comment| {
+            // Otherwise, there's no following branch or the indentation is too deep, so attach to the
+            // recursively last statement in the preceding body with the matching indentation.
+            handle_own_line_comment_after_branch(comment, preceding, locator)
+        })
+        .or_else(|comment| handle_own_line_comment_between_statements(comment, locator))
+}
+
+/// Handles own-line comments between statements. If an own-line comment is between two statements,
+/// it's treated as a leading comment of the following statement _if_ there are no empty lines
+/// separating the comment and the statement; otherwise, it's treated as a trailing comment of the
+/// preceding statement.
+///
+/// For example, this comment would be a trailing comment of `x = 1`:
+/// ```python
+/// x = 1
+/// # comment
+///
+/// y = 2
+/// ```
+///
+/// However, this comment would be a leading comment of `y = 2`:
+/// ```python
+/// x = 1
+///
+/// # comment
+/// y = 2
+/// ```
+fn handle_own_line_comment_between_statements<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let Some(preceding) = comment.preceding_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let Some(following) = comment.following_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // We're looking for comments between two statements, like:
+    // ```python
+    // x = 1
+    // # comment
+    // y = 2
+    // ```
+    if !preceding.is_statement() || !following.is_statement() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // If the comment is directly attached to the following statement; make it a leading
+    // comment:
+    // ```python
+    // x = 1
+    //
+    // # leading comment
+    // y = 2
+    // ```
+    //
+    // Otherwise, if there's at least one empty line, make it a trailing comment:
+    // ```python
+    // x = 1
+    // # trailing comment
+    //
+    // y = 2
+    // ```
+    if max_empty_lines(locator.slice(TextRange::new(comment.end(), following.start()))) == 0 {
+        CommentPlacement::leading(following, comment)
+    } else {
+        CommentPlacement::trailing(preceding, comment)
+    }
 }
 
 /// Handles own line comments between two branches of a node.
@@ -752,6 +835,47 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
     }
 }
 
+/// Attaches comments between two bool or compare expression operands to the preceding operand if the comment is before the operator.
+///
+/// ```python
+/// a = (
+///     5 > 3
+///     # trailing comment
+///     and 3 == 3
+/// )
+/// ```
+fn handle_trailing_binary_like_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    debug_assert!(
+        comment.enclosing_node().is_expr_bool_op() || comment.enclosing_node().is_expr_compare()
+    );
+
+    // Only if there's a preceding node (in which case, the preceding node is `left` or middle node).
+    let (Some(left_operand), Some(right_operand)) =
+        (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let between_operands_range = TextRange::new(left_operand.end(), right_operand.start());
+
+    let mut tokens = SimpleTokenizer::new(locator.contents(), between_operands_range)
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+    let operator_offset = tokens
+        .next()
+        .expect("Expected a token for the operator")
+        .start();
+
+    if comment.end() < operator_offset {
+        CommentPlacement::trailing(left_operand, comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
+}
+
 /// Handles own line comments on the module level before a class or function statement.
 /// A comment only becomes the leading comment of a class or function if it isn't separated by an empty
 /// line from the class. Comments that are separated by at least one empty line from the header of the
@@ -940,6 +1064,74 @@ fn handle_leading_class_with_decorators_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
+/// Handles comments between a keyword's identifier and value:
+/// ```python
+/// func(
+///     x  # dangling
+///     =  # dangling
+///     # dangling
+///     1,
+///     **  # dangling
+///     y
+/// )
+/// ```
+fn handle_keyword_comment<'a>(
+    comment: DecoratedComment<'a>,
+    keyword: &'a ast::Keyword,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let start = keyword.arg.as_ref().map_or(keyword.start(), Ranged::end);
+
+    // If the comment is parenthesized, it should be attached to the value:
+    // ```python
+    // func(
+    //     x=(  # comment
+    //         1
+    //     )
+    // )
+    // ```
+    let mut tokenizer =
+        SimpleTokenizer::new(locator.contents(), TextRange::new(start, comment.start()));
+    if tokenizer.any(|token| token.kind == SimpleTokenKind::LParen) {
+        return CommentPlacement::Default(comment);
+    }
+
+    CommentPlacement::leading(comment.enclosing_node(), comment)
+}
+
+/// Handles comments between a pattern keyword's identifier and value:
+/// ```python
+/// case Point2D(
+///     x  # dangling
+///     =  # dangling
+///     # dangling
+///     1
+/// )
+/// ```
+fn handle_pattern_keyword_comment<'a>(
+    comment: DecoratedComment<'a>,
+    pattern_keyword: &'a ast::PatternKeyword,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    // If the comment is parenthesized, it should be attached to the value:
+    // ```python
+    // case Point2D(
+    //     x=(  # comment
+    //         1
+    //     )
+    // )
+    // ```
+    let mut tokenizer = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(pattern_keyword.attr.end(), comment.start()),
+    );
+    if tokenizer.any(|token| token.kind == SimpleTokenKind::LParen) {
+        return CommentPlacement::Default(comment);
+    }
+
+    CommentPlacement::leading(comment.enclosing_node(), comment)
+}
+
 /// Handles comments between `**` and the variable name in dict unpacking
 /// It attaches these to the appropriate value node.
 ///
@@ -954,10 +1146,7 @@ fn handle_dict_unpacking_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    debug_assert!(matches!(
-        comment.enclosing_node(),
-        AnyNodeRef::ExprDict(_) | AnyNodeRef::Keyword(_)
-    ));
+    debug_assert!(matches!(comment.enclosing_node(), AnyNodeRef::ExprDict(_)));
 
     // no node after our comment so we can't be between `**` and the name (node)
     let Some(following) = comment.following_node() else {
@@ -980,7 +1169,7 @@ fn handle_dict_unpacking_comment<'a>(
     // if the remaining tokens from the previous node are exactly `**`,
     // re-assign the comment to the one that follows the stars
     if tokens.any(|token| token.kind == SimpleTokenKind::DoubleStar) {
-        CommentPlacement::trailing(following, comment)
+        CommentPlacement::leading(following, comment)
     } else {
         CommentPlacement::Default(comment)
     }
@@ -1769,6 +1958,7 @@ fn max_empty_lines(contents: &str) -> u32 {
         }
     }
 
+    max_new_lines = newlines.max(max_new_lines);
     max_new_lines.saturating_sub(1)
 }
 

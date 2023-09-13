@@ -224,11 +224,11 @@ pub(crate) fn unnecessary_map(
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_map(
-                checker.locator(),
-                checker.stylist(),
                 expr,
                 parent,
                 object_type,
+                checker.locator(),
+                checker.stylist(),
             )
             .map(Fix::suggested)
         });

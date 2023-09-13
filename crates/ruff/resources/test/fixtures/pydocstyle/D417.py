@@ -128,6 +128,19 @@ def f(x, *, y, z):
     """
     return x, y, z
 
+def f(x):
+    """Do something with valid description.
+
+    Args:
+    ----
+        x: the value
+
+    Returns:
+    -------
+        the value
+    """
+    return x
+
 
 class Test:
     def f(self, /, arg1: int) -> None:

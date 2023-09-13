@@ -386,7 +386,6 @@ impl<'a> StringParser<'a> {
                     if !constant_piece.is_empty() {
                         spec_constructor.push(Expr::from(ast::ExprConstant {
                             value: std::mem::take(&mut constant_piece).into(),
-                            kind: None,
                             range: self.range(start_location),
                         }));
                     }
@@ -407,7 +406,6 @@ impl<'a> StringParser<'a> {
         if !constant_piece.is_empty() {
             spec_constructor.push(Expr::from(ast::ExprConstant {
                 value: std::mem::take(&mut constant_piece).into(),
-                kind: None,
                 range: self.range(start_location),
             }));
         }
@@ -445,7 +443,6 @@ impl<'a> StringParser<'a> {
                     if !content.is_empty() {
                         values.push(Expr::from(ast::ExprConstant {
                             value: std::mem::take(&mut content).into(),
-                            kind: None,
                             range: self.range(start_location),
                         }));
                     }
@@ -480,7 +477,6 @@ impl<'a> StringParser<'a> {
         if !content.is_empty() {
             values.push(Expr::from(ast::ExprConstant {
                 value: content.into(),
-                kind: None,
                 range: self.range(start_location),
             }));
         }
@@ -512,7 +508,6 @@ impl<'a> StringParser<'a> {
 
         Ok(Expr::from(ast::ExprConstant {
             value: content.chars().map(|c| c as u8).collect::<Vec<u8>>().into(),
-            kind: None,
             range: self.range(start_location),
         }))
     }
@@ -529,8 +524,11 @@ impl<'a> StringParser<'a> {
             }
         }
         Ok(Expr::from(ast::ExprConstant {
-            value: value.into(),
-            kind: self.kind.is_unicode().then(|| "u".to_string()),
+            value: ast::Constant::Str(ast::StringConstant {
+                value,
+                unicode: self.kind.is_unicode(),
+                implicit_concatenated: false,
+            }),
             range: self.range(start_location),
         }))
     }
@@ -566,7 +564,7 @@ pub(crate) fn parse_strings(
     // Preserve the initial location and kind.
     let initial_start = values[0].0;
     let last_end = values.last().unwrap().2;
-    let initial_kind = (values[0].1 .1 == StringKind::Unicode).then(|| "u".to_owned());
+    let is_initial_kind_unicode = values[0].1 .1 == StringKind::Unicode;
     let has_fstring = values
         .iter()
         .any(|(_, (_, kind, ..), _)| kind.is_any_fstring());
@@ -604,7 +602,6 @@ pub(crate) fn parse_strings(
                 value: content,
                 implicit_concatenated,
             }),
-            kind: None,
             range: TextRange::new(initial_start, last_end),
         }
         .into());
@@ -626,9 +623,9 @@ pub(crate) fn parse_strings(
         return Ok(ast::ExprConstant {
             value: Constant::Str(StringConstant {
                 value: content.join(""),
+                unicode: is_initial_kind_unicode,
                 implicit_concatenated,
             }),
-            kind: initial_kind,
             range: TextRange::new(initial_start, last_end),
         }
         .into());
@@ -644,9 +641,9 @@ pub(crate) fn parse_strings(
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(StringConstant {
                 value: current.drain(..).collect::<String>(),
+                unicode: is_initial_kind_unicode,
                 implicit_concatenated,
             }),
-            kind: initial_kind.clone(),
             range: TextRange::new(start, end),
         })
     };

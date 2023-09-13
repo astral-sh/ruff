@@ -22,7 +22,7 @@ glob = { version = "0.3.1" }
 globset = { version = "0.4.10" }
 ignore = { version = "0.4.20" }
 insta = { version = "1.31.0", feature = ["filters", "glob"] }
-is-macro = { version = "0.2.2" }
+is-macro = { version = "0.3.0" }
 itertools = { version = "0.10.5" }
 log = { version = "0.4.17" }
 memchr = "2.5.0"
@@ -40,6 +40,7 @@ serde_json = { version = "1.0.93" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1", features = ["inline"] }
 smallvec = { version = "1.10.0" }
+static_assertions = "1.1.0"
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 syn = { version = "2.0.15" }
@@ -49,12 +50,13 @@ toml = { version = "0.7.2" }
 tracing = "0.1.37"
 tracing-indicatif = "0.3.4"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+unicode-ident = "1.0.11"
 unicode-width = "0.1.10"
 uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 wsl = { version = "0.1.0" }
 
 # v1.0.1
-libcst = { git = "https://github.com/Instagram/LibCST.git", rev = "3cacca1a1029f05707e50703b49fe3dd860aa839", default-features = false }
+libcst = { version = "0.1.0", default-features = false }
 
 [profile.release]
 lto = "fat"

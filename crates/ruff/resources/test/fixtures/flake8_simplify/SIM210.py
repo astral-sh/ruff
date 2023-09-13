@@ -13,3 +13,8 @@ def f():
         return False
 
     a = True if b else False
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7076
+samesld = True if (psl.privatesuffix(urlparse(response.url).netloc) ==
+                                   psl.privatesuffix(src.netloc)) else False

@@ -1,20 +1,21 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use std::ops::Deref;
 
 use ruff_python_ast::{
-    self as ast, Alias, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag, DebugText,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern, Stmt,
-    Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
+    DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters,
+    Pattern, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    WithItem,
 };
+use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
-
 use ruff_source_file::LineEnding;
 
 use super::stylist::{Indentation, Quote, Stylist};
 
 mod precedence {
+    pub(crate) const NAMED_EXPR: u8 = 1;
     pub(crate) const ASSIGN: u8 = 3;
     pub(crate) const ANN_ASSIGN: u8 = 5;
     pub(crate) const AUG_ASSIGN: u8 = 5;
@@ -31,7 +32,6 @@ mod precedence {
     pub(crate) const TUPLE: u8 = 19;
     pub(crate) const FORMATTED_VALUE: u8 = 19;
     pub(crate) const COMMA: u8 = 21;
-    pub(crate) const NAMED_EXPR: u8 = 23;
     pub(crate) const ASSERT: u8 = 23;
     pub(crate) const COMPREHENSION_ELEMENT: u8 = 27;
     pub(crate) const LAMBDA: u8 = 27;
@@ -266,19 +266,23 @@ impl<'a> Generator<'a> {
                     if let Some(arguments) = arguments {
                         self.p("(");
                         let mut first = true;
-                        for base in &arguments.args {
-                            self.p_delim(&mut first, ", ");
-                            self.unparse_expr(base, precedence::MAX);
-                        }
-                        for keyword in &arguments.keywords {
-                            self.p_delim(&mut first, ", ");
-                            if let Some(arg) = &keyword.arg {
-                                self.p_id(arg);
-                                self.p("=");
-                            } else {
-                                self.p("**");
+                        for arg_or_keyword in arguments.arguments_source_order() {
+                            match arg_or_keyword {
+                                ArgOrKeyword::Arg(arg) => {
+                                    self.p_delim(&mut first, ", ");
+                                    self.unparse_expr(arg, precedence::MAX);
+                                }
+                                ArgOrKeyword::Keyword(keyword) => {
+                                    self.p_delim(&mut first, ", ");
+                                    if let Some(arg) = &keyword.arg {
+                                        self.p_id(arg);
+                                        self.p("=");
+                                    } else {
+                                        self.p("**");
+                                    }
+                                    self.unparse_expr(&keyword.value, precedence::MAX);
+                                }
                             }
-                            self.unparse_expr(&keyword.value, precedence::MAX);
                         }
                         self.p(")");
                     }
@@ -359,7 +363,7 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(target, precedence::ANN_ASSIGN);
                     self.p_if(need_parens, ")");
                     self.p(": ");
-                    self.unparse_expr(annotation, precedence::ANN_ASSIGN);
+                    self.unparse_expr(annotation, precedence::COMMA);
                     if let Some(value) = value {
                         self.p(" = ");
                         self.unparse_expr(value, precedence::COMMA);
@@ -1046,19 +1050,24 @@ impl<'a> Generator<'a> {
                     self.unparse_comp(generators);
                 } else {
                     let mut first = true;
-                    for arg in &arguments.args {
-                        self.p_delim(&mut first, ", ");
-                        self.unparse_expr(arg, precedence::COMMA);
-                    }
-                    for kw in &arguments.keywords {
-                        self.p_delim(&mut first, ", ");
-                        if let Some(arg) = &kw.arg {
-                            self.p_id(arg);
-                            self.p("=");
-                            self.unparse_expr(&kw.value, precedence::COMMA);
-                        } else {
-                            self.p("**");
-                            self.unparse_expr(&kw.value, precedence::MAX);
+
+                    for arg_or_keyword in arguments.arguments_source_order() {
+                        match arg_or_keyword {
+                            ArgOrKeyword::Arg(arg) => {
+                                self.p_delim(&mut first, ", ");
+                                self.unparse_expr(arg, precedence::COMMA);
+                            }
+                            ArgOrKeyword::Keyword(keyword) => {
+                                self.p_delim(&mut first, ", ");
+                                if let Some(arg) = &keyword.arg {
+                                    self.p_id(arg);
+                                    self.p("=");
+                                    self.unparse_expr(&keyword.value, precedence::COMMA);
+                                } else {
+                                    self.p("**");
+                                    self.unparse_expr(&keyword.value, precedence::MAX);
+                                }
+                            }
                         }
                     }
                 }
@@ -1079,14 +1088,7 @@ impl<'a> Generator<'a> {
             Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, false);
             }
-            Expr::Constant(ast::ExprConstant {
-                value,
-                kind,
-                range: _,
-            }) => {
-                if let Some(kind) = kind {
-                    self.p(kind);
-                }
+            Expr::Constant(ast::ExprConstant { value, range: _ }) => {
                 self.unparse_constant(value);
             }
             Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
@@ -1169,7 +1171,10 @@ impl<'a> Generator<'a> {
             Constant::Bytes(b) => {
                 self.p_bytes_repr(b);
             }
-            Constant::Str(ast::StringConstant { value, .. }) => {
+            Constant::Str(ast::StringConstant { value, unicode, .. }) => {
+                if *unicode {
+                    self.p("u");
+                }
                 self.p_str_repr(value);
             }
             Constant::None => self.p("None"),
@@ -1381,11 +1386,11 @@ impl<'a> Generator<'a> {
 mod tests {
     use ruff_python_ast::{Mod, ModModule};
     use ruff_python_parser::{self, parse_suite, Mode};
-
     use ruff_source_file::LineEnding;
 
-    use super::Generator;
     use crate::stylist::{Indentation, Quote};
+
+    use super::Generator;
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
@@ -1413,7 +1418,7 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let ast = ruff_python_parser::parse(contents, Mode::Jupyter, "<filename>").unwrap();
+        let ast = ruff_python_parser::parse(contents, Mode::Ipython, "<filename>").unwrap();
         let Mod::Module(ModModule { body, .. }) = ast else {
             panic!("Source code didn't return ModModule")
         };
@@ -1636,6 +1641,17 @@ class Foo:
         assert_round_trip!(r#"[n * 2 for n in range(10)]"#);
         assert_round_trip!(r#"{n * 2 for n in range(10)}"#);
         assert_round_trip!(r#"{i: n * 2 for i, n in enumerate(range(10))}"#);
+        assert_round_trip!(
+            "class SchemaItem(NamedTuple):
+    fields: ((\"property_key\", str),)"
+        );
+        assert_round_trip!(
+            "def func():
+    return (i := 1)"
+        );
+        assert_round_trip!("yield (i := 1)");
+        assert_round_trip!("x = (i := 1)");
+        assert_round_trip!("x += (i := 1)");
 
         // Type aliases
         assert_round_trip!(r#"type Foo = int | str"#);
@@ -1643,6 +1659,11 @@ class Foo:
         assert_round_trip!(r#"type Foo[*Ts] = ..."#);
         assert_round_trip!(r#"type Foo[**P] = ..."#);
         assert_round_trip!(r#"type Foo[T, U, *Ts, **P] = ..."#);
+        // https://github.com/astral-sh/ruff/issues/6498
+        assert_round_trip!(r#"f(a=1, *args, **kwargs)"#);
+        assert_round_trip!(r#"f(*args, a=1, **kwargs)"#);
+        assert_round_trip!(r#"f(*args, a=1, *args2, **kwargs)"#);
+        assert_round_trip!("class A(*args, a=2, *args2, **kwargs):\n    pass");
     }
 
     #[test]

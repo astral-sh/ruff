@@ -278,8 +278,6 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
                 acc
             })
             .into(),
-
-        kind: None,
         range: TextRange::default(),
     });
     Some(generator.expr(&node))
@@ -340,7 +338,6 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                     .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
                                             value: (*name).to_string().into(),
-                                            kind: None,
                                             range: TextRange::default(),
                                         })
                                     })
@@ -375,7 +372,6 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                     .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
                                             value: (*name).to_string().into(),
-                                            kind: None,
                                             range: TextRange::default(),
                                         })
                                     })

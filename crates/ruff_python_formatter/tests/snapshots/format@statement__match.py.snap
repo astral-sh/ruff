@@ -985,18 +985,18 @@ match pattern_match_class:
         ...
 
     case A(
-        b=# b
+        # b
         # c
-        2  # d
+        b=2  # d
         # e
     ):
         pass
 
     case A(
         # a
-        b=# b
+        # b
         # c
-        2  # d
+        b=2  # d
         # e
     ):
         pass

@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 use ruff::registry::Linter;
+use ruff::settings::types::PreviewMode;
 use ruff::RuleSelector;
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -331,7 +332,7 @@ pub(crate) fn infer_plugins_from_codes(selectors: &HashSet<RuleSelector>) -> Vec
     .filter(|plugin| {
         for selector in selectors {
             if selector
-                .into_iter()
+                .rules(PreviewMode::Disabled)
                 .any(|rule| Linter::from(plugin).rules().any(|r| r == rule))
             {
                 return true;

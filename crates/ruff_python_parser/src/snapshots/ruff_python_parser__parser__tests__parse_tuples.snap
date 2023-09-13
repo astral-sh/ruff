@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     Assign(
@@ -40,7 +40,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                 value: Int(
                                     4,
                                 ),
-                                kind: None,
                             },
                         ),
                         Constant(
@@ -49,7 +48,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                 value: Int(
                                     5,
                                 ),
-                                kind: None,
                             },
                         ),
                     ],

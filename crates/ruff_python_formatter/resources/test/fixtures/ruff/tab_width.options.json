@@ -1,8 +1,11 @@
 [
   {
-    "tab_width": 2
+    "indent_width": 2
   },
   {
-    "tab_width": 4
+    "indent_width": 4
+  },
+  {
+    "indent_width": 8
   }
 ]

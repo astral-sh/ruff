@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::settings::types::{
-    FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
+    FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
 };
 use ruff::RuleSelector;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -115,6 +115,11 @@ pub struct CheckCommand {
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
+    /// Enable preview mode; checks will include unstable rules and fixes.
+    #[arg(long, overrides_with("no_preview"))]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for
     /// configuration.
     #[arg(long, conflicts_with = "isolated")]
@@ -333,12 +338,6 @@ pub struct FormatCommand {
     /// files would have been modified, and zero otherwise.
     #[arg(long)]
     pub check: bool,
-    /// Specify file to write the formatter output to (default: stdout).
-    #[arg(short, long)]
-    pub output_file: Option<PathBuf>,
-    /// The minimum Python version that should be supported.
-    #[arg(long, value_enum)]
-    pub target_version: Option<PythonVersion>,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
@@ -369,6 +368,12 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
+
+    /// Enable preview mode; checks will include unstable rules and fixes.
+    #[arg(long, overrides_with("no_preview"), hide = true)]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -389,7 +394,7 @@ pub struct LogLevelArgs {
         help_heading = "Log levels"
     )]
     pub verbose: bool,
-    /// Print lint violations, but nothing else.
+    /// Print diagnostics, but nothing else.
     #[arg(
         short,
         long,
@@ -398,7 +403,7 @@ pub struct LogLevelArgs {
         help_heading = "Log levels"
     )]
     pub quiet: bool,
-    /// Disable all logging (but still exit with status code "1" upon detecting lint violations).
+    /// Disable all logging (but still exit with status code "1" upon detecting diagnostics).
     #[arg(
         short,
         long,
@@ -458,6 +463,7 @@ impl CheckCommand {
                 ignore: self.ignore,
                 line_length: self.line_length,
                 per_file_ignores: self.per_file_ignores,
+                preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,
@@ -488,7 +494,6 @@ impl FormatCommand {
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
-                output_file: self.output_file,
                 stdin_filename: self.stdin_filename,
             },
             Overrides {
@@ -497,8 +502,8 @@ impl FormatCommand {
                     self.respect_gitignore,
                     self.no_respect_gitignore,
                 ),
+                preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                target_version: self.target_version,
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..Overrides::default()
             },
@@ -550,7 +555,6 @@ pub struct FormatArguments {
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
-    pub output_file: Option<PathBuf>,
     pub stdin_filename: Option<PathBuf>,
 }
 
@@ -569,6 +573,7 @@ pub struct Overrides {
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    pub preview: Option<PreviewMode>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
     pub show_source: Option<bool>,
@@ -631,6 +636,9 @@ impl ConfigProcessor for Overrides {
         }
         if let Some(line_length) = &self.line_length {
             config.line_length = Some(*line_length);
+        }
+        if let Some(preview) = &self.preview {
+            config.preview = Some(*preview);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));

@@ -20,7 +20,6 @@ expression: parse_ast
                     value: Int(
                         1,
                     ),
-                    kind: None,
                 },
             ),
         },

@@ -30,7 +30,6 @@ expression: parse_ast
                                                 real: 0.0,
                                                 imag: 0.0,
                                             },
-                                            kind: None,
                                         },
                                     ),
                                 },
@@ -57,7 +56,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -130,7 +128,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -162,7 +159,6 @@ expression: parse_ast
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -174,7 +170,6 @@ expression: parse_ast
                                 value: Int(
                                     0,
                                 ),
-                                kind: None,
                             },
                         ),
                     ),
@@ -197,7 +192,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -215,7 +209,6 @@ expression: parse_ast
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -227,7 +220,6 @@ expression: parse_ast
                                 value: Int(
                                     1,
                                 ),
-                                kind: None,
                             },
                         ),
                     ),
@@ -250,7 +242,6 @@ expression: parse_ast
                                         value: Int(
                                             1,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -269,7 +260,6 @@ expression: parse_ast
                     value: Int(
                         3,
                     ),
-                    kind: None,
                 },
             ),
             cases: [
@@ -288,7 +278,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -302,7 +291,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -316,7 +304,6 @@ expression: parse_ast
                                                 value: Int(
                                                     2,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -330,7 +317,6 @@ expression: parse_ast
                                                 value: Int(
                                                     3,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -358,7 +344,6 @@ expression: parse_ast
                                         value: Bool(
                                             true,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -398,7 +383,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 0,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -412,7 +396,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 1,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -433,7 +416,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 1,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -447,7 +429,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 0,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -478,7 +459,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -526,10 +506,10 @@ expression: parse_ast
                                             value: Str(
                                                 StringConstant {
                                                     value: "seq",
+                                                    unicode: false,
                                                     implicit_concatenated: false,
                                                 },
                                             ),
-                                            kind: None,
                                         },
                                     ),
                                 ),
@@ -559,10 +539,10 @@ expression: parse_ast
                                             value: Str(
                                                 StringConstant {
                                                     value: "map",
+                                                    unicode: false,
                                                     implicit_concatenated: false,
                                                 },
                                             ),
-                                            kind: None,
                                         },
                                     ),
                                 ),
@@ -596,7 +576,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -614,7 +593,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 1,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -628,7 +606,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 2,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -668,7 +645,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -691,7 +667,6 @@ expression: parse_ast
                                                     value: Int(
                                                         0,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -713,7 +688,6 @@ expression: parse_ast
                                                                                     value: Int(
                                                                                         1,
                                                                                     ),
-                                                                                    kind: None,
                                                                                 },
                                                                             ),
                                                                         },
@@ -727,7 +701,6 @@ expression: parse_ast
                                                                                     value: Int(
                                                                                         2,
                                                                                     ),
-                                                                                    kind: None,
                                                                                 },
                                                                             ),
                                                                         },
@@ -768,7 +741,6 @@ expression: parse_ast
                                                     value: Int(
                                                         1,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -800,7 +772,6 @@ expression: parse_ast
                                                     value: Int(
                                                         0,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -818,7 +789,6 @@ expression: parse_ast
                                                                         value: Int(
                                                                             1,
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                             },
@@ -832,7 +802,6 @@ expression: parse_ast
                                                                         value: Int(
                                                                             2,
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                             },
@@ -867,10 +836,10 @@ expression: parse_ast
                                                 value: Str(
                                                     StringConstant {
                                                         value: "X",
+                                                        unicode: false,
                                                         implicit_concatenated: false,
                                                     },
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -906,7 +875,6 @@ expression: parse_ast
                                         value: Int(
                                             1,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -941,7 +909,6 @@ expression: parse_ast
                                         value: Int(
                                             2,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -976,7 +943,6 @@ expression: parse_ast
                                             value: Float(
                                                 0.25,
                                             ),
-                                            kind: None,
                                         },
                                     ),
                                     op: Add,
@@ -987,7 +953,6 @@ expression: parse_ast
                                                 real: 0.0,
                                                 imag: 1.75,
                                             },
-                                            kind: None,
                                         },
                                     ),
                                 },
@@ -1014,7 +979,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1051,7 +1015,6 @@ expression: parse_ast
                                                 real: 0.0,
                                                 imag: 0.0,
                                             },
-                                            kind: None,
                                         },
                                     ),
                                 },
@@ -1078,7 +1041,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1097,7 +1059,6 @@ expression: parse_ast
                     value: Int(
                         4,
                     ),
-                    kind: None,
                 },
             ),
             cases: [
@@ -1116,7 +1077,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1130,7 +1090,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1144,7 +1103,6 @@ expression: parse_ast
                                                 value: Int(
                                                     2,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1158,7 +1116,6 @@ expression: parse_ast
                                                 value: Int(
                                                     3,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1186,7 +1143,6 @@ expression: parse_ast
                                         value: Bool(
                                             true,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1218,7 +1174,6 @@ expression: parse_ast
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -1251,7 +1206,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1284,7 +1238,6 @@ expression: parse_ast
                                         value: Int(
                                             1,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -1298,7 +1251,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1327,7 +1279,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1346,7 +1297,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -1360,7 +1310,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1389,7 +1338,6 @@ expression: parse_ast
                                         value: Int(
                                             1,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1431,7 +1379,6 @@ expression: parse_ast
                                         value: Int(
                                             2,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1497,7 +1444,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1529,7 +1475,6 @@ expression: parse_ast
                                     value: Int(
                                         1,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -1554,7 +1499,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1572,7 +1516,6 @@ expression: parse_ast
                                     value: Int(
                                         1,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -1597,7 +1540,6 @@ expression: parse_ast
                                         value: Int(
                                             1,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1630,10 +1572,10 @@ expression: parse_ast
                                         value: Str(
                                             StringConstant {
                                                 value: "foo",
+                                                unicode: false,
                                                 implicit_concatenated: false,
                                             },
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -1695,7 +1637,6 @@ expression: parse_ast
                                 value: Int(
                                     0,
                                 ),
-                                kind: None,
                             },
                         ),
                         Constant(
@@ -1704,7 +1645,6 @@ expression: parse_ast
                                 value: Int(
                                     1,
                                 ),
-                                kind: None,
                             },
                         ),
                         Constant(
@@ -1713,7 +1653,6 @@ expression: parse_ast
                                 value: Int(
                                     2,
                                 ),
-                                kind: None,
                             },
                         ),
                     ],
@@ -1736,7 +1675,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1750,7 +1688,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1775,7 +1712,6 @@ expression: parse_ast
                                                 value: Int(
                                                     2,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1803,7 +1739,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1839,7 +1774,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1867,7 +1801,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1889,7 +1822,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1903,7 +1835,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1943,7 +1874,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 0,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 ),
@@ -1975,7 +1905,6 @@ expression: parse_ast
                                         value: Int(
                                             1,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -1997,7 +1926,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -2011,7 +1939,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -2039,7 +1966,6 @@ expression: parse_ast
                                         value: Int(
                                             2,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2119,7 +2045,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2158,7 +2083,6 @@ expression: parse_ast
                                                     value: Float(
                                                         0.25,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         },
@@ -2171,7 +2095,6 @@ expression: parse_ast
                                                 real: 0.0,
                                                 imag: 1.75,
                                             },
-                                            kind: None,
                                         },
                                     ),
                                 },
@@ -2198,7 +2121,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2268,7 +2190,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2353,7 +2274,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2402,7 +2322,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2434,7 +2353,6 @@ expression: parse_ast
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -2459,7 +2377,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2510,7 +2427,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2559,7 +2475,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2581,10 +2496,10 @@ expression: parse_ast
                                                 value: Str(
                                                     StringConstant {
                                                         value: "",
+                                                        unicode: false,
                                                         implicit_concatenated: false,
                                                     },
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -2612,7 +2527,6 @@ expression: parse_ast
                                         value: Int(
                                             1,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2630,10 +2544,10 @@ expression: parse_ast
                                     value: Str(
                                         StringConstant {
                                             value: "",
+                                            unicode: false,
                                             implicit_concatenated: false,
                                         },
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -2658,7 +2572,6 @@ expression: parse_ast
                                         value: Int(
                                             2,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2713,7 +2626,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2798,7 +2710,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -2838,7 +2749,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 0,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -2865,7 +2775,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 1,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -2892,7 +2801,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 2,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -2941,7 +2849,6 @@ expression: parse_ast
                                                     value: Int(
                                                         2,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         },
@@ -2969,7 +2876,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -3002,7 +2908,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -3020,7 +2925,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 1,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -3034,7 +2938,6 @@ expression: parse_ast
                                                             value: Int(
                                                                 2,
                                                             ),
-                                                            kind: None,
                                                         },
                                                     ),
                                                 },
@@ -3074,7 +2977,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -3097,7 +2999,6 @@ expression: parse_ast
                                                     value: Int(
                                                         0,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -3119,7 +3020,6 @@ expression: parse_ast
                                                                                     value: Int(
                                                                                         1,
                                                                                     ),
-                                                                                    kind: None,
                                                                                 },
                                                                             ),
                                                                         },
@@ -3133,7 +3033,6 @@ expression: parse_ast
                                                                                     value: Int(
                                                                                         2,
                                                                                     ),
-                                                                                    kind: None,
                                                                                 },
                                                                             ),
                                                                         },
@@ -3174,7 +3073,6 @@ expression: parse_ast
                                                     value: Int(
                                                         1,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -3206,7 +3104,6 @@ expression: parse_ast
                                                     value: Int(
                                                         0,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -3224,7 +3121,6 @@ expression: parse_ast
                                                                         value: Int(
                                                                             1,
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                             },
@@ -3238,7 +3134,6 @@ expression: parse_ast
                                                                         value: Int(
                                                                             2,
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                             },
@@ -3273,10 +3168,10 @@ expression: parse_ast
                                                 value: Str(
                                                     StringConstant {
                                                         value: "X",
+                                                        unicode: false,
                                                         implicit_concatenated: false,
                                                     },
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -3312,7 +3207,6 @@ expression: parse_ast
                                         value: Int(
                                             1,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -3347,7 +3241,6 @@ expression: parse_ast
                                         value: Int(
                                             2,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -3370,7 +3263,6 @@ expression: parse_ast
                                 value: Int(
                                     0,
                                 ),
-                                kind: None,
                             },
                         ),
                         Constant(
@@ -3379,7 +3271,6 @@ expression: parse_ast
                                 value: Int(
                                     1,
                                 ),
-                                kind: None,
                             },
                         ),
                         Constant(
@@ -3388,7 +3279,6 @@ expression: parse_ast
                                 value: Int(
                                     2,
                                 ),
-                                kind: None,
                             },
                         ),
                     ],
@@ -3411,7 +3301,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -3450,7 +3339,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -3473,7 +3361,6 @@ expression: parse_ast
                                 value: Int(
                                     0,
                                 ),
-                                kind: None,
                             },
                         ),
                         Constant(
@@ -3482,7 +3369,6 @@ expression: parse_ast
                                 value: Int(
                                     1,
                                 ),
-                                kind: None,
                             },
                         ),
                         Constant(
@@ -3491,7 +3377,6 @@ expression: parse_ast
                                 value: Int(
                                     2,
                                 ),
-                                kind: None,
                             },
                         ),
                     ],
@@ -3525,7 +3410,6 @@ expression: parse_ast
                                                 value: Int(
                                                     2,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -3553,7 +3437,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -3615,7 +3498,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -3704,7 +3586,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -3791,7 +3672,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },

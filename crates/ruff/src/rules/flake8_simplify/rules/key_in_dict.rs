@@ -4,6 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -31,29 +32,19 @@ use crate::registry::AsRule;
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[violation]
 pub struct InDictKeys {
-    key: String,
-    dict: String,
     operator: String,
 }
 
 impl AlwaysAutofixableViolation for InDictKeys {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InDictKeys {
-            key,
-            dict,
-            operator,
-        } = self;
-        format!("Use `{key} {operator} {dict}` instead of `{key} {operator} {dict}.keys()`")
+        let InDictKeys { operator } = self;
+        format!("Use `key {operator} dict` instead of `key {operator} dict.keys()`")
     }
 
     fn autofix_title(&self) -> String {
-        let InDictKeys {
-            key,
-            dict,
-            operator,
-        } = self;
-        format!("Convert to `{key} {operator} {dict}`")
+        let InDictKeys { operator: _ } = self;
+        format!("Remove `.keys()`")
     }
 }
 
@@ -101,25 +92,40 @@ fn key_in_dict(
         .unwrap_or(left.range());
     let right_range = parenthesized_range(right.into(), parent, checker.locator().contents())
         .unwrap_or(right.range());
-    let value_range = parenthesized_range(value.into(), parent, checker.locator().contents())
-        .unwrap_or(value.range());
-
-    let left_content = checker.locator().slice(left_range);
-    let value_content = checker.locator().slice(value_range);
 
     let mut diagnostic = Diagnostic::new(
         InDictKeys {
-            key: left_content.to_string(),
-            dict: value_content.to_string(),
             operator: operator.as_str().to_string(),
         },
         TextRange::new(left_range.start(), right_range.end()),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            value_content.to_string(),
-            right_range,
-        )));
+        // Delete from the start of the dot to the end of the expression.
+        if let Some(dot) = SimpleTokenizer::starts_at(value.end(), checker.locator().contents())
+            .skip_trivia()
+            .find(|token| token.kind == SimpleTokenKind::Dot)
+        {
+            // If the `.keys()` is followed by (e.g.) a keyword, we need to insert a space,
+            // since we're removing parentheses, which could lead to invalid syntax, as in:
+            // ```python
+            // if key in foo.keys()and bar:
+            // ```
+            let range = TextRange::new(dot.start(), right.end());
+            if checker
+                .locator()
+                .after(range.end())
+                .chars()
+                .next()
+                .is_some_and(|char| char.is_ascii_alphabetic())
+            {
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    " ".to_string(),
+                    range,
+                )));
+            } else {
+                diagnostic.set_fix(Fix::suggested(Edit::range_deletion(range)));
+            }
+        }
     }
     checker.diagnostics.push(diagnostic);
 }

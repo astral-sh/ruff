@@ -16,10 +16,10 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "aaa",
+                                        unicode: false,
                                         implicit_concatenated: false,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                         FormattedValue(
@@ -43,10 +43,10 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "ccc",
+                                        unicode: false,
                                         implicit_concatenated: false,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                         FormattedValue(
@@ -70,10 +70,10 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "eee",
+                                        unicode: false,
                                         implicit_concatenated: false,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                     ],

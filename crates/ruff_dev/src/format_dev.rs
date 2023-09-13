@@ -18,6 +18,7 @@ use imara_diff::{diff, Algorithm};
 use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use ruff::line_width::LineLength;
 use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
@@ -36,10 +37,17 @@ use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_python_formatter::{
     format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
 };
-use ruff_workspace::resolver::python_files_in_path;
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, Resolver};
 
 /// Find files that ruff would check so we can format them. Adapted from `ruff_cli`.
-fn ruff_check_paths(dirs: &[PathBuf]) -> anyhow::Result<Vec<Result<DirEntry, ignore::Error>>> {
+#[allow(clippy::type_complexity)]
+fn ruff_check_paths(
+    dirs: &[PathBuf],
+) -> anyhow::Result<(
+    Vec<Result<DirEntry, ignore::Error>>,
+    Resolver,
+    PyprojectConfig,
+)> {
     let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
@@ -57,11 +65,11 @@ fn ruff_check_paths(dirs: &[PathBuf]) -> anyhow::Result<Vec<Result<DirEntry, ign
         FilePattern::Builtin("*.pyi"),
     ])
     .unwrap();
-    let (paths, _resolver) = python_files_in_path(&cli.files, &pyproject_config, &overrides)?;
+    let (paths, resolver) = python_files_in_path(&cli.files, &pyproject_config, &overrides)?;
     if paths.is_empty() {
         bail!("no python files in {:?}", dirs)
     }
-    Ok(paths)
+    Ok((paths, resolver, pyproject_config))
 }
 
 /// Collects statistics over the formatted files to compute the Jaccard index or the similarity
@@ -448,7 +456,7 @@ fn format_dev_project(
 
     // Find files to check (or in this case, format twice). Adapted from ruff_cli
     // First argument is ignored
-    let paths = ruff_check_paths(files)?;
+    let (paths, resolver, pyproject_config) = ruff_check_paths(files)?;
 
     let results = {
         let pb_span =
@@ -461,7 +469,14 @@ fn format_dev_project(
         #[cfg(feature = "singlethreaded")]
         let iter = { paths.into_iter() };
         iter.map(|dir_entry| {
-            let result = format_dir_entry(dir_entry, stability_check, write, &black_options);
+            let result = format_dir_entry(
+                dir_entry,
+                stability_check,
+                write,
+                &black_options,
+                &resolver,
+                &pyproject_config,
+            );
             pb_span.pb_inc(1);
             result
         })
@@ -517,6 +532,8 @@ fn format_dir_entry(
     stability_check: bool,
     write: bool,
     options: &BlackOptions,
+    resolver: &Resolver,
+    pyproject_config: &PyprojectConfig,
 ) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
     let dir_entry = match dir_entry.context("Iterating the files in the repository failed") {
         Ok(dir_entry) => dir_entry,
@@ -528,10 +545,17 @@ fn format_dir_entry(
         return Ok((Ok(Statistics::default()), file));
     }
 
-    let file = dir_entry.path().to_path_buf();
-    let options = options.to_py_format_options(&file);
+    let path = dir_entry.path().to_path_buf();
+    let mut options = options.to_py_format_options(&path);
+
+    let settings = resolver.resolve(&path, pyproject_config);
+    // That's a bad way of doing this but it's not worth doing something better for format_dev
+    if settings.line_length != LineLength::default() {
+        options = options.with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
+    }
+
     // Handle panics (mostly in `debug_assert!`)
-    let result = match catch_unwind(|| format_dev_file(&file, stability_check, write, options)) {
+    let result = match catch_unwind(|| format_dev_file(&path, stability_check, write, options)) {
         Ok(result) => result,
         Err(panic) => {
             if let Some(message) = panic.downcast_ref::<String>() {
@@ -550,7 +574,7 @@ fn format_dir_entry(
             }
         }
     };
-    Ok((result, file))
+    Ok((result, path))
 }
 
 /// A compact diff that only shows a header and changes, but nothing unchanged. This makes viewing

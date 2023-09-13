@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.286"
+version = "0.0.289"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -25,6 +25,7 @@ ruff = { path = "../ruff", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_formatter = { path = "../ruff_formatter" }
+ruff_notebook = { path = "../ruff_notebook" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
@@ -63,14 +64,18 @@ shellexpand = { workspace = true }
 similar = { workspace = true }
 strum = { workspace = true, features = [] }
 thiserror = { workspace = true }
-tracing = { workspace = true }
+tracing = { workspace = true, features = ["log"] }
 walkdir = { version = "2.3.2" }
 wild = { version = "2" }
 
 [dev-dependencies]
 assert_cmd = { version = "2.0.8" }
+# Avoid writing colored snapshots when running tests from the terminal
+colored = { workspace = true, features = ["no-color"]}
 insta = { workspace = true, features = ["filters"] }
+insta-cmd = { version = "0.4.0" }
 tempfile = "3.6.0"
+test-case = { workspace = true }
 ureq = { version = "2.6.2", features = [] }
 
 [target.'cfg(target_os = "windows")'.dependencies]

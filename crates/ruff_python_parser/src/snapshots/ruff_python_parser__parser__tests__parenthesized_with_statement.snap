@@ -1,0 +1,676 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: "parse_suite(source, \"<test>\").unwrap()"
+---
+[
+    With(
+        StmtWith {
+            range: 0..21,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 6..9,
+                    context_expr: Name(
+                        ExprName {
+                            range: 7..8,
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+                WithItem {
+                    range: 11..14,
+                    context_expr: Name(
+                        ExprName {
+                            range: 12..13,
+                            id: "b",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 17..21,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 22..56,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 28..31,
+                    context_expr: Name(
+                        ExprName {
+                            range: 29..30,
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+                WithItem {
+                    range: 33..36,
+                    context_expr: Name(
+                        ExprName {
+                            range: 34..35,
+                            id: "b",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+                WithItem {
+                    range: 38..44,
+                    context_expr: Name(
+                        ExprName {
+                            range: 38..39,
+                            id: "c",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 43..44,
+                                id: "d",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+                WithItem {
+                    range: 46..49,
+                    context_expr: Name(
+                        ExprName {
+                            range: 47..48,
+                            id: "e",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 52..56,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 57..74,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 63..64,
+                    context_expr: Name(
+                        ExprName {
+                            range: 63..64,
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+                WithItem {
+                    range: 66..67,
+                    context_expr: Name(
+                        ExprName {
+                            range: 66..67,
+                            id: "b",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 70..74,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 75..97,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 80..91,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 80..86,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 81..82,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 84..85,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 90..91,
+                                id: "c",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 93..97,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 98..122,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 104..115,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 104..110,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 105..106,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 108..109,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 114..115,
+                                id: "c",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 118..122,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 123..142,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 129..135,
+                    context_expr: Name(
+                        ExprName {
+                            range: 129..130,
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 134..135,
+                                id: "b",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 138..142,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 143..157,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 149..150,
+                    context_expr: Name(
+                        ExprName {
+                            range: 149..150,
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 153..157,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 158..177,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 164..170,
+                    context_expr: NamedExpr(
+                        ExprNamedExpr {
+                            range: 164..170,
+                            target: Name(
+                                ExprName {
+                                    range: 164..165,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Constant(
+                                ExprConstant {
+                                    range: 169..170,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 173..177,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 178..202,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 184..195,
+                    context_expr: NamedExpr(
+                        ExprNamedExpr {
+                            range: 184..190,
+                            target: Name(
+                                ExprName {
+                                    range: 184..185,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Constant(
+                                ExprConstant {
+                                    range: 189..190,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 195..196,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 198..202,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 203..219,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 209..212,
+                    context_expr: Name(
+                        ExprName {
+                            range: 210..211,
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 215..219,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 220..241,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 226..234,
+                    context_expr: NamedExpr(
+                        ExprNamedExpr {
+                            range: 227..233,
+                            target: Name(
+                                ExprName {
+                                    range: 227..228,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Constant(
+                                ExprConstant {
+                                    range: 232..233,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 237..241,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 242..271,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 248..254,
+                    context_expr: Name(
+                        ExprName {
+                            range: 248..249,
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 253..254,
+                                id: "b",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+                WithItem {
+                    range: 256..264,
+                    context_expr: NamedExpr(
+                        ExprNamedExpr {
+                            range: 257..263,
+                            target: Name(
+                                ExprName {
+                                    range: 257..258,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Constant(
+                                ExprConstant {
+                                    range: 262..263,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 267..271,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 272..296,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 278..279,
+                    context_expr: Name(
+                        ExprName {
+                            range: 278..279,
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+                WithItem {
+                    range: 281..289,
+                    context_expr: NamedExpr(
+                        ExprNamedExpr {
+                            range: 282..288,
+                            target: Name(
+                                ExprName {
+                                    range: 282..283,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Constant(
+                                ExprConstant {
+                                    range: 287..288,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 292..296,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 297..315,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 303..308,
+                    context_expr: Yield(
+                        ExprYield {
+                            range: 303..308,
+                            value: None,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 311..315,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 316..341,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 322..334,
+                    context_expr: YieldFrom(
+                        ExprYieldFrom {
+                            range: 322..334,
+                            value: Name(
+                                ExprName {
+                                    range: 333..334,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 337..341,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 342..362,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 348..355,
+                    context_expr: Yield(
+                        ExprYield {
+                            range: 349..354,
+                            value: None,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 358..362,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 363..390,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 369..383,
+                    context_expr: YieldFrom(
+                        ExprYieldFrom {
+                            range: 370..382,
+                            value: Name(
+                                ExprName {
+                                    range: 381..382,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 386..390,
+                    },
+                ),
+            ],
+        },
+    ),
+]

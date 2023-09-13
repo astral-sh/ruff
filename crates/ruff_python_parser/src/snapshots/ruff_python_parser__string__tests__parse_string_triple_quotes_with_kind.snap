@@ -12,11 +12,9 @@ expression: parse_ast
                     value: Str(
                         StringConstant {
                             value: "Hello, world!",
+                            unicode: true,
                             implicit_concatenated: false,
                         },
-                    ),
-                    kind: Some(
-                        "u",
                     ),
                 },
             ),
