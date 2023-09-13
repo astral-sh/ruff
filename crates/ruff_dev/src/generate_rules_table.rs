@@ -25,7 +25,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
             }
             AutofixKind::None => format!("<span style='opacity: 0.1'>{FIX_SYMBOL}</span>"),
         };
-        let preview_token = if rule.is_preview() {
+        let preview_token = if rule.is_preview() || rule.is_nursery() {
             format!("<span style='opacity: 1'>{PREVIEW_SYMBOL}</span>")
         } else {
             format!("<span style='opacity: 0.1'>{PREVIEW_SYMBOL}</span>")

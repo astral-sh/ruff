@@ -25,24 +25,24 @@ insta = { version = "1.31.0", feature = ["filters", "glob"] }
 is-macro = { version = "0.3.0" }
 itertools = { version = "0.10.5" }
 log = { version = "0.4.17" }
-memchr = "2.5.0"
+memchr = "2.6.3"
 num-bigint = { version = "0.4.3" }
 num-traits = { version = "0.2.15" }
 once_cell = { version = "1.17.1" }
-path-absolutize = { version = "3.0.14" }
+path-absolutize = { version = "3.1.1" }
 proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
 rustc-hash = { version = "1.1.0" }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
-serde_json = { version = "1.0.93" }
+serde_json = { version = "1.0.106" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1", features = ["inline"] }
 smallvec = { version = "1.10.0" }
 static_assertions = "1.1.0"
-strum = { version = "0.24.1", features = ["strum_macros"] }
-strum_macros = { version = "0.24.3" }
+strum = { version = "0.25.0", features = ["strum_macros"] }
+strum_macros = { version = "0.25.2" }
 syn = { version = "2.0.15" }
 test-case = { version = "3.0.0" }
 thiserror = { version = "1.0.43" }

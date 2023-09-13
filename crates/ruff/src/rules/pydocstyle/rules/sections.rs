@@ -1691,7 +1691,10 @@ fn common_section(
     }
 
     if checker.enabled(Rule::NoBlankLineBeforeSection) {
-        if !context.previous_line().is_some_and(str::is_empty) {
+        if !context
+            .previous_line()
+            .is_some_and(|line| line.trim().is_empty())
+        {
             let mut diagnostic = Diagnostic::new(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),
