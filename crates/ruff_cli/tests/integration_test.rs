@@ -278,7 +278,8 @@ fn nursery_all() {
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
     -:1:1: D100 Missing docstring in public module
-    Found 2 errors.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    Found 3 errors.
 
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
@@ -317,8 +318,9 @@ fn nursery_group_selector() {
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
+    -:1:1: RUF902 Hey this is a nursery test rule.
     -:1:2: E225 Missing whitespace around operator
-    Found 2 errors.
+    Found 3 errors.
 
     ----- stderr -----
     warning: The `NURSERY` selector has been deprecated. Use the `--preview` flag instead.
@@ -337,8 +339,9 @@ fn nursery_group_selector_preview_enabled() {
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
+    -:1:1: RUF902 Hey this is a nursery test rule.
     -:1:2: E225 Missing whitespace around operator
-    Found 2 errors.
+    Found 3 errors.
 
     ----- stderr -----
     warning: The `NURSERY` selector has been deprecated. Use the `PREVIEW` selector instead.
@@ -377,8 +380,11 @@ fn preview_enabled_all() {
     -:1:1: E741 Ambiguous variable name: `I`
     -:1:1: D100 Missing docstring in public module
     -:1:1: CPY001 Missing copyright notice at top of file
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF901 Hey this is a preview test rule.
+    -:1:1: RUF902 Hey this is a nursery test rule.
     -:1:2: E225 Missing whitespace around operator
-    Found 4 errors.
+    Found 7 errors.
 
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
@@ -467,8 +473,10 @@ fn preview_enabled_group_selector() {
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
+    -:1:1: RUF901 Hey this is a preview test rule.
+    -:1:1: RUF902 Hey this is a nursery test rule.
     -:1:2: E225 Missing whitespace around operator
-    Found 2 errors.
+    Found 4 errors.
 
     ----- stderr -----
     "###);
