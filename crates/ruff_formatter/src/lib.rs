@@ -52,23 +52,20 @@ pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, Pri
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
 pub use group_id::GroupId;
 use ruff_text_size::{TextRange, TextSize};
-use std::str::FromStr;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Default)]
 pub enum IndentStyle {
-    /// Tab
+    /// Use tabs to indent code.
     #[default]
     Tab,
-    /// Space, with its quantity
-    Space(u8),
+    /// Use [`IndentWidth`] spaces to indent code.
+    Space,
 }
 
 impl IndentStyle {
-    pub const DEFAULT_SPACES: u8 = 2;
-
     /// Returns `true` if this is an [`IndentStyle::Tab`].
     pub const fn is_tab(&self) -> bool {
         matches!(self, IndentStyle::Tab)
@@ -76,58 +73,42 @@ impl IndentStyle {
 
     /// Returns `true` if this is an [`IndentStyle::Space`].
     pub const fn is_space(&self) -> bool {
-        matches!(self, IndentStyle::Space(_))
-    }
-}
-
-impl FromStr for IndentStyle {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "tab" | "Tabs" => Ok(Self::Tab),
-            "space" | "Spaces" => Ok(Self::Space(IndentStyle::DEFAULT_SPACES)),
-            // TODO: replace this error with a diagnostic
-            v => {
-                let v = v.strip_prefix("Spaces, size: ").unwrap_or(v);
-
-                u8::from_str(v)
-                    .map(Self::Space)
-                    .map_err(|_| "Value not supported for IndentStyle")
-            }
-        }
+        matches!(self, IndentStyle::Space)
     }
 }
 
 impl std::fmt::Display for IndentStyle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IndentStyle::Tab => std::write!(f, "Tab"),
-            IndentStyle::Space(size) => std::write!(f, "Spaces, size: {size}"),
+            IndentStyle::Tab => std::write!(f, "tab"),
+            IndentStyle::Space => std::write!(f, "space"),
         }
     }
 }
 
-/// The visual width of a `\t` character.
+/// The visual width of a indentation.
+///
+/// Determines the visual width of a tab character (`\t`) and the number of
+/// spaces per indent when using [`IndentStyle::Space`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct TabWidth(NonZeroU8);
+pub struct IndentWidth(NonZeroU8);
 
-impl TabWidth {
+impl IndentWidth {
     /// Return the numeric value for this [`LineWidth`]
     pub const fn value(&self) -> u32 {
         self.0.get() as u32
     }
 }
 
-impl Default for TabWidth {
+impl Default for IndentWidth {
     fn default() -> Self {
         Self(NonZeroU8::new(2).unwrap())
     }
 }
 
-impl TryFrom<u8> for TabWidth {
+impl TryFrom<u8> for IndentWidth {
     type Error = TryFromIntError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -196,16 +177,8 @@ pub trait FormatOptions {
     /// The indent style.
     fn indent_style(&self) -> IndentStyle;
 
-    /// The visual width of a tab character.
-    fn tab_width(&self) -> TabWidth;
-
     /// The visual width of an indent
-    fn indent_width(&self) -> u32 {
-        match self.indent_style() {
-            IndentStyle::Tab => self.tab_width().value(),
-            IndentStyle::Space(spaces) => u32::from(spaces),
-        }
-    }
+    fn indent_width(&self) -> IndentWidth;
 
     /// What's the max width of a line. Defaults to 80.
     fn line_width(&self) -> LineWidth;
@@ -250,6 +223,7 @@ impl FormatContext for SimpleFormatContext {
 #[derive(Debug, Default, Eq, PartialEq, Clone)]
 pub struct SimpleFormatOptions {
     pub indent_style: IndentStyle,
+    pub indent_width: IndentWidth,
     pub line_width: LineWidth,
 }
 
@@ -258,8 +232,8 @@ impl FormatOptions for SimpleFormatOptions {
         self.indent_style
     }
 
-    fn tab_width(&self) -> TabWidth {
-        TabWidth::default()
+    fn indent_width(&self) -> IndentWidth {
+        self.indent_width
     }
 
     fn line_width(&self) -> LineWidth {
@@ -270,6 +244,7 @@ impl FormatOptions for SimpleFormatOptions {
         PrinterOptions {
             line_width: self.line_width,
             indent_style: self.indent_style,
+            indent_width: self.indent_width,
             source_map_generation: SourceMapGeneration::Enabled,
             ..PrinterOptions::default()
         }

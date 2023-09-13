@@ -353,7 +353,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
         } else {
             // Start with 2 because of the two leading spaces.
             let width = 2u32.saturating_add(
-                TextWidth::from_text(&normalized_comment, f.options().tab_width())
+                TextWidth::from_text(&normalized_comment, f.options().indent_width())
                     .width()
                     .expect("Expected comment not to contain any newlines")
                     .value(),

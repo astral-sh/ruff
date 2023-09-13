@@ -47,7 +47,7 @@ where
     text_len > 5
         && text_len
             <= context.options().line_width().value() as usize
-                - context.options().indent_width() as usize
+                - context.options().indent_width().value() as usize
 }
 
 pub(crate) trait NeedsParentheses {
