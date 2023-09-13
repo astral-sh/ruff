@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, PySourceType};
-use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -47,31 +47,49 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
     }
 }
 
-/// Find f-strings that don't contain any formatted values in an [`FString`].
+/// Return an iterator containing a two-element tuple for each f-string in the
+/// given [`ExprFString`] expression. The first element of the tuple is the
+/// f-string prefix range, and the second element is the entire f-string range.
+///
+/// For example,
+///
+/// ```python
+/// f"example"
+/// ```
+///
+/// would return `[(0..1, 0..10)]`.
+///
+/// This function assumes that the given expression is an [`ExprFString`]
+/// without any placeholder expressions.
+///
+/// [`ExprFString`]: `ruff_python_ast::ExprFString`
 fn find_useless_f_strings<'a>(
     expr: &'a Expr,
     locator: &'a Locator,
     source_type: PySourceType,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
     let contents = locator.slice(expr);
+    let mut current_f_string_start = TextSize::default();
     lexer::lex_starts_at(contents, source_type.as_mode(), expr.start())
         .flatten()
-        .filter_map(|(tok, range)| match tok {
-            Tok::String {
-                kind: StringKind::FString | StringKind::RawFString,
-                ..
-            } => {
-                let first_char = locator.slice(TextRange::at(range.start(), TextSize::from(1)));
+        .filter_map(move |(tok, range)| match tok {
+            Tok::FStringStart => {
+                current_f_string_start = range.start();
+                None
+            }
+            Tok::FStringEnd => {
+                let first_char =
+                    locator.slice(TextRange::at(current_f_string_start, TextSize::from(1)));
                 // f"..."  => f_position = 0
                 // fr"..." => f_position = 0
                 // rf"..." => f_position = 1
                 let f_position = u32::from(!(first_char == "f" || first_char == "F"));
                 Some((
                     TextRange::at(
-                        range.start() + TextSize::from(f_position),
+                        current_f_string_start + TextSize::from(f_position),
                         TextSize::from(1),
                     ),
-                    range,
+                    TextRange::new(current_f_string_start, range.end()),
                 ))
             }
             _ => None,
