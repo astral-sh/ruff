@@ -366,16 +366,3 @@ jobs:
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
-
-  validate-sha-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 57065ecff4937cd9be885fada6747eed79e769d8
-      - name: Check main branch
-        run: |
-          if git branch --contains 57065ecff4937cd9be885fada6747eed79e769d8 | grep -E '(^|\s)main$'; then
-            echo "The specified sha is not on the main branch" >&2
-            exit 1
-          fi
