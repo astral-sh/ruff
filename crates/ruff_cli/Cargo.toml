@@ -52,7 +52,7 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 itoa = { version = "1.0.6" }
 log = { workspace = true }
-notify = { version = "5.1.0" }
+notify = { version = "6.1.1" }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
 rayon = { version = "1.7.0" }
 regex = { workspace = true }
