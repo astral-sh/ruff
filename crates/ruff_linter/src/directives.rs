@@ -95,6 +95,31 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
                 break;
             }
 
+            // F-strings can be multi-line even without triple quotes. For example,
+            //
+            // ```python
+            // f"foo {
+            //    x
+            //        *
+            //             y
+            // }"
+            // ```
+            //
+            // We expect `noqa` directives on the last line of the f-string.
+            Tok::FStringEnd => {
+                // SAFETY: If we're at the end of a f-string, the indexer must have a
+                // corresponding f-string range for it.
+                let fstring_start = indexer
+                    .fstring_ranges()
+                    .outermost(range.start())
+                    .unwrap()
+                    .start();
+                string_mappings.push(TextRange::new(
+                    locator.line_start(fstring_start),
+                    range.end(),
+                ));
+            }
+
             // For multi-line strings, we expect `noqa` directives on the last line of the
             // string.
             Tok::String {
@@ -427,6 +452,50 @@ ghi
         assert_eq!(
             noqa_mappings(contents),
             NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(28))])
+        );
+
+        let contents = "x = f'abc {
+a
+    *
+        b
+}'
+y = 2
+";
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(32))])
+        );
+
+        let contents = "x = f'''abc
+def
+ghi
+'''
+y = 2
+z = x + 1";
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(23))])
+        );
+
+        let contents = "x = 1
+y = f'''abc
+def
+ghi
+'''
+z = 2";
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(29))])
+        );
+
+        let contents = "x = 1
+y = f'''abc
+def
+ghi
+'''";
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(29))])
         );
 
         let contents = r"x = \
