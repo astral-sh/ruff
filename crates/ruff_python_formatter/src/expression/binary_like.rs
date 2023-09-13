@@ -466,8 +466,11 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
     }
 }
 
-const fn is_simple_power_expression(left: &Expr, right: &Expr) -> bool {
-    is_simple_power_operand(left) && is_simple_power_operand(right)
+fn is_simple_power_expression(left: &Expr, right: &Expr, source: &str) -> bool {
+    is_simple_power_operand(left)
+        && is_simple_power_operand(right)
+        && !is_expression_parenthesized(left.into(), source)
+        && !is_expression_parenthesized(right.into(), source)
 }
 
 /// Return `true` if an [`Expr`] adheres to [Black's definition](https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators)
@@ -661,6 +664,7 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                     && is_simple_power_expression(
                         left.last_operand().expression(),
                         right.first_operand().expression(),
+                        f.context().source(),
                     );
 
                 if let Some(leading) = left.first_operand().leading_binary_comments() {

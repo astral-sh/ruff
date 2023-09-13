@@ -206,6 +206,11 @@ if (
 for user_id in set(target_user_ids) - {u.user_id for u in updates}:
     updates.append(UserPresenceState.default(user_id))
 
+# If either operator is parenthesized, use non-simple formatting.
+# See: https://github.com/astral-sh/ruff/issues/7318.
+10**(2)
+10**2
+
 # Keeps parenthesized left hand sides
 (
     log(self.price / self.strike)
