@@ -372,10 +372,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ebe9c03545a4496811efeee7a530a5632e48e7d2
+          ref: 57065ecff4937cd9be885fada6747eed79e769d8
       - name: Check main branch
         run: |
-          if git branch --contains ebe9c03545a4496811efeee7a530a5632e48e7d2 | grep -E '(^|\s)main$'; then
+          if git branch --contains 57065ecff4937cd9be885fada6747eed79e769d8 | grep -E '(^|\s)main$'; then
             echo "The specified sha is not on the main branch" >&2
             exit 1
           fi
