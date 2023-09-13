@@ -1,5 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use itertools::Itertools;
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -2177,6 +2178,34 @@ pub struct Arguments {
     pub keywords: Vec<Keyword>,
 }
 
+/// An entry in the argument list of a function call.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ArgOrKeyword<'a> {
+    Arg(&'a Expr),
+    Keyword(&'a Keyword),
+}
+
+impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
+    fn from(arg: &'a Expr) -> Self {
+        Self::Arg(arg)
+    }
+}
+
+impl<'a> From<&'a Keyword> for ArgOrKeyword<'a> {
+    fn from(keyword: &'a Keyword) -> Self {
+        Self::Keyword(keyword)
+    }
+}
+
+impl Ranged for ArgOrKeyword<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::Arg(arg) => arg.range(),
+            Self::Keyword(keyword) => keyword.range(),
+        }
+    }
+}
+
 impl Arguments {
     /// Return the number of positional and keyword arguments.
     pub fn len(&self) -> usize {
@@ -2211,6 +2240,46 @@ impl Arguments {
         self.find_keyword(name)
             .map(|keyword| &keyword.value)
             .or_else(|| self.find_positional(position))
+    }
+
+    /// Return the positional and keyword arguments in the order of declaration.
+    ///
+    /// Positional arguments are generally before keyword arguments, but star arguments are an
+    /// exception:
+    /// ```python
+    /// class A(*args, a=2, *args2, **kwargs):
+    ///     pass
+    ///
+    /// f(*args, a=2, *args2, **kwargs)
+    /// ```
+    /// where `*args` and `args2` are `args` while `a=1` and `kwargs` are `keywords`.
+    ///
+    /// If you would just chain `args` and `keywords` the call would get reordered which we don't
+    /// want. This function instead "merge sorts" them into the correct order.
+    ///
+    /// Note that the order of evaluation is always first `args`, then `keywords`:
+    /// ```python
+    /// def f(*args, **kwargs):
+    ///     pass
+    ///
+    /// def g(x):
+    ///     print(x)
+    ///     return x
+    ///
+    ///
+    /// f(*g([1]), a=g(2), *g([3]), **g({"4": 5}))
+    /// ```
+    /// Output:
+    /// ```text
+    /// [1]
+    /// [3]
+    /// 2
+    /// {'4': 5}
+    /// ```
+    pub fn arguments_source_order(&self) -> impl Iterator<Item = ArgOrKeyword<'_>> {
+        let args = self.args.iter().map(ArgOrKeyword::Arg);
+        let keywords = self.keywords.iter().map(ArgOrKeyword::Keyword);
+        args.merge_by(keywords, |left, right| left.start() < right.start())
     }
 }
 
