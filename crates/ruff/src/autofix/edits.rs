@@ -92,7 +92,7 @@ pub(crate) fn remove_argument<T: Ranged>(
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
-        .arguments_as_declared()
+        .arguments_source_order()
         .map(|arg| arg.range())
         .filter(|range| argument.range() != *range)
         .partition(|range| range.start() < argument.start());

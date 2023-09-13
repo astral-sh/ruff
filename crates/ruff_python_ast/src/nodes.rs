@@ -2276,7 +2276,7 @@ impl Arguments {
     /// 2
     /// {'4': 5}
     /// ```
-    pub fn arguments_as_declared(&self) -> impl Iterator<Item = ArgOrKeyword<'_>> {
+    pub fn arguments_source_order(&self) -> impl Iterator<Item = ArgOrKeyword<'_>> {
         let args = self.args.iter().map(ArgOrKeyword::Arg);
         let keywords = self.keywords.iter().map(ArgOrKeyword::Keyword);
         args.merge_by(keywords, |left, right| left.start() < right.start())

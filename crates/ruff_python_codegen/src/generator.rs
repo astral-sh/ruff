@@ -266,7 +266,7 @@ impl<'a> Generator<'a> {
                     if let Some(arguments) = arguments {
                         self.p("(");
                         let mut first = true;
-                        for arg_or_keyword in arguments.arguments_as_declared() {
+                        for arg_or_keyword in arguments.arguments_source_order() {
                             match arg_or_keyword {
                                 ArgOrKeyword::Arg(arg) => {
                                     self.p_delim(&mut first, ", ");
@@ -1051,7 +1051,7 @@ impl<'a> Generator<'a> {
                 } else {
                     let mut first = true;
 
-                    for arg_or_keyword in arguments.arguments_as_declared() {
+                    for arg_or_keyword in arguments.arguments_source_order() {
                         match arg_or_keyword {
                             ArgOrKeyword::Arg(arg) => {
                                 self.p_delim(&mut first, ", ");

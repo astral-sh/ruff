@@ -3549,7 +3549,7 @@ impl AstNode for Arguments {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        for arg_or_keyword in self.arguments_as_declared() {
+        for arg_or_keyword in self.arguments_source_order() {
             match arg_or_keyword {
                 ArgOrKeyword::Arg(arg) => visitor.visit_expr(arg),
                 ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
