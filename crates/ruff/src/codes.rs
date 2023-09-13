@@ -868,10 +868,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         #[cfg(feature = "test-rules")]
         (Ruff, "900") => (RuleGroup::Unspecified, rules::ruff::rules::StableTestRule),
         #[cfg(feature = "test-rules")]
-        (Ruff, "901") => (RuleGroup::Preview, rules::ruff::rules::PreviewTestRule),
+        (Ruff, "911") => (RuleGroup::Preview, rules::ruff::rules::PreviewTestRule),
         #[cfg(feature = "test-rules")]
         #[allow(deprecated)]
-        (Ruff, "902") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
+        (Ruff, "912") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
 
         // flake8-django
         (Flake8Django, "001") => (RuleGroup::Unspecified, rules::flake8_django::rules::DjangoNullableModelStringField),

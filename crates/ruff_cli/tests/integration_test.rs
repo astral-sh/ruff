@@ -249,16 +249,16 @@ fn show_statistics() {
 
 #[test]
 fn nursery_prefix() {
-    // `--select E` should detect E741, but not E225, which is in the nursery.
-    let args = ["--select", "E"];
+    // Should only detect RUF900, but not the unstable test rules
+    let args = ["--select", "RUF9"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
+    -:1:1: RUF900 Hey this is a stable test rule.
     Found 1 error.
 
     ----- stderr -----
@@ -267,19 +267,18 @@ fn nursery_prefix() {
 
 #[test]
 fn nursery_all() {
-    // `--select ALL` should detect E741, but not E225, which is in the nursery.
+    // Should detect RUF900, but not the unstable test rules
     let args = ["--select", "ALL"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
     -:1:1: D100 Missing docstring in public module
     -:1:1: RUF900 Hey this is a stable test rule.
-    Found 3 errors.
+    Found 2 errors.
 
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
@@ -289,38 +288,36 @@ fn nursery_all() {
 
 #[test]
 fn nursery_direct() {
-    // `--select E225` should detect E225.
-    let args = ["--select", "E225"];
+    let args = ["--select", "RUF912"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:2: E225 Missing whitespace around operator
+    -:1:1: RUF912 Hey this is a nursery test rule.
     Found 1 error.
 
     ----- stderr -----
-    warning: Selection of nursery rule `E225` without the `--preview` flag is deprecated.
+    warning: Selection of nursery rule `RUF912` without the `--preview` flag is deprecated.
     "###);
 }
 
 #[test]
 fn nursery_group_selector() {
-    // Only nursery rules should be detected e.g. E225 and a warning should be displayed
+    // Only nursery rules should be detected e.g. RUF912
     let args = ["--select", "NURSERY"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:1: RUF902 Hey this is a nursery test rule.
-    -:1:2: E225 Missing whitespace around operator
-    Found 3 errors.
+    -:1:1: RUF912 Hey this is a nursery test rule.
+    Found 2 errors.
 
     ----- stderr -----
     warning: The `NURSERY` selector has been deprecated. Use the `--preview` flag instead.
@@ -329,19 +326,18 @@ fn nursery_group_selector() {
 
 #[test]
 fn nursery_group_selector_preview_enabled() {
-    // Only nursery rules should be detected e.g. E225 and a warning should be displayed
+    // A warning should be displayed due to deprecated selector usage
     let args = ["--select", "NURSERY", "--preview"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:1: RUF902 Hey this is a nursery test rule.
-    -:1:2: E225 Missing whitespace around operator
-    Found 3 errors.
+    -:1:1: RUF912 Hey this is a nursery test rule.
+    Found 2 errors.
 
     ----- stderr -----
     warning: The `NURSERY` selector has been deprecated. Use the `PREVIEW` selector instead.
@@ -350,18 +346,19 @@ fn nursery_group_selector_preview_enabled() {
 
 #[test]
 fn preview_enabled_prefix() {
-    // E741 and E225 (preview) should both be detected
-    let args = ["--select", "E", "--preview"];
+    // All the RUF9XX test rules should be triggered
+    let args = ["--select", "RUF9", "--preview"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
-    -:1:2: E225 Missing whitespace around operator
-    Found 2 errors.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF911 Hey this is a preview test rule.
+    -:1:1: RUF912 Hey this is a nursery test rule.
+    Found 3 errors.
 
     ----- stderr -----
     "###);
@@ -373,18 +370,16 @@ fn preview_enabled_all() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
     -:1:1: D100 Missing docstring in public module
     -:1:1: CPY001 Missing copyright notice at top of file
     -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 Hey this is a preview test rule.
-    -:1:1: RUF902 Hey this is a nursery test rule.
-    -:1:2: E225 Missing whitespace around operator
-    Found 7 errors.
+    -:1:1: RUF911 Hey this is a preview test rule.
+    -:1:1: RUF912 Hey this is a nursery test rule.
+    Found 5 errors.
 
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
@@ -394,16 +389,16 @@ fn preview_enabled_all() {
 
 #[test]
 fn preview_enabled_direct() {
-    // E225 should be detected without warning
-    let args = ["--select", "E225", "--preview"];
+    // Should be enabled without warning
+    let args = ["--select", "RUF911", "--preview"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:2: E225 Missing whitespace around operator
+    -:1:1: RUF911 Hey this is a preview test rule.
     Found 1 error.
 
     ----- stderr -----
@@ -412,35 +407,35 @@ fn preview_enabled_direct() {
 
 #[test]
 fn preview_disabled_direct() {
-    // FURB145 is preview not nursery so selecting should be empty
-    let args = ["--select", "FURB145"];
+    // RUF911 is preview not nursery so selecting should be empty
+    let args = ["--select", "RUF911"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("a = l[:]\n"), @r###"
+        .pass_stdin(""), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    warning: Selection `FURB145` has no effect because the `--preview` flag was not included.
+    warning: Selection `RUF911` has no effect because the `--preview` flag was not included.
     "###);
 }
 
 #[test]
 fn preview_disabled_prefix_empty() {
-    // Warns that the selection is empty since all of the CPY rules are in preview
-    let args = ["--select", "CPY"];
+    // Warns that the selection is empty since all of the RUF91 rules are in preview
+    let args = ["--select", "RUF91"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    warning: Selection `CPY` has no effect because the `--preview` flag was not included.
+    warning: Selection `RUF91` has no effect because the `--preview` flag was not included.
     "###);
 }
 
@@ -451,7 +446,7 @@ fn preview_disabled_group_selector() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -468,15 +463,14 @@ fn preview_enabled_group_selector() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:1: RUF901 Hey this is a preview test rule.
-    -:1:1: RUF902 Hey this is a nursery test rule.
-    -:1:2: E225 Missing whitespace around operator
-    Found 4 errors.
+    -:1:1: RUF911 Hey this is a preview test rule.
+    -:1:1: RUF912 Hey this is a nursery test rule.
+    Found 3 errors.
 
     ----- stderr -----
     "###);
@@ -484,18 +478,19 @@ fn preview_enabled_group_selector() {
 
 #[test]
 fn preview_enabled_group_ignore() {
-    // `--select E --ignore PREVIEW` should detect E741 and E225, which is in preview but "E" is more specific.
-    let args = ["--select", "E", "--ignore", "PREVIEW", "--preview"];
+    // Should detect stable and unstable rules, RUF9 is more specific than PREVIEW so ignore has no effect
+    let args = ["--select", "RUF9", "--ignore", "PREVIEW", "--preview"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
-        .pass_stdin("I=42\n"), @r###"
+        .pass_stdin(""), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
-    -:1:2: E225 Missing whitespace around operator
-    Found 2 errors.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF911 Hey this is a preview test rule.
+    -:1:1: RUF912 Hey this is a nursery test rule.
+    Found 3 errors.
 
     ----- stderr -----
     "###);
