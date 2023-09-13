@@ -718,7 +718,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
         if outer_name.value == "list" {
             tree = Expression::Call(Box::new((*inner_call).clone()));
         } else {
-            // If the `reverse` argument is used
+            // If the `reverse` argument is used...
             let args = if inner_call.args.iter().any(|arg| {
                 matches!(
                     arg.keyword,
@@ -770,6 +770,28 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
                     .collect_vec()
             } else {
                 let mut args = inner_call.args.clone();
+
+                // If necessary, parenthesize a generator expression, as a generator expression must
+                // be parenthesized if it's not a solitary argument. For example, given:
+                // ```python
+                // reversed(sorted(i for i in range(42)))
+                // ```
+                // Rewrite as:
+                // ```python
+                // sorted((i for i in range(42)), reverse=True)
+                // ```
+                if let [arg] = args.as_mut_slice() {
+                    if matches!(arg.value, Expression::GeneratorExp(_)) {
+                        if arg.value.lpar().is_empty() && arg.value.rpar().is_empty() {
+                            arg.value = arg
+                                .value
+                                .clone()
+                                .with_parens(LeftParen::default(), RightParen::default());
+                        }
+                    }
+                }
+
+                // Add the `reverse=True` argument.
                 args.push(Arg {
                     value: Expression::Name(Box::new(Name {
                         value: "True",
