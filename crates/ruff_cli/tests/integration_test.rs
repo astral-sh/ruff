@@ -405,6 +405,23 @@ fn preview_enabled_direct() {
 }
 
 #[test]
+fn preview_disabled_direct() {
+    // FURB145 is preview not nursery so selecting should be empty
+    let args = ["--select", "FURB145"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("a = l[:]\n"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: Selection `FURB145` has no effect because the `--preview` flag was not included.
+    "###);
+}
+
+#[test]
 fn preview_disabled_prefix_empty() {
     // Warns that the selection is empty since all of the CPY rules are in preview
     let args = ["--select", "CPY"];
