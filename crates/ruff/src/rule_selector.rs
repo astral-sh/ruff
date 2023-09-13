@@ -212,7 +212,7 @@ impl RuleSelector {
             // Always include rules that are not in preview or the nursery
             !(rule.is_preview() || rule.is_nursery())
             // Backwards compatibility allows selection of nursery rules by exact code or dedicated group
-            || (matches!(self, RuleSelector::Rule { .. }) || matches!(self, RuleSelector::Nursery { .. }) && rule.is_nursery())
+            || ((matches!(self, RuleSelector::Rule { .. }) || matches!(self, RuleSelector::Nursery { .. })) && rule.is_nursery())
             // Enabling preview includes all preview or nursery rules
             || preview.is_enabled()
         })

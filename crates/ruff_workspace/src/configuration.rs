@@ -764,7 +764,7 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 #[cfg(test)]
 mod tests {
     use crate::configuration::{Configuration, RuleSelection};
-    use ruff::codes::{Flake8Copyright, Pycodestyle};
+    use ruff::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff::registry::{Linter, Rule, RuleSet};
     use ruff::settings::types::PreviewMode;
     use ruff::RuleSelector;
@@ -811,9 +811,10 @@ mod tests {
         Rule::RepeatedAppend,
         Rule::DeleteFullSlice,
         Rule::CheckAndRemoveFromSet,
-        Rule::SliceCopy,
         Rule::QuadraticListSummation,
     ];
+
+    const PREVIEW_RULES: &[Rule] = &[Rule::SliceCopy];
 
     #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(
@@ -1101,6 +1102,29 @@ mod tests {
     }
 
     #[test]
+    fn select_rule_preview() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Refurb::_145.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::empty();
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Refurb::_145.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rule(Rule::SliceCopy);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn select_preview() {
         let actual = resolve_rules(
             [RuleSelection {
@@ -1119,7 +1143,9 @@ mod tests {
             }],
             Some(PreviewMode::Enabled),
         );
-        let expected = RuleSet::from_rules(NURSERY_RULES);
+
+        let expected =
+            RuleSet::from_rules(NURSERY_RULES).union(&RuleSet::from_rules(PREVIEW_RULES));
         assert_eq!(actual, expected);
     }
 
