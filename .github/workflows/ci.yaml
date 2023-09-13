@@ -374,7 +374,6 @@ jobs:
         with:
           ref: ebe9c03545a4496811efeee7a530a5632e48e7d2
       - name: Check main branch
-        if: ${{ inputs.sha }}
         run: |
           if git branch --contains ebe9c03545a4496811efeee7a530a5632e48e7d2 | grep -E '(^|\s)main$'; then
             echo "The specified sha is not on the main branch" >&2
