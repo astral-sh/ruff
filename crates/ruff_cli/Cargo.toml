@@ -69,6 +69,7 @@ walkdir = { version = "2.3.2" }
 wild = { version = "2" }
 
 [dev-dependencies]
+ruff = { path = "../ruff", features = ["clap", "test-rules"] }
 assert_cmd = { version = "2.0.8" }
 # Avoid writing colored snapshots when running tests from the terminal
 colored = { workspace = true, features = ["no-color"]}

@@ -89,3 +89,5 @@ default = []
 schemars = ["dep:schemars"]
 # Enables the UnreachableCode rule
 unreachable-code = []
+# Enables rules for internal integration tests
+test-rules = []

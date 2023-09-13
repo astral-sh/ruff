@@ -214,7 +214,7 @@ pub fn check_path(
     }
 
     // Raise violations for internal test rules
-    #[cfg(test)]
+    #[cfg(feature = "test-rules")]
     {
         if settings.rules.enabled(Rule::StableTestRule) {
             diagnostics.push(Diagnostic::new(
