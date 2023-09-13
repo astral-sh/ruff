@@ -811,6 +811,7 @@ mod tests {
         Rule::RepeatedAppend,
         Rule::DeleteFullSlice,
         Rule::CheckAndRemoveFromSet,
+        Rule::SliceCopy,
         Rule::QuadraticListSummation,
     ];
 
