@@ -931,7 +931,7 @@ UP035.py:74:1: UP035 [*] Import from `collections.abc` instead: `AsyncGenerator`
    74 |+from collections.abc import AsyncGenerator
 75 75 | from typing import Reversible
 76 76 | from typing import Generator
-77 77 | 
+77 77 | from typing import Callable
 
 UP035.py:75:1: UP035 [*] Import from `collections.abc` instead: `Reversible`
    |
@@ -940,6 +940,7 @@ UP035.py:75:1: UP035 [*] Import from `collections.abc` instead: `Reversible`
 75 | from typing import Reversible
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
 76 | from typing import Generator
+77 | from typing import Callable
    |
    = help: Import from `collections.abc`
 
@@ -950,8 +951,8 @@ UP035.py:75:1: UP035 [*] Import from `collections.abc` instead: `Reversible`
 75    |-from typing import Reversible
    75 |+from collections.abc import Reversible
 76 76 | from typing import Generator
-77 77 | 
-78 78 | # OK
+77 77 | from typing import Callable
+78 78 | from typing import cast
 
 UP035.py:76:1: UP035 [*] Import from `collections.abc` instead: `Generator`
    |
@@ -959,8 +960,8 @@ UP035.py:76:1: UP035 [*] Import from `collections.abc` instead: `Generator`
 75 | from typing import Reversible
 76 | from typing import Generator
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-77 | 
-78 | # OK
+77 | from typing import Callable
+78 | from typing import cast
    |
    = help: Import from `collections.abc`
 
@@ -970,23 +971,63 @@ UP035.py:76:1: UP035 [*] Import from `collections.abc` instead: `Generator`
 75 75 | from typing import Reversible
 76    |-from typing import Generator
    76 |+from collections.abc import Generator
-77 77 | 
-78 78 | # OK
-79 79 | from a import b
+77 77 | from typing import Callable
+78 78 | from typing import cast
+79 79 | 
 
-UP035.py:88:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
+UP035.py:77:1: UP035 [*] Import from `collections.abc` instead: `Callable`
    |
-87 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
-88 | from typing_extensions import dataclass_transform
+75 | from typing import Reversible
+76 | from typing import Generator
+77 | from typing import Callable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+78 | from typing import cast
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+74 74 | from typing import AsyncGenerator
+75 75 | from typing import Reversible
+76 76 | from typing import Generator
+77    |-from typing import Callable
+   77 |+from collections.abc import Callable
+78 78 | from typing import cast
+79 79 | 
+80 80 | # OK
+
+UP035.py:87:1: UP035 [*] Import from `typing` instead: `NamedTuple`
+   |
+86 | # Ok: `typing_extensions` contains backported improvements.
+87 | from typing_extensions import NamedTuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+88 | 
+89 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+   |
+   = help: Import from `typing`
+
+ℹ Suggested fix
+84 84 | from typing_extensions import SupportsIndex
+85 85 | 
+86 86 | # Ok: `typing_extensions` contains backported improvements.
+87    |-from typing_extensions import NamedTuple
+   87 |+from typing import NamedTuple
+88 88 | 
+89 89 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+90 90 | from typing_extensions import dataclass_transform
+
+UP035.py:90:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
+   |
+89 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+90 | from typing_extensions import dataclass_transform
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
    |
    = help: Import from `typing`
 
 ℹ Suggested fix
-85 85 | from typing_extensions import NamedTuple
-86 86 | 
-87 87 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
-88    |-from typing_extensions import dataclass_transform
-   88 |+from typing import dataclass_transform
+87 87 | from typing_extensions import NamedTuple
+88 88 | 
+89 89 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+90    |-from typing_extensions import dataclass_transform
+   90 |+from typing import dataclass_transform
 
 
