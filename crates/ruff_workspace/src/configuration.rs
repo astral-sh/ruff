@@ -27,7 +27,7 @@ use ruff::settings::types::{
     Version,
 };
 use ruff::settings::{defaults, resolve_per_file_ignores, AllSettings, CliSettings, Settings};
-use ruff::{fs, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION};
+use ruff::{fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION};
 use ruff_cache::cache_dir;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
@@ -460,7 +460,10 @@ impl Configuration {
         let mut carryover_ignores: Option<&[RuleSelector]> = None;
         let mut carryover_unfixables: Option<&[RuleSelector]> = None;
 
+        // Store selectors for displaying warnings
         let mut redirects = FxHashMap::default();
+        let mut deprecated_nursery_selectors = FxHashSet::default();
+        let mut ignored_preview_selectors = FxHashSet::default();
 
         for selection in &self.rule_selections {
             // If a selection only specifies extend-select we cannot directly
@@ -571,8 +574,7 @@ impl Configuration {
                 }
             }
 
-            // We insert redirects into the hashmap so that we
-            // can warn the users about remapped rule codes.
+            // Check for selections that require a warning
             for selector in selection
                 .select
                 .iter()
@@ -583,6 +585,29 @@ impl Configuration {
                 .chain(selection.unfixable.iter())
                 .chain(selection.extend_fixable.iter())
             {
+                #[allow(deprecated)]
+                if matches!(selector, RuleSelector::Nursery) {
+                    let suggestion = if preview.is_disabled() {
+                        "Use the `--preview` flag instead."
+                    } else {
+                        "Use the `PREVIEW` selector instead."
+                    };
+                    warn_user_once!("The `NURSERY` selector has been deprecated. {suggestion}");
+                }
+
+                if preview.is_disabled() {
+                    if let RuleSelector::Rule { prefix, .. } = selector {
+                        if prefix.rules().any(|rule| rule.is_nursery()) {
+                            deprecated_nursery_selectors.insert(selector);
+                        }
+                    }
+
+                    // Check if the selector is empty because preview mode is disabled
+                    if selector.rules(PreviewMode::Disabled).next().is_none() {
+                        ignored_preview_selectors.insert(selector);
+                    }
+                }
+
                 if let RuleSelector::Prefix {
                     prefix,
                     redirected_from: Some(redirect_from),
@@ -600,6 +625,18 @@ impl Configuration {
                 "`{from}` has been remapped to `{}{}`.",
                 target.linter().common_prefix(),
                 target.short_code()
+            );
+        }
+
+        for selection in deprecated_nursery_selectors {
+            let (prefix, code) = selection.prefix_and_code();
+            warn_user!("Selection of nursery rule `{prefix}{code}` without the `--preview` flag is deprecated.",);
+        }
+
+        for selection in ignored_preview_selectors {
+            let (prefix, code) = selection.prefix_and_code();
+            warn_user!(
+                "Selection `{prefix}{code}` has no effect because the `--preview` flag was not included.",
             );
         }
 
