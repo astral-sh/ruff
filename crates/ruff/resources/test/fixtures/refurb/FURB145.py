@@ -5,12 +5,13 @@ a = l[:]
 b, c = 1, l[:]
 d, e = l[:], 1
 m = l[::]
+l[:]
+print(l[:])
 
 # False negatives.
 aa = a[:]  # Type inference.
 
 # OK.
-l[:]  # No assignment.
 t = (1, 2, 3, 4, 5)
 f = t[:]  # t.copy() is not supported.
 g = l[1:3]

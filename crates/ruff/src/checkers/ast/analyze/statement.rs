@@ -1361,9 +1361,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.settings.rules.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
             }
-            if checker.settings.rules.enabled(Rule::SliceCopy) {
-                refurb::rules::slice_copy(checker, value);
-            }
             if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnprefixedTypeParam,

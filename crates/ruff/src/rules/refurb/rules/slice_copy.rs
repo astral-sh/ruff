@@ -52,33 +52,32 @@ impl Violation for SliceCopy {
 }
 
 /// FURB145
-pub(crate) fn slice_copy(checker: &mut Checker, value: &Expr) {
-    fn check(value: &Expr, checker: &mut Checker) {
-        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
-            elts.iter().for_each(|elt| check(elt, checker));
-        } else {
-            let Some(name) = match_list_full_slice(value, checker.semantic()) else {
-                return;
-            };
-            let mut diagnostic = Diagnostic::new(SliceCopy, value.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                let replacement = generate_method_call(name, "copy", checker.generator());
-                diagnostic.set_fix(Fix::suggested(Edit::replacement(
-                    replacement,
-                    value.start(),
-                    value.end(),
-                )));
-            }
-            checker.diagnostics.push(diagnostic);
-        };
+pub(crate) fn slice_copy(checker: &mut Checker, subscript: &ast::ExprSubscript) {
+    if subscript.ctx.is_store() || subscript.ctx.is_del() {
+        return;
     }
-    check(value, checker);
+
+    let Some(name) = match_list_full_slice(subscript, checker.semantic()) else {
+        return;
+    };
+    let mut diagnostic = Diagnostic::new(SliceCopy, subscript.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        let replacement = generate_method_call(name, "copy", checker.generator());
+        diagnostic.set_fix(Fix::suggested(Edit::replacement(
+            replacement,
+            subscript.start(),
+            subscript.end(),
+        )));
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 /// Matches `obj[:]` where `obj` is a list.
-fn match_list_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a str> {
+fn match_list_full_slice<'a>(
+    subscript: &'a ast::ExprSubscript,
+    semantic: &SemanticModel,
+) -> Option<&'a str> {
     // Check that it is `obj[:]`.
-    let subscript = expr.as_subscript_expr()?;
     if !matches!(
         subscript.slice.as_ref(),
         Expr::Slice(ast::ExprSlice {
@@ -90,12 +89,13 @@ fn match_list_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option
     ) {
         return None;
     }
-    let ast::ExprName { id: name, .. } = subscript.value.as_name_expr()?;
+
+    let ast::ExprName { id, .. } = subscript.value.as_name_expr()?;
 
     // Check that `obj` is a list.
     let scope = semantic.current_scope();
     let bindings: Vec<&Binding> = scope
-        .get_all(name)
+        .get_all(id)
         .map(|binding_id| semantic.binding(binding_id))
         .collect();
     let [binding] = bindings.as_slice() else {
@@ -105,5 +105,5 @@ fn match_list_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option
         return None;
     }
 
-    Some(name)
+    Some(id)
 }
