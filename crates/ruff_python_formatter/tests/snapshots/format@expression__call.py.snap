@@ -248,6 +248,29 @@ f(x=(
   # comment
   1
 ))
+
+args = [2]
+args2 = [3]
+kwargs = {"4": 5}
+
+# https://github.com/astral-sh/ruff/issues/6498
+f(a=1, *args, **kwargs)
+f(*args, a=1, **kwargs)
+f(*args, a=1, *args2, **kwargs)
+f(  # a
+    *  # b
+    args
+    # c
+    ,  # d
+    a=1,
+    # e
+    *  # f
+    args2
+    # g
+    **  # h
+    kwargs,
+)
+
 ```
 
 ## Output
@@ -492,6 +515,27 @@ f(
         # comment
         1
     )
+)
+
+args = [2]
+args2 = [3]
+kwargs = {"4": 5}
+
+# https://github.com/astral-sh/ruff/issues/6498
+f(a=1, *args, **kwargs)
+f(*args, a=1, **kwargs)
+f(*args, a=1, *args2, **kwargs)
+f(  # a
+    # b
+    *args,  # d
+    # c
+    a=1,
+    # e
+    # f
+    *args2
+    # g
+    **  # h
+    kwargs,
 )
 ```
 
