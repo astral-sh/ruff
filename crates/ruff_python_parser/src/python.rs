@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 0bcd25bcb90fbd48df028412e64d846abc7d017d549f5fdf745ea2fe01052ecd
+// sha3: 28c3616641cf815eb22318982db3c1fdad27755117dde4835fb76f3de70fd4be
 use num_bigint::BigInt;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, IpyEscapeKind};
@@ -36216,7 +36216,7 @@ fn __action218<
             return Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
                 location: value.start(),
-            })?; 
+            })?;
         }
         let debug_text = debug.map(|_| {
             let start_offset = location + "{".text_len();
