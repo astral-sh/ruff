@@ -591,7 +591,8 @@ impl<'source> Lexer<'source> {
                     self.cursor.bump(); // '\'
                     if matches!(self.cursor.first(), '{' | '}') {
                         // Don't consume `{` or `}` as we want them to be emitted as tokens.
-                        break;
+                        // They will be handled in the next iteration.
+                        continue;
                     } else if !fstring.is_raw_string() {
                         if self.cursor.eat_char2('N', '{') {
                             in_named_unicode = true;
@@ -1986,6 +1987,12 @@ def f(arg=%timeit a = b):
     }
 
     #[test]
+    fn test_fstring_escape_braces() {
+        let source = r"f'\{foo}' f'\\{foo}' f'\{{foo}}' f'\\{{foo}}'";
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
     fn test_fstring_escape_raw() {
         let source = r#"rf"\{x:\"\{x}} \"\"\
  end""#;
@@ -2100,6 +2107,7 @@ f"{(lambda x:{x})}"
         assert_eq!(lex_fstring_error(r"f'\u007b}'"), SingleRbrace);
         assert_eq!(lex_fstring_error("f'{a:b}}'"), SingleRbrace);
         assert_eq!(lex_fstring_error("f'{3:}}>10}'"), SingleRbrace);
+        assert_eq!(lex_fstring_error(r"f'\{foo}\}'"), SingleRbrace);
 
         assert_eq!(lex_fstring_error("f'{'"), UnclosedLbrace);
         assert_eq!(lex_fstring_error("f'{foo!r'"), UnclosedLbrace);
