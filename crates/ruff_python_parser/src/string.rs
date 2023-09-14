@@ -204,7 +204,27 @@ impl<'a> StringParser<'a> {
         let start_location = self.get_pos();
         while let Some(ch) = self.next_char() {
             match ch {
-                '\\' if !self.kind.is_raw() => {
+                // We can encounter a `\` as the last character in a `FStringMiddle`
+                // token which is valid in this context. For example,
+                //
+                // ```python
+                // f"\{foo} \{bar:\}"
+                // # ^     ^^     ^
+                // ```
+                //
+                // Here, the `FStringMiddle` token content will be "\" and " \"
+                // which is invalid if we look at the content in isolation:
+                //
+                // ```python
+                // "\"
+                // ```
+                //
+                // However, the content is syntactically valid in the context of
+                // the f-string because it's a substring of the entire f-string.
+                // This is still an invalid escape sequence, but we don't want to
+                // raise a syntax error as is done by the CPython parser. It might
+                // be supported in the future, refer to point 3: https://peps.python.org/pep-0701/#rejected-ideas
+                '\\' if !self.kind.is_raw() && self.peek().is_some() => {
                     value.push_str(&self.parse_escaped_char()?);
                 }
                 // If there are any curly braces inside a `FStringMiddle` token,
