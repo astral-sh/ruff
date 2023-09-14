@@ -42,24 +42,34 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             "A subscript expression can only have a single dangling comment, the one after the bracket"
         );
 
-        match value.as_ref() {
-            Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-            Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-            Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-            _ => value.format().fmt(f)?,
-        }
-
-        let format_slice = format_with(|f: &mut PyFormatter| {
-            if let Expr::Tuple(tuple) = slice.as_ref() {
-                write!(f, [tuple.format().with_options(TupleParentheses::Preserve)])
-            } else {
-                write!(f, [slice.format()])
+        let format_inner = format_with(|f| {
+            match value.as_ref() {
+                Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
+                Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
+                Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
+                _ => value.format().fmt(f)?,
             }
+
+            let format_slice = format_with(|f: &mut PyFormatter| {
+                if let Expr::Tuple(tuple) = slice.as_ref() {
+                    write!(f, [tuple.format().with_options(TupleParentheses::Preserve)])
+                } else {
+                    write!(f, [slice.format()])
+                }
+            });
+
+            parenthesized("[", &format_slice, "]")
+                .with_dangling_comments(dangling_comments)
+                .fmt(f)
         });
 
-        parenthesized("[", &format_slice, "]")
-            .with_dangling_comments(dangling_comments)
-            .fmt(f)
+        let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
+            && call_chain_layout == CallChainLayout::Fluent;
+        if is_call_chain_root {
+            write!(f, [group(&format_inner)])
+        } else {
+            write!(f, [format_inner])
+        }
     }
 
     fn fmt_dangling_comments(
