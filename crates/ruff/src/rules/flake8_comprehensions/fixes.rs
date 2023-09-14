@@ -7,17 +7,17 @@ use libcst_native::{
     RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
-use ruff_python_ast::Expr;
-use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::Expr;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::autofix::edits::pad;
-use crate::cst::helpers::space;
+use crate::cst::helpers::{negate, space};
 use crate::rules::flake8_comprehensions::rules::ObjectType;
 use crate::{
     checkers::ast::Checker,
@@ -728,7 +728,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
                     })
                 )
             }) {
-                // Negate the `reverse` argument
+                // Negate the `reverse` argument.
                 inner_call
                     .args
                     .clone()
@@ -741,31 +741,9 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
                                 ..
                             })
                         ) {
-                            if let Expression::Name(ref val) = arg.value {
-                                if val.value == "True" {
-                                    // TODO: even better would be to drop the argument, as False is the default
-                                    arg.value = Expression::Name(Box::new(Name {
-                                        value: "False",
-                                        lpar: vec![],
-                                        rpar: vec![],
-                                    }));
-                                    arg
-                                } else if val.value == "False" {
-                                    arg.value = Expression::Name(Box::new(Name {
-                                        value: "True",
-                                        lpar: vec![],
-                                        rpar: vec![],
-                                    }));
-                                    arg
-                                } else {
-                                    arg
-                                }
-                            } else {
-                                arg
-                            }
-                        } else {
-                            arg
+                            arg.value = negate(&arg.value);
                         }
+                        arg
                     })
                     .collect_vec()
             } else {
