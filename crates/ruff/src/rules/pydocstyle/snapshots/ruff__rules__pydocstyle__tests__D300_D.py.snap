@@ -77,4 +77,13 @@ D.py:658:5: D300 Use triple double quotes `"""`
 660 |         pass
     |
 
+D.py:664:5: D300 Use triple double quotes `"""`
+    |
+663 |   def newline_after_closing_quote(self):
+664 |       "We enforce a newline after the closing quote for a multi-line docstring \
+    |  _____^
+665 | |     but continuations shouldn't be considered multi-line"
+    | |_________________________________________________________^ D300
+    |
+
 

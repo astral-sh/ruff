@@ -30,6 +30,11 @@ impl<'a> Docstring<'a> {
     pub(crate) fn leading_quote(&self) -> &'a str {
         &self.contents[TextRange::up_to(self.body_range.start())]
     }
+
+    pub(crate) fn triple_quoted(&self) -> bool {
+        let leading_quote = self.leading_quote();
+        leading_quote.ends_with("\"\"\"") || leading_quote.ends_with("'''")
+    }
 }
 
 impl Ranged for Docstring<'_> {
