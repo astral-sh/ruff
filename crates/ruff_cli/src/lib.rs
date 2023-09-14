@@ -111,13 +111,15 @@ pub fn run(
             {
                 eprintln!(
                     r#"
-{}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
+{}{} {} If you could open an issue at:
 
-https://github.com/astral-sh/ruff/issues/new?title=%5BPanic%5D
+    https://github.com/astral-sh/ruff/issues/new?title=%5BPanic%5D
 
-quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
+...quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
 "#,
                     "error".red().bold(),
+                    ":".bold(),
+                    "Ruff crashed.".bold(),
                 );
             }
             default_panic_hook(info);

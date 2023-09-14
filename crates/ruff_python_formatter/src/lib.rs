@@ -120,7 +120,7 @@ impl From<ParseError> for FormatModuleError {
     }
 }
 
-#[tracing::instrument(level=Level::TRACE, skip_all, err)]
+#[tracing::instrument(level=Level::TRACE, skip_all)]
 pub fn format_module(
     contents: &str,
     options: PyFormatOptions,

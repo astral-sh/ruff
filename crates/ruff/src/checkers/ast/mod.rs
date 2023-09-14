@@ -304,6 +304,8 @@ where
         // the node.
         let flags_snapshot = self.semantic.flags;
 
+        panic!("TODO: Checker::visit_stmt");
+
         // Step 1: Binding
         match stmt {
             Stmt::AugAssign(ast::StmtAugAssign {
