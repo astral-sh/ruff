@@ -30,10 +30,10 @@ expression: parse_ast
                                                     value: Str(
                                                         StringConstant {
                                                             value: "eg",
+                                                            unicode: false,
                                                             implicit_concatenated: false,
                                                         },
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                             List(
@@ -59,7 +59,6 @@ expression: parse_ast
                                                                                 value: Int(
                                                                                     1,
                                                                                 ),
-                                                                                kind: None,
                                                                             },
                                                                         ),
                                                                     ],
@@ -86,7 +85,6 @@ expression: parse_ast
                                                                                 value: Int(
                                                                                     2,
                                                                                 ),
-                                                                                kind: None,
                                                                             },
                                                                         ),
                                                                     ],
@@ -113,7 +111,6 @@ expression: parse_ast
                                                                                 value: Int(
                                                                                     3,
                                                                                 ),
-                                                                                kind: None,
                                                                             },
                                                                         ),
                                                                     ],
@@ -140,7 +137,6 @@ expression: parse_ast
                                                                                 value: Int(
                                                                                     4,
                                                                                 ),
-                                                                                kind: None,
                                                                             },
                                                                         ),
                                                                     ],
@@ -208,10 +204,10 @@ expression: parse_ast
                                                                         value: Str(
                                                                             StringConstant {
                                                                                 value: "caught ",
+                                                                                unicode: false,
                                                                                 implicit_concatenated: false,
                                                                             },
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                                 FormattedValue(
@@ -253,10 +249,10 @@ expression: parse_ast
                                                                         value: Str(
                                                                             StringConstant {
                                                                                 value: " with nested ",
+                                                                                unicode: false,
                                                                                 implicit_concatenated: false,
                                                                             },
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                                 FormattedValue(
@@ -343,10 +339,10 @@ expression: parse_ast
                                                                         value: Str(
                                                                             StringConstant {
                                                                                 value: "caught ",
+                                                                                unicode: false,
                                                                                 implicit_concatenated: false,
                                                                             },
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                                 FormattedValue(
@@ -388,10 +384,10 @@ expression: parse_ast
                                                                         value: Str(
                                                                             StringConstant {
                                                                                 value: " with nested ",
+                                                                                unicode: false,
                                                                                 implicit_concatenated: false,
                                                                             },
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                                 FormattedValue(

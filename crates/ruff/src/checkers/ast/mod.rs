@@ -528,11 +528,7 @@ where
                     &self.semantic.definitions,
                 );
                 self.semantic.push_definition(definition);
-
-                self.semantic.push_scope(match &stmt {
-                    Stmt::FunctionDef(stmt) => ScopeKind::Function(stmt),
-                    _ => unreachable!("Expected Stmt::FunctionDef"),
-                });
+                self.semantic.push_scope(ScopeKind::Function(function_def));
 
                 self.deferred.functions.push(self.semantic.snapshot());
 
@@ -1192,7 +1188,6 @@ where
             }
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
-                kind: _,
                 range: _,
             }) => {
                 if self.semantic.in_type_definition()

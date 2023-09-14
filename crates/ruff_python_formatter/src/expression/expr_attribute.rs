@@ -37,49 +37,45 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            let needs_parentheses = matches!(
-                value.as_ref(),
-                Expr::Constant(ExprConstant {
-                    value: Constant::Int(_) | Constant::Float(_),
-                    ..
-                })
-            );
+            let parenthesize_value =
+                // If the value is an integer, we need to parenthesize it to avoid a syntax error.
+                matches!(
+                    value.as_ref(),
+                    Expr::Constant(ExprConstant {
+                        value: Constant::Int(_) | Constant::Float(_),
+                        ..
+                    })
+                ) || is_expression_parenthesized(value.into(), f.context().source());
 
-            if needs_parentheses {
-                value.format().with_options(Parentheses::Always).fmt(f)?;
-            } else if call_chain_layout == CallChainLayout::Fluent {
-                match value.as_ref() {
-                    Expr::Attribute(expr) => {
-                        expr.format().with_options(call_chain_layout).fmt(f)?;
-                    }
-                    Expr::Call(expr) => {
-                        expr.format().with_options(call_chain_layout).fmt(f)?;
-                        if call_chain_layout == CallChainLayout::Fluent {
-                            // Format the dot on its own line
+            if call_chain_layout == CallChainLayout::Fluent {
+                if parenthesize_value {
+                    // Don't propagate the call chain layout.
+                    value.format().with_options(Parentheses::Always).fmt(f)?;
+
+                    // Format the dot on its own line.
+                    soft_line_break().fmt(f)?;
+                } else {
+                    match value.as_ref() {
+                        Expr::Attribute(expr) => {
+                            expr.format().with_options(call_chain_layout).fmt(f)?;
+                        }
+                        Expr::Call(expr) => {
+                            expr.format().with_options(call_chain_layout).fmt(f)?;
                             soft_line_break().fmt(f)?;
                         }
-                    }
-                    Expr::Subscript(expr) => {
-                        expr.format().with_options(call_chain_layout).fmt(f)?;
-                        if call_chain_layout == CallChainLayout::Fluent {
-                            // Format the dot on its own line
+                        Expr::Subscript(expr) => {
+                            expr.format().with_options(call_chain_layout).fmt(f)?;
                             soft_line_break().fmt(f)?;
                         }
-                    }
-                    _ => {
-                        // This matches [`CallChainLayout::from_expression`]
-                        if is_expression_parenthesized(value.as_ref().into(), f.context().source())
-                        {
-                            value.format().with_options(Parentheses::Always).fmt(f)?;
-                            // Format the dot on its own line
-                            soft_line_break().fmt(f)?;
-                        } else {
-                            value.format().fmt(f)?;
+                        _ => {
+                            value.format().with_options(Parentheses::Never).fmt(f)?;
                         }
                     }
                 }
+            } else if parenthesize_value {
+                value.format().with_options(Parentheses::Always).fmt(f)?;
             } else {
-                value.format().fmt(f)?;
+                value.format().with_options(Parentheses::Never).fmt(f)?;
             }
 
             // Identify dangling comments before and after the dot:
@@ -113,7 +109,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 f,
                 [
                     dangling_comments(before_dot),
-                    text("."),
+                    token("."),
                     dangling_comments(after_dot),
                     attr.format()
                 ]

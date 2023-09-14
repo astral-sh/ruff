@@ -222,3 +222,170 @@ x = (
 x = (
     () - ()  #
 )
+
+
+# Avoid unnecessary parentheses around multiline strings.
+expected_content = """<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>%s/simple/sitemap-simple.xml</loc><lastmod>%s</lastmod>
+</sitemap>
+</sitemapindex>
+""" % (
+    self.base_url,
+    date.today(),
+)
+
+expected_content = (
+    """<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>%s/simple/sitemap-simple.xml</loc><lastmod>%s</lastmod>
+</sitemap>
+</sitemapindex>
+"""
+    # Needs parentheses
+    % (
+    self.base_url,
+    date.today(),
+    )
+)
+
+expected_content = (
+    """<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>%s/simple/sitemap-simple.xml</loc><lastmod>%s</lastmod>
+</sitemap>
+</sitemapindex>
+"""
+    %
+    # Needs parentheses
+    (
+        self.base_url,
+        date.today(),
+    )
+)
+
+
+expected_content = """<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>%s/simple/sitemap-simple.xml</loc><lastmod>%s</lastmod>
+</sitemap>
+</sitemapindex>
+""" + a.call.expression(
+    self.base_url,
+    date.today(),
+)
+
+expected_content = """<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>%s/simple/sitemap-simple.xml</loc><lastmod>%s</lastmod>
+</sitemap>
+</sitemapindex>
+""" + sssssssssssssssssssssssssssssssssssssssssooooo * looooooooooooooooooooooooooooooongggggggggggg
+
+call(arg1, arg2, """
+short
+""", arg3=True)
+
+expected_content = (
+    """<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>%s/simple/sitemap-simple.xml</loc><lastmod>%s</lastmod>
+</sitemap>
+</sitemapindex>
+"""
+    %
+    (
+        self.base_url
+    )
+)
+
+
+expected_content = (
+    """<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>%s/simple/sitemap-simple.xml</loc><lastmod>%s</lastmod>
+</sitemap>
+</sitemapindex>
+"""
+    %
+    (
+        # Needs parentheses
+        self.base_url
+    )
+)
+
+
+rowuses = [(1 << j) |                  # column ordinal
+           (1 << (n + i-j + n-1)) |    # NW-SE ordinal
+           (1 << (n + 2*n-1 + i+j))    # NE-SW ordinal
+           for j in rangen]
+
+rowuses = [((1 << j) # column ordinal
+         )|
+           (
+               # comment
+               (1 << (n + i-j + n-1))) |    # NW-SE ordinal
+           (1 << (n + 2*n-1 + i+j))    # NE-SW ordinal
+           for j in rangen]
+
+skip_bytes = (
+    header.timecnt * 5  # Transition times and types
+    + header.typecnt * 6  # Local time type records
+    + header.charcnt  # Time zone designations
+    + header.leapcnt * 8  # Leap second records
+    + header.isstdcnt  # Standard/wall indicators
+    + header.isutcnt  # UT/local indicators
+)
+
+
+if (
+    (1 + 2)  # test
+    or (3 + 4)  # other
+    or (4 + 5)  # more
+):
+    pass
+
+
+if (
+    (1 and 2)  # test
+    + (3 and 4)  # other
+    + (4 and 5)  # more
+):
+    pass
+
+
+if (
+    (1 + 2)  # test
+    < (3 + 4)  # other
+    > (4 + 5)  # more
+):
+    pass
+
+ z = (
+                 a
+                 +
+                 # a: extracts this comment
+                 (
+                     # b: and this comment
+                     (
+                         # c: formats it as part of the expression
+                         x and y
+                     )
+             )
+ )
+
+z = (
+    (
+
+        (
+
+            x and y
+            # a: formats it as part of the expression
+
+        )
+        # b: extracts this comment
+
+    )
+    # c: and this comment
+    + a
+)

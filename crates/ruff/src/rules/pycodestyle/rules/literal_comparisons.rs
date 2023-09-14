@@ -172,7 +172,6 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             if checker.enabled(Rule::TrueFalseComparison) {
                 if let Expr::Constant(ast::ExprConstant {
                     value: Constant::Bool(value),
-                    kind: None,
                     range: _,
                 }) = comparator
                 {
@@ -241,7 +240,6 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
         if checker.enabled(Rule::TrueFalseComparison) {
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Bool(value),
-                kind: None,
                 range: _,
             }) = next
             {

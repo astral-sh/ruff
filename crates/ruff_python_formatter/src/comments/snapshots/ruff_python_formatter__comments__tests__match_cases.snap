@@ -4,6 +4,21 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
+        kind: StmtMatch,
+        range: 27..550,
+        source: `match pt:⏎`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# After match comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
         kind: MatchCase,
         range: 84..132,
         source: `case (x, y):⏎`,
@@ -107,20 +122,5 @@ expression: comments.debug(test_case.source_code)
                 formatted: false,
             },
         ],
-    },
-    Node {
-        kind: StmtExpr,
-        range: 656..670,
-        source: `print("other")`,
-    }: {
-        "leading": [
-            SourceComment {
-                text: "# After match comment",
-                position: OwnLine,
-                formatted: false,
-            },
-        ],
-        "dangling": [],
-        "trailing": [],
     },
 }

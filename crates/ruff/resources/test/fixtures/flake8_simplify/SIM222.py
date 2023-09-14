@@ -152,3 +152,11 @@ if (a or [1] or True or [2]) == (a or [1]):  # SIM222
 
 if f(a or [1] or True or [2]):  # SIM222
     pass
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7099
+def secondToTime(s0: int) -> (int, int, int) or str:
+    m, s = divmod(s0, 60)
+
+
+def secondToTime(s0: int) -> ((int, int, int) or str):
+    m, s = divmod(s0, 60)

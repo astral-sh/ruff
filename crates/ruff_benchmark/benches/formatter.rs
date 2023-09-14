@@ -1,10 +1,9 @@
 use std::path::Path;
-use std::time::Duration;
 
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
 };
-use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
+use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_formatter::{format_node, PyFormatOptions};
 use ruff_python_index::CommentRangesBuilder;
 use ruff_python_parser::lexer::lex;
@@ -29,6 +28,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     Ok(vec![
         TestCase::fast(TestFile::try_download("numpy/globals.py", "https://raw.githubusercontent.com/numpy/numpy/89d64415e349ca75a25250f22b874aa16e5c0973/numpy/_globals.py")?),
+        TestCase::fast(TestFile::try_download("unicode/pypinyin.py", "https://raw.githubusercontent.com/mozillazg/python-pinyin/9521e47d96e3583a5477f5e43a2e82d513f27a3f/pypinyin/standard.py")?),
         TestCase::normal(TestFile::try_download(
             "pydantic/types.py",
             "https://raw.githubusercontent.com/pydantic/pydantic/83b3c49e99ceb4599d9286a3d793cea44ac36d4b/pydantic/types.py",
@@ -47,12 +47,6 @@ fn benchmark_formatter(criterion: &mut Criterion) {
 
     for case in test_cases {
         group.throughput(Throughput::Bytes(case.code().len() as u64));
-
-        group.measurement_time(match case.speed() {
-            TestCaseSpeed::Fast => Duration::from_secs(5),
-            TestCaseSpeed::Normal => Duration::from_secs(10),
-            TestCaseSpeed::Slow => Duration::from_secs(20),
-        });
 
         group.bench_with_input(
             BenchmarkId::from_parameter(case.name()),

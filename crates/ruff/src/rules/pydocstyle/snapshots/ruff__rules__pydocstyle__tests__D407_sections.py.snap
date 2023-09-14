@@ -496,5 +496,6 @@ sections.py:527:5: D407 [*] Missing dashed underline after section ("Parameters"
     530 |+    ----------
 530 531 |     ===========
 531 532 |     """
+532 533 | 
 
 

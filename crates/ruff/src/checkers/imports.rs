@@ -85,7 +85,7 @@ pub(crate) fn check_imports(
     stylist: &Stylist,
     path: &Path,
     package: Option<&Path>,
-    source_kind: Option<&SourceKind>,
+    source_kind: &SourceKind,
     source_type: PySourceType,
 ) -> (Vec<Diagnostic>, Option<ImportMap>) {
     // Extract all import blocks from the AST.

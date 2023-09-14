@@ -1,5 +1,5 @@
 use memchr::{memchr2, memchr3, memrchr3_iter};
-use unic_ucd_ident::{is_xid_continue, is_xid_start};
+use unicode_ident::{is_xid_continue, is_xid_start};
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 

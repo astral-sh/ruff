@@ -21,7 +21,7 @@ impl FormatNodeRule<ExprStarred> for FormatExprStarred {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        write!(f, [text("*"), dangling_comments(dangling), value.format()])
+        write!(f, [token("*"), dangling_comments(dangling), value.format()])
     }
 
     fn fmt_dangling_comments(

@@ -145,7 +145,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [flake8-builtins](https://pypi.org/project/flake8-builtins/)
 - [flake8-commas](https://pypi.org/project/flake8-commas/)
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
-- [flake8-copyright](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-copyright](https://pypi.org/project/flake8-copyright/)
 - [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 - [flake8-debugger](https://pypi.org/project/flake8-debugger/)
 - [flake8-django](https://pypi.org/project/flake8-django/)
@@ -382,37 +382,9 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 By default, no `convention` is set, and so the enabled rules are determined by the `select` setting
 alone.
 
-## What is the "nursery"?
+## What is preview?
 
-The "nursery" is a collection of newer rules that are considered experimental or unstable.
-
-If a rule is marked as part of the "nursery", it can only be enabled via direct selection. For
-example, consider a hypothetical rule, `HYP001`. If `HYP001` were included in the "nursery", it
-could be enabled by adding the following to your `pyproject.toml`:
-
-```toml
-[tool.ruff]
-extend-select = ["HYP001"]
-```
-
-However, it would _not_ be enabled by selecting the `HYP` category, like so:
-
-```toml
-[tool.ruff]
-extend-select = ["HYP"]
-```
-
-Similarly, it would _not_ be enabled via the `ALL` selector:
-
-```toml
-[tool.ruff]
-select = ["ALL"]
-```
-
-(The "nursery" terminology comes from [Clippy](https://doc.rust-lang.org/nightly/clippy/), a similar
-tool for linting Rust code.)
-
-To see which rules are currently in the "nursery", visit the [rules reference](https://beta.ruff.rs/docs/rules/).
+Preview enables a collection of newer rules and fixes that are considered experimental or unstable. See the [preview documentation](https://beta.ruff.rs/docs/preview/) for more details; or, to see which rules are currently in preview, visit the [rules reference](https://beta.ruff.rs/docs/rules/).
 
 ## How can I tell what settings Ruff is using to check my code?
 

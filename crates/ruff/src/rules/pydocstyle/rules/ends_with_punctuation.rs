@@ -89,6 +89,17 @@ pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring
         let line = lines.next().unwrap();
         let trimmed = line.trim_end();
 
+        if trimmed.ends_with('\\') {
+            // Ignore the edge case whether a single quoted string is multiple lines through an
+            // escape (https://github.com/astral-sh/ruff/issues/7139). Single quote docstrings are
+            // flagged by D300.
+            // ```python
+            // "\
+            // "
+            // ```
+            return;
+        }
+
         if !trimmed.ends_with(['.', '!', '?']) {
             let mut diagnostic = Diagnostic::new(EndsInPunctuation, docstring.range());
             // Best-effort autofix: avoid adding a period after other punctuation marks.

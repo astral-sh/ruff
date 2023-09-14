@@ -83,4 +83,19 @@ C416.py:9:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
 11 11 | [i for i, in z]
 12 12 | [i for i, j in y]
 
+C416.py:22:70: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
+   |
+21 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
+22 | any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
+   |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^ C416
+   |
+   = help: Rewrite using `list()`
+
+ℹ Suggested fix
+19 19 | {k: v if v else None for k, v in y}
+20 20 | 
+21 21 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
+22    |-any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
+   22 |+any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in list(SymbolType))
+
 

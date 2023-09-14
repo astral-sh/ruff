@@ -1,4 +1,5 @@
 use thiserror::Error;
+use tracing::Level;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
@@ -13,7 +14,7 @@ use crate::comments::{
     dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
-pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
+pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
 use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
@@ -119,6 +120,7 @@ impl From<ParseError> for FormatModuleError {
     }
 }
 
+#[tracing::instrument(level=Level::TRACE, skip_all, err)]
 pub fn format_module(
     contents: &str,
     options: PyFormatOptions,
@@ -166,10 +168,9 @@ pub fn format_node<'a>(
 }
 
 /// Public function for generating a printable string of the debug comments.
-pub fn pretty_comments(formatted: &Formatted<PyFormatContext>, source: &str) -> String {
-    let comments = formatted.context().comments();
+pub fn pretty_comments(root: &Mod, comment_ranges: &CommentRanges, source: &str) -> String {
+    let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
 
-    // When comments are empty we'd display an empty map '{}'
     std::format!(
         "{comments:#?}",
         comments = comments.debug(SourceCode::new(source))
@@ -215,10 +216,12 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-for converter in connection.ops.get_db_converters(
-    expression
-) + expression.get_db_converters(connection):
-    ...
+(header.timecnt * 5  # Transition times and types
+  + header.typecnt * 6  # Local time type records
+  + header.charcnt  # Time zone designations
+  + header.leapcnt * 8  # Leap second records
+  + header.isstdcnt  # Standard/wall indicators
+  + header.isutcnt)  # UT/local indicators
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
@@ -242,9 +245,9 @@ for converter in connection.ops.get_db_converters(
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
         // use ruff_formatter::FormatContext;
-        // formatted
+        // dbg!(formatted
         //     .document()
-        //     .display(formatted.context().source_code());
+        //     .display(formatted.context().source_code()));
         //
         // dbg!(formatted
         //     .context()
@@ -271,21 +274,18 @@ for converter in connection.ops.get_db_converters(
         struct FormatString<'a>(&'a str);
 
         impl Format<SimpleFormatContext> for FormatString<'_> {
-            fn fmt(
-                &self,
-                f: &mut ruff_formatter::formatter::Formatter<SimpleFormatContext>,
-            ) -> FormatResult<()> {
+            fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
                 let format_str = format_with(|f| {
-                    write!(f, [text("\"")])?;
+                    write!(f, [token("\"")])?;
 
                     let mut words = self.0.split_whitespace().peekable();
                     let mut fill = f.fill();
 
                     let separator = format_with(|f| {
                         group(&format_args![
-                            if_group_breaks(&text("\"")),
+                            if_group_breaks(&token("\"")),
                             soft_line_break_or_space(),
-                            if_group_breaks(&text("\" "))
+                            if_group_breaks(&token("\" "))
                         ])
                         .fmt(f)
                     });
@@ -293,10 +293,10 @@ for converter in connection.ops.get_db_converters(
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [dynamic_text(word, None)])?;
+                            write!(f, [text(word, None)])?;
 
                             if is_last {
-                                write!(f, [text("\"")])?;
+                                write!(f, [token("\"")])?;
                             }
 
                             Ok(())
@@ -311,9 +311,9 @@ for converter in connection.ops.get_db_converters(
                 write!(
                     f,
                     [group(&format_args![
-                        if_group_breaks(&text("(")),
+                        if_group_breaks(&token("(")),
                         soft_block_indent(&format_str),
-                        if_group_breaks(&text(")"))
+                        if_group_breaks(&token(")"))
                     ])]
                 )
             }

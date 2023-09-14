@@ -24,9 +24,9 @@ not_fixed
 ## Outputs
 ### Output 1
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
-tab-width               = 4
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -45,15 +45,17 @@ not_fixed
     	 more
     else:
     	   other
+
+
 # fmt: on
 ```
 
 
 ### Output 2
 ```
-indent-style            = Spaces, size: 2
+indent-style            = space
 line-width              = 88
-tab-width               = 4
+indent-width            = 2
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -72,15 +74,17 @@ not_fixed
   	 more
   else:
   	   other
+
+
 # fmt: on
 ```
 
 
 ### Output 3
 ```
-indent-style            = Tab
+indent-style            = tab
 line-width              = 88
-tab-width               = 4
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -99,6 +103,8 @@ not_fixed
 		 more
 	else:
 		   other
+
+
 # fmt: on
 ```
 

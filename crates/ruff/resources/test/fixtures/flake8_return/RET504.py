@@ -357,3 +357,9 @@ def foo():
 def foo():
     a = 1  # Comment
     return a
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7098
+def mavko_debari(P_kbar):
+    D=0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
+    return D

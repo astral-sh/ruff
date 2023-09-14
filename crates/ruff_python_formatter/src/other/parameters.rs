@@ -102,7 +102,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             dangling.split_at(parenthesis_comments_end);
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            let separator = format_with(|f| write!(f, [text(","), soft_line_break_or_space()]));
+            let separator = format_with(|f| write!(f, [token(","), soft_line_break_or_space()]));
             let mut joiner = f.join_with(separator);
             let mut last_node: Option<AnyNodeRef> = None;
 
@@ -127,7 +127,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                     let assignment = assign_argument_separator_comment_placement(
                         slash.as_ref(),
                         star.as_ref(),
-                        comment.slice().range(),
+                        comment.range(),
                         comment.line_position(),
                     )
                     .expect("Unexpected dangling comment type in function parameters");
@@ -156,7 +156,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             if let Some(vararg) = vararg {
                 joiner.entry(&format_args![
                     leading_node_comments(vararg.as_ref()),
-                    text("*"),
+                    token("*"),
                     vararg.format()
                 ]);
                 last_node = Some(vararg.as_any_node_ref());
@@ -192,7 +192,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             if let Some(kwarg) = kwarg {
                 joiner.entry(&format_args![
                     leading_node_comments(kwarg.as_ref()),
-                    text("**"),
+                    token("**"),
                     kwarg.format()
                 ]);
                 last_node = Some(kwarg.as_any_node_ref());
@@ -216,10 +216,10 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 // For lambdas (no parentheses), preserve the trailing comma. It doesn't
                 // behave like a magic trailing comma, it's just preserved
                 if has_trailing_comma(item, last_node, f.context().source()) {
-                    write!(f, [text(",")])?;
+                    write!(f, [token(",")])?;
                 }
             } else {
-                write!(f, [if_group_breaks(&text(","))])?;
+                write!(f, [if_group_breaks(&token(","))])?;
 
                 if f.options().magic_trailing_comma().is_respect()
                     && has_trailing_comma(item, last_node, f.context().source())
@@ -252,10 +252,10 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             write!(
                 f,
                 [
-                    text("("),
+                    token("("),
                     dangling_open_parenthesis_comments(parenthesis_dangling),
                     soft_block_indent(&group(&format_inner)),
-                    text(")")
+                    token(")")
                 ]
             )
         }
@@ -279,7 +279,7 @@ struct CommentsAroundText<'a> {
 impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if self.comments.is_empty() {
-            text(self.text).fmt(f)
+            token(self.text).fmt(f)
         } else {
             // There might be own line comments in trailing, but those are weird and we can kinda
             // ignore them
@@ -301,7 +301,7 @@ impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
                 f,
                 [
                     leading_comments(leading),
-                    text(self.text),
+                    token(self.text),
                     trailing_comments(trailing)
                 ]
             )

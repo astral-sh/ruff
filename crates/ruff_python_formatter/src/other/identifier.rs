@@ -8,7 +8,7 @@ pub struct FormatIdentifier;
 
 impl FormatRule<Identifier, PyFormatContext<'_>> for FormatIdentifier {
     fn fmt(&self, item: &Identifier, f: &mut PyFormatter) -> FormatResult<()> {
-        source_text_slice(item.range(), ContainsNewlines::No).fmt(f)
+        source_text_slice(item.range()).fmt(f)
     }
 }
 

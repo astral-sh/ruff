@@ -21,7 +21,6 @@ use ruff_text_size::Ranged;
 
 use crate::autofix::{fix_file, FixResult};
 use crate::directives;
-use crate::jupyter::Notebook;
 use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
@@ -29,18 +28,7 @@ use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
 use crate::source_kind::SourceKind;
-
-#[cfg(not(fuzzing))]
-pub(crate) fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
-    let path = test_resource_path("fixtures/jupyter").join(path);
-    Notebook::from_path(&path).map_err(|err| {
-        anyhow::anyhow!(
-            "Failed to read notebook file `{}`: {:?}",
-            path.display(),
-            err
-        )
-    })
-}
+use ruff_notebook::{Notebook, NotebookError};
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -67,12 +55,12 @@ pub(crate) fn test_notebook_path(
     path: impl AsRef<Path>,
     expected: impl AsRef<Path>,
     settings: &Settings,
-) -> Result<TestedNotebook> {
-    let source_notebook = read_jupyter_notebook(path.as_ref())?;
+) -> Result<TestedNotebook, NotebookError> {
+    let source_notebook = Notebook::from_path(path.as_ref())?;
 
     let source_kind = SourceKind::IpyNotebook(source_notebook);
     let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings);
-    let expected_notebook = read_jupyter_notebook(expected.as_ref())?;
+    let expected_notebook = Notebook::from_path(expected.as_ref())?;
     let linted_notebook = transformed.into_owned().expect_ipy_notebook();
 
     assert_eq!(
@@ -144,7 +132,7 @@ pub(crate) fn test_contents<'a>(
         &directives,
         settings,
         flags::Noqa::Enabled,
-        Some(source_kind),
+        source_kind,
         source_type,
     );
 
@@ -207,7 +195,7 @@ pub(crate) fn test_contents<'a>(
                 &directives,
                 settings,
                 flags::Noqa::Enabled,
-                Some(source_kind),
+                source_kind,
                 source_type,
             );
 
@@ -273,12 +261,8 @@ Source with applied fixes:
     (messages, transformed)
 }
 
-fn print_diagnostics(
-    diagnostics: Vec<Diagnostic>,
-    file_path: &Path,
-    source: &SourceKind,
-) -> String {
-    let filename = file_path.file_name().unwrap().to_string_lossy();
+fn print_diagnostics(diagnostics: Vec<Diagnostic>, path: &Path, source: &SourceKind) -> String {
+    let filename = path.file_name().unwrap().to_string_lossy();
     let source_file = SourceFileBuilder::new(filename.as_ref(), source.source_code()).finish();
 
     let messages: Vec<_> = diagnostics
@@ -290,8 +274,8 @@ fn print_diagnostics(
         })
         .collect();
 
-    if let Some(notebook) = source.notebook() {
-        print_jupyter_messages(&messages, &filename, notebook)
+    if let Some(notebook) = source.as_ipy_notebook() {
+        print_jupyter_messages(&messages, path, notebook)
     } else {
         print_messages(&messages)
     }
@@ -299,7 +283,7 @@ fn print_diagnostics(
 
 pub(crate) fn print_jupyter_messages(
     messages: &[Message],
-    filename: &str,
+    path: &Path,
     notebook: &Notebook,
 ) -> String {
     let mut output = Vec::new();
@@ -312,8 +296,8 @@ pub(crate) fn print_jupyter_messages(
             &mut output,
             messages,
             &EmitterContext::new(&FxHashMap::from_iter([(
-                filename.to_string(),
-                notebook.clone(),
+                path.file_name().unwrap().to_string_lossy().to_string(),
+                notebook.index().clone(),
             )])),
         )
         .unwrap();

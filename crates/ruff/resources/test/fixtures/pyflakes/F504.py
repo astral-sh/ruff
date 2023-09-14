@@ -9,3 +9,8 @@ hidden = {"a": "!"}
 "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
 
 '' % {'a''b' : ''}  # F504 ("ab" not used)
+
+# https://github.com/astral-sh/ruff/issues/4899
+"" % {
+  'test1': '',  'test2': '',
+}

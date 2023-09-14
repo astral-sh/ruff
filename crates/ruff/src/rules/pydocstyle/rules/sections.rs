@@ -1377,9 +1377,7 @@ fn blanks_and_section_underline(
     }
 
     if let Some(non_blank_line) = following_lines.next() {
-        let dash_line_found = non_blank_line
-            .chars()
-            .all(|char| char.is_whitespace() || char == '-');
+        let dash_line_found = is_dashed_underline(&non_blank_line);
 
         if dash_line_found {
             if blank_lines_after_header > 0 {
@@ -1693,7 +1691,10 @@ fn common_section(
     }
 
     if checker.enabled(Rule::NoBlankLineBeforeSection) {
-        if !context.previous_line().is_some_and(str::is_empty) {
+        if !context
+            .previous_line()
+            .is_some_and(|line| line.trim().is_empty())
+        {
             let mut diagnostic = Diagnostic::new(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),
@@ -1798,7 +1799,9 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     let relevant_lines = std::iter::once(first_line)
         .chain(following_lines)
         .map(|l| l.as_str())
-        .filter(|line| line.starts_with(leading_space) || line.is_empty())
+        .filter(|line| {
+            line.is_empty() || (line.starts_with(leading_space) && !is_dashed_underline(line))
+        })
         .join("\n");
     let args_content = dedent(&relevant_lines);
 
@@ -1988,4 +1991,9 @@ fn parse_google_sections(
             missing_args(checker, docstring, &documented_args);
         }
     }
+}
+
+fn is_dashed_underline(line: &str) -> bool {
+    let trimmed_line = line.trim();
+    !trimmed_line.is_empty() && trimmed_line.chars().all(|char| char == '-')
 }

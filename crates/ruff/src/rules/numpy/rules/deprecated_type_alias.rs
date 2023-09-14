@@ -1,7 +1,6 @@
-use ruff_python_ast::Expr;
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -34,16 +33,18 @@ pub struct NumpyDeprecatedTypeAlias {
     type_name: String,
 }
 
-impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
+impl Violation for NumpyDeprecatedTypeAlias {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let NumpyDeprecatedTypeAlias { type_name } = self;
         format!("Type alias `np.{type_name}` is deprecated, replace with builtin type")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let NumpyDeprecatedTypeAlias { type_name } = self;
-        format!("Replace `np.{type_name}` with builtin type")
+        Some(format!("Replace `np.{type_name}` with builtin type"))
     }
 }
 
@@ -73,15 +74,17 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                match type_name {
-                    "unicode" => "str",
-                    "long" => "int",
-                    _ => type_name,
-                }
-                .to_string(),
-                expr.range(),
-            )));
+            let type_name = match type_name {
+                "unicode" => "str",
+                "long" => "int",
+                _ => type_name,
+            };
+            if checker.semantic().is_builtin(type_name) {
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    type_name.to_string(),
+                    expr.range(),
+                )));
+            }
         }
         checker.diagnostics.push(diagnostic);
     }

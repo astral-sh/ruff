@@ -191,9 +191,8 @@ assert (
     # Trailing test value own-line
     # Test dangler
 ), "Some string"  # Trailing msg same-line
-
-
 # Trailing assert
+
 
 def test():
     assert (

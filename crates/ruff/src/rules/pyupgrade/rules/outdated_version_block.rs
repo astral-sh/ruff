@@ -60,66 +60,147 @@ impl AlwaysAutofixableViolation for OutdatedVersionBlock {
     }
 }
 
-/// Converts a `BigInt` to a `u32`. If the number is negative, it will return 0.
-fn bigint_to_u32(number: &BigInt) -> u32 {
-    let the_number = number.to_u32_digits();
-    match the_number.0 {
-        Sign::Minus | Sign::NoSign => 0,
-        Sign::Plus => *the_number.1.first().unwrap(),
-    }
-}
+/// UP036
+pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
+    for branch in if_elif_branches(stmt_if) {
+        let Expr::Compare(ast::ExprCompare {
+            left,
+            ops,
+            comparators,
+            range: _,
+        }) = &branch.test
+        else {
+            continue;
+        };
 
-/// Gets the version from the tuple
-fn extract_version(elts: &[Expr]) -> Vec<u32> {
-    let mut version: Vec<u32> = vec![];
-    for elt in elts {
-        if let Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(item),
-            ..
-        }) = &elt
+        let ([op], [comparison]) = (ops.as_slice(), comparators.as_slice()) else {
+            continue;
+        };
+
+        if !checker
+            .semantic()
+            .resolve_call_path(left)
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "version_info"]))
         {
-            let number = bigint_to_u32(item);
-            version.push(number);
-        } else {
-            return version;
+            continue;
         }
-    }
-    version
-}
 
-/// Returns true if the `if_version` is less than the `PythonVersion`
-fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool) -> bool {
-    let mut if_version_iter = if_version.iter();
-    if let Some(if_major) = if_version_iter.next() {
-        let (py_major, py_minor) = py_version.as_tuple();
-        match if_major.cmp(&py_major) {
-            Ordering::Less => true,
-            Ordering::Equal => {
-                if let Some(if_minor) = if_version_iter.next() {
-                    // Check the if_minor number (the minor version).
-                    if or_equal {
-                        *if_minor <= py_minor
-                    } else {
-                        *if_minor < py_minor
+        match comparison {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => match op {
+                CmpOp::Lt | CmpOp::LtE => {
+                    let version = extract_version(elts);
+                    let target = checker.settings.target_version;
+                    if compare_version(&version, target, op == &CmpOp::LtE) {
+                        let mut diagnostic =
+                            Diagnostic::new(OutdatedVersionBlock, branch.test.range());
+                        if checker.patch(diagnostic.kind.rule()) {
+                            if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
+                            }
+                        }
+                        checker.diagnostics.push(diagnostic);
                     }
-                } else {
-                    // Assume Python 3.0.
-                    true
+                }
+                CmpOp::Gt | CmpOp::GtE => {
+                    let version = extract_version(elts);
+                    let target = checker.settings.target_version;
+                    if compare_version(&version, target, op == &CmpOp::GtE) {
+                        let mut diagnostic =
+                            Diagnostic::new(OutdatedVersionBlock, branch.test.range());
+                        if checker.patch(diagnostic.kind.rule()) {
+                            if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
+                            }
+                        }
+                        checker.diagnostics.push(diagnostic);
+                    }
+                }
+                _ => {}
+            },
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Int(number),
+                ..
+            }) => {
+                if op == &CmpOp::Eq {
+                    match bigint_to_u32(number) {
+                        2 => {
+                            let mut diagnostic =
+                                Diagnostic::new(OutdatedVersionBlock, branch.test.range());
+                            if checker.patch(diagnostic.kind.rule()) {
+                                if let Some(fix) =
+                                    fix_always_false_branch(checker, stmt_if, &branch)
+                                {
+                                    diagnostic.set_fix(fix);
+                                }
+                            }
+                            checker.diagnostics.push(diagnostic);
+                        }
+                        3 => {
+                            let mut diagnostic =
+                                Diagnostic::new(OutdatedVersionBlock, branch.test.range());
+                            if checker.patch(diagnostic.kind.rule()) {
+                                if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch)
+                                {
+                                    diagnostic.set_fix(fix);
+                                }
+                            }
+                            checker.diagnostics.push(diagnostic);
+                        }
+                        _ => {}
+                    }
                 }
             }
-            Ordering::Greater => false,
+            _ => (),
         }
-    } else {
-        false
     }
 }
 
-/// For fixing, we have 4 cases:
-/// * Just an if: delete as statement (insert pass in parent if required)
-/// * If with an elif: delete, turn elif into if
-/// * If with an else: delete, dedent else
-/// * Just an elif: delete, `elif False` can always be removed
-fn fix_py2_block(checker: &Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> Option<Fix> {
+/// Returns true if the `target_version` is always less than the [`PythonVersion`].
+fn compare_version(target_version: &[u32], py_version: PythonVersion, or_equal: bool) -> bool {
+    let mut target_version_iter = target_version.iter();
+
+    let Some(if_major) = target_version_iter.next() else {
+        return false;
+    };
+
+    let (py_major, py_minor) = py_version.as_tuple();
+
+    match if_major.cmp(&py_major) {
+        Ordering::Less => true,
+        Ordering::Greater => false,
+        Ordering::Equal => {
+            let Some(if_minor) = target_version_iter.next() else {
+                return true;
+            };
+            if or_equal {
+                // Ex) `sys.version_info <= 3.8`. If Python 3.8 is the minimum supported version,
+                // the condition won't always evaluate to `false`, so we want to return `false`.
+                *if_minor < py_minor
+            } else {
+                // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
+                // the condition _will_ always evaluate to `false`, so we want to return `true`.
+                *if_minor <= py_minor
+            }
+        }
+    }
+}
+
+/// Fix a branch that is known to always evaluate to `false`.
+///
+/// For example, when running with a minimum supported version of Python 3.8, the following branch
+/// would be considered redundant:
+/// ```python
+/// if sys.version_info < (3, 7): ...
+/// ```
+///
+/// In this case, the fix would involve removing the branch; however, there are multiple cases to
+/// consider. For example, if the `if` has an `else`, then the `if` should be removed, and the
+/// `else` should be inlined at the top level.
+fn fix_always_false_branch(
+    checker: &Checker,
+    stmt_if: &StmtIf,
+    branch: &IfElifBranch,
+) -> Option<Fix> {
     match branch.kind {
         BranchKind::If => match stmt_if.elif_else_clauses.first() {
             // If we have a lone `if`, delete as statement (insert pass in parent if required)
@@ -210,8 +291,18 @@ fn fix_py2_block(checker: &Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> 
     }
 }
 
-/// Convert a [`Stmt::If`], removing the `else` block.
-fn fix_py3_block(checker: &mut Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> Option<Fix> {
+/// Fix a branch that is known to always evaluate to `true`.
+///
+/// For example, when running with a minimum supported version of Python 3.8, the following branch
+/// would be considered redundant, as it's known to always evaluate to `true`:
+/// ```python
+/// if sys.version_info >= (3, 8): ...
+/// ```
+fn fix_always_true_branch(
+    checker: &mut Checker,
+    stmt_if: &StmtIf,
+    branch: &IfElifBranch,
+) -> Option<Fix> {
     match branch.kind {
         BranchKind::If => {
             // If the first statement is an `if`, use the body of this statement, and ignore
@@ -262,85 +353,31 @@ fn fix_py3_block(checker: &mut Checker, stmt_if: &StmtIf, branch: &IfElifBranch)
     }
 }
 
-/// UP036
-pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
-    for branch in if_elif_branches(stmt_if) {
-        let Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-        }) = &branch.test
-        else {
-            continue;
-        };
+/// Converts a `BigInt` to a `u32`. If the number is negative, it will return 0.
+fn bigint_to_u32(number: &BigInt) -> u32 {
+    let the_number = number.to_u32_digits();
+    match the_number.0 {
+        Sign::Minus | Sign::NoSign => 0,
+        Sign::Plus => *the_number.1.first().unwrap(),
+    }
+}
 
-        let ([op], [comparison]) = (ops.as_slice(), comparators.as_slice()) else {
-            continue;
-        };
-
-        if !checker
-            .semantic()
-            .resolve_call_path(left)
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "version_info"]))
+/// Gets the version from the tuple
+fn extract_version(elts: &[Expr]) -> Vec<u32> {
+    let mut version: Vec<u32> = vec![];
+    for elt in elts {
+        if let Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(item),
+            ..
+        }) = &elt
         {
-            continue;
-        }
-
-        match comparison {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let version = extract_version(elts);
-                let target = checker.settings.target_version;
-                if op == &CmpOp::Lt || op == &CmpOp::LtE {
-                    if compare_version(&version, target, op == &CmpOp::LtE) {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock, branch.test.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(fix) = fix_py2_block(checker, stmt_if, &branch) {
-                                diagnostic.set_fix(fix);
-                            }
-                        }
-                        checker.diagnostics.push(diagnostic);
-                    }
-                } else if op == &CmpOp::Gt || op == &CmpOp::GtE {
-                    if compare_version(&version, target, op == &CmpOp::GtE) {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock, branch.test.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(fix) = fix_py3_block(checker, stmt_if, &branch) {
-                                diagnostic.set_fix(fix);
-                            }
-                        }
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
-            }
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(number),
-                ..
-            }) => {
-                let version_number = bigint_to_u32(number);
-                if version_number == 2 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch.test.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(fix) = fix_py2_block(checker, stmt_if, &branch) {
-                            diagnostic.set_fix(fix);
-                        }
-                    }
-                    checker.diagnostics.push(diagnostic);
-                } else if version_number == 3 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch.test.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(fix) = fix_py3_block(checker, stmt_if, &branch) {
-                            diagnostic.set_fix(fix);
-                        }
-                    }
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            _ => (),
+            let number = bigint_to_u32(item);
+            version.push(number);
+        } else {
+            return version;
         }
     }
+    version
 }
 
 #[cfg(test)]
@@ -355,8 +392,8 @@ mod tests {
     #[test_case(PythonVersion::Py37, &[3, 0], true, true; "compare-3.0-whole")]
     #[test_case(PythonVersion::Py37, &[3, 1], true, true; "compare-3.1")]
     #[test_case(PythonVersion::Py37, &[3, 5], true, true; "compare-3.5")]
-    #[test_case(PythonVersion::Py37, &[3, 7], true, true; "compare-3.7")]
-    #[test_case(PythonVersion::Py37, &[3, 7], false, false; "compare-3.7-not-equal")]
+    #[test_case(PythonVersion::Py37, &[3, 7], true, false; "compare-3.7")]
+    #[test_case(PythonVersion::Py37, &[3, 7], false, true; "compare-3.7-not-equal")]
     #[test_case(PythonVersion::Py37, &[3, 8], false , false; "compare-3.8")]
     #[test_case(PythonVersion::Py310, &[3,9], true, true; "compare-3.9")]
     #[test_case(PythonVersion::Py310, &[3, 11], true, false; "compare-3.11")]

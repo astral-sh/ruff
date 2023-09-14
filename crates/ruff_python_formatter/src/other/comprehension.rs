@@ -32,14 +32,13 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
         } = item;
 
         if *is_async {
-            write!(f, [text("async"), space()])?;
+            write!(f, [token("async"), space()])?;
         }
 
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling(item);
         let (before_target_comments, before_in_comments) = dangling_item_comments.split_at(
-            dangling_item_comments
-                .partition_point(|comment| comment.slice().end() < target.start()),
+            dangling_item_comments.partition_point(|comment| comment.end() < target.start()),
         );
 
         let trailing_in_comments = comments.dangling(iter);
@@ -55,14 +54,14 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
         write!(
             f,
             [
-                text("for"),
+                token("for"),
                 trailing_comments(before_target_comments),
                 group(&format_args!(
                     Spacer(target),
                     ExprTupleWithoutParentheses(target),
                     in_spacer,
                     leading_comments(before_in_comments),
-                    text("in"),
+                    token("in"),
                     trailing_comments(trailing_in_comments),
                     Spacer(iter),
                     iter.format(),
@@ -82,7 +81,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                         );
                     joiner.entry(&group(&format_args!(
                         leading_comments(own_line_if_comments),
-                        text("if"),
+                        token("if"),
                         trailing_comments(end_of_line_if_comments),
                         Spacer(if_case),
                         if_case.format(),

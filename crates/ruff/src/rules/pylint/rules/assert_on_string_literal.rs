@@ -77,7 +77,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                 AssertOnStringLiteral {
                     kind: if values.iter().all(|value| match value {
                         Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                            Constant::Str(value, ..) => value.is_empty(),
+                            Constant::Str(value) => value.is_empty(),
                             Constant::Bytes(value) => value.is_empty(),
                             _ => false,
                         },
@@ -86,7 +86,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                         Kind::Empty
                     } else if values.iter().any(|value| match value {
                         Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                            Constant::Str(value, ..) => !value.is_empty(),
+                            Constant::Str(value) => !value.is_empty(),
                             Constant::Bytes(value) => !value.is_empty(),
                             _ => false,
                         },

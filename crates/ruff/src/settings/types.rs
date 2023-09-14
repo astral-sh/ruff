@@ -92,6 +92,23 @@ impl PythonVersion {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
+pub enum PreviewMode {
+    #[default]
+    Disabled,
+    Enabled,
+}
+
+impl From<bool> for PreviewMode {
+    fn from(version: bool) -> Self {
+        if version {
+            PreviewMode::Enabled
+        } else {
+            PreviewMode::Disabled
+        }
+    }
+}
+
 #[derive(Debug, Clone, CacheKey, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),
@@ -177,7 +194,8 @@ pub struct PerFileIgnore {
 
 impl PerFileIgnore {
     pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
-        let rules: RuleSet = prefixes.iter().flat_map(IntoIterator::into_iter).collect();
+        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
+        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
         let path = Path::new(&pattern);
         let absolute = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),

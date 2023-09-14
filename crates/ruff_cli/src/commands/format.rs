@@ -1,25 +1,24 @@
 use std::fmt::{Display, Formatter};
-use std::fs::File;
 use std::io;
-use std::io::{BufWriter, Write};
 use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::Result;
 use colored::Colorize;
-use log::{debug, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
-use tracing::{span, Level};
+use tracing::{debug, warn};
 
 use ruff::fs;
 use ruff::logging::LogLevel;
+use ruff::settings::types::PreviewMode;
 use ruff::warn_user_once;
 use ruff_formatter::LineWidth;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
+use ruff_source_file::{find_newline, LineEnding};
 use ruff_workspace::resolver::python_files_in_path;
 
 use crate::args::{FormatArguments, Overrides};
@@ -61,30 +60,46 @@ pub(crate) fn format(
     let start = Instant::now();
     let (results, errors): (Vec<_>, Vec<_>) = paths
         .into_par_iter()
-        .filter_map(|entry| match entry {
-            Ok(entry) => {
-                let path = entry.path();
+        .filter_map(|entry| {
+            match entry {
+                Ok(entry) => {
+                    let path = entry.path();
 
-                let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
-                    SourceType::from(path)
-                else {
-                    // Ignore any non-Python files.
-                    return None;
-                };
+                    let SourceType::Python(
+                        source_type @ (PySourceType::Python | PySourceType::Stub),
+                    ) = SourceType::from(path)
+                    else {
+                        // Ignore any non-Python files.
+                        return None;
+                    };
 
-                let line_length = resolver.resolve(path, &pyproject_config).line_length;
-                let options = PyFormatOptions::from_source_type(source_type)
-                    .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
-                Some(format_path(path, options, mode))
+                    let resolved_settings = resolver.resolve(path, &pyproject_config);
+
+                    let preview = match resolved_settings.preview {
+                        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+                        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+                    };
+                    let line_length = resolved_settings.line_length;
+
+                    let options = PyFormatOptions::from_source_type(source_type)
+                        .with_line_width(LineWidth::from(NonZeroU16::from(line_length)))
+                        .with_preview(preview);
+                    debug!("Formatting {} with {:?}", path.display(), options);
+                    Some(format_path(path, options, mode))
+                }
+                Err(err) => Some(Err(FormatCommandError::Ignore(err))),
             }
-            Err(err) => Some(Err(FormatCommandError::Ignore(err))),
         })
         .partition_map(|result| match result {
             Ok(diagnostic) => Left(diagnostic),
             Err(err) => Right(err),
         });
     let duration = start.elapsed();
-    debug!("Formatted files in: {:?}", duration);
+    debug!(
+        "Formatted {} files in {:.2?}",
+        results.len() + errors.len(),
+        duration
+    );
 
     let summary = FormatResultSummary::new(results, mode);
 
@@ -98,15 +113,10 @@ pub(crate) fn format(
 
     // Report on the formatting changes.
     if log_level >= LogLevel::Default {
-        let mut writer: Box<dyn Write> = match &cli.output_file {
-            Some(path) => {
-                colored::control::set_override(false);
-                let file = File::create(path)?;
-                Box::new(BufWriter::new(file))
-            }
-            _ => Box::new(BufWriter::new(io::stdout())),
-        };
-        writeln!(writer, "{summary}")?;
+        #[allow(clippy::print_stdout)]
+        {
+            println!("{summary}");
+        }
     }
 
     match mode {
@@ -140,12 +150,18 @@ fn format_path(
 ) -> Result<FormatCommandResult, FormatCommandError> {
     let unformatted = std::fs::read_to_string(path)
         .map_err(|err| FormatCommandError::Read(Some(path.to_path_buf()), err))?;
-    let formatted = {
-        let span = span!(Level::TRACE, "format_path_without_io", path = %path.display());
-        let _enter = span.enter();
-        format_module(&unformatted, options)
-            .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?
+
+    let line_ending = match find_newline(&unformatted) {
+        Some((_, LineEnding::Lf)) | None => ruff_formatter::printer::LineEnding::LineFeed,
+        Some((_, LineEnding::Cr)) => ruff_formatter::printer::LineEnding::CarriageReturn,
+        Some((_, LineEnding::CrLf)) => ruff_formatter::printer::LineEnding::CarriageReturnLineFeed,
     };
+
+    let options = options.with_line_ending(line_ending);
+
+    let formatted = format_module(&unformatted, options)
+        .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?;
+
     let formatted = formatted.as_code();
     if formatted.len() == unformatted.len() && formatted == unformatted {
         Ok(FormatCommandResult::Unchanged)

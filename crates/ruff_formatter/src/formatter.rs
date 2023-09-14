@@ -52,11 +52,11 @@ impl<'buf, Context> Formatter<'buf, Context> {
     /// # fn main() -> FormatResult<()> {
     /// let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
     ///     f.join()
-    ///         .entry(&text("a"))
+    ///         .entry(&token("a"))
     ///         .entry(&space())
-    ///         .entry(&text("+"))
+    ///         .entry(&token("+"))
     ///         .entry(&space())
-    ///         .entry(&text("b"))
+    ///         .entry(&token("b"))
     ///         .finish()
     /// })])?;
     ///
@@ -83,11 +83,11 @@ impl<'buf, Context> Formatter<'buf, Context> {
     ///
     /// # fn main() -> FormatResult<()> {
     /// let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
-    ///     f.join_with(&format_args!(text(","), space()))
-    ///         .entry(&text("1"))
-    ///         .entry(&text("2"))
-    ///         .entry(&text("3"))
-    ///         .entry(&text("4"))
+    ///     f.join_with(&format_args!(token(","), space()))
+    ///         .entry(&token("1"))
+    ///         .entry(&token("2"))
+    ///         .entry(&token("3"))
+    ///         .entry(&token("4"))
     ///         .finish()
     /// })])?;
     ///
@@ -121,10 +121,10 @@ impl<'buf, Context> Formatter<'buf, Context> {
     /// # fn main() -> FormatResult<()> {
     /// let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
     ///     f.fill()
-    ///         .entry(&soft_line_break_or_space(), &text("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
-    ///         .entry(&soft_line_break_or_space(), &text("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
-    ///         .entry(&soft_line_break_or_space(), &text("cccccccccccccccccccccccccccccc"))
-    ///         .entry(&soft_line_break_or_space(), &text("dddddddddddddddddddddddddddddd"))
+    ///         .entry(&soft_line_break_or_space(), &token("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+    ///         .entry(&soft_line_break_or_space(), &token("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
+    ///         .entry(&soft_line_break_or_space(), &token("cccccccccccccccccccccccccccccc"))
+    ///         .entry(&soft_line_break_or_space(), &token("dddddddddddddddddddddddddddddd"))
     ///         .finish()
     /// })])?;
     ///
@@ -142,10 +142,10 @@ impl<'buf, Context> Formatter<'buf, Context> {
     ///
     /// # fn main() -> FormatResult<()> {
     /// let entries = vec![
-    ///     text("<b>Important: </b>"),
-    ///     text("Please do not commit memory bugs such as segfaults, buffer overflows, etc. otherwise you "),
-    ///     text("<em>will</em>"),
-    ///     text(" be reprimanded")
+    ///     token("<b>Important: </b>"),
+    ///     token("Please do not commit memory bugs such as segfaults, buffer overflows, etc. otherwise you "),
+    ///     token("<em>will</em>"),
+    ///     token(" be reprimanded")
     /// ];
     ///
     /// let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {

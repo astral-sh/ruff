@@ -15,7 +15,7 @@ impl FormatNodeRule<Alias> for FormatAlias {
         } = item;
         name.format().fmt(f)?;
         if let Some(asname) = asname {
-            write!(f, [space(), text("as"), space(), asname.format()])?;
+            write!(f, [space(), token("as"), space(), asname.format()])?;
         }
         Ok(())
     }

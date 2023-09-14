@@ -119,8 +119,8 @@ mod tests {
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"))]
     #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"))]
     #[test_case(
-        Rule::RepeatedEqualityComparisonTarget,
-        Path::new("repeated_equality_comparison_target.py")
+        Rule::RepeatedEqualityComparison,
+        Path::new("repeated_equality_comparison.py")
     )]
     #[test_case(Rule::SelfAssigningVariable, Path::new("self_assigning_variable.py"))]
     #[test_case(

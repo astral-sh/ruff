@@ -136,6 +136,15 @@ def something():
      for some_boolean_variable in some_iterable
  )
  
+@@ -86,5 +78,7 @@
+     clone._iterable_class = (
+         NamedValuesListIterable
+         if named
+-        else FlatValuesListIterable if flat else ValuesListIterable
++        else FlatValuesListIterable
++        if flat
++        else ValuesListIterable
+     )
 ```
 
 ## Ruff Output
@@ -221,7 +230,9 @@ def something():
     clone._iterable_class = (
         NamedValuesListIterable
         if named
-        else FlatValuesListIterable if flat else ValuesListIterable
+        else FlatValuesListIterable
+        if flat
+        else ValuesListIterable
     )
 ```
 

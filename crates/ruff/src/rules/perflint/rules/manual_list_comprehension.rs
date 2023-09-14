@@ -4,6 +4,8 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_semantic::analyze::typing::is_list;
+use ruff_python_semantic::Binding;
 
 use crate::checkers::ast::Checker;
 
@@ -112,19 +114,19 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     };
 
-    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if if_test.is_none() {
-        if arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
-            return;
-        }
-    }
-
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
 
     if attr.as_str() != "append" {
         return;
+    }
+
+    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`).
+    if if_test.is_none() {
+        if arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
+            return;
+        }
     }
 
     // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
@@ -138,6 +140,25 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     if any_over_expr(arg, &|expr| {
         ComparableExpr::from(expr) == ComparableExpr::from(value)
     }) {
+        return;
+    }
+
+    // Avoid non-list values.
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+        return;
+    };
+    let bindings: Vec<&Binding> = checker
+        .semantic()
+        .current_scope()
+        .get_all(id)
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .collect();
+
+    let [binding] = bindings.as_slice() else {
+        return;
+    };
+
+    if !is_list(binding, checker.semantic()) {
         return;
     }
 

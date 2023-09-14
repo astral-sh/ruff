@@ -34,12 +34,14 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
                 f,
                 [group(&format_args![
                     key.format(),
-                    text(":"),
+                    token(":"),
                     space(),
                     self.value.format()
                 ])]
             )
         } else {
+            // TODO(charlie): Make these dangling comments on the `ExprDict`, and identify them
+            // dynamically, so as to avoid the parent rendering its child's comments.
             let comments = f.context().comments().clone();
             let leading_value_comments = comments.leading(self.value);
             write!(
@@ -47,7 +49,7 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
                 [
                     // make sure the leading comments are hoisted past the `**`
                     leading_comments(leading_value_comments),
-                    group(&format_args![text("**"), self.value.format()])
+                    group(&format_args![token("**"), self.value.format()])
                 ]
             )
         }

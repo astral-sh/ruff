@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.286"
+version = "0.0.289"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -18,6 +18,7 @@ name = "ruff"
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
 ruff_index = { path = "../ruff_index" }
+ruff_notebook = { path = "../ruff_notebook" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
 ruff_python_codegen = { path = "../ruff_python_codegen" }
@@ -55,7 +56,7 @@ path-absolutize = { workspace = true, features = [
 ] }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.3.1", features = ["serde"] }
-pyproject-toml = { version = "0.6.0" }
+pyproject-toml = { version = "0.7.0" }
 quick-junit = { version = "0.3.2" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
@@ -64,17 +65,15 @@ schemars = { workspace = true, optional = true }
 semver = { version = "1.0.16" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_with = { version = "3.0.0" }
 similar = { workspace = true }
 smallvec = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-thiserror = { version = "1.0.43" }
+thiserror = { workspace = true }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
 unicode-width = { workspace = true }
 unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }
-uuid = { workspace = true, features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 wsl = { version = "0.1.0" }
 
 [dev-dependencies]

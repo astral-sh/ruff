@@ -1,0 +1,53 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "-"
+    - "--isolated"
+    - "--no-cache"
+    - "--format"
+    - json
+    - "--stdin-filename"
+    - F401.py
+  stdin: "import os\n"
+---
+success: false
+exit_code: 1
+----- stdout -----
+[
+  {
+    "code": "F401",
+    "end_location": {
+      "column": 10,
+      "row": 1
+    },
+    "filename": "/path/to/F401.py",
+    "fix": {
+      "applicability": "Automatic",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 1,
+            "row": 2
+          },
+          "location": {
+            "column": 1,
+            "row": 1
+          }
+        }
+      ],
+      "message": "Remove unused import: `os`"
+    },
+    "location": {
+      "column": 8,
+      "row": 1
+    },
+    "message": "`os` imported but unused",
+    "noqa_row": 1,
+    "url": "https://beta.ruff.rs/docs/rules/unused-import"
+  }
+]
+----- stderr -----
+

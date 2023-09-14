@@ -17,7 +17,7 @@ impl FormatNodeRule<Parameter> for FormatParameter {
         name.format().fmt(f)?;
 
         if let Some(annotation) = annotation {
-            write!(f, [text(":"), space(), annotation.format()])?;
+            write!(f, [token(":"), space(), annotation.format()])?;
         }
 
         Ok(())

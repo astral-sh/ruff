@@ -21,7 +21,7 @@ impl FormatNodeRule<ExprName> for FormatExprName {
                 .text(f.context().source_code())
         );
 
-        write!(f, [source_text_slice(*range, ContainsNewlines::No)])
+        write!(f, [source_text_slice(*range)])
     }
 
     fn fmt_dangling_comments(

@@ -39,10 +39,10 @@ expression: parse_ast
             value: Str(
                 StringConstant {
                     value: "{foo}",
+                    unicode: false,
                     implicit_concatenated: false,
                 },
             ),
-            kind: None,
         },
     ),
 ]

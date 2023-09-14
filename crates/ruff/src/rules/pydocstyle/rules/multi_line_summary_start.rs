@@ -151,6 +151,15 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
             }
             checker.diagnostics.push(diagnostic);
         }
+    } else if first_line.as_str().ends_with('\\') {
+        // Ignore the edge case whether a single quoted string is multiple lines through an
+        // escape (https://github.com/astral-sh/ruff/issues/7139). Single quote docstrings are
+        // flagged by D300.
+        // ```python
+        // "\
+        // "
+        // ```
+        return;
     } else {
         if checker.enabled(Rule::MultiLineSummarySecondLine) {
             let mut diagnostic = Diagnostic::new(MultiLineSummarySecondLine, docstring.range());

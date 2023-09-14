@@ -13,10 +13,10 @@ Dict(
                         value: Str(
                             StringConstant {
                                 value: "a",
+                                unicode: false,
                                 implicit_concatenated: false,
                             },
                         ),
-                        kind: None,
                     },
                 ),
             ),
@@ -28,10 +28,10 @@ Dict(
                         value: Str(
                             StringConstant {
                                 value: "d",
+                                unicode: false,
                                 implicit_concatenated: false,
                             },
                         ),
-                        kind: None,
                     },
                 ),
             ),
@@ -43,10 +43,10 @@ Dict(
                     value: Str(
                         StringConstant {
                             value: "b",
+                            unicode: false,
                             implicit_concatenated: false,
                         },
                     ),
-                    kind: None,
                 },
             ),
             Name(
@@ -62,10 +62,10 @@ Dict(
                     value: Str(
                         StringConstant {
                             value: "e",
+                            unicode: false,
                             implicit_concatenated: false,
                         },
                     ),
-                    kind: None,
                 },
             ),
         ],

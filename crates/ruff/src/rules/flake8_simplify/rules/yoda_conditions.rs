@@ -9,8 +9,10 @@ use ruff_python_stdlib::str::{self};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
+use crate::autofix::edits::pad;
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
 use crate::registry::AsRule;
 
@@ -116,43 +118,43 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
                 whitespace_before,
                 whitespace_after,
             } => CompOp::GreaterThan {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::GreaterThan {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::LessThan {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::LessThanEqual {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::GreaterThanEqual {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::GreaterThanEqual {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::LessThanEqual {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::Equal {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::Equal {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             CompOp::NotEqual {
                 whitespace_before,
                 whitespace_after,
             } => CompOp::NotEqual {
-                whitespace_before,
-                whitespace_after,
+                whitespace_before: or_space(whitespace_before),
+                whitespace_after: or_space(whitespace_after),
             },
             _ => panic!("Expected comparison operator"),
         };
@@ -193,7 +195,7 @@ pub(crate) fn yoda_conditions(
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                suggestion,
+                pad(suggestion, expr.range(), checker.locator()),
                 expr.range(),
             )));
         }

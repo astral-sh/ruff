@@ -21,6 +21,11 @@ use crate::registry::AsRule;
 /// a single `extend`. Each `append` resizes the list individually, whereas an
 /// `extend` can resize the list once for all elements.
 ///
+/// ## Known problems
+/// This rule is prone to false negatives due to type inference limitations,
+/// as it will only detect lists that are instantiated as literals or annotated
+/// with a type annotation.
+///
 /// ## Example
 /// ```python
 /// nums = [1, 2, 3]

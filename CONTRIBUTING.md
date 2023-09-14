@@ -129,6 +129,7 @@ At time of writing, the repository includes the following crates:
     intermediate representation. The backend for `ruff_python_formatter`.
 - `crates/ruff_index`: library crate inspired by `rustc_index`.
 - `crates/ruff_macros`: proc macro crate containing macros used by Ruff.
+- `crates/ruff_notebook`: library crate for parsing and manipulating Jupyter notebooks.
 - `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities.
 - `crates/ruff_python_codegen`: library crate containing utilities for generating Python source code.
 - `crates/ruff_python_formatter`: library crate implementing the Python formatter. Emits an

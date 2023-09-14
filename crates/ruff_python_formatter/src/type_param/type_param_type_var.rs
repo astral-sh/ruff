@@ -15,7 +15,7 @@ impl FormatNodeRule<TypeParamTypeVar> for FormatTypeParamTypeVar {
         } = item;
         name.format().fmt(f)?;
         if let Some(bound) = bound {
-            write!(f, [text(":"), space(), bound.format()])?;
+            write!(f, [token(":"), space(), bound.format()])?;
         }
         Ok(())
     }
