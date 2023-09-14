@@ -207,9 +207,6 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             needs_parentheses => needs_parentheses,
         };
 
-        println!("Expression: {:?}", expression);
-        println!("Needs parentheses: {:?}", needs_parentheses);
-
         match needs_parentheses {
             OptionalParentheses::Multiline => match parenthesize {
                 Parenthesize::IfBreaksOrIfRequired => {
@@ -221,7 +218,6 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
                 Parenthesize::Optional | Parenthesize::IfBreaks => {
                     if can_omit_optional_parentheses(expression, f.context()) {
-                        println!("Can omit optional parentheses");
                         optional_parentheses(&expression.format().with_options(Parentheses::Never))
                             .fmt(f)
                     } else {
@@ -378,8 +374,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
-
-    println!("{:#?}", visitor);
 
     if visitor.max_precedence == OperatorPrecedence::None {
         true
