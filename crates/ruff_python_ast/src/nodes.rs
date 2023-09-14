@@ -3254,6 +3254,12 @@ pub struct ParenthesizedExpr {
     /// The underlying expression.
     pub expr: Expr,
 }
+impl ParenthesizedExpr {
+    /// Returns `true` if the expression is may be parenthesized.
+    pub fn is_parenthesized(&self) -> bool {
+        self.range != self.expr.range()
+    }
+}
 impl Ranged for ParenthesizedExpr {
     fn range(&self) -> TextRange {
         self.range
