@@ -2628,6 +2628,16 @@ impl Deref for StringConstant {
     }
 }
 
+impl From<String> for StringConstant {
+    fn from(value: String) -> StringConstant {
+        Self {
+            value,
+            unicode: false,
+            implicit_concatenated: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BytesConstant {
     /// The bytes value as resolved by the parser (i.e., without quotes, or escape sequences, or
@@ -2641,6 +2651,15 @@ impl Deref for BytesConstant {
     type Target = [u8];
     fn deref(&self) -> &Self::Target {
         self.value.as_slice()
+    }
+}
+
+impl From<Vec<u8>> for BytesConstant {
+    fn from(value: Vec<u8>) -> BytesConstant {
+        Self {
+            value,
+            implicit_concatenated: false,
+        }
     }
 }
 
