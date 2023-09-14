@@ -667,7 +667,10 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                     leading_comments(leading).fmt(f)?;
                 }
 
-                in_parentheses_only_group(&left).fmt(f)?;
+                match &left.0 {
+                    [OperandOrOperator::Operand(operand)] => operand.fmt(f)?,
+                    _ => in_parentheses_only_group(&left).fmt(f)?,
+                }
 
                 if let Some(trailing) = left.last_operand().trailing_binary_comments() {
                     trailing_comments(trailing).fmt(f)?;
@@ -708,7 +711,10 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
             leading_comments(leading).fmt(f)?;
         }
 
-        in_parentheses_only_group(&right).fmt(f)
+        match &right.0 {
+            [OperandOrOperator::Operand(operand)] => operand.fmt(f),
+            _ => in_parentheses_only_group(&right).fmt(f),
+        }
     }
 }
 
