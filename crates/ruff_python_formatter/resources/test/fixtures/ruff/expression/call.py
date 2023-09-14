@@ -265,3 +265,8 @@ f(  # a
     kwargs,
 )
 
+# Regression test for: https://github.com/astral-sh/ruff/issues/7370
+result = (
+    f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
+    + 1
+)()
