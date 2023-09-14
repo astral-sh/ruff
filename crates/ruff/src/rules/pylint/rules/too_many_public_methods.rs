@@ -1,8 +1,8 @@
-use ruff_python_ast::{self as ast, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Checks for classes with too many public methods
 ///
 /// By default, this rule allows up to 20 statements, as configured by the
-/// `pylint.max-public-methods` option.
+/// [`pylint.max-public-methods`] option.
 ///
 /// ## Why is this bad?
 /// Classes with many public methods are harder to understand
@@ -19,8 +19,7 @@ use crate::checkers::ast::Checker;
 /// Instead, consider refactoring the class into separate classes.
 ///
 /// ## Example
-/// With `pylint.max-public-settings` set to 5
-///
+/// Assuming that `pylint.max-public-settings` is set to 5:
 /// ```python
 /// class Linter:
 ///     def __init__(self):
@@ -106,12 +105,12 @@ pub(crate) fn too_many_public_methods(
     class_def: &ast::StmtClassDef,
     max_methods: usize,
 ) {
-    let ast::StmtClassDef { body, range, .. } = class_def;
-    let methods = body
+    let methods = class_def
+        .body
         .iter()
-        .filter(|stmt| match stmt {
-            Stmt::FunctionDef(node) => matches!(visibility::method_visibility(node), Public),
-            _ => false,
+        .filter(|stmt| {
+            stmt.as_function_def_stmt()
+                .is_some_and(|node| matches!(visibility::method_visibility(node), Public))
         })
         .count();
 
@@ -121,7 +120,7 @@ pub(crate) fn too_many_public_methods(
                 methods,
                 max_methods,
             },
-            *range,
+            class_def.range(),
         ));
     }
 }
