@@ -1350,7 +1350,13 @@ NamedExpression: ast::ParenthesizedExpr = {
 };
 
 LambdaDef: ast::ParenthesizedExpr = {
-    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <body:Test<"all">> <end_location:@R> =>? {
+    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
+        if fstring_middle.is_some() {
+            return Err(LexicalError {
+                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+                location,
+            })?;
+        }
         parameters.as_ref().map(validate_arguments).transpose()?;
 
         Ok(ast::ExprLambda {
@@ -1588,14 +1594,14 @@ StringLiteral: StringType = {
 FStringExpr: StringType = {
     <location:@L> FStringStart <values:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
         StringType::FString(ast::ExprFString {
-            values: values.into_iter().flatten().collect(),
+            values,
             implicit_concatenated: false,
             range: (location..end_location).into()
         })
     }
 };
 
-FStringMiddlePattern: Option<ast::Expr> = {
+FStringMiddlePattern: ast::Expr = {
     FStringReplacementField,
     <start_location:@L> <fstring_middle:fstring_middle> =>? {
         let (source, is_raw) = fstring_middle;
@@ -1603,8 +1609,14 @@ FStringMiddlePattern: Option<ast::Expr> = {
     }
 };
 
-FStringReplacementField: Option<ast::Expr> = {
-    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> => {
+FStringReplacementField: ast::Expr = {
+    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> =>? {
+        if value.expr.is_lambda_expr() && !value.is_parenthesized() {
+            return Err(LexicalError {
+                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+                location: value.start(),
+            })?;
+        }
         let debug_text = debug.map(|_| {
             let start_offset = location + "{".text_len();
             let end_offset = if let Some((conversion_start, _)) = conversion {
@@ -1620,7 +1632,7 @@ FStringReplacementField: Option<ast::Expr> = {
                 trailing: source_code[TextRange::new(value.range().end(), end_offset)].to_string(),
             }
         });
-        Some(
+        Ok(
             ast::ExprFormattedValue {
                 value: Box::new(value.into()),
                 debug_text,
@@ -1642,7 +1654,7 @@ FStringFormatSpecSuffix: ast::Expr = {
 FStringFormatSpec: ast::Expr = {
     <location:@L> <values:FStringMiddlePattern*> <end_location:@R> => {
         ast::ExprFString {
-            values: values.into_iter().flatten().collect(),
+            values,
             implicit_concatenated: false,
             range: (location..end_location).into()
         }.into()
