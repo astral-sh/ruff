@@ -851,7 +851,7 @@ mod tests {
         Rule::QuadraticListSummation,
     ];
 
-    const PREVIEW_RULES: &[Rule] = &[Rule::SliceCopy];
+    const PREVIEW_RULES: &[Rule] = &[Rule::TooManyPublicMethods, Rule::SliceCopy];
 
     #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(
