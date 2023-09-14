@@ -1,17 +1,16 @@
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
-use ruff::line_width::LineLength;
 use rustc_hash::FxHashMap;
 
+use ruff::line_width::LineLength;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
 };
-use ruff::RuleSelector;
+use ruff::{RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::resolver::ConfigProcessor;
 
@@ -129,7 +128,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -139,7 +138,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -149,7 +148,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -159,7 +158,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
@@ -191,7 +190,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -201,7 +200,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -211,7 +210,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -221,7 +220,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
@@ -509,11 +508,6 @@ impl FormatCommand {
             },
         )
     }
-}
-
-fn parse_rule_selector(env: &str) -> Result<RuleSelector, std::io::Error> {
-    RuleSelector::from_str(env)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))
 }
 
 fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
