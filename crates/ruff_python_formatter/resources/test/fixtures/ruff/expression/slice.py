@@ -91,3 +91,10 @@ f = "f"[:,]
 g1 = "g"[(1):(2)]
 g2 = "g"[(1):(2):(3)]
 
+# Don't omit optional parentheses for subscripts
+# https://github.com/astral-sh/ruff/issues/7319
+def f():
+    return (
+        package_version is not None
+        and package_version.split(".")[:2] == package_info.version.split(".")[:2]
+    )
