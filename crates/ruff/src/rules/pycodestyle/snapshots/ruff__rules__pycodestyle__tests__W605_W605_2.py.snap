@@ -139,7 +139,7 @@ W605_2.py:44:11: W605 [*] Invalid escape sequence: `\{`
    44 |+value = rf'\{{1}}'
 45 45 | value = f'\{1}'
 46 46 | value = f'{1:\}'
-47 47 | 
+47 47 | value = f"{f"\{1}"}"
 
 W605_2.py:45:11: W605 [*] Invalid escape sequence: `\{`
    |
@@ -148,6 +148,7 @@ W605_2.py:45:11: W605 [*] Invalid escape sequence: `\{`
 45 | value = f'\{1}'
    |           ^^ W605
 46 | value = f'{1:\}'
+47 | value = f"{f"\{1}"}"
    |
    = help: Add backslash to escape sequence
 
@@ -158,8 +159,8 @@ W605_2.py:45:11: W605 [*] Invalid escape sequence: `\{`
 45    |-value = f'\{1}'
    45 |+value = rf'\{1}'
 46 46 | value = f'{1:\}'
-47 47 | 
-48 48 | # Okay
+47 47 | value = f"{f"\{1}"}"
+48 48 | value = rf"{f"\{1}"}"
 
 W605_2.py:46:14: W605 [*] Invalid escape sequence: `\}`
    |
@@ -167,8 +168,8 @@ W605_2.py:46:14: W605 [*] Invalid escape sequence: `\}`
 45 | value = f'\{1}'
 46 | value = f'{1:\}'
    |              ^^ W605
-47 | 
-48 | # Okay
+47 | value = f"{f"\{1}"}"
+48 | value = rf"{f"\{1}"}"
    |
    = help: Add backslash to escape sequence
 
@@ -178,8 +179,49 @@ W605_2.py:46:14: W605 [*] Invalid escape sequence: `\}`
 45 45 | value = f'\{1}'
 46    |-value = f'{1:\}'
    46 |+value = rf'{1:\}'
-47 47 | 
-48 48 | # Okay
-49 49 | value = rf'\{{1}}'
+47 47 | value = f"{f"\{1}"}"
+48 48 | value = rf"{f"\{1}"}"
+49 49 | 
+
+W605_2.py:47:14: W605 [*] Invalid escape sequence: `\{`
+   |
+45 | value = f'\{1}'
+46 | value = f'{1:\}'
+47 | value = f"{f"\{1}"}"
+   |              ^^ W605
+48 | value = rf"{f"\{1}"}"
+   |
+   = help: Add backslash to escape sequence
+
+ℹ Fix
+44 44 | value = f'\{{1}}'
+45 45 | value = f'\{1}'
+46 46 | value = f'{1:\}'
+47    |-value = f"{f"\{1}"}"
+   47 |+value = f"{rf"\{1}"}"
+48 48 | value = rf"{f"\{1}"}"
+49 49 | 
+50 50 | # Okay
+
+W605_2.py:48:15: W605 [*] Invalid escape sequence: `\{`
+   |
+46 | value = f'{1:\}'
+47 | value = f"{f"\{1}"}"
+48 | value = rf"{f"\{1}"}"
+   |               ^^ W605
+49 | 
+50 | # Okay
+   |
+   = help: Add backslash to escape sequence
+
+ℹ Fix
+45 45 | value = f'\{1}'
+46 46 | value = f'{1:\}'
+47 47 | value = f"{f"\{1}"}"
+48    |-value = rf"{f"\{1}"}"
+   48 |+value = rf"{rf"\{1}"}"
+49 49 | 
+50 50 | # Okay
+51 51 | value = rf'\{{1}}'
 
 

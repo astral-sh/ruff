@@ -47,36 +47,22 @@ pub(crate) fn invalid_escape_sequence(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     indexer: &Indexer,
-    tok: &Tok,
-    tok_range: TextRange,
+    token: &Tok,
+    token_range: TextRange,
     autofix: bool,
 ) {
-    let (start_offset, body) = match tok {
+    let token_source_code = match token {
         Tok::FStringMiddle { value, is_raw } => {
             if *is_raw {
                 return;
             }
-            (tok_range.start(), value.as_str())
+            value.as_str()
         }
-        Tok::String {
-            value,
-            kind,
-            triple_quoted,
-        } => {
+        Tok::String { kind, .. } => {
             if kind.is_raw() {
                 return;
             }
-
-            let quote_len = if *triple_quoted {
-                TextSize::new(3)
-            } else {
-                TextSize::new(1)
-            };
-
-            (
-                tok_range.start() + kind.prefix_len() + quote_len,
-                value.as_str(),
-            )
+            locator.slice(token_range)
         }
         _ => return,
     };
@@ -85,7 +71,7 @@ pub(crate) fn invalid_escape_sequence(
     let mut invalid_escape_sequence = Vec::new();
 
     let mut prev = None;
-    let bytes = body.as_bytes();
+    let bytes = token_source_code.as_bytes();
     for i in memchr_iter(b'\\', bytes) {
         // If the previous character was also a backslash, skip.
         if prev.is_some_and(|prev| prev == i - 1) {
@@ -95,9 +81,9 @@ pub(crate) fn invalid_escape_sequence(
 
         prev = Some(i);
 
-        let next_char = match body[i + 1..].chars().next() {
+        let next_char = match token_source_code[i + 1..].chars().next() {
             Some(next_char) => next_char,
-            None if tok.is_f_string_middle() => {
+            None if token.is_f_string_middle() => {
                 // If we're at the end of a f-string middle token, the next character
                 // is actually emitted as a different token. For example,
                 //
@@ -105,8 +91,8 @@ pub(crate) fn invalid_escape_sequence(
                 // f"\{1}"
                 // ```
                 //
-                // is lexed as `FStringMiddle('\\')` and `LBrace`, so we need to check
-                // the next character in the source file.
+                // is lexed as `FStringMiddle('\\')` and `LBrace` (ignoring irrelevant
+                // tokens), so we need to check the next character in the source code.
                 //
                 // Now, if we're at the end of the f-string itself, the lexer wouldn't
                 // have emitted the `FStringMiddle` token in the first place. For example,
@@ -116,11 +102,14 @@ pub(crate) fn invalid_escape_sequence(
                 // ```
                 //
                 // Here, there won't be any `FStringMiddle` because it's an unterminated
-                // f-string.
-                let Some(next_char) = locator.after(tok_range.end()).chars().next() else {
+                // f-string. This means that if there's a `FStringMiddle` token and we
+                // encounter a `\` character, then the next character is always going to
+                // be part of the f-string.
+                if let Some(next_char) = locator.after(token_range.end()).chars().next() {
+                    next_char
+                } else {
                     continue;
-                };
-                next_char
+                }
             }
             // If we're at the end of the file, skip.
             None => continue,
@@ -164,7 +153,7 @@ pub(crate) fn invalid_escape_sequence(
             continue;
         }
 
-        let location = start_offset + TextSize::try_from(i).unwrap();
+        let location = token_range.start() + TextSize::try_from(i).unwrap();
         let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
         invalid_escape_sequence.push(Diagnostic::new(InvalidEscapeSequence(next_char), range));
     }
@@ -179,12 +168,16 @@ pub(crate) fn invalid_escape_sequence(
                 )));
             }
         } else {
-            let tok_start = if tok.is_f_string_middle() {
+            let tok_start = if token.is_f_string_middle() {
                 // SAFETY: If this is a `FStringMiddle` token, then the indexer
                 // must have the f-string range.
-                indexer.f_string_range(tok_range.start()).unwrap().start()
+                indexer
+                    .fstring_ranges()
+                    .innermost(token_range.start())
+                    .unwrap()
+                    .start()
             } else {
-                tok_range.start()
+                token_range.start()
             };
             // Turn into raw string.
             for diagnostic in &mut invalid_escape_sequence {
