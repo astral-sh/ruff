@@ -36,9 +36,6 @@ use crate::settings::{flags, Settings};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs};
 
-const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
-const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
-
 /// A [`Result`]-like type that returns both data and an error. Used to return
 /// diagnostics even in the face of parse errors, since many diagnostics can be
 /// generated without a full AST.
@@ -543,8 +540,9 @@ fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: 
     let codes = collect_rule_codes(diagnostics.iter().map(|diagnostic| diagnostic.kind.rule()));
     if cfg!(debug_assertions) {
         eprintln!(
-            "{}: Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
+            "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
             "debug error".red().bold(),
+            ":".bold(),
             MAX_ITERATIONS,
             fs::relativize_path(path),
             codes,
@@ -553,18 +551,17 @@ fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: 
     } else {
         eprintln!(
             r#"
-{}: Failed to converge after {} iterations.
+{}{} Failed to converge after {} iterations.
 
-This indicates a bug in `{}`. If you could open an issue at:
+This indicates a bug in Ruff. If you could open an issue at:
 
-    {}/issues/new?title=%5BInfinite%20loop%5D
+    https://github.com/astral-sh/ruff/issues/new?title=%5BInfinite%20loop%5D
 
 ...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
+            ":".bold(),
             MAX_ITERATIONS,
-            CARGO_PKG_NAME,
-            CARGO_PKG_REPOSITORY,
             fs::relativize_path(path),
             codes
         );
@@ -581,8 +578,9 @@ fn report_autofix_syntax_error(
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {
         eprintln!(
-            "{}: Autofix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
+            "{}{} Autofix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
             "error".red().bold(),
+            ":".bold(),
             fs::relativize_path(path),
             codes,
             error,
@@ -591,17 +589,16 @@ fn report_autofix_syntax_error(
     } else {
         eprintln!(
             r#"
-{}: Autofix introduced a syntax error. Reverting all changes.
+{}{} Autofix introduced a syntax error. Reverting all changes.
 
-This indicates a bug in `{}`. If you could open an issue at:
+This indicates a bug in Ruff. If you could open an issue at:
 
-    {}/issues/new?title=%5BAutofix%20error%5D
+    https://github.com/astral-sh/ruff/issues/new?title=%5BAutofix%20error%5D
 
 ...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
-            CARGO_PKG_NAME,
-            CARGO_PKG_REPOSITORY,
+            ":".bold(),
             fs::relativize_path(path),
             codes,
         );
