@@ -658,3 +658,8 @@ class CommentAfterDocstring:
     "After this docstring there's a comment."  # priorities=1
     def sort_services(self):
         pass
+
+
+def newline_after_closing_quote(self):
+    "We enforce a newline after the closing quote for a multi-line docstring \
+    but continuations shouldn't be considered multi-line"
