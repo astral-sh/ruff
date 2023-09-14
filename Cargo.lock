@@ -784,15 +784,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6999dc1837253364c2ebb0704ba97994bd874e8f195d665c50b7548f6ea92764"
 
 [[package]]
-name = "fern"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9f0c14694cbd524c8720dd69b0e3179344f04ebb5f90f2e4a440c6ea3b2f1ee"
-dependencies = [
- "log",
-]
-
-[[package]]
 name = "filetime"
 version = "0.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2030,7 +2021,6 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
- "fern",
  "glob",
  "globset",
  "imperative",
@@ -2080,6 +2070,8 @@ dependencies = [
  "test-case",
  "thiserror",
  "toml",
+ "tracing",
+ "tracing-subscriber",
  "typed-arena",
  "unicode-width",
  "unicode_names2",

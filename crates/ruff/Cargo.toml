@@ -37,7 +37,6 @@ bitflags = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 colored = { workspace = true }
-fern = { version = "0.6.1" }
 glob = { workspace = true }
 globset = { workspace = true }
 imperative = { version = "1.0.4" }
@@ -71,6 +70,8 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 typed-arena = { version = "2.0.2" }
 unicode-width = { workspace = true }
 unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }

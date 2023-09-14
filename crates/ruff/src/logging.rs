@@ -4,16 +4,17 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 use colored::Colorize;
-use fern;
-use log::Level;
 use once_cell::sync::Lazy;
-use ruff_python_parser::{ParseError, ParseErrorType};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::EnvFilter;
 
+use ruff_notebook::Notebook;
+use ruff_python_parser::{ParseError, ParseErrorType};
 use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
 
 use crate::fs;
 use crate::source_kind::SourceKind;
-use ruff_notebook::Notebook;
 
 pub static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
 
@@ -90,49 +91,27 @@ pub enum LogLevel {
 
 impl LogLevel {
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    const fn level_filter(&self) -> log::LevelFilter {
+    const fn tracing_level(&self) -> tracing::Level {
         match self {
-            LogLevel::Default => log::LevelFilter::Info,
-            LogLevel::Verbose => log::LevelFilter::Debug,
-            LogLevel::Quiet => log::LevelFilter::Off,
-            LogLevel::Silent => log::LevelFilter::Off,
+            LogLevel::Default => tracing::Level::INFO,
+            LogLevel::Verbose => tracing::Level::DEBUG,
+            LogLevel::Quiet => tracing::Level::WARN,
+            LogLevel::Silent => tracing::Level::ERROR,
         }
     }
 }
 
+/// Log level priorities: 1. `RUST_LOG=`, 2. explicit CLI log level, 3. default to info
 pub fn set_up_logging(level: &LogLevel) -> Result<()> {
-    fern::Dispatch::new()
-        .format(|out, message, record| match record.level() {
-            Level::Error => {
-                out.finish(format_args!(
-                    "{}{} {}",
-                    "error".red().bold(),
-                    ":".bold(),
-                    message
-                ));
-            }
-            Level::Warn => {
-                out.finish(format_args!(
-                    "{}{} {}",
-                    "warning".yellow().bold(),
-                    ":".bold(),
-                    message
-                ));
-            }
-            Level::Info | Level::Debug | Level::Trace => {
-                out.finish(format_args!(
-                    "{}[{}][{}] {}",
-                    chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                    record.target(),
-                    record.level(),
-                    message
-                ));
-            }
-        })
-        .level(level.level_filter())
-        .level_for("globset", log::LevelFilter::Warn)
-        .chain(std::io::stderr())
-        .apply()?;
+    let filter_layer = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::builder()
+            .with_default_directive(level.tracing_level().into())
+            .parse_lossy("")
+    });
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(tracing_subscriber::fmt::layer())
+        .init();
     Ok(())
 }
 
