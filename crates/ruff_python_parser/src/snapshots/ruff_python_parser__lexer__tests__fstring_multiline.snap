@@ -1,0 +1,99 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        FStringStart,
+        0..4,
+    ),
+    (
+        FStringMiddle {
+            value: "\nhello\n    world\n",
+            is_raw: false,
+        },
+        4..21,
+    ),
+    (
+        FStringEnd,
+        21..24,
+    ),
+    (
+        FStringStart,
+        25..29,
+    ),
+    (
+        FStringMiddle {
+            value: "\n    world\nhello\n",
+            is_raw: false,
+        },
+        29..46,
+    ),
+    (
+        FStringEnd,
+        46..49,
+    ),
+    (
+        FStringStart,
+        50..52,
+    ),
+    (
+        FStringMiddle {
+            value: "some ",
+            is_raw: false,
+        },
+        52..57,
+    ),
+    (
+        Lbrace,
+        57..58,
+    ),
+    (
+        FStringStart,
+        58..62,
+    ),
+    (
+        FStringMiddle {
+            value: "multiline\nallowed ",
+            is_raw: false,
+        },
+        62..80,
+    ),
+    (
+        Lbrace,
+        80..81,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        81..82,
+    ),
+    (
+        Rbrace,
+        82..83,
+    ),
+    (
+        FStringEnd,
+        83..86,
+    ),
+    (
+        Rbrace,
+        86..87,
+    ),
+    (
+        FStringMiddle {
+            value: " string",
+            is_raw: false,
+        },
+        87..94,
+    ),
+    (
+        FStringEnd,
+        94..95,
+    ),
+    (
+        Newline,
+        95..95,
+    ),
+]

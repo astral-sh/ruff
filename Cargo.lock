@@ -2375,6 +2375,7 @@ name = "ruff_python_parser"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.4.0",
  "insta",
  "is-macro",
  "itertools",
