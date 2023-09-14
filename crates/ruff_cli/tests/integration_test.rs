@@ -341,7 +341,7 @@ fn nursery_group_selector_preview_enabled() {
     Found 2 errors.
 
     ----- stderr -----
-    warning: The `NURSERY` selector has been deprecated. Use the `PREVIEW` selector instead.
+    warning: The `NURSERY` selector has been deprecated.
     "###);
 }
 
@@ -439,38 +439,21 @@ fn preview_disabled_prefix_empty() {
 }
 
 #[test]
-fn preview_disabled_group_selector() {
-    // `--select PREVIEW` should warn without the `--preview` flag
-    let args = ["--select", "PREVIEW"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
-        .pass_stdin("I=42\n"), @r###"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-
-    ----- stderr -----
-    warning: Selection `PREVIEW` has no effect because the `--preview` flag was not included.
-    "###);
-}
-
-#[test]
-fn preview_enabled_group_selector() {
-    // `--select PREVIEW` is okay with the `--preview` flag and shouldn't warn
+fn preview_group_selector() {
+    // `--select PREVIEW` should error (selector was removed)
     let args = ["--select", "PREVIEW", "--preview"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 Missing whitespace around operator
-    Found 2 errors.
 
     ----- stderr -----
+    error: invalid value 'PREVIEW' for '--select <RULE_CODE>': Unknown rule selector: `PREVIEW`
+
+    For more information, try '--help'.
     "###);
 }
 
@@ -483,13 +466,13 @@ fn preview_enabled_group_ignore() {
         .args(args)
         .pass_stdin("I=42\n"), @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
-    -:1:2: E225 Missing whitespace around operator
-    Found 2 errors.
 
     ----- stderr -----
+    error: invalid value 'PREVIEW' for '--ignore <RULE_CODE>': Unknown rule selector: `PREVIEW`
+
+    For more information, try '--help'.
     "###);
 }
 

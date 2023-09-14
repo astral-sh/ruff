@@ -588,11 +588,12 @@ impl Configuration {
                 #[allow(deprecated)]
                 if matches!(selector, RuleSelector::Nursery) {
                     let suggestion = if preview.is_disabled() {
-                        "Use the `--preview` flag instead."
+                        " Use the `--preview` flag instead."
                     } else {
-                        "Use the `PREVIEW` selector instead."
+                        // We have no suggested alternative since there is intentionally no "PREVIEW" selector
+                        ""
                     };
-                    warn_user_once!("The `NURSERY` selector has been deprecated. {suggestion}");
+                    warn_user_once!("The `NURSERY` selector has been deprecated.{suggestion}");
                 }
 
                 if preview.is_disabled() {
@@ -1093,6 +1094,27 @@ mod tests {
     }
 
     #[test]
+    fn select_all_preview() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::All]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        assert!(!actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::All]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        assert!(actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
+    }
+
+    #[test]
     fn select_linter_preview() {
         let actual = resolve_rules(
             [RuleSelection {
@@ -1158,31 +1180,6 @@ mod tests {
             Some(PreviewMode::Enabled),
         );
         let expected = RuleSet::from_rule(Rule::SliceCopy);
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn select_preview() {
-        let actual = resolve_rules(
-            [RuleSelection {
-                select: Some(vec![RuleSelector::Preview]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewMode::Disabled),
-        );
-        let expected = RuleSet::empty();
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules(
-            [RuleSelection {
-                select: Some(vec![RuleSelector::Preview]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewMode::Enabled),
-        );
-
-        let expected =
-            RuleSet::from_rules(NURSERY_RULES).union(&RuleSet::from_rules(PREVIEW_RULES));
         assert_eq!(actual, expected);
     }
 

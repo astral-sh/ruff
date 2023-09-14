@@ -15,10 +15,8 @@ use crate::settings::types::PreviewMode;
 pub enum RuleSelector {
     /// Select all rules (includes rules in preview if enabled)
     All,
-    /// Category to select all rules in preview (includes legacy nursery rules)
-    Preview,
     /// Legacy category to select all rules in the "nursery" which predated preview mode
-    #[deprecated(note = "Use `RuleSelector::Preview` for new rules instead")]
+    #[deprecated(note = "The nursery was replaced with 'preview mode' which has no selector")]
     Nursery,
     /// Legacy category to select both the `mccabe` and `flake8-comprehensions` linters
     /// via a single selector.
@@ -54,7 +52,6 @@ impl FromStr for RuleSelector {
             "ALL" => Ok(Self::All),
             #[allow(deprecated)]
             "NURSERY" => Ok(Self::Nursery),
-            "PREVIEW" => Ok(Self::Preview),
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
@@ -121,7 +118,6 @@ impl RuleSelector {
             RuleSelector::All => ("", "ALL"),
             #[allow(deprecated)]
             RuleSelector::Nursery => ("", "NURSERY"),
-            RuleSelector::Preview => ("", "PREVIEW"),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
             RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
@@ -185,9 +181,6 @@ impl RuleSelector {
             RuleSelector::Nursery => {
                 RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_nursery))
             }
-            RuleSelector::Preview => RuleSelectorIter::Nursery(
-                Rule::iter().filter(|rule| rule.is_preview() || rule.is_nursery()),
-            ),
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
                     .rules()
@@ -301,7 +294,6 @@ impl RuleSelector {
     pub fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
-            RuleSelector::Preview => Specificity::All,
             #[allow(deprecated)]
             RuleSelector::Nursery => Specificity::All,
             RuleSelector::T => Specificity::LinterGroup,
