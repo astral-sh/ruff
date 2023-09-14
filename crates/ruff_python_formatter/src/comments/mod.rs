@@ -567,7 +567,7 @@ mod tests {
             let source_code = SourceCode::new(source);
             let (tokens, comment_ranges) =
                 tokens_and_ranges(source).expect("Expect source to be valid Python");
-            let parsed = parse_ok_tokens(tokens, Mode::Module, "test.py")
+            let parsed = parse_ok_tokens(tokens, source, Mode::Module, "test.py")
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {
