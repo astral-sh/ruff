@@ -394,8 +394,9 @@ i = 1  # noqa: E741, F841
 x = 1  # noqa
 ```
 
-Note that, for multi-line strings, the `noqa` directive should come at the end of the string, and
-will apply to the entire string, like so:
+For multi-line strings (like docstrings),
+the `noqa` directive should come at the end of the string (after the closing triple quote),
+and will apply to the entire string, like so:
 
 ```python
 """Lorem ipsum dolor sit amet.

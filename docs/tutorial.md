@@ -205,6 +205,11 @@ def sum_even_numbers(numbers: List[int]) -> int:
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
+For more in-depth instructions on ignoring errors,
+please see [_Configuration_](configuration.md#error-suppression).
+
+### Adding Rules
+
 When enabling a new rule on an existing codebase, you may want to ignore all _existing_
 violations of that rule and instead focus on enforcing it going forward.
 
