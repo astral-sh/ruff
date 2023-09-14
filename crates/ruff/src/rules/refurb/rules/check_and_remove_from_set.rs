@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for uses of `set#remove` that can be replaced with `set#discard`.
+/// Checks for uses of `set.remove` that can be replaced with `set.discard`.
 ///
 /// ## Why is this bad?
 /// If an element should be removed from a set if it is present, it is more

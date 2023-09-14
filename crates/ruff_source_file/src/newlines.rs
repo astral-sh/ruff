@@ -15,8 +15,8 @@ impl UniversalNewlines for str {
     }
 }
 
-/// Like [`str#lines`], but accommodates LF, CRLF, and CR line endings,
-/// the latter of which are not supported by [`str#lines`].
+/// Like [`str::lines`], but accommodates LF, CRLF, and CR line endings,
+/// the latter of which are not supported by [`str::lines`].
 ///
 /// ## Examples
 ///

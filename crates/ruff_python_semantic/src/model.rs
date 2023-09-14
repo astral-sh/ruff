@@ -545,7 +545,7 @@ impl<'a> SemanticModel<'a> {
     ///
     /// For example, given `["Class", "method"`], resolve the `BindingKind::ClassDefinition`
     /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
-    /// `Class#method`.
+    /// `Class.method`.
     pub fn lookup_attribute(&'a self, value: &'a Expr) -> Option<BindingId> {
         let call_path = collect_call_path(value)?;
 
