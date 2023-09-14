@@ -13,7 +13,7 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// Checks for unbounded slice expressions to copy a list.
 ///
 /// ## Why is this bad?
-/// The `list#copy` method is more readable and consistent with copying other
+/// The `list.copy` method is more readable and consistent with copying other
 /// types.
 ///
 /// ## Known problems

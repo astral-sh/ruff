@@ -12,10 +12,10 @@ use crate::registry::AsRule;
 use crate::rules::flynt::helpers;
 
 /// ## What it does
-/// Checks for `str#join` calls that can be replaced with f-strings.
+/// Checks for `str.join` calls that can be replaced with f-strings.
 ///
 /// ## Why is this bad?
-/// f-strings are more readable and generally preferred over `str#join` calls.
+/// f-strings are more readable and generally preferred over `str.join` calls.
 ///
 /// ## Example
 /// ```python
