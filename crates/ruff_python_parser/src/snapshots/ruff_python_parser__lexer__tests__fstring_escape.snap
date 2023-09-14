@@ -50,13 +50,6 @@ expression: lex_source(source)
         11..12,
     ),
     (
-        FStringMiddle {
-            value: "",
-            is_raw: false,
-        },
-        12..12,
-    ),
-    (
         Rbrace,
         12..13,
     ),

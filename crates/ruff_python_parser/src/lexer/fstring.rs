@@ -126,9 +126,12 @@ impl FStringContext {
         }
     }
 
-    /// Decrements the format spec depth unconditionally.
-    pub(crate) fn end_format_spec(&mut self) {
-        self.format_spec_depth = self.format_spec_depth.saturating_sub(1);
+    /// Decrements the format spec depth if the current f-string is in a format
+    /// spec.
+    pub(crate) fn try_end_format_spec(&mut self, current_nesting: u32) {
+        if self.is_in_format_spec(current_nesting) {
+            self.format_spec_depth = self.format_spec_depth.saturating_sub(1);
+        }
     }
 }
 
