@@ -10,7 +10,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::hashable::HashableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
@@ -74,7 +74,8 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         return;
     }
 
-    let mut value_to_comparators: FxHashMap<HashableExpr, (usize, Vec<&Expr>)> =
+    // Map from expression hash to (starting offset, number of comparisons, list
+    let mut value_to_comparators: FxHashMap<HashableExpr, (TextSize, Vec<&Expr>)> =
         FxHashMap::with_capacity_and_hasher(
             bool_op.values.len() * 2,
             BuildHasherDefault::default(),
@@ -95,30 +96,31 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         };
 
         if matches!(left.as_ref(), Expr::Name(_) | Expr::Attribute(_)) {
-            let (left_count, left_matches) = value_to_comparators
+            let (_, left_matches) = value_to_comparators
                 .entry(left.deref().into())
-                .or_insert_with(|| (0, Vec::new()));
-            *left_count += 1;
+                .or_insert_with(|| (left.start(), Vec::new()));
             left_matches.push(right);
         }
 
         if matches!(right, Expr::Name(_) | Expr::Attribute(_)) {
-            let (right_count, right_matches) = value_to_comparators
+            let (_, right_matches) = value_to_comparators
                 .entry(right.into())
-                .or_insert_with(|| (0, Vec::new()));
-            *right_count += 1;
+                .or_insert_with(|| (right.start(), Vec::new()));
             right_matches.push(left);
         }
     }
 
-    for (value, (count, comparators)) in value_to_comparators {
-        if count > 1 {
+    for (value, (_, comparators)) in value_to_comparators
+        .iter()
+        .sorted_by_key(|(_, (start, _))| *start)
+    {
+        if comparators.len() > 1 {
             checker.diagnostics.push(Diagnostic::new(
                 RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
                         value.as_expr(),
                         bool_op.op,
-                        &comparators,
+                        comparators,
                         checker.locator(),
                     )),
                 },
