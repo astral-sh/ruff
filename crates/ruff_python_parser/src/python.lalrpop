@@ -11,7 +11,7 @@ use crate::{
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::{concatenate_strings, parse_fstring_middle, parse_string_literal},
+    string::{StringType, concatenate_strings, parse_fstring_middle, parse_string_literal},
     token::{self, StringKind},
 };
 use lalrpop_util::ParseError;
@@ -669,7 +669,7 @@ LiteralPattern: ast::Pattern = {
         range: (location..end_location).into()
     }.into(),
     <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
-        value: Box::new(concatenate_strings(strings, (location..end_location).into())?.into()),
+        value: Box::new(concatenate_strings(strings, (location..end_location).into())?),
         range: (location..end_location).into()
     }.into()),
 }
@@ -726,7 +726,7 @@ MappingKey: ast::Expr = {
         value: false.into(),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
 }
 
 MatchMappingEntry: (ast::Expr, ast::Pattern) = {
@@ -1573,25 +1573,25 @@ SliceOp: Option<ast::ParenthesizedExpr> = {
     <location:@L> ":" <e:Test<"all">?> => e,
 }
 
-StringLiteralOrFString: ast::ParenthesizedExpr = {
+StringLiteralOrFString: StringType = {
     StringLiteral,
     FStringExpr,
 };
 
-StringLiteral: ast::ParenthesizedExpr = {
+StringLiteral: StringType = {
     <start_location:@L> <string:string> =>? {
         let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(&source, kind, triple_quoted, start_location)?.into())
+        Ok(parse_string_literal(&source, kind, triple_quoted, start_location)?)
     }
 };
 
-FStringExpr: ast::ParenthesizedExpr = {
+FStringExpr: StringType = {
     <location:@L> FStringStart <values:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
-        ast::ExprFString {
+        StringType::FString(ast::ExprFString {
             values: values.into_iter().flatten().collect(),
             implicit_concatenated: false,
             range: (location..end_location).into()
-        }.into()
+        })
     }
 };
 
@@ -1665,7 +1665,7 @@ FStringConversion: (TextSize, ast::ConversionFlag) = {
 };
 
 Atom<Goal>: ast::ParenthesizedExpr = {
-    <location:@L> <strings:StringLiteralOrFString+> <end_location:@L> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
     <location:@L> <value:Constant> <end_location:@R> => ast::ExprConstant {
         value,
         range: (location..end_location).into(),
