@@ -1,0 +1,170 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        FStringStart,
+        0..2,
+    ),
+    (
+        Lbrace,
+        2..3,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        3..4,
+    ),
+    (
+        Colon,
+        4..5,
+    ),
+    (
+        FStringMiddle {
+            value: "=10",
+            is_raw: false,
+        },
+        5..8,
+    ),
+    (
+        Rbrace,
+        8..9,
+    ),
+    (
+        FStringMiddle {
+            value: " ",
+            is_raw: false,
+        },
+        9..10,
+    ),
+    (
+        Lbrace,
+        10..11,
+    ),
+    (
+        Lpar,
+        11..12,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        12..13,
+    ),
+    (
+        ColonEqual,
+        13..15,
+    ),
+    (
+        Int {
+            value: 10,
+        },
+        15..17,
+    ),
+    (
+        Rpar,
+        17..18,
+    ),
+    (
+        Rbrace,
+        18..19,
+    ),
+    (
+        FStringMiddle {
+            value: " ",
+            is_raw: false,
+        },
+        19..20,
+    ),
+    (
+        Lbrace,
+        20..21,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        21..22,
+    ),
+    (
+        Comma,
+        22..23,
+    ),
+    (
+        Lbrace,
+        23..24,
+    ),
+    (
+        Name {
+            name: "y",
+        },
+        24..25,
+    ),
+    (
+        ColonEqual,
+        25..27,
+    ),
+    (
+        Int {
+            value: 10,
+        },
+        27..29,
+    ),
+    (
+        Rbrace,
+        29..30,
+    ),
+    (
+        Rbrace,
+        30..31,
+    ),
+    (
+        FStringMiddle {
+            value: " ",
+            is_raw: false,
+        },
+        31..32,
+    ),
+    (
+        Lbrace,
+        32..33,
+    ),
+    (
+        Lsqb,
+        33..34,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        34..35,
+    ),
+    (
+        ColonEqual,
+        35..37,
+    ),
+    (
+        Int {
+            value: 10,
+        },
+        37..39,
+    ),
+    (
+        Rsqb,
+        39..40,
+    ),
+    (
+        Rbrace,
+        40..41,
+    ),
+    (
+        FStringEnd,
+        41..42,
+    ),
+    (
+        Newline,
+        42..42,
+    ),
+]
