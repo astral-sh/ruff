@@ -57,8 +57,6 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         }
 
         let format_slice = format_with(|f: &mut PyFormatter| {
-            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-
             if let Expr::Tuple(tuple) = slice.as_ref() {
                 write!(f, [tuple.format().with_options(TupleParentheses::Preserve)])
             } else {

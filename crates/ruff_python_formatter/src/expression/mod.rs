@@ -385,14 +385,21 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
         // Only use the more complex IR when there is any expression that we can possibly split by
         false
     } else {
+        fn is_parenthesized(expr: &Expr, context: &PyFormatContext) -> bool {
+            // Don't break subscripts except in parenthesized context. It looks weird.
+            !matches!(expr, Expr::Subscript(_))
+                && has_parentheses(expr, context).is_some_and(OwnParentheses::is_non_empty)
+        }
+
         // Only use the layout if the first or last expression has parentheses of some sort, and
         // those parentheses are non-empty.
-        let first_parenthesized = visitor.first.is_some_and(|first| {
-            has_parentheses(first, context).is_some_and(OwnParentheses::is_non_empty)
-        });
-        let last_parenthesized = visitor.last.is_some_and(|last| {
-            has_parentheses(last, context).is_some_and(OwnParentheses::is_non_empty)
-        });
+        let first_parenthesized = visitor
+            .first
+            .is_some_and(|first| is_parenthesized(first, context));
+        let last_parenthesized = visitor
+            .last
+            .is_some_and(|last| is_parenthesized(last, context));
+
         first_parenthesized || last_parenthesized
     }
 }
@@ -502,6 +509,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the subscript is always parenthesized
                 self.visit_expr(value);
+                self.last = Some(expr);
                 // Don't walk the slice, because the slice is always parenthesized.
                 return;
             }
