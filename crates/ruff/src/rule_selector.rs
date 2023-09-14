@@ -336,13 +336,14 @@ pub enum Specificity {
 }
 
 #[cfg(feature = "clap")]
-mod clap_completion {
+pub mod clap_completion {
     use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
     use strum::IntoEnumIterator;
 
     use crate::{
         codes::RuleCodePrefix,
         registry::{Linter, RuleNamespace},
+        rule_selector::is_single_rule_selector,
         RuleSelector,
     };
 
@@ -362,17 +363,29 @@ mod clap_completion {
 
         fn parse_ref(
             &self,
-            _cmd: &clap::Command,
-            _arg: Option<&clap::Arg>,
+            cmd: &clap::Command,
+            arg: Option<&clap::Arg>,
             value: &std::ffi::OsStr,
         ) -> Result<Self::Value, clap::Error> {
             let value = value
                 .to_str()
                 .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-            value
-                .parse()
-                .map_err(|e| clap::Error::raw(clap::error::ErrorKind::InvalidValue, e))
+            value.parse().map_err(|_| {
+                let mut error =
+                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                if let Some(arg) = arg {
+                    error.insert(
+                        clap::error::ContextKind::InvalidArg,
+                        clap::error::ContextValue::String(arg.to_string()),
+                    );
+                }
+                error.insert(
+                    clap::error::ContextKind::InvalidValue,
+                    clap::error::ContextValue::String(value.to_string()),
+                );
+                error
+            })
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
@@ -387,27 +400,34 @@ mod clap_completion {
                             RuleCodePrefix::iter()
                                 // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
                                 // off-by-default
-                                .filter(|p| {
-                                    format!("{}{}", p.linter().common_prefix(), p.short_code())
-                                        != "RUF014"
+                                .filter(|prefix| {
+                                    format!(
+                                        "{}{}",
+                                        prefix.linter().common_prefix(),
+                                        prefix.short_code()
+                                    ) != "RUF014"
                                 })
-                                .map(|p| {
-                                    let prefix = p.linter().common_prefix();
-                                    let code = p.short_code();
-
-                                    let mut rules_iter = p.rules();
-                                    let rule1 = rules_iter.next();
-                                    let rule2 = rules_iter.next();
-
-                                    let value = PossibleValue::new(format!("{prefix}{code}"));
-
-                                    if rule2.is_none() {
-                                        let rule1 = rule1.unwrap();
-                                        let name: &'static str = rule1.into();
-                                        value.help(name)
-                                    } else {
-                                        value
+                                .filter_map(|prefix| {
+                                    // Ex) `UP`
+                                    if prefix.short_code().is_empty() {
+                                        let code = prefix.linter().common_prefix();
+                                        let name = prefix.linter().name();
+                                        return Some(PossibleValue::new(code).help(name));
                                     }
+
+                                    // Ex) `UP004`
+                                    if is_single_rule_selector(&prefix) {
+                                        let rule = prefix.rules().next()?;
+                                        let code = format!(
+                                            "{}{}",
+                                            prefix.linter().common_prefix(),
+                                            prefix.short_code()
+                                        );
+                                        let name: &'static str = rule.into();
+                                        return Some(PossibleValue::new(code).help(name));
+                                    }
+
+                                    None
                                 }),
                         ),
                 ),

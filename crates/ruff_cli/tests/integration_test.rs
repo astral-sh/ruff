@@ -451,7 +451,7 @@ fn preview_group_selector() {
     ----- stdout -----
 
     ----- stderr -----
-    error: invalid value 'PREVIEW' for '--select <RULE_CODE>': Unknown rule selector: `PREVIEW`
+    error: invalid value 'PREVIEW' for '--select <RULE_CODE>'
 
     For more information, try '--help'.
     "###);
@@ -470,7 +470,7 @@ fn preview_enabled_group_ignore() {
     ----- stdout -----
 
     ----- stderr -----
-    error: invalid value 'PREVIEW' for '--ignore <RULE_CODE>': Unknown rule selector: `PREVIEW`
+    error: invalid value 'PREVIEW' for '--ignore <RULE_CODE>'
 
     For more information, try '--help'.
     "###);

@@ -476,7 +476,7 @@ Ruff supports two command-line flags that alter its exit code behavior:
     `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
     autofixing.
 
-## Autocompletion
+## Shell autocompletion
 
 Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
 by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
