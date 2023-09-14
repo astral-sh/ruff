@@ -41,7 +41,4 @@ f"{{{{x}}}}"
 ''f""
 (""f""r"")
 f"{v:{f"0.2f"}}"
-
-# To be fixed
-# Error: f-string: single '}' is not allowed at line 41 column 8
-# f"\{{x}}"
+f"\{{x}}"
