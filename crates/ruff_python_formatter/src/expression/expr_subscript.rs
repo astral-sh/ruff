@@ -96,7 +96,11 @@ impl NeedsParentheses for ExprSubscript {
             ) == CallChainLayout::Fluent
             {
                 OptionalParentheses::Multiline
-            } else if is_expression_parenthesized(self.value.as_ref().into(), context.source()) {
+            } else if is_expression_parenthesized(
+                self.value.as_ref().into(),
+                context.comments().ranges(),
+                context.source(),
+            ) {
                 OptionalParentheses::Never
             } else {
                 match self.value.needs_parentheses(self.into(), context) {
