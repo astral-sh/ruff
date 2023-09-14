@@ -552,7 +552,10 @@ impl<'source> Lexer<'source> {
 
         loop {
             match self.cursor.first() {
-                EOF_CHAR => {
+                // The condition is to differentiate between the `NUL` (`\0`) character
+                // in the source code and the one returned by `self.cursor.first()` when
+                // we reach the end of the source code.
+                EOF_CHAR if self.cursor.is_eof() => {
                     let error = if fstring.is_triple_quoted() {
                         FStringErrorType::UnterminatedTripleQuotedString
                     } else {
@@ -2017,6 +2020,12 @@ f"{lambda x:{x}}"
 f"{(lambda x:{x})}"
 "#
         .trim();
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_with_nul_char() {
+        let source = r"f'\0'";
         assert_debug_snapshot!(lex_source(source));
     }
 
