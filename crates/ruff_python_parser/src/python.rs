@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 30d0d2aaf2b47a3a6d7fc4dee7c36841e366cea767654a8a82812e8885100c35
+// sha3: 6e6758b27cd7e61d2accccaa87a90fe073c9b609a1b3253e85a6440f5530f6d7
 use num_bigint::BigInt;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, IpyEscapeKind};
@@ -9,7 +9,7 @@ use crate::{
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::{concatenate_strings, parse_fstring_middle, parse_string_literal},
+    string::{StringType, concatenate_strings, parse_fstring_middle, parse_string_literal},
     token::{self, StringKind},
 };
 use lalrpop_util::ParseError;
@@ -33,7 +33,7 @@ mod __parse__Top {
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::{concatenate_strings, parse_fstring_middle, parse_string_literal},
+    string::{StringType, concatenate_strings, parse_fstring_middle, parse_string_literal},
     token::{self, StringKind},
 };
     use lalrpop_util::ParseError;
@@ -117,36 +117,38 @@ mod __parse__Top {
         Variant67(alloc::vec::Vec<ast::ExceptHandler>),
         Variant68((TextSize, ast::ConversionFlag)),
         Variant69(core::option::Option<(TextSize, ast::ConversionFlag)>),
-        Variant70(Option<ast::Expr>),
-        Variant71(alloc::vec::Vec<Option<ast::Expr>>),
-        Variant72(core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>),
-        Variant73(ast::Alias),
-        Variant74(Vec<ast::Alias>),
-        Variant75(ast::Int),
-        Variant76(alloc::vec::Vec<ast::Int>),
-        Variant77((Option<ast::Int>, Option<ast::Identifier>)),
-        Variant78(ast::MatchCase),
-        Variant79(alloc::vec::Vec<ast::MatchCase>),
-        Variant80(ast::PatternKeyword),
-        Variant81((ast::Expr, ast::Pattern)),
-        Variant82(Vec<ast::Identifier>),
-        Variant83(Vec<ast::PatternKeyword>),
-        Variant84(Vec<(ast::Expr, ast::Pattern)>),
-        Variant85(Vec<ast::ParameterWithDefault>),
-        Variant86(Vec<ast::TypeParam>),
-        Variant87((Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)),
-        Variant88(core::option::Option<ast::Pattern>),
-        Variant89(ast::PatternArguments),
-        Variant90(ast::Comprehension),
-        Variant91(alloc::vec::Vec<ast::Comprehension>),
-        Variant92(Option<ast::ParenthesizedExpr>),
-        Variant93(core::option::Option<Option<ast::ParenthesizedExpr>>),
-        Variant94(Vec<ast::Stmt>),
-        Variant95(ast::Mod),
-        Variant96(ast::TypeParam),
-        Variant97(ast::TypeParams),
-        Variant98(core::option::Option<ast::TypeParams>),
-        Variant99(ast::UnaryOp),
+        Variant70(StringType),
+        Variant71(Option<ast::Expr>),
+        Variant72(alloc::vec::Vec<Option<ast::Expr>>),
+        Variant73(core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>),
+        Variant74(ast::Alias),
+        Variant75(Vec<ast::Alias>),
+        Variant76(ast::Int),
+        Variant77(alloc::vec::Vec<ast::Int>),
+        Variant78((Option<ast::Int>, Option<ast::Identifier>)),
+        Variant79(ast::MatchCase),
+        Variant80(alloc::vec::Vec<ast::MatchCase>),
+        Variant81(ast::PatternKeyword),
+        Variant82((ast::Expr, ast::Pattern)),
+        Variant83(Vec<ast::Identifier>),
+        Variant84(Vec<ast::PatternKeyword>),
+        Variant85(Vec<(ast::Expr, ast::Pattern)>),
+        Variant86(Vec<ast::ParameterWithDefault>),
+        Variant87(Vec<ast::TypeParam>),
+        Variant88((Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)),
+        Variant89(core::option::Option<ast::Pattern>),
+        Variant90(ast::PatternArguments),
+        Variant91(ast::Comprehension),
+        Variant92(alloc::vec::Vec<ast::Comprehension>),
+        Variant93(Option<ast::ParenthesizedExpr>),
+        Variant94(core::option::Option<Option<ast::ParenthesizedExpr>>),
+        Variant95(Vec<ast::Stmt>),
+        Variant96(alloc::vec::Vec<StringType>),
+        Variant97(ast::Mod),
+        Variant98(ast::TypeParam),
+        Variant99(ast::TypeParams),
+        Variant100(core::option::Option<ast::TypeParams>),
+        Variant101(ast::UnaryOp),
     }
     const __ACTION: &[i16] = &[
         // State 0
@@ -12743,14 +12745,14 @@ mod __parse__Top {
                 __reduce160(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             161 => {
-                // Arguments = "(", FunctionArgument, ")" => ActionFn(1528);
+                // Arguments = "(", FunctionArgument, ")" => ActionFn(1530);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant31(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1528::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1530::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -12758,13 +12760,13 @@ mod __parse__Top {
                 (3, 84)
             }
             162 => {
-                // Arguments = "(", ")" => ActionFn(1529);
+                // Arguments = "(", ")" => ActionFn(1531);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1529::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1531::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -12772,7 +12774,7 @@ mod __parse__Top {
                 (2, 84)
             }
             163 => {
-                // Arguments = "(", (<FunctionArgument> ",")+, FunctionArgument, ")" => ActionFn(1530);
+                // Arguments = "(", (<FunctionArgument> ",")+, FunctionArgument, ")" => ActionFn(1532);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant31(__symbols);
@@ -12780,7 +12782,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1530::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1532::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -12788,14 +12790,14 @@ mod __parse__Top {
                 (4, 84)
             }
             164 => {
-                // Arguments = "(", (<FunctionArgument> ",")+, ")" => ActionFn(1531);
+                // Arguments = "(", (<FunctionArgument> ",")+, ")" => ActionFn(1533);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant32(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1531::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1533::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -12866,11 +12868,11 @@ mod __parse__Top {
                 __reduce181(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             182 => {
-                // Atom<"all"> = StringLiteralOrFString+ => ActionFn(728);
-                let __sym0 = __pop_Variant17(__symbols);
+                // Atom<"all"> = StringLiteralOrFString+ => ActionFn(1232);
+                let __sym0 = __pop_Variant96(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action728::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1232::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -12899,7 +12901,7 @@ mod __parse__Top {
                 __reduce189(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             190 => {
-                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ",", ")" => ActionFn(1238);
+                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ",", ")" => ActionFn(1239);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -12909,7 +12911,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1238::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1239::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -12917,7 +12919,7 @@ mod __parse__Top {
                 (6, 94)
             }
             191 => {
-                // Atom<"all"> = "(", NamedOrStarExpr, ",", ")" => ActionFn(1239);
+                // Atom<"all"> = "(", NamedOrStarExpr, ",", ")" => ActionFn(1240);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -12925,7 +12927,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1239::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1240::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -12933,7 +12935,7 @@ mod __parse__Top {
                 (4, 94)
             }
             192 => {
-                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1240);
+                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1241);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -12944,7 +12946,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1240::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1241::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -12952,29 +12954,12 @@ mod __parse__Top {
                 (7, 94)
             }
             193 => {
-                // Atom<"all"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1241);
+                // Atom<"all"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1242);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant17(__symbols);
                 let __sym1 = __pop_Variant15(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym4.2;
-                let __nt = match super::__action1241::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant15(__nt), __end));
-                (5, 94)
-            }
-            194 => {
-                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ")" => ActionFn(1242);
-                assert!(__symbols.len() >= 5);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant15(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant33(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
@@ -12985,15 +12970,32 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant15(__nt), __end));
                 (5, 94)
             }
+            194 => {
+                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ")" => ActionFn(1243);
+                assert!(__symbols.len() >= 5);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant15(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant33(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym4.2;
+                let __nt = match super::__action1243::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant15(__nt), __end));
+                (5, 94)
+            }
             195 => {
-                // Atom<"all"> = "(", NamedOrStarExpr, ")" => ActionFn(1243);
+                // Atom<"all"> = "(", NamedOrStarExpr, ")" => ActionFn(1244);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant15(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1243::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1244::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13001,7 +13003,7 @@ mod __parse__Top {
                 (3, 94)
             }
             196 => {
-                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1244);
+                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1245);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant17(__symbols);
@@ -13011,7 +13013,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1244::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1245::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13019,7 +13021,7 @@ mod __parse__Top {
                 (6, 94)
             }
             197 => {
-                // Atom<"all"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1245);
+                // Atom<"all"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1246);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant17(__symbols);
@@ -13027,7 +13029,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1245::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1246::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13044,7 +13046,7 @@ mod __parse__Top {
                 __reduce200(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             201 => {
-                // Atom<"all"> = "(", "**", Expression<"all">, ")" => ActionFn(1249);
+                // Atom<"all"> = "(", "**", Expression<"all">, ")" => ActionFn(1250);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant15(__symbols);
@@ -13052,7 +13054,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1249::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1250::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13087,11 +13089,11 @@ mod __parse__Top {
                 __reduce210(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             211 => {
-                // Atom<"no-withitems"> = StringLiteralOrFString+ => ActionFn(749);
-                let __sym0 = __pop_Variant17(__symbols);
+                // Atom<"no-withitems"> = StringLiteralOrFString+ => ActionFn(1259);
+                let __sym0 = __pop_Variant96(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action749::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1259::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13114,7 +13116,7 @@ mod __parse__Top {
                 __reduce216(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             217 => {
-                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ",", ")" => ActionFn(1262);
+                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ",", ")" => ActionFn(1264);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -13124,7 +13126,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1262::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1264::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13132,7 +13134,7 @@ mod __parse__Top {
                 (6, 95)
             }
             218 => {
-                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ",", ")" => ActionFn(1263);
+                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ",", ")" => ActionFn(1265);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -13140,7 +13142,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1263::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1265::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13148,7 +13150,7 @@ mod __parse__Top {
                 (4, 95)
             }
             219 => {
-                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1264);
+                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1266);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -13159,7 +13161,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1264::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1266::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13167,7 +13169,7 @@ mod __parse__Top {
                 (7, 95)
             }
             220 => {
-                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1265);
+                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1267);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -13176,7 +13178,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1265::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1267::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13184,7 +13186,7 @@ mod __parse__Top {
                 (5, 95)
             }
             221 => {
-                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ")" => ActionFn(1266);
+                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ")" => ActionFn(1268);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant15(__symbols);
@@ -13193,7 +13195,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1266::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1268::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13201,14 +13203,14 @@ mod __parse__Top {
                 (5, 95)
             }
             222 => {
-                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ")" => ActionFn(1267);
+                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ")" => ActionFn(1269);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant15(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1267::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1269::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13216,7 +13218,7 @@ mod __parse__Top {
                 (3, 95)
             }
             223 => {
-                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1268);
+                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1270);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant17(__symbols);
@@ -13226,7 +13228,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1268::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1270::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13234,7 +13236,7 @@ mod __parse__Top {
                 (6, 95)
             }
             224 => {
-                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1269);
+                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1271);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant17(__symbols);
@@ -13242,7 +13244,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1269::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1271::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13259,7 +13261,7 @@ mod __parse__Top {
                 __reduce227(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             228 => {
-                // Atom<"no-withitems"> = "(", "**", Expression<"all">, ")" => ActionFn(1273);
+                // Atom<"no-withitems"> = "(", "**", Expression<"all">, ")" => ActionFn(1275);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant15(__symbols);
@@ -13267,7 +13269,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1273::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1275::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13744,7 +13746,7 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant71(__nt), __end));
                 (1, 147)
             }
             380 => {
@@ -13985,11 +13987,11 @@ mod __parse__Top {
                 __reduce458(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             459 => {
-                // IpyEscapeCommandExpr = ipy_escape_command => ActionFn(1338);
+                // IpyEscapeCommandExpr = ipy_escape_command => ActionFn(1340);
                 let __sym0 = __pop_Variant5(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action1338::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1340::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -13997,11 +13999,11 @@ mod __parse__Top {
                 (1, 172)
             }
             460 => {
-                // IpyEscapeCommandStatement = ipy_escape_command => ActionFn(1339);
+                // IpyEscapeCommandStatement = ipy_escape_command => ActionFn(1341);
                 let __sym0 = __pop_Variant5(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action1339::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1341::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14009,13 +14011,13 @@ mod __parse__Top {
                 (1, 173)
             }
             461 => {
-                // IpyHelpEndEscapeCommandStatement = Expression<"all">, ("?")+ => ActionFn(1340);
+                // IpyHelpEndEscapeCommandStatement = Expression<"all">, ("?")+ => ActionFn(1342);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant22(__symbols);
                 let __sym0 = __pop_Variant15(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1340::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1342::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14035,7 +14037,7 @@ mod __parse__Top {
                 __reduce465(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             466 => {
-                // LambdaDef = "lambda", ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>, ":", Test<"all"> => ActionFn(1714);
+                // LambdaDef = "lambda", ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>, ":", Test<"all"> => ActionFn(1716);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant15(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -14043,7 +14045,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1714::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1716::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14051,14 +14053,14 @@ mod __parse__Top {
                 (4, 177)
             }
             467 => {
-                // LambdaDef = "lambda", ":", Test<"all"> => ActionFn(1715);
+                // LambdaDef = "lambda", ":", Test<"all"> => ActionFn(1717);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant15(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1715::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1717::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14093,11 +14095,11 @@ mod __parse__Top {
                 __reduce476(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             477 => {
-                // LiteralPattern = StringLiteralOrFString+ => ActionFn(1347);
-                let __sym0 = __pop_Variant17(__symbols);
+                // LiteralPattern = StringLiteralOrFString+ => ActionFn(1349);
+                let __sym0 = __pop_Variant96(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action1347::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1349::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14123,11 +14125,11 @@ mod __parse__Top {
                 __reduce483(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             484 => {
-                // MappingKey = StringLiteralOrFString+ => ActionFn(1351);
-                let __sym0 = __pop_Variant17(__symbols);
+                // MappingKey = StringLiteralOrFString+ => ActionFn(1353);
+                let __sym0 = __pop_Variant96(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action1351::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1353::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14387,7 +14389,7 @@ mod __parse__Top {
                 __reduce568(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             569 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1594);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1596);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -14395,10 +14397,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant64(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1594::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1596::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14406,7 +14408,7 @@ mod __parse__Top {
                 (7, 219)
             }
             570 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1595);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1597);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -14416,10 +14418,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1595::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1597::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14427,7 +14429,7 @@ mod __parse__Top {
                 (9, 219)
             }
             571 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1596);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1598);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -14438,10 +14440,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
-                let __nt = match super::__action1596::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1598::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14449,17 +14451,17 @@ mod __parse__Top {
                 (10, 219)
             }
             572 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1597);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1599);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1597::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1599::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14467,7 +14469,7 @@ mod __parse__Top {
                 (6, 219)
             }
             573 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1598);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1600);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant9(__symbols);
@@ -14476,48 +14478,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym7.2;
-                let __nt = match super::__action1598::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (8, 219)
-            }
-            574 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1599);
-                assert!(__symbols.len() >= 9);
-                let __sym8 = __pop_Variant0(__symbols);
-                let __sym7 = __pop_Variant9(__symbols);
-                let __sym6 = __pop_Variant0(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym8.2;
-                let __nt = match super::__action1599::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (9, 219)
-            }
-            575 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1600);
-                assert!(__symbols.len() >= 8);
-                let __sym7 = __pop_Variant0(__symbols);
-                let __sym6 = __pop_Variant9(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant12(__symbols);
-                let __sym3 = __pop_Variant64(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1600::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -14527,8 +14488,49 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (8, 219)
             }
+            574 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1601);
+                assert!(__symbols.len() >= 9);
+                let __sym8 = __pop_Variant0(__symbols);
+                let __sym7 = __pop_Variant9(__symbols);
+                let __sym6 = __pop_Variant0(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym8.2;
+                let __nt = match super::__action1601::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (9, 219)
+            }
+            575 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1602);
+                assert!(__symbols.len() >= 8);
+                let __sym7 = __pop_Variant0(__symbols);
+                let __sym6 = __pop_Variant9(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant12(__symbols);
+                let __sym3 = __pop_Variant64(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym7.2;
+                let __nt = match super::__action1602::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (8, 219)
+            }
             576 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1601);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1603);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -14539,10 +14541,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
-                let __nt = match super::__action1601::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1603::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14550,7 +14552,7 @@ mod __parse__Top {
                 (10, 219)
             }
             577 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1602);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1604);
                 assert!(__symbols.len() >= 11);
                 let __sym10 = __pop_Variant0(__symbols);
                 let __sym9 = __pop_Variant9(__symbols);
@@ -14562,10 +14564,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym10.2;
-                let __nt = match super::__action1602::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
+                let __nt = match super::__action1604::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14573,7 +14575,7 @@ mod __parse__Top {
                 (11, 219)
             }
             578 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1603);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1605);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -14581,10 +14583,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1603::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1605::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14592,7 +14594,7 @@ mod __parse__Top {
                 (7, 219)
             }
             579 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1604);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1606);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -14602,10 +14604,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1604::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1606::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14613,7 +14615,7 @@ mod __parse__Top {
                 (9, 219)
             }
             580 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1605);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1607);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -14624,10 +14626,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
-                let __nt = match super::__action1605::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1607::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14635,16 +14637,16 @@ mod __parse__Top {
                 (10, 219)
             }
             581 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, "," => ActionFn(1606);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, "," => ActionFn(1608);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant64(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1606::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1608::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14652,7 +14654,7 @@ mod __parse__Top {
                 (5, 219)
             }
             582 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, "," => ActionFn(1607);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, "," => ActionFn(1609);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant64(__symbols);
@@ -14660,10 +14662,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1607::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1609::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14671,7 +14673,7 @@ mod __parse__Top {
                 (7, 219)
             }
             583 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, "," => ActionFn(1608);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, "," => ActionFn(1610);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant64(__symbols);
@@ -14680,10 +14682,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1608::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1610::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14691,15 +14693,15 @@ mod __parse__Top {
                 (8, 219)
             }
             584 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", "," => ActionFn(1609);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", "," => ActionFn(1611);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1609::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1611::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14707,51 +14709,14 @@ mod __parse__Top {
                 (4, 219)
             }
             585 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", "," => ActionFn(1610);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", "," => ActionFn(1612);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym5.2;
-                let __nt = match super::__action1610::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (6, 219)
-            }
-            586 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", "," => ActionFn(1611);
-                assert!(__symbols.len() >= 7);
-                let __sym6 = __pop_Variant0(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym6.2;
-                let __nt = match super::__action1611::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (7, 219)
-            }
-            587 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1612);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant12(__symbols);
-                let __sym3 = __pop_Variant64(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1612::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -14761,8 +14726,45 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (6, 219)
             }
+            586 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", "," => ActionFn(1613);
+                assert!(__symbols.len() >= 7);
+                let __sym6 = __pop_Variant0(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym6.2;
+                let __nt = match super::__action1613::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (7, 219)
+            }
+            587 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1614);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant12(__symbols);
+                let __sym3 = __pop_Variant64(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym5.2;
+                let __nt = match super::__action1614::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (6, 219)
+            }
             588 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1613);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1615);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant12(__symbols);
@@ -14771,10 +14773,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1613::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1615::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14782,7 +14784,7 @@ mod __parse__Top {
                 (8, 219)
             }
             589 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1614);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1616);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant12(__symbols);
@@ -14792,10 +14794,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1614::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1616::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14803,16 +14805,16 @@ mod __parse__Top {
                 (9, 219)
             }
             590 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1615);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1617);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1615::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1617::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14820,7 +14822,7 @@ mod __parse__Top {
                 (5, 219)
             }
             591 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1616);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1618);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant12(__symbols);
@@ -14828,10 +14830,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1616::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1618::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14839,7 +14841,7 @@ mod __parse__Top {
                 (7, 219)
             }
             592 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1617);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1619);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant12(__symbols);
@@ -14848,10 +14850,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1617::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1619::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14859,13 +14861,13 @@ mod __parse__Top {
                 (8, 219)
             }
             593 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, "," => ActionFn(1618);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, "," => ActionFn(1620);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1618::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1620::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14873,15 +14875,15 @@ mod __parse__Top {
                 (2, 219)
             }
             594 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", "," => ActionFn(1619);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", "," => ActionFn(1621);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1619::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1621::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14889,16 +14891,16 @@ mod __parse__Top {
                 (4, 219)
             }
             595 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1620);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1622);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1620::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1622::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14906,17 +14908,17 @@ mod __parse__Top {
                 (5, 219)
             }
             596 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1621);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1623);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant64(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1621::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1623::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14924,7 +14926,7 @@ mod __parse__Top {
                 (6, 219)
             }
             597 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1622);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1624);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -14933,10 +14935,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1622::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1624::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14944,7 +14946,7 @@ mod __parse__Top {
                 (8, 219)
             }
             598 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1623);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1625);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -14954,10 +14956,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1623::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1625::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14965,16 +14967,16 @@ mod __parse__Top {
                 (9, 219)
             }
             599 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1624);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1626);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1624::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1626::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -14982,7 +14984,7 @@ mod __parse__Top {
                 (5, 219)
             }
             600 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1625);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1627);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant9(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -14990,46 +14992,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym6.2;
-                let __nt = match super::__action1625::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (7, 219)
-            }
-            601 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1626);
-                assert!(__symbols.len() >= 8);
-                let __sym7 = __pop_Variant9(__symbols);
-                let __sym6 = __pop_Variant0(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym7.2;
-                let __nt = match super::__action1626::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (8, 219)
-            }
-            602 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1627);
-                assert!(__symbols.len() >= 7);
-                let __sym6 = __pop_Variant9(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant12(__symbols);
-                let __sym3 = __pop_Variant64(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1627::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -15039,8 +15002,47 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (7, 219)
             }
+            601 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1628);
+                assert!(__symbols.len() >= 8);
+                let __sym7 = __pop_Variant9(__symbols);
+                let __sym6 = __pop_Variant0(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym7.2;
+                let __nt = match super::__action1628::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (8, 219)
+            }
+            602 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1629);
+                assert!(__symbols.len() >= 7);
+                let __sym6 = __pop_Variant9(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant12(__symbols);
+                let __sym3 = __pop_Variant64(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym6.2;
+                let __nt = match super::__action1629::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (7, 219)
+            }
             603 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1628);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1630);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -15050,10 +15052,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1628::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1630::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15061,7 +15063,7 @@ mod __parse__Top {
                 (9, 219)
             }
             604 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1629);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1631);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant9(__symbols);
                 let __sym8 = __pop_Variant0(__symbols);
@@ -15072,10 +15074,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
-                let __nt = match super::__action1629::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1631::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15083,17 +15085,17 @@ mod __parse__Top {
                 (10, 219)
             }
             605 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1630);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1632);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1630::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1632::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15101,7 +15103,7 @@ mod __parse__Top {
                 (6, 219)
             }
             606 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1631);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1633);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -15110,10 +15112,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1631::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1633::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15121,7 +15123,7 @@ mod __parse__Top {
                 (8, 219)
             }
             607 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1632);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1634);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -15131,10 +15133,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1632::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1634::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15142,15 +15144,15 @@ mod __parse__Top {
                 (9, 219)
             }
             608 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter => ActionFn(1633);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter => ActionFn(1635);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant64(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1633::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1635::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15158,17 +15160,17 @@ mod __parse__Top {
                 (4, 219)
             }
             609 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter => ActionFn(1634);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter => ActionFn(1636);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant64(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1634::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1636::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15176,7 +15178,7 @@ mod __parse__Top {
                 (6, 219)
             }
             610 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter => ActionFn(1635);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter => ActionFn(1637);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant64(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -15184,10 +15186,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1635::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1637::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15195,14 +15197,14 @@ mod __parse__Top {
                 (7, 219)
             }
             611 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*" => ActionFn(1636);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*" => ActionFn(1638);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1636::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1638::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15210,48 +15212,13 @@ mod __parse__Top {
                 (3, 219)
             }
             612 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*" => ActionFn(1637);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*" => ActionFn(1639);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym4.2;
-                let __nt = match super::__action1637::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (5, 219)
-            }
-            613 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*" => ActionFn(1638);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym5.2;
-                let __nt = match super::__action1638::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (6, 219)
-            }
-            614 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1639);
-                assert!(__symbols.len() >= 5);
-                let __sym4 = __pop_Variant12(__symbols);
-                let __sym3 = __pop_Variant64(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1639::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -15261,8 +15228,43 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (5, 219)
             }
+            613 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*" => ActionFn(1640);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym5.2;
+                let __nt = match super::__action1640::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (6, 219)
+            }
+            614 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1641);
+                assert!(__symbols.len() >= 5);
+                let __sym4 = __pop_Variant12(__symbols);
+                let __sym3 = __pop_Variant64(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym4.2;
+                let __nt = match super::__action1641::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (5, 219)
+            }
             615 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1640);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1642);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant12(__symbols);
                 let __sym5 = __pop_Variant64(__symbols);
@@ -15270,10 +15272,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1640::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1642::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15281,7 +15283,7 @@ mod __parse__Top {
                 (7, 219)
             }
             616 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1641);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1643);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant12(__symbols);
                 let __sym6 = __pop_Variant64(__symbols);
@@ -15290,10 +15292,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1641::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1643::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15301,15 +15303,15 @@ mod __parse__Top {
                 (8, 219)
             }
             617 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1642);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1644);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1642::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1644::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15317,17 +15319,17 @@ mod __parse__Top {
                 (4, 219)
             }
             618 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1643);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1645);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant12(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1643::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1645::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15335,7 +15337,7 @@ mod __parse__Top {
                 (6, 219)
             }
             619 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1644);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1646);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant12(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -15343,10 +15345,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1644::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1646::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15354,11 +15356,11 @@ mod __parse__Top {
                 (7, 219)
             }
             620 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>> => ActionFn(1645);
-                let __sym0 = __pop_Variant85(__symbols);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>> => ActionFn(1647);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action1645::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1647::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15366,14 +15368,14 @@ mod __parse__Top {
                 (1, 219)
             }
             621 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/" => ActionFn(1646);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/" => ActionFn(1648);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1646::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1648::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15381,15 +15383,15 @@ mod __parse__Top {
                 (3, 219)
             }
             622 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1647);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1649);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1647::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1649::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15397,15 +15399,15 @@ mod __parse__Top {
                 (4, 219)
             }
             623 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1648);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1650);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1648::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1650::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15413,17 +15415,17 @@ mod __parse__Top {
                 (4, 219)
             }
             624 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1649);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1651);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1649::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1651::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15431,7 +15433,7 @@ mod __parse__Top {
                 (6, 219)
             }
             625 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1650);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1652);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -15439,10 +15441,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1650::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1652::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15450,14 +15452,14 @@ mod __parse__Top {
                 (7, 219)
             }
             626 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1651);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1653);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1651::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1653::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15465,16 +15467,16 @@ mod __parse__Top {
                 (3, 219)
             }
             627 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1652);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1654);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1652::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1654::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15482,17 +15484,17 @@ mod __parse__Top {
                 (5, 219)
             }
             628 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1653);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1655);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1653::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1655::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15500,7 +15502,7 @@ mod __parse__Top {
                 (6, 219)
             }
             629 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1393);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1395);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant9(__symbols);
@@ -15509,7 +15511,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1393::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1395::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15517,7 +15519,7 @@ mod __parse__Top {
                 (5, 219)
             }
             630 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1394);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1396);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant9(__symbols);
@@ -15525,7 +15527,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1394::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1396::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15533,7 +15535,7 @@ mod __parse__Top {
                 (4, 219)
             }
             631 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1395);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1397);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
@@ -15543,7 +15545,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1395::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1397::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15551,7 +15553,7 @@ mod __parse__Top {
                 (6, 219)
             }
             632 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1396);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1398);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant9(__symbols);
@@ -15560,7 +15562,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1396::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1398::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15568,14 +15570,14 @@ mod __parse__Top {
                 (5, 219)
             }
             633 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, "," => ActionFn(1397);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, "," => ActionFn(1399);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant64(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1397::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1399::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15583,13 +15585,13 @@ mod __parse__Top {
                 (3, 219)
             }
             634 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", "," => ActionFn(1398);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", "," => ActionFn(1400);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1398::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1400::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15597,41 +15599,10 @@ mod __parse__Top {
                 (2, 219)
             }
             635 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1399);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1401);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant12(__symbols);
-                let __sym1 = __pop_Variant64(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym3.2;
-                let __nt = match super::__action1399::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (4, 219)
-            }
-            636 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1400);
-                assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant12(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym2.2;
-                let __nt = match super::__action1400::<>(source_code, mode, __sym0, __sym1, __sym2) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (3, 219)
-            }
-            637 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1401);
-                assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant9(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant64(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
@@ -15643,11 +15614,11 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (4, 219)
             }
-            638 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1402);
+            636 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1402);
                 assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant9(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant12(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
@@ -15658,8 +15629,39 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (3, 219)
             }
+            637 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1403);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant9(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant64(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym3.2;
+                let __nt = match super::__action1403::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (4, 219)
+            }
+            638 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1404);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant9(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym2.2;
+                let __nt = match super::__action1404::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (3, 219)
+            }
             639 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1403);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1405);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -15668,7 +15670,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1403::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1405::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15676,7 +15678,7 @@ mod __parse__Top {
                 (5, 219)
             }
             640 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1404);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1406);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant9(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -15684,7 +15686,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1404::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1406::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15692,13 +15694,13 @@ mod __parse__Top {
                 (4, 219)
             }
             641 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter => ActionFn(1405);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter => ActionFn(1407);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant64(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1405::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1407::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15706,11 +15708,11 @@ mod __parse__Top {
                 (2, 219)
             }
             642 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*" => ActionFn(1406);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*" => ActionFn(1408);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action1406::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1408::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15718,14 +15720,14 @@ mod __parse__Top {
                 (1, 219)
             }
             643 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1407);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1409);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant12(__symbols);
                 let __sym1 = __pop_Variant64(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1407::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1409::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15733,13 +15735,13 @@ mod __parse__Top {
                 (3, 219)
             }
             644 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1408);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1410);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant12(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1408::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1410::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15753,7 +15755,7 @@ mod __parse__Top {
                 __reduce646(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             647 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1654);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1656);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -15761,10 +15763,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant64(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1654::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1656::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15772,7 +15774,7 @@ mod __parse__Top {
                 (7, 220)
             }
             648 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1655);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1657);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -15782,10 +15784,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1655::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1657::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15793,7 +15795,7 @@ mod __parse__Top {
                 (9, 220)
             }
             649 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1656);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1658);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -15804,10 +15806,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
-                let __nt = match super::__action1656::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1658::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15815,17 +15817,17 @@ mod __parse__Top {
                 (10, 220)
             }
             650 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1657);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1659);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1657::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1659::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15833,7 +15835,7 @@ mod __parse__Top {
                 (6, 220)
             }
             651 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1658);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1660);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant9(__symbols);
@@ -15842,48 +15844,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym7.2;
-                let __nt = match super::__action1658::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (8, 220)
-            }
-            652 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1659);
-                assert!(__symbols.len() >= 9);
-                let __sym8 = __pop_Variant0(__symbols);
-                let __sym7 = __pop_Variant9(__symbols);
-                let __sym6 = __pop_Variant0(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym8.2;
-                let __nt = match super::__action1659::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (9, 220)
-            }
-            653 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1660);
-                assert!(__symbols.len() >= 8);
-                let __sym7 = __pop_Variant0(__symbols);
-                let __sym6 = __pop_Variant9(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant12(__symbols);
-                let __sym3 = __pop_Variant64(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1660::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -15893,8 +15854,49 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (8, 220)
             }
+            652 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1661);
+                assert!(__symbols.len() >= 9);
+                let __sym8 = __pop_Variant0(__symbols);
+                let __sym7 = __pop_Variant9(__symbols);
+                let __sym6 = __pop_Variant0(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym8.2;
+                let __nt = match super::__action1661::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (9, 220)
+            }
+            653 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1662);
+                assert!(__symbols.len() >= 8);
+                let __sym7 = __pop_Variant0(__symbols);
+                let __sym6 = __pop_Variant9(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant12(__symbols);
+                let __sym3 = __pop_Variant64(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym7.2;
+                let __nt = match super::__action1662::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (8, 220)
+            }
             654 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1661);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1663);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -15905,10 +15907,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
-                let __nt = match super::__action1661::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1663::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15916,7 +15918,7 @@ mod __parse__Top {
                 (10, 220)
             }
             655 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1662);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1664);
                 assert!(__symbols.len() >= 11);
                 let __sym10 = __pop_Variant0(__symbols);
                 let __sym9 = __pop_Variant9(__symbols);
@@ -15928,10 +15930,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym10.2;
-                let __nt = match super::__action1662::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
+                let __nt = match super::__action1664::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15939,7 +15941,7 @@ mod __parse__Top {
                 (11, 220)
             }
             656 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1663);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1665);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -15947,10 +15949,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1663::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1665::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15958,7 +15960,7 @@ mod __parse__Top {
                 (7, 220)
             }
             657 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1664);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1666);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -15968,10 +15970,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1664::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1666::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -15979,7 +15981,7 @@ mod __parse__Top {
                 (9, 220)
             }
             658 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1665);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1667);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -15990,10 +15992,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
-                let __nt = match super::__action1665::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1667::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16001,16 +16003,16 @@ mod __parse__Top {
                 (10, 220)
             }
             659 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, "," => ActionFn(1666);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, "," => ActionFn(1668);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant64(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1666::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1668::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16018,7 +16020,7 @@ mod __parse__Top {
                 (5, 220)
             }
             660 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, "," => ActionFn(1667);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, "," => ActionFn(1669);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant64(__symbols);
@@ -16026,10 +16028,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1667::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1669::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16037,7 +16039,7 @@ mod __parse__Top {
                 (7, 220)
             }
             661 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, "," => ActionFn(1668);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, "," => ActionFn(1670);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant64(__symbols);
@@ -16046,10 +16048,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1668::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1670::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16057,15 +16059,15 @@ mod __parse__Top {
                 (8, 220)
             }
             662 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", "," => ActionFn(1669);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", "," => ActionFn(1671);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1669::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1671::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16073,51 +16075,14 @@ mod __parse__Top {
                 (4, 220)
             }
             663 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", "," => ActionFn(1670);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", "," => ActionFn(1672);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym5.2;
-                let __nt = match super::__action1670::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (6, 220)
-            }
-            664 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", "," => ActionFn(1671);
-                assert!(__symbols.len() >= 7);
-                let __sym6 = __pop_Variant0(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym6.2;
-                let __nt = match super::__action1671::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (7, 220)
-            }
-            665 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1672);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant12(__symbols);
-                let __sym3 = __pop_Variant64(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1672::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16127,8 +16092,45 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (6, 220)
             }
+            664 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", "," => ActionFn(1673);
+                assert!(__symbols.len() >= 7);
+                let __sym6 = __pop_Variant0(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym6.2;
+                let __nt = match super::__action1673::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (7, 220)
+            }
+            665 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1674);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant12(__symbols);
+                let __sym3 = __pop_Variant64(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym5.2;
+                let __nt = match super::__action1674::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (6, 220)
+            }
             666 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1673);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1675);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant12(__symbols);
@@ -16137,10 +16139,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1673::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1675::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16148,7 +16150,7 @@ mod __parse__Top {
                 (8, 220)
             }
             667 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1674);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1676);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant12(__symbols);
@@ -16158,10 +16160,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1674::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1676::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16169,16 +16171,16 @@ mod __parse__Top {
                 (9, 220)
             }
             668 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1675);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1677);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1675::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1677::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16186,7 +16188,7 @@ mod __parse__Top {
                 (5, 220)
             }
             669 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1676);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1678);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant12(__symbols);
@@ -16194,10 +16196,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1676::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1678::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16205,7 +16207,7 @@ mod __parse__Top {
                 (7, 220)
             }
             670 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1677);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1679);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant12(__symbols);
@@ -16214,10 +16216,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1677::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1679::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16225,13 +16227,13 @@ mod __parse__Top {
                 (8, 220)
             }
             671 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, "," => ActionFn(1678);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, "," => ActionFn(1680);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1678::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1680::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16239,15 +16241,15 @@ mod __parse__Top {
                 (2, 220)
             }
             672 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", "," => ActionFn(1679);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", "," => ActionFn(1681);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1679::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1681::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16255,16 +16257,16 @@ mod __parse__Top {
                 (4, 220)
             }
             673 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1680);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1682);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1680::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1682::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16272,17 +16274,17 @@ mod __parse__Top {
                 (5, 220)
             }
             674 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1681);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1683);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant64(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1681::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1683::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16290,7 +16292,7 @@ mod __parse__Top {
                 (6, 220)
             }
             675 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1682);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1684);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -16299,10 +16301,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1682::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1684::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16310,7 +16312,7 @@ mod __parse__Top {
                 (8, 220)
             }
             676 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1683);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1685);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -16320,10 +16322,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1683::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1685::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16331,16 +16333,16 @@ mod __parse__Top {
                 (9, 220)
             }
             677 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1684);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1686);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1684::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1686::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16348,7 +16350,7 @@ mod __parse__Top {
                 (5, 220)
             }
             678 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1685);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1687);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant9(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -16356,46 +16358,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym6.2;
-                let __nt = match super::__action1685::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (7, 220)
-            }
-            679 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1686);
-                assert!(__symbols.len() >= 8);
-                let __sym7 = __pop_Variant9(__symbols);
-                let __sym6 = __pop_Variant0(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym7.2;
-                let __nt = match super::__action1686::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (8, 220)
-            }
-            680 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1687);
-                assert!(__symbols.len() >= 7);
-                let __sym6 = __pop_Variant9(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant12(__symbols);
-                let __sym3 = __pop_Variant64(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1687::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16405,8 +16368,47 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (7, 220)
             }
+            679 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1688);
+                assert!(__symbols.len() >= 8);
+                let __sym7 = __pop_Variant9(__symbols);
+                let __sym6 = __pop_Variant0(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym7.2;
+                let __nt = match super::__action1688::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (8, 220)
+            }
+            680 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1689);
+                assert!(__symbols.len() >= 7);
+                let __sym6 = __pop_Variant9(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant12(__symbols);
+                let __sym3 = __pop_Variant64(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym6.2;
+                let __nt = match super::__action1689::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (7, 220)
+            }
             681 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1688);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1690);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -16416,10 +16418,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1688::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1690::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16427,7 +16429,7 @@ mod __parse__Top {
                 (9, 220)
             }
             682 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1689);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1691);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant9(__symbols);
                 let __sym8 = __pop_Variant0(__symbols);
@@ -16438,10 +16440,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
-                let __nt = match super::__action1689::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1691::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16449,17 +16451,17 @@ mod __parse__Top {
                 (10, 220)
             }
             683 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1690);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1692);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1690::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1692::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16467,7 +16469,7 @@ mod __parse__Top {
                 (6, 220)
             }
             684 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1691);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1693);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -16476,10 +16478,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1691::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1693::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16487,7 +16489,7 @@ mod __parse__Top {
                 (8, 220)
             }
             685 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1692);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1694);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -16497,10 +16499,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
-                let __nt = match super::__action1692::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1694::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16508,15 +16510,15 @@ mod __parse__Top {
                 (9, 220)
             }
             686 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter => ActionFn(1693);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter => ActionFn(1695);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant64(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1693::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1695::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16524,17 +16526,17 @@ mod __parse__Top {
                 (4, 220)
             }
             687 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter => ActionFn(1694);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter => ActionFn(1696);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant64(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1694::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1696::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16542,7 +16544,7 @@ mod __parse__Top {
                 (6, 220)
             }
             688 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter => ActionFn(1695);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter => ActionFn(1697);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant64(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -16550,10 +16552,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1695::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1697::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16561,14 +16563,14 @@ mod __parse__Top {
                 (7, 220)
             }
             689 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*" => ActionFn(1696);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*" => ActionFn(1698);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1696::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1698::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16576,48 +16578,13 @@ mod __parse__Top {
                 (3, 220)
             }
             690 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*" => ActionFn(1697);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*" => ActionFn(1699);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym4.2;
-                let __nt = match super::__action1697::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (5, 220)
-            }
-            691 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*" => ActionFn(1698);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym5.2;
-                let __nt = match super::__action1698::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (6, 220)
-            }
-            692 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1699);
-                assert!(__symbols.len() >= 5);
-                let __sym4 = __pop_Variant12(__symbols);
-                let __sym3 = __pop_Variant64(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1699::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -16627,8 +16594,43 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (5, 220)
             }
+            691 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*" => ActionFn(1700);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym5.2;
+                let __nt = match super::__action1700::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (6, 220)
+            }
+            692 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1701);
+                assert!(__symbols.len() >= 5);
+                let __sym4 = __pop_Variant12(__symbols);
+                let __sym3 = __pop_Variant64(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym4.2;
+                let __nt = match super::__action1701::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (5, 220)
+            }
             693 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1700);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1702);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant12(__symbols);
                 let __sym5 = __pop_Variant64(__symbols);
@@ -16636,10 +16638,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1700::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1702::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16647,7 +16649,7 @@ mod __parse__Top {
                 (7, 220)
             }
             694 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1701);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1703);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant12(__symbols);
                 let __sym6 = __pop_Variant64(__symbols);
@@ -16656,10 +16658,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
-                let __nt = match super::__action1701::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1703::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16667,15 +16669,15 @@ mod __parse__Top {
                 (8, 220)
             }
             695 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1702);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1704);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1702::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1704::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16683,17 +16685,17 @@ mod __parse__Top {
                 (4, 220)
             }
             696 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1703);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1705);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant12(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1703::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1705::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16701,7 +16703,7 @@ mod __parse__Top {
                 (6, 220)
             }
             697 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1704);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1706);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant12(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -16709,10 +16711,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1704::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1706::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16720,11 +16722,11 @@ mod __parse__Top {
                 (7, 220)
             }
             698 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>> => ActionFn(1705);
-                let __sym0 = __pop_Variant85(__symbols);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>> => ActionFn(1707);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action1705::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1707::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16732,14 +16734,14 @@ mod __parse__Top {
                 (1, 220)
             }
             699 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/" => ActionFn(1706);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/" => ActionFn(1708);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1706::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1708::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16747,15 +16749,15 @@ mod __parse__Top {
                 (3, 220)
             }
             700 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1707);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1709);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1707::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1709::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16763,15 +16765,15 @@ mod __parse__Top {
                 (4, 220)
             }
             701 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1708);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1710);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1708::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1710::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16779,17 +16781,17 @@ mod __parse__Top {
                 (4, 220)
             }
             702 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1709);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1711);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1709::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1711::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16797,7 +16799,7 @@ mod __parse__Top {
                 (6, 220)
             }
             703 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1710);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1712);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -16805,10 +16807,10 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
-                let __nt = match super::__action1710::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1712::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16816,14 +16818,14 @@ mod __parse__Top {
                 (7, 220)
             }
             704 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", KwargParameter<StarUntypedParameter> => ActionFn(1711);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", KwargParameter<StarUntypedParameter> => ActionFn(1713);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1711::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1713::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16831,16 +16833,16 @@ mod __parse__Top {
                 (3, 220)
             }
             705 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", KwargParameter<StarUntypedParameter> => ActionFn(1712);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", KwargParameter<StarUntypedParameter> => ActionFn(1714);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1712::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1714::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16848,17 +16850,17 @@ mod __parse__Top {
                 (5, 220)
             }
             706 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1713);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1715);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant86(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1713::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1715::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16866,7 +16868,7 @@ mod __parse__Top {
                 (6, 220)
             }
             707 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1431);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1433);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant9(__symbols);
@@ -16875,7 +16877,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1431::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1433::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16883,7 +16885,7 @@ mod __parse__Top {
                 (5, 220)
             }
             708 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1432);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1434);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant9(__symbols);
@@ -16891,7 +16893,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1432::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1434::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16899,7 +16901,7 @@ mod __parse__Top {
                 (4, 220)
             }
             709 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1433);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1435);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
@@ -16909,7 +16911,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
-                let __nt = match super::__action1433::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1435::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16917,7 +16919,7 @@ mod __parse__Top {
                 (6, 220)
             }
             710 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1434);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1436);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant9(__symbols);
@@ -16926,7 +16928,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1434::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1436::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16934,14 +16936,14 @@ mod __parse__Top {
                 (5, 220)
             }
             711 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, "," => ActionFn(1435);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, "," => ActionFn(1437);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant64(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1435::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1437::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16949,13 +16951,13 @@ mod __parse__Top {
                 (3, 220)
             }
             712 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", "," => ActionFn(1436);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", "," => ActionFn(1438);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1436::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1438::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -16963,41 +16965,10 @@ mod __parse__Top {
                 (2, 220)
             }
             713 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1437);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1439);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant12(__symbols);
-                let __sym1 = __pop_Variant64(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym3.2;
-                let __nt = match super::__action1437::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (4, 220)
-            }
-            714 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1438);
-                assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant12(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0;
-                let __end = __sym2.2;
-                let __nt = match super::__action1438::<>(source_code, mode, __sym0, __sym1, __sym2) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
-                (3, 220)
-            }
-            715 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1439);
-                assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant9(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant64(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
@@ -17009,11 +16980,11 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (4, 220)
             }
-            716 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1440);
+            714 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1440);
                 assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant9(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant12(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
@@ -17024,8 +16995,39 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant46(__nt), __end));
                 (3, 220)
             }
+            715 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1441);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant9(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant64(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym3.2;
+                let __nt = match super::__action1441::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (4, 220)
+            }
+            716 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1442);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant9(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym2.2;
+                let __nt = match super::__action1442::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant46(__nt), __end));
+                (3, 220)
+            }
             717 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1441);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1443);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -17034,7 +17036,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
-                let __nt = match super::__action1441::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1443::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -17042,7 +17044,7 @@ mod __parse__Top {
                 (5, 220)
             }
             718 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1442);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1444);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant9(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -17050,7 +17052,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
-                let __nt = match super::__action1442::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1444::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -17058,13 +17060,13 @@ mod __parse__Top {
                 (4, 220)
             }
             719 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter => ActionFn(1443);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter => ActionFn(1445);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant64(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1443::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1445::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -17072,11 +17074,11 @@ mod __parse__Top {
                 (2, 220)
             }
             720 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*" => ActionFn(1444);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*" => ActionFn(1446);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
-                let __nt = match super::__action1444::<>(source_code, mode, __sym0) {
+                let __nt = match super::__action1446::<>(source_code, mode, __sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -17084,14 +17086,14 @@ mod __parse__Top {
                 (1, 220)
             }
             721 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1445);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1447);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant12(__symbols);
                 let __sym1 = __pop_Variant64(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1445::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1447::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -17099,13 +17101,13 @@ mod __parse__Top {
                 (3, 220)
             }
             722 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1446);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1448);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant12(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1446::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1448::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -17363,14 +17365,14 @@ mod __parse__Top {
                 (2, 223)
             }
             743 => {
-                // Parameters = "(", ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>, ")" => ActionFn(1449);
+                // Parameters = "(", ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>, ")" => ActionFn(1451);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant46(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
-                let __nt = match super::__action1449::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                let __nt = match super::__action1451::<>(source_code, mode, __sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -17378,13 +17380,13 @@ mod __parse__Top {
                 (3, 224)
             }
             744 => {
-                // Parameters = "(", ")" => ActionFn(1450);
+                // Parameters = "(", ")" => ActionFn(1452);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
-                let __nt = match super::__action1450::<>(source_code, mode, __sym0, __sym1) {
+                let __nt = match super::__action1452::<>(source_code, mode, __sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -17661,7 +17663,7 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant15(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant70(__nt), __end));
                 (1, 251)
             }
             833 => {
@@ -17999,7 +18001,7 @@ mod __parse__Top {
             }
             944 => {
                 // __Top = Top => ActionFn(0);
-                let __sym0 = __pop_Variant95(__symbols);
+                let __sym0 = __pop_Variant97(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
                 let __nt = super::__action0::<>(source_code, mode, __sym0);
@@ -18058,13 +18060,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant77<
+    fn __pop_Variant78<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, (Option<ast::Int>, Option<ast::Identifier>), TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant77(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant78(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18118,13 +18120,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant87<
+    fn __pop_Variant88<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant87(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant88(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18138,13 +18140,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant81<
+    fn __pop_Variant82<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, (ast::Expr, ast::Pattern), TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant81(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant82(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18208,23 +18210,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant70<
+    fn __pop_Variant71<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Option<ast::Expr>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant70(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant71(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant92<
+    fn __pop_Variant93<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Option<ast::ParenthesizedExpr>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant92(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant93(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18235,6 +18237,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant6(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant70<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, StringType, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant70(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18268,23 +18280,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant84<
+    fn __pop_Variant85<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant84(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant85(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant74<
+    fn __pop_Variant75<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::Alias>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant74(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant75(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18298,23 +18310,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant82<
+    fn __pop_Variant83<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::Identifier>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant82(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant83(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant85<
+    fn __pop_Variant86<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::ParameterWithDefault>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant85(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant86(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18338,33 +18350,33 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant83<
+    fn __pop_Variant84<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::PatternKeyword>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant83(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant84(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant94<
+    fn __pop_Variant95<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::Stmt>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant94(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant95(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant86<
+    fn __pop_Variant87<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::TypeParam>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant86(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant87(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18418,23 +18430,33 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant71<
+    fn __pop_Variant72<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, alloc::vec::Vec<Option<ast::Expr>>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant71(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant72(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant91<
+    fn __pop_Variant96<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, alloc::vec::Vec<StringType>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant96(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant92<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, alloc::vec::Vec<ast::Comprehension>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant91(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant92(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18458,23 +18480,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant76<
+    fn __pop_Variant77<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, alloc::vec::Vec<ast::Int>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant76(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant77(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant79<
+    fn __pop_Variant80<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, alloc::vec::Vec<ast::MatchCase>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant79(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant80(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18538,13 +18560,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant73<
+    fn __pop_Variant74<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::Alias, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant73(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant74(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18568,13 +18590,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant90<
+    fn __pop_Variant91<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::Comprehension, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant90(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant91(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18628,33 +18650,33 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant75<
+    fn __pop_Variant76<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::Int, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant75(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant76(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant78<
+    fn __pop_Variant79<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::MatchCase, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant78(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant79(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant95<
+    fn __pop_Variant97<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::Mod, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant95(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant97(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18718,23 +18740,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant89<
+    fn __pop_Variant90<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::PatternArguments, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant89(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant90(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant80<
+    fn __pop_Variant81<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::PatternKeyword, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant80(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant81(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18758,33 +18780,33 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant96<
+    fn __pop_Variant98<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::TypeParam, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant96(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant97<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::TypeParams, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant97(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant98(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
     fn __pop_Variant99<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::UnaryOp, TextSize)
+    ) -> (TextSize, ast::TypeParams, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant99(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant101<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, ast::UnaryOp, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant101(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18798,13 +18820,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant72<
+    fn __pop_Variant73<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant72(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant73(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18848,13 +18870,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant93<
+    fn __pop_Variant94<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, core::option::Option<Option<ast::ParenthesizedExpr>>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant93(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant94(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18958,13 +18980,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant88<
+    fn __pop_Variant89<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, core::option::Option<ast::Pattern>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant88(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant89(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18978,13 +19000,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant98<
+    fn __pop_Variant100<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, core::option::Option<ast::TypeParams>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant98(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant100(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -21643,11 +21665,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = Constant => ActionFn(1232);
+        // Atom<"all"> = Constant => ActionFn(1233);
         let __sym0 = __pop_Variant57(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1232::<>(source_code, mode, __sym0);
+        let __nt = super::__action1233::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 94)
     }
@@ -21660,11 +21682,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = Identifier => ActionFn(1233);
+        // Atom<"all"> = Identifier => ActionFn(1234);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1233::<>(source_code, mode, __sym0);
+        let __nt = super::__action1234::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 94)
     }
@@ -21677,14 +21699,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "[", ListLiteralValues, "]" => ActionFn(1590);
+        // Atom<"all"> = "[", ListLiteralValues, "]" => ActionFn(1592);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1590::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1592::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 94)
     }
@@ -21697,13 +21719,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "[", "]" => ActionFn(1591);
+        // Atom<"all"> = "[", "]" => ActionFn(1593);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1591::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1593::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 94)
     }
@@ -21716,7 +21738,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "[", TestOrStarNamedExpr, CompFor, "]" => ActionFn(1235);
+        // Atom<"all"> = "[", TestOrStarNamedExpr, CompFor, "]" => ActionFn(1236);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant54(__symbols);
@@ -21724,7 +21746,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1235::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1236::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 94)
     }
@@ -21737,7 +21759,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", ")" => ActionFn(1236);
+        // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", ")" => ActionFn(1237);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -21745,7 +21767,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1236::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1237::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 94)
     }
@@ -21758,14 +21780,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "(", OneOrMore<Test<"all">>, ")" => ActionFn(1237);
+        // Atom<"all"> = "(", OneOrMore<Test<"all">>, ")" => ActionFn(1238);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1237::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1238::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 94)
     }
@@ -21778,13 +21800,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "(", ")" => ActionFn(1246);
+        // Atom<"all"> = "(", ")" => ActionFn(1247);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1246::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1247::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 94)
     }
@@ -21797,14 +21819,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "(", YieldExpr, ")" => ActionFn(1247);
+        // Atom<"all"> = "(", YieldExpr, ")" => ActionFn(1248);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1247::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1248::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 94)
     }
@@ -21817,7 +21839,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "(", NamedExpressionTest, CompFor, ")" => ActionFn(1248);
+        // Atom<"all"> = "(", NamedExpressionTest, CompFor, ")" => ActionFn(1249);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant54(__symbols);
@@ -21825,7 +21847,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1248::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1249::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 94)
     }
@@ -21838,14 +21860,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", DictLiteralValues, "}" => ActionFn(1558);
+        // Atom<"all"> = "{", DictLiteralValues, "}" => ActionFn(1560);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant62(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1558::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1560::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 94)
     }
@@ -21858,13 +21880,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", "}" => ActionFn(1559);
+        // Atom<"all"> = "{", "}" => ActionFn(1561);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1559::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1561::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 94)
     }
@@ -21877,7 +21899,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", DictEntry, CompFor, "}" => ActionFn(1251);
+        // Atom<"all"> = "{", DictEntry, CompFor, "}" => ActionFn(1252);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant54(__symbols);
@@ -21885,7 +21907,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1251::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1252::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 94)
     }
@@ -21898,14 +21920,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", SetLiteralValues, "}" => ActionFn(1252);
+        // Atom<"all"> = "{", SetLiteralValues, "}" => ActionFn(1253);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1252::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1253::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 94)
     }
@@ -21918,7 +21940,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", NamedExpressionTest, CompFor, "}" => ActionFn(1253);
+        // Atom<"all"> = "{", NamedExpressionTest, CompFor, "}" => ActionFn(1254);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant54(__symbols);
@@ -21926,7 +21948,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1253::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1254::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 94)
     }
@@ -21939,11 +21961,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "True" => ActionFn(1254);
+        // Atom<"all"> = "True" => ActionFn(1255);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1254::<>(source_code, mode, __sym0);
+        let __nt = super::__action1255::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 94)
     }
@@ -21956,11 +21978,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "False" => ActionFn(1255);
+        // Atom<"all"> = "False" => ActionFn(1256);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1255::<>(source_code, mode, __sym0);
+        let __nt = super::__action1256::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 94)
     }
@@ -21973,11 +21995,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "None" => ActionFn(1256);
+        // Atom<"all"> = "None" => ActionFn(1257);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1256::<>(source_code, mode, __sym0);
+        let __nt = super::__action1257::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 94)
     }
@@ -21990,11 +22012,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "..." => ActionFn(1257);
+        // Atom<"all"> = "..." => ActionFn(1258);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1257::<>(source_code, mode, __sym0);
+        let __nt = super::__action1258::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 94)
     }
@@ -22007,11 +22029,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = Constant => ActionFn(1258);
+        // Atom<"no-withitems"> = Constant => ActionFn(1260);
         let __sym0 = __pop_Variant57(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1258::<>(source_code, mode, __sym0);
+        let __nt = super::__action1260::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 95)
     }
@@ -22024,11 +22046,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = Identifier => ActionFn(1259);
+        // Atom<"no-withitems"> = Identifier => ActionFn(1261);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1259::<>(source_code, mode, __sym0);
+        let __nt = super::__action1261::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 95)
     }
@@ -22041,14 +22063,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "[", ListLiteralValues, "]" => ActionFn(1592);
+        // Atom<"no-withitems"> = "[", ListLiteralValues, "]" => ActionFn(1594);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1592::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1594::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 95)
     }
@@ -22061,13 +22083,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "[", "]" => ActionFn(1593);
+        // Atom<"no-withitems"> = "[", "]" => ActionFn(1595);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1593::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1595::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 95)
     }
@@ -22080,7 +22102,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "[", TestOrStarNamedExpr, CompFor, "]" => ActionFn(1261);
+        // Atom<"no-withitems"> = "[", TestOrStarNamedExpr, CompFor, "]" => ActionFn(1263);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant54(__symbols);
@@ -22088,7 +22110,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1261::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1263::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 95)
     }
@@ -22101,13 +22123,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "(", ")" => ActionFn(1270);
+        // Atom<"no-withitems"> = "(", ")" => ActionFn(1272);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1270::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1272::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 95)
     }
@@ -22120,14 +22142,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "(", YieldExpr, ")" => ActionFn(1271);
+        // Atom<"no-withitems"> = "(", YieldExpr, ")" => ActionFn(1273);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1271::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1273::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 95)
     }
@@ -22140,7 +22162,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "(", NamedExpressionTest, CompFor, ")" => ActionFn(1272);
+        // Atom<"no-withitems"> = "(", NamedExpressionTest, CompFor, ")" => ActionFn(1274);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant54(__symbols);
@@ -22148,7 +22170,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1272::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1274::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 95)
     }
@@ -22161,14 +22183,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", DictLiteralValues, "}" => ActionFn(1560);
+        // Atom<"no-withitems"> = "{", DictLiteralValues, "}" => ActionFn(1562);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant62(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1560::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1562::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 95)
     }
@@ -22181,13 +22203,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", "}" => ActionFn(1561);
+        // Atom<"no-withitems"> = "{", "}" => ActionFn(1563);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1561::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1563::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 95)
     }
@@ -22200,7 +22222,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", DictEntry, CompFor, "}" => ActionFn(1275);
+        // Atom<"no-withitems"> = "{", DictEntry, CompFor, "}" => ActionFn(1277);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant54(__symbols);
@@ -22208,7 +22230,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1275::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1277::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 95)
     }
@@ -22221,14 +22243,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", SetLiteralValues, "}" => ActionFn(1276);
+        // Atom<"no-withitems"> = "{", SetLiteralValues, "}" => ActionFn(1278);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1276::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1278::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 95)
     }
@@ -22241,7 +22263,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", NamedExpressionTest, CompFor, "}" => ActionFn(1277);
+        // Atom<"no-withitems"> = "{", NamedExpressionTest, CompFor, "}" => ActionFn(1279);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant54(__symbols);
@@ -22249,7 +22271,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1277::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1279::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 95)
     }
@@ -22262,11 +22284,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "True" => ActionFn(1278);
+        // Atom<"no-withitems"> = "True" => ActionFn(1280);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1278::<>(source_code, mode, __sym0);
+        let __nt = super::__action1280::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 95)
     }
@@ -22279,11 +22301,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "False" => ActionFn(1279);
+        // Atom<"no-withitems"> = "False" => ActionFn(1281);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1279::<>(source_code, mode, __sym0);
+        let __nt = super::__action1281::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 95)
     }
@@ -22296,11 +22318,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "None" => ActionFn(1280);
+        // Atom<"no-withitems"> = "None" => ActionFn(1282);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1280::<>(source_code, mode, __sym0);
+        let __nt = super::__action1282::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 95)
     }
@@ -22313,11 +22335,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "..." => ActionFn(1281);
+        // Atom<"no-withitems"> = "..." => ActionFn(1283);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1281::<>(source_code, mode, __sym0);
+        let __nt = super::__action1283::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 95)
     }
@@ -22347,13 +22369,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"all"> = AtomExpr2<"all">, Arguments => ActionFn(1282);
+        // AtomExpr2<"all"> = AtomExpr2<"all">, Arguments => ActionFn(1284);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant50(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1282::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1284::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 96)
     }
@@ -22366,7 +22388,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"all"> = AtomExpr2<"all">, "[", SubscriptList, "]" => ActionFn(1283);
+        // AtomExpr2<"all"> = AtomExpr2<"all">, "[", SubscriptList, "]" => ActionFn(1285);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant15(__symbols);
@@ -22374,7 +22396,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1283::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1285::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 96)
     }
@@ -22387,14 +22409,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"all"> = AtomExpr2<"all">, ".", Identifier => ActionFn(1284);
+        // AtomExpr2<"all"> = AtomExpr2<"all">, ".", Identifier => ActionFn(1286);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1284::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1286::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 96)
     }
@@ -22424,13 +22446,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, Arguments => ActionFn(1285);
+        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, Arguments => ActionFn(1287);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant50(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1285::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1287::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 97)
     }
@@ -22443,7 +22465,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, "[", SubscriptList, "]" => ActionFn(1286);
+        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, "[", SubscriptList, "]" => ActionFn(1288);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant15(__symbols);
@@ -22451,7 +22473,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1286::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1288::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 97)
     }
@@ -22464,14 +22486,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, ".", Identifier => ActionFn(1287);
+        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, ".", Identifier => ActionFn(1289);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1287::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1289::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 97)
     }
@@ -22484,13 +22506,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr<"all"> = "await", AtomExpr2<"all"> => ActionFn(1288);
+        // AtomExpr<"all"> = "await", AtomExpr2<"all"> => ActionFn(1290);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1288::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1290::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 98)
     }
@@ -22520,13 +22542,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr<"no-withitems"> = "await", AtomExpr2<"all"> => ActionFn(1289);
+        // AtomExpr<"no-withitems"> = "await", AtomExpr2<"all"> => ActionFn(1291);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1289::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1291::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 99)
     }
@@ -22777,11 +22799,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // CapturePattern = Identifier => ActionFn(1290);
+        // CapturePattern = Identifier => ActionFn(1292);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1290::<>(source_code, mode, __sym0);
+        let __nt = super::__action1292::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 101)
     }
@@ -22794,17 +22816,17 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = "class", Identifier, TypeParams, Arguments, ":", Suite => ActionFn(1746);
+        // ClassDef = "class", Identifier, TypeParams, Arguments, ":", Suite => ActionFn(1748);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant50(__symbols);
-        let __sym2 = __pop_Variant97(__symbols);
+        let __sym2 = __pop_Variant99(__symbols);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1746::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1748::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 102)
     }
@@ -22817,7 +22839,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = "class", Identifier, Arguments, ":", Suite => ActionFn(1747);
+        // ClassDef = "class", Identifier, Arguments, ":", Suite => ActionFn(1749);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -22826,7 +22848,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1747::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1749::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 102)
     }
@@ -22839,18 +22861,18 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = Decorator+, "class", Identifier, TypeParams, Arguments, ":", Suite => ActionFn(1748);
+        // ClassDef = Decorator+, "class", Identifier, TypeParams, Arguments, ":", Suite => ActionFn(1750);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant50(__symbols);
-        let __sym3 = __pop_Variant97(__symbols);
+        let __sym3 = __pop_Variant99(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1748::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1750::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 102)
     }
@@ -22863,7 +22885,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = Decorator+, "class", Identifier, Arguments, ":", Suite => ActionFn(1749);
+        // ClassDef = Decorator+, "class", Identifier, Arguments, ":", Suite => ActionFn(1751);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
@@ -22873,7 +22895,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1749::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1751::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 102)
     }
@@ -22886,16 +22908,16 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = "class", Identifier, TypeParams, ":", Suite => ActionFn(1750);
+        // ClassDef = "class", Identifier, TypeParams, ":", Suite => ActionFn(1752);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant97(__symbols);
+        let __sym2 = __pop_Variant99(__symbols);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1750::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1752::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 102)
     }
@@ -22908,7 +22930,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = "class", Identifier, ":", Suite => ActionFn(1751);
+        // ClassDef = "class", Identifier, ":", Suite => ActionFn(1753);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant25(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -22916,7 +22938,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1751::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1753::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 102)
     }
@@ -22929,17 +22951,17 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = Decorator+, "class", Identifier, TypeParams, ":", Suite => ActionFn(1752);
+        // ClassDef = Decorator+, "class", Identifier, TypeParams, ":", Suite => ActionFn(1754);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant97(__symbols);
+        let __sym3 = __pop_Variant99(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1752::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1754::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 102)
     }
@@ -22952,7 +22974,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = Decorator+, "class", Identifier, ":", Suite => ActionFn(1753);
+        // ClassDef = Decorator+, "class", Identifier, ":", Suite => ActionFn(1755);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -22961,7 +22983,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1753::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1755::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 102)
     }
@@ -22974,13 +22996,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchName, PatternArguments => ActionFn(1291);
+        // ClassPattern = MatchName, PatternArguments => ActionFn(1293);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant89(__symbols);
+        let __sym1 = __pop_Variant90(__symbols);
         let __sym0 = __pop_Variant44(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1291::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1293::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 103)
     }
@@ -22993,13 +23015,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchNameOrAttr, PatternArguments => ActionFn(1292);
+        // ClassPattern = MatchNameOrAttr, PatternArguments => ActionFn(1294);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant89(__symbols);
+        let __sym1 = __pop_Variant90(__symbols);
         let __sym0 = __pop_Variant44(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1292::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1294::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 103)
     }
@@ -23131,11 +23153,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<FunctionArgument> = FunctionArgument => ActionFn(1524);
+        // Comma<FunctionArgument> = FunctionArgument => ActionFn(1526);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1524::<>(source_code, mode, __sym0);
+        let __nt = super::__action1526::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant52(__nt), __end));
         (1, 105)
     }
@@ -23148,10 +23170,10 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<FunctionArgument> =  => ActionFn(1525);
+        // Comma<FunctionArgument> =  => ActionFn(1527);
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
-        let __nt = super::__action1525::<>(source_code, mode, &__start, &__end);
+        let __nt = super::__action1527::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant52(__nt), __end));
         (0, 105)
     }
@@ -23164,13 +23186,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<FunctionArgument> = (<FunctionArgument> ",")+, FunctionArgument => ActionFn(1526);
+        // Comma<FunctionArgument> = (<FunctionArgument> ",")+, FunctionArgument => ActionFn(1528);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant31(__symbols);
         let __sym0 = __pop_Variant32(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1526::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1528::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant52(__nt), __end));
         (2, 105)
     }
@@ -23183,11 +23205,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<FunctionArgument> = (<FunctionArgument> ",")+ => ActionFn(1527);
+        // Comma<FunctionArgument> = (<FunctionArgument> ",")+ => ActionFn(1529);
         let __sym0 = __pop_Variant32(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1527::<>(source_code, mode, __sym0);
+        let __nt = super::__action1529::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant52(__nt), __end));
         (1, 105)
     }
@@ -23200,11 +23222,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<Pattern> = Pattern => ActionFn(1532);
+        // Comma<Pattern> = Pattern => ActionFn(1534);
         let __sym0 = __pop_Variant35(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1532::<>(source_code, mode, __sym0);
+        let __nt = super::__action1534::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (1, 106)
     }
@@ -23217,10 +23239,10 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<Pattern> =  => ActionFn(1533);
+        // Comma<Pattern> =  => ActionFn(1535);
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
-        let __nt = super::__action1533::<>(source_code, mode, &__start, &__end);
+        let __nt = super::__action1535::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (0, 106)
     }
@@ -23233,13 +23255,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<Pattern> = (<Pattern> ",")+, Pattern => ActionFn(1534);
+        // Comma<Pattern> = (<Pattern> ",")+, Pattern => ActionFn(1536);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant35(__symbols);
         let __sym0 = __pop_Variant36(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1534::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1536::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (2, 106)
     }
@@ -23252,11 +23274,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<Pattern> = (<Pattern> ",")+ => ActionFn(1535);
+        // Comma<Pattern> = (<Pattern> ",")+ => ActionFn(1537);
         let __sym0 = __pop_Variant36(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1535::<>(source_code, mode, __sym0);
+        let __nt = super::__action1537::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (1, 106)
     }
@@ -23270,7 +23292,7 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // CompFor = SingleForComprehension+ => ActionFn(234);
-        let __sym0 = __pop_Variant91(__symbols);
+        let __sym0 = __pop_Variant92(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action234::<>(source_code, mode, __sym0);
@@ -23493,13 +23515,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comparison<"all"> = Expression<"all">, (CompOp Expression<"all">)+ => ActionFn(1293);
+        // Comparison<"all"> = Expression<"all">, (CompOp Expression<"all">)+ => ActionFn(1295);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant43(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1293::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1295::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 110)
     }
@@ -23529,13 +23551,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comparison<"no-withitems"> = Expression<"all">, (CompOp Expression<"all">)+ => ActionFn(1294);
+        // Comparison<"no-withitems"> = Expression<"all">, (CompOp Expression<"all">)+ => ActionFn(1296);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant43(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1294::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1296::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 111)
     }
@@ -23840,11 +23862,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ConstantAtom = Constant => ActionFn(1295);
+        // ConstantAtom = Constant => ActionFn(1297);
         let __sym0 = __pop_Variant57(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1295::<>(source_code, mode, __sym0);
+        let __nt = super::__action1297::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 117)
     }
@@ -23874,13 +23896,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ConstantExpr = "-", ConstantAtom => ActionFn(1296);
+        // ConstantExpr = "-", ConstantAtom => ActionFn(1298);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1296::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1298::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 118)
     }
@@ -23893,14 +23915,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Decorator = "@", NamedExpressionTest, "\n" => ActionFn(1297);
+        // Decorator = "@", NamedExpressionTest, "\n" => ActionFn(1299);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1297::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1299::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant58(__nt), __end));
         (3, 119)
     }
@@ -23982,13 +24004,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DelStatement = "del", ExpressionList2 => ActionFn(1298);
+        // DelStatement = "del", ExpressionList2 => ActionFn(1300);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1298::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1300::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 122)
     }
@@ -24126,11 +24148,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DottedName = name => ActionFn(1299);
+        // DottedName = name => ActionFn(1301);
         let __sym0 = __pop_Variant6(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1299::<>(source_code, mode, __sym0);
+        let __nt = super::__action1301::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (1, 127)
     }
@@ -24143,13 +24165,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DottedName = name, ("." Identifier)+ => ActionFn(1300);
+        // DottedName = name, ("." Identifier)+ => ActionFn(1302);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant21(__symbols);
         let __sym0 = __pop_Variant6(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1300::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1302::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (2, 127)
     }
@@ -24162,14 +24184,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DoubleStarTypedParameter = Identifier, ":", Test<"all"> => ActionFn(1301);
+        // DoubleStarTypedParameter = Identifier, ":", Test<"all"> => ActionFn(1303);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1301::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1303::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant64(__nt), __end));
         (3, 128)
     }
@@ -24182,11 +24204,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DoubleStarTypedParameter = Identifier => ActionFn(1302);
+        // DoubleStarTypedParameter = Identifier => ActionFn(1304);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1302::<>(source_code, mode, __sym0);
+        let __nt = super::__action1304::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant64(__nt), __end));
         (1, 128)
     }
@@ -24232,7 +24254,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExceptClause = "except", Test<"all">, ":", Suite => ActionFn(1718);
+        // ExceptClause = "except", Test<"all">, ":", Suite => ActionFn(1720);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant25(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -24240,7 +24262,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1718::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1720::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant66(__nt), __end));
         (4, 130)
     }
@@ -24253,14 +24275,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExceptClause = "except", ":", Suite => ActionFn(1719);
+        // ExceptClause = "except", ":", Suite => ActionFn(1721);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant25(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1719::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1721::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant66(__nt), __end));
         (3, 130)
     }
@@ -24414,14 +24436,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Expression<"all"> = Expression<"all">, "|", XorExpression<"all"> => ActionFn(1303);
+        // Expression<"all"> = Expression<"all">, "|", XorExpression<"all"> => ActionFn(1305);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1303::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1305::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 134)
     }
@@ -24451,14 +24473,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Expression<"no-withitems"> = Expression<"all">, "|", XorExpression<"all"> => ActionFn(1304);
+        // Expression<"no-withitems"> = Expression<"all">, "|", XorExpression<"all"> => ActionFn(1306);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1304::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1306::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 135)
     }
@@ -24592,11 +24614,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = GenericList<TestOrStarExpr> => ActionFn(1743);
+        // ExpressionStatement = GenericList<TestOrStarExpr> => ActionFn(1745);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1743::<>(source_code, mode, __sym0);
+        let __nt = super::__action1745::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 140)
     }
@@ -24609,13 +24631,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = GenericList<TestOrStarExpr>, AssignSuffix+ => ActionFn(1744);
+        // ExpressionStatement = GenericList<TestOrStarExpr>, AssignSuffix+ => ActionFn(1746);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant17(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1744::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1746::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 140)
     }
@@ -24628,14 +24650,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = GenericList<TestOrStarExpr>, AugAssign, TestListOrYieldExpr => ActionFn(1745);
+        // ExpressionStatement = GenericList<TestOrStarExpr>, AugAssign, TestListOrYieldExpr => ActionFn(1747);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant49(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1745::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1747::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (3, 140)
     }
@@ -24648,7 +24670,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = Test<"all">, ":", Test<"all">, AssignSuffix => ActionFn(1522);
+        // ExpressionStatement = Test<"all">, ":", Test<"all">, AssignSuffix => ActionFn(1524);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant15(__symbols);
         let __sym2 = __pop_Variant15(__symbols);
@@ -24656,7 +24678,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1522::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1524::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 140)
     }
@@ -24669,14 +24691,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = Test<"all">, ":", Test<"all"> => ActionFn(1523);
+        // ExpressionStatement = Test<"all">, ":", Test<"all"> => ActionFn(1525);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1523::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1525::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (3, 140)
     }
@@ -24722,14 +24744,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringExpr = FStringStart, FStringEnd => ActionFn(1576);
+        // FStringExpr = FStringStart, FStringEnd => ActionFn(1578);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1576::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant15(__nt), __end));
+        let __nt = super::__action1578::<>(source_code, mode, __sym0, __sym1);
+        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (2, 143)
     }
     pub(crate) fn __reduce372<
@@ -24741,15 +24763,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringExpr = FStringStart, FStringMiddlePattern+, FStringEnd => ActionFn(1577);
+        // FStringExpr = FStringStart, FStringMiddlePattern+, FStringEnd => ActionFn(1579);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant71(__symbols);
+        let __sym1 = __pop_Variant72(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1577::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant15(__nt), __end));
+        let __nt = super::__action1579::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (3, 143)
     }
     pub(crate) fn __reduce373<
@@ -24761,10 +24783,10 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringFormatSpec =  => ActionFn(1578);
+        // FStringFormatSpec =  => ActionFn(1580);
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
-        let __nt = super::__action1578::<>(source_code, mode, &__start, &__end);
+        let __nt = super::__action1580::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (0, 144)
     }
@@ -24777,11 +24799,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringFormatSpec = FStringMiddlePattern+ => ActionFn(1579);
-        let __sym0 = __pop_Variant71(__symbols);
+        // FStringFormatSpec = FStringMiddlePattern+ => ActionFn(1581);
+        let __sym0 = __pop_Variant72(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1579::<>(source_code, mode, __sym0);
+        let __nt = super::__action1581::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 144)
     }
@@ -24847,11 +24869,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringMiddlePattern = FStringReplacementField => ActionFn(216);
-        let __sym0 = __pop_Variant70(__symbols);
+        let __sym0 = __pop_Variant71(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action216::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (1, 147)
     }
     pub(crate) fn __reduce380<
@@ -24867,7 +24889,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action270::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
         (0, 148)
     }
     pub(crate) fn __reduce381<
@@ -24880,11 +24902,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringMiddlePattern* = FStringMiddlePattern+ => ActionFn(271);
-        let __sym0 = __pop_Variant71(__symbols);
+        let __sym0 = __pop_Variant72(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action271::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
         (1, 148)
     }
     pub(crate) fn __reduce382<
@@ -24897,11 +24919,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringMiddlePattern+ = FStringMiddlePattern => ActionFn(449);
-        let __sym0 = __pop_Variant70(__symbols);
+        let __sym0 = __pop_Variant71(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action449::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
         (1, 149)
     }
     pub(crate) fn __reduce383<
@@ -24915,12 +24937,12 @@ mod __parse__Top {
     {
         // FStringMiddlePattern+ = FStringMiddlePattern+, FStringMiddlePattern => ActionFn(450);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant70(__symbols);
-        let __sym0 = __pop_Variant71(__symbols);
+        let __sym1 = __pop_Variant71(__symbols);
+        let __sym0 = __pop_Variant72(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action450::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
         (2, 149)
     }
     pub(crate) fn __reduce384<
@@ -24932,7 +24954,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringReplacementField = "{", TestListOrYieldExpr, "=", FStringConversion, FStringFormatSpecSuffix, "}" => ActionFn(1568);
+        // FStringReplacementField = "{", TestListOrYieldExpr, "=", FStringConversion, FStringFormatSpecSuffix, "}" => ActionFn(1570);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant44(__symbols);
@@ -24942,8 +24964,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1568::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        let __nt = super::__action1570::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (6, 150)
     }
     pub(crate) fn __reduce385<
@@ -24955,7 +24977,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringReplacementField = "{", TestListOrYieldExpr, "=", FStringConversion, "}" => ActionFn(1569);
+        // FStringReplacementField = "{", TestListOrYieldExpr, "=", FStringConversion, "}" => ActionFn(1571);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant68(__symbols);
@@ -24964,8 +24986,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1569::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        let __nt = super::__action1571::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (5, 150)
     }
     pub(crate) fn __reduce386<
@@ -24977,7 +24999,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringReplacementField = "{", TestListOrYieldExpr, "=", FStringFormatSpecSuffix, "}" => ActionFn(1570);
+        // FStringReplacementField = "{", TestListOrYieldExpr, "=", FStringFormatSpecSuffix, "}" => ActionFn(1572);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant44(__symbols);
@@ -24986,8 +25008,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1570::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        let __nt = super::__action1572::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (5, 150)
     }
     pub(crate) fn __reduce387<
@@ -24999,7 +25021,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringReplacementField = "{", TestListOrYieldExpr, "=", "}" => ActionFn(1571);
+        // FStringReplacementField = "{", TestListOrYieldExpr, "=", "}" => ActionFn(1573);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -25007,8 +25029,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1571::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        let __nt = super::__action1573::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (4, 150)
     }
     pub(crate) fn __reduce388<
@@ -25020,7 +25042,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringReplacementField = "{", TestListOrYieldExpr, FStringConversion, FStringFormatSpecSuffix, "}" => ActionFn(1572);
+        // FStringReplacementField = "{", TestListOrYieldExpr, FStringConversion, FStringFormatSpecSuffix, "}" => ActionFn(1574);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant44(__symbols);
@@ -25029,8 +25051,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1572::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        let __nt = super::__action1574::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (5, 150)
     }
     pub(crate) fn __reduce389<
@@ -25042,7 +25064,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringReplacementField = "{", TestListOrYieldExpr, FStringConversion, "}" => ActionFn(1573);
+        // FStringReplacementField = "{", TestListOrYieldExpr, FStringConversion, "}" => ActionFn(1575);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant68(__symbols);
@@ -25050,8 +25072,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1573::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        let __nt = super::__action1575::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (4, 150)
     }
     pub(crate) fn __reduce390<
@@ -25063,7 +25085,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringReplacementField = "{", TestListOrYieldExpr, FStringFormatSpecSuffix, "}" => ActionFn(1574);
+        // FStringReplacementField = "{", TestListOrYieldExpr, FStringFormatSpecSuffix, "}" => ActionFn(1576);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant44(__symbols);
@@ -25071,8 +25093,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1574::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        let __nt = super::__action1576::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (4, 150)
     }
     pub(crate) fn __reduce391<
@@ -25084,15 +25106,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FStringReplacementField = "{", TestListOrYieldExpr, "}" => ActionFn(1575);
+        // FStringReplacementField = "{", TestListOrYieldExpr, "}" => ActionFn(1577);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1575::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        let __nt = super::__action1577::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (3, 150)
     }
     pub(crate) fn __reduce392<
@@ -25104,13 +25126,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Factor<"all"> = UnaryOp, Factor<"all"> => ActionFn(1312);
+        // Factor<"all"> = UnaryOp, Factor<"all"> => ActionFn(1314);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
-        let __sym0 = __pop_Variant99(__symbols);
+        let __sym0 = __pop_Variant101(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1312::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1314::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 151)
     }
@@ -25140,13 +25162,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Factor<"no-withitems"> = UnaryOp, Factor<"all"> => ActionFn(1313);
+        // Factor<"no-withitems"> = UnaryOp, Factor<"all"> => ActionFn(1315);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
-        let __sym0 = __pop_Variant99(__symbols);
+        let __sym0 = __pop_Variant101(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1313::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1315::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 152)
     }
@@ -25176,11 +25198,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = "break" => ActionFn(1314);
+        // FlowStatement = "break" => ActionFn(1316);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1314::<>(source_code, mode, __sym0);
+        let __nt = super::__action1316::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 153)
     }
@@ -25193,11 +25215,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = "continue" => ActionFn(1315);
+        // FlowStatement = "continue" => ActionFn(1317);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1315::<>(source_code, mode, __sym0);
+        let __nt = super::__action1317::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 153)
     }
@@ -25210,13 +25232,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = "return", GenericList<TestOrStarExpr> => ActionFn(1739);
+        // FlowStatement = "return", GenericList<TestOrStarExpr> => ActionFn(1741);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1739::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1741::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 153)
     }
@@ -25229,11 +25251,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = "return" => ActionFn(1740);
+        // FlowStatement = "return" => ActionFn(1742);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1740::<>(source_code, mode, __sym0);
+        let __nt = super::__action1742::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 153)
     }
@@ -25246,11 +25268,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = YieldExpr => ActionFn(1317);
+        // FlowStatement = YieldExpr => ActionFn(1319);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1317::<>(source_code, mode, __sym0);
+        let __nt = super::__action1319::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 153)
     }
@@ -25280,7 +25302,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ForStatement = "async", "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite, "else", ":", Suite => ActionFn(1730);
+        // ForStatement = "async", "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite, "else", ":", Suite => ActionFn(1732);
         assert!(__symbols.len() >= 10);
         let __sym9 = __pop_Variant25(__symbols);
         let __sym8 = __pop_Variant0(__symbols);
@@ -25294,7 +25316,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym9.2;
-        let __nt = super::__action1730::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
+        let __nt = super::__action1732::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (10, 154)
     }
@@ -25307,7 +25329,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ForStatement = "async", "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite => ActionFn(1731);
+        // ForStatement = "async", "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite => ActionFn(1733);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -25318,7 +25340,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1731::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1733::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 154)
     }
@@ -25331,7 +25353,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ForStatement = "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite, "else", ":", Suite => ActionFn(1732);
+        // ForStatement = "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite, "else", ":", Suite => ActionFn(1734);
         assert!(__symbols.len() >= 9);
         let __sym8 = __pop_Variant25(__symbols);
         let __sym7 = __pop_Variant0(__symbols);
@@ -25344,7 +25366,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym8.2;
-        let __nt = super::__action1732::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
+        let __nt = super::__action1734::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (9, 154)
     }
@@ -25357,7 +25379,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ForStatement = "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite => ActionFn(1733);
+        // ForStatement = "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite => ActionFn(1735);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
@@ -25367,7 +25389,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1733::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1735::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 154)
     }
@@ -25380,20 +25402,20 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "async", "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1754);
+        // FuncDef = "async", "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1756);
         assert!(__symbols.len() >= 9);
         let __sym8 = __pop_Variant25(__symbols);
         let __sym7 = __pop_Variant0(__symbols);
         let __sym6 = __pop_Variant15(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant46(__symbols);
-        let __sym3 = __pop_Variant97(__symbols);
+        let __sym3 = __pop_Variant99(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym8.2;
-        let __nt = super::__action1754::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
+        let __nt = super::__action1756::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (9, 155)
     }
@@ -25406,7 +25428,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "async", "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1755);
+        // FuncDef = "async", "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1757);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant25(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
@@ -25418,7 +25440,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym7.2;
-        let __nt = super::__action1755::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action1757::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 155)
     }
@@ -25431,21 +25453,21 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "async", "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1756);
+        // FuncDef = Decorator+, "async", "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1758);
         assert!(__symbols.len() >= 10);
         let __sym9 = __pop_Variant25(__symbols);
         let __sym8 = __pop_Variant0(__symbols);
         let __sym7 = __pop_Variant15(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant46(__symbols);
-        let __sym4 = __pop_Variant97(__symbols);
+        let __sym4 = __pop_Variant99(__symbols);
         let __sym3 = __pop_Variant23(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym9.2;
-        let __nt = super::__action1756::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
+        let __nt = super::__action1758::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (10, 155)
     }
@@ -25458,7 +25480,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "async", "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1757);
+        // FuncDef = Decorator+, "async", "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1759);
         assert!(__symbols.len() >= 9);
         let __sym8 = __pop_Variant25(__symbols);
         let __sym7 = __pop_Variant0(__symbols);
@@ -25471,7 +25493,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym8.2;
-        let __nt = super::__action1757::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
+        let __nt = super::__action1759::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (9, 155)
     }
@@ -25484,18 +25506,18 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "async", "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1758);
+        // FuncDef = "async", "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1760);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant46(__symbols);
-        let __sym3 = __pop_Variant97(__symbols);
+        let __sym3 = __pop_Variant99(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1758::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1760::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 155)
     }
@@ -25508,7 +25530,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "async", "def", Identifier, Parameters, ":", Suite => ActionFn(1759);
+        // FuncDef = "async", "def", Identifier, Parameters, ":", Suite => ActionFn(1761);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
@@ -25518,7 +25540,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1759::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1761::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 155)
     }
@@ -25531,19 +25553,19 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "async", "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1760);
+        // FuncDef = Decorator+, "async", "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1762);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant25(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant46(__symbols);
-        let __sym4 = __pop_Variant97(__symbols);
+        let __sym4 = __pop_Variant99(__symbols);
         let __sym3 = __pop_Variant23(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym7.2;
-        let __nt = super::__action1760::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action1762::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 155)
     }
@@ -25556,7 +25578,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "async", "def", Identifier, Parameters, ":", Suite => ActionFn(1761);
+        // FuncDef = Decorator+, "async", "def", Identifier, Parameters, ":", Suite => ActionFn(1763);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -25567,7 +25589,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1761::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1763::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 155)
     }
@@ -25580,19 +25602,19 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1762);
+        // FuncDef = "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1764);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant25(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant15(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant46(__symbols);
-        let __sym2 = __pop_Variant97(__symbols);
+        let __sym2 = __pop_Variant99(__symbols);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym7.2;
-        let __nt = super::__action1762::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action1764::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 155)
     }
@@ -25605,7 +25627,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1763);
+        // FuncDef = "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1765);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -25616,7 +25638,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1763::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1765::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 155)
     }
@@ -25629,20 +25651,20 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1764);
+        // FuncDef = Decorator+, "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1766);
         assert!(__symbols.len() >= 9);
         let __sym8 = __pop_Variant25(__symbols);
         let __sym7 = __pop_Variant0(__symbols);
         let __sym6 = __pop_Variant15(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant46(__symbols);
-        let __sym3 = __pop_Variant97(__symbols);
+        let __sym3 = __pop_Variant99(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym8.2;
-        let __nt = super::__action1764::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
+        let __nt = super::__action1766::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (9, 155)
     }
@@ -25655,7 +25677,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1765);
+        // FuncDef = Decorator+, "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1767);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant25(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
@@ -25667,7 +25689,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym7.2;
-        let __nt = super::__action1765::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action1767::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 155)
     }
@@ -25680,17 +25702,17 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1766);
+        // FuncDef = "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1768);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant46(__symbols);
-        let __sym2 = __pop_Variant97(__symbols);
+        let __sym2 = __pop_Variant99(__symbols);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1766::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1768::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 155)
     }
@@ -25703,7 +25725,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "def", Identifier, Parameters, ":", Suite => ActionFn(1767);
+        // FuncDef = "def", Identifier, Parameters, ":", Suite => ActionFn(1769);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -25712,7 +25734,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1767::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1769::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 155)
     }
@@ -25725,18 +25747,18 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1768);
+        // FuncDef = Decorator+, "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1770);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant46(__symbols);
-        let __sym3 = __pop_Variant97(__symbols);
+        let __sym3 = __pop_Variant99(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1768::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1770::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 155)
     }
@@ -25749,7 +25771,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "def", Identifier, Parameters, ":", Suite => ActionFn(1769);
+        // FuncDef = Decorator+, "def", Identifier, Parameters, ":", Suite => ActionFn(1771);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
@@ -25759,7 +25781,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant59(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1769::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1771::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 155)
     }
@@ -25772,13 +25794,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = NamedExpressionTest, CompFor => ActionFn(1540);
+        // FunctionArgument = NamedExpressionTest, CompFor => ActionFn(1542);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant54(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1540::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1542::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (2, 156)
     }
@@ -25791,11 +25813,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = NamedExpressionTest => ActionFn(1541);
+        // FunctionArgument = NamedExpressionTest => ActionFn(1543);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1541::<>(source_code, mode, __sym0);
+        let __nt = super::__action1543::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (1, 156)
     }
@@ -25808,14 +25830,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = Identifier, "=", Test<"all"> => ActionFn(1319);
+        // FunctionArgument = Identifier, "=", Test<"all"> => ActionFn(1321);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1319::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1321::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (3, 156)
     }
@@ -25828,13 +25850,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = "*", Test<"all"> => ActionFn(1320);
+        // FunctionArgument = "*", Test<"all"> => ActionFn(1322);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1320::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1322::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (2, 156)
     }
@@ -25847,13 +25869,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = "**", Test<"all"> => ActionFn(1321);
+        // FunctionArgument = "**", Test<"all"> => ActionFn(1323);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1321::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1323::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (2, 156)
     }
@@ -25871,7 +25893,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action460::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (1, 157)
     }
     pub(crate) fn __reduce428<
@@ -25887,7 +25909,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action461::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (0, 157)
     }
     pub(crate) fn __reduce429<
@@ -25899,13 +25921,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GenericList<ExpressionOrStarExpression> = OneOrMore<ExpressionOrStarExpression>, "," => ActionFn(1322);
+        // GenericList<ExpressionOrStarExpression> = OneOrMore<ExpressionOrStarExpression>, "," => ActionFn(1324);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant33(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1322::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1324::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 158)
     }
@@ -25918,11 +25940,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GenericList<ExpressionOrStarExpression> = OneOrMore<ExpressionOrStarExpression> => ActionFn(1323);
+        // GenericList<ExpressionOrStarExpression> = OneOrMore<ExpressionOrStarExpression> => ActionFn(1325);
         let __sym0 = __pop_Variant33(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1323::<>(source_code, mode, __sym0);
+        let __nt = super::__action1325::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 158)
     }
@@ -25935,13 +25957,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GenericList<TestOrStarExpr> = OneOrMore<TestOrStarExpr>, "," => ActionFn(1324);
+        // GenericList<TestOrStarExpr> = OneOrMore<TestOrStarExpr>, "," => ActionFn(1326);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant33(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1324::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1326::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 159)
     }
@@ -25954,11 +25976,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GenericList<TestOrStarExpr> = OneOrMore<TestOrStarExpr> => ActionFn(1325);
+        // GenericList<TestOrStarExpr> = OneOrMore<TestOrStarExpr> => ActionFn(1327);
         let __sym0 = __pop_Variant33(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1325::<>(source_code, mode, __sym0);
+        let __nt = super::__action1327::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 159)
     }
@@ -25971,13 +25993,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GlobalStatement = "global", OneOrMore<Identifier> => ActionFn(1326);
+        // GlobalStatement = "global", OneOrMore<Identifier> => ActionFn(1328);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant82(__symbols);
+        let __sym1 = __pop_Variant83(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1326::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1328::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 160)
     }
@@ -26009,11 +26031,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Identifier = name => ActionFn(1327);
+        // Identifier = name => ActionFn(1329);
         let __sym0 = __pop_Variant6(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1327::<>(source_code, mode, __sym0);
+        let __nt = super::__action1329::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (1, 162)
     }
@@ -26118,15 +26140,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsAlias<DottedName> = DottedName, "as", Identifier => ActionFn(1328);
+        // ImportAsAlias<DottedName> = DottedName, "as", Identifier => ActionFn(1330);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1328::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        let __nt = super::__action1330::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (3, 164)
     }
     pub(crate) fn __reduce441<
@@ -26138,12 +26160,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsAlias<DottedName> = DottedName => ActionFn(1329);
+        // ImportAsAlias<DottedName> = DottedName => ActionFn(1331);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1329::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        let __nt = super::__action1331::<>(source_code, mode, __sym0);
+        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (1, 164)
     }
     pub(crate) fn __reduce442<
@@ -26155,15 +26177,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsAlias<Identifier> = Identifier, "as", Identifier => ActionFn(1330);
+        // ImportAsAlias<Identifier> = Identifier, "as", Identifier => ActionFn(1332);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1330::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        let __nt = super::__action1332::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (3, 165)
     }
     pub(crate) fn __reduce443<
@@ -26175,12 +26197,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsAlias<Identifier> = Identifier => ActionFn(1331);
+        // ImportAsAlias<Identifier> = Identifier => ActionFn(1333);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1331::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        let __nt = super::__action1333::<>(source_code, mode, __sym0);
+        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (1, 165)
     }
     pub(crate) fn __reduce444<
@@ -26192,12 +26214,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsNames = OneOrMore<ImportAsAlias<Identifier>> => ActionFn(1332);
-        let __sym0 = __pop_Variant74(__symbols);
+        // ImportAsNames = OneOrMore<ImportAsAlias<Identifier>> => ActionFn(1334);
+        let __sym0 = __pop_Variant75(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1332::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1334::<>(source_code, mode, __sym0);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (1, 166)
     }
     pub(crate) fn __reduce445<
@@ -26209,16 +26231,16 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsNames = "(", OneOrMore<ImportAsAlias<Identifier>>, ",", ")" => ActionFn(1333);
+        // ImportAsNames = "(", OneOrMore<ImportAsAlias<Identifier>>, ",", ")" => ActionFn(1335);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant74(__symbols);
+        let __sym1 = __pop_Variant75(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1333::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1335::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (4, 166)
     }
     pub(crate) fn __reduce446<
@@ -26230,15 +26252,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsNames = "(", OneOrMore<ImportAsAlias<Identifier>>, ")" => ActionFn(1334);
+        // ImportAsNames = "(", OneOrMore<ImportAsAlias<Identifier>>, ")" => ActionFn(1336);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant74(__symbols);
+        let __sym1 = __pop_Variant75(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1334::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1336::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (3, 166)
     }
     pub(crate) fn __reduce447<
@@ -26250,12 +26272,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsNames = "*" => ActionFn(1335);
+        // ImportAsNames = "*" => ActionFn(1337);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1335::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1337::<>(source_code, mode, __sym0);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (1, 166)
     }
     pub(crate) fn __reduce448<
@@ -26272,7 +26294,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action64::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (1, 167)
     }
     pub(crate) fn __reduce449<
@@ -26289,7 +26311,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action65::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (1, 167)
     }
     pub(crate) fn __reduce450<
@@ -26305,7 +26327,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action384::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
         (0, 168)
     }
     pub(crate) fn __reduce451<
@@ -26318,11 +26340,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ImportDots* = ImportDots+ => ActionFn(385);
-        let __sym0 = __pop_Variant76(__symbols);
+        let __sym0 = __pop_Variant77(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action385::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
         (1, 168)
     }
     pub(crate) fn __reduce452<
@@ -26335,11 +26357,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ImportDots+ = ImportDots => ActionFn(382);
-        let __sym0 = __pop_Variant75(__symbols);
+        let __sym0 = __pop_Variant76(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action382::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
         (1, 169)
     }
     pub(crate) fn __reduce453<
@@ -26353,12 +26375,12 @@ mod __parse__Top {
     {
         // ImportDots+ = ImportDots+, ImportDots => ActionFn(383);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant75(__symbols);
-        let __sym0 = __pop_Variant76(__symbols);
+        let __sym1 = __pop_Variant76(__symbols);
+        let __sym0 = __pop_Variant77(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action383::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
         (2, 169)
     }
     pub(crate) fn __reduce454<
@@ -26370,12 +26392,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportFromLocation = DottedName => ActionFn(1588);
+        // ImportFromLocation = DottedName => ActionFn(1590);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1588::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
+        let __nt = super::__action1590::<>(source_code, mode, __sym0);
+        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
         (1, 170)
     }
     pub(crate) fn __reduce455<
@@ -26387,14 +26409,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportFromLocation = ImportDots+, DottedName => ActionFn(1589);
+        // ImportFromLocation = ImportDots+, DottedName => ActionFn(1591);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant23(__symbols);
-        let __sym0 = __pop_Variant76(__symbols);
+        let __sym0 = __pop_Variant77(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1589::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
+        let __nt = super::__action1591::<>(source_code, mode, __sym0, __sym1);
+        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
         (2, 170)
     }
     pub(crate) fn __reduce456<
@@ -26407,11 +26429,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ImportFromLocation = ImportDots+ => ActionFn(63);
-        let __sym0 = __pop_Variant76(__symbols);
+        let __sym0 = __pop_Variant77(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action63::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
         (1, 170)
     }
     pub(crate) fn __reduce457<
@@ -26423,13 +26445,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportStatement = "import", OneOrMore<ImportAsAlias<DottedName>> => ActionFn(1336);
+        // ImportStatement = "import", OneOrMore<ImportAsAlias<DottedName>> => ActionFn(1338);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant74(__symbols);
+        let __sym1 = __pop_Variant75(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1336::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1338::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 171)
     }
@@ -26442,15 +26464,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportStatement = "from", ImportFromLocation, "import", ImportAsNames => ActionFn(1337);
+        // ImportStatement = "from", ImportFromLocation, "import", ImportAsNames => ActionFn(1339);
         assert!(__symbols.len() >= 4);
-        let __sym3 = __pop_Variant74(__symbols);
+        let __sym3 = __pop_Variant75(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant77(__symbols);
+        let __sym1 = __pop_Variant78(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1337::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1339::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 171)
     }
@@ -26463,13 +26485,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // KwargParameter<DoubleStarTypedParameter> = "**", DoubleStarTypedParameter => ActionFn(1562);
+        // KwargParameter<DoubleStarTypedParameter> = "**", DoubleStarTypedParameter => ActionFn(1564);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant64(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1562::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1564::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (2, 175)
     }
@@ -26482,11 +26504,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // KwargParameter<DoubleStarTypedParameter> = "**" => ActionFn(1563);
+        // KwargParameter<DoubleStarTypedParameter> = "**" => ActionFn(1565);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1563::<>(source_code, mode, __sym0);
+        let __nt = super::__action1565::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (1, 175)
     }
@@ -26604,11 +26626,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = "None" => ActionFn(1342);
+        // LiteralPattern = "None" => ActionFn(1344);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1342::<>(source_code, mode, __sym0);
+        let __nt = super::__action1344::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 180)
     }
@@ -26621,11 +26643,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = "True" => ActionFn(1343);
+        // LiteralPattern = "True" => ActionFn(1345);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1343::<>(source_code, mode, __sym0);
+        let __nt = super::__action1345::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 180)
     }
@@ -26638,11 +26660,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = "False" => ActionFn(1344);
+        // LiteralPattern = "False" => ActionFn(1346);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1344::<>(source_code, mode, __sym0);
+        let __nt = super::__action1346::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 180)
     }
@@ -26655,11 +26677,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = ConstantExpr => ActionFn(1345);
+        // LiteralPattern = ConstantExpr => ActionFn(1347);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1345::<>(source_code, mode, __sym0);
+        let __nt = super::__action1347::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 180)
     }
@@ -26672,11 +26694,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = AddOpExpr => ActionFn(1346);
+        // LiteralPattern = AddOpExpr => ActionFn(1348);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1346::<>(source_code, mode, __sym0);
+        let __nt = super::__action1348::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 180)
     }
@@ -26740,11 +26762,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingKey = "None" => ActionFn(1348);
+        // MappingKey = "None" => ActionFn(1350);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1348::<>(source_code, mode, __sym0);
+        let __nt = super::__action1350::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 181)
     }
@@ -26757,11 +26779,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingKey = "True" => ActionFn(1349);
+        // MappingKey = "True" => ActionFn(1351);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1349::<>(source_code, mode, __sym0);
+        let __nt = super::__action1351::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 181)
     }
@@ -26774,11 +26796,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingKey = "False" => ActionFn(1350);
+        // MappingKey = "False" => ActionFn(1352);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1350::<>(source_code, mode, __sym0);
+        let __nt = super::__action1352::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 181)
     }
@@ -26791,13 +26813,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", "}" => ActionFn(1352);
+        // MappingPattern = "{", "}" => ActionFn(1354);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1352::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1354::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 182)
     }
@@ -26810,15 +26832,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "}" => ActionFn(1353);
+        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "}" => ActionFn(1355);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant84(__symbols);
+        let __sym1 = __pop_Variant85(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1353::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1355::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 182)
     }
@@ -26831,14 +26853,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, "}" => ActionFn(1354);
+        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, "}" => ActionFn(1356);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant84(__symbols);
+        let __sym1 = __pop_Variant85(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1354::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1356::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 182)
     }
@@ -26851,7 +26873,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", "**", Identifier, ",", "}" => ActionFn(1355);
+        // MappingPattern = "{", "**", Identifier, ",", "}" => ActionFn(1357);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -26860,7 +26882,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1355::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1357::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (5, 182)
     }
@@ -26873,7 +26895,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", "**", Identifier, "}" => ActionFn(1356);
+        // MappingPattern = "{", "**", Identifier, "}" => ActionFn(1358);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
@@ -26881,7 +26903,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1356::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1358::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 182)
     }
@@ -26894,18 +26916,18 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "**", Identifier, ",", "}" => ActionFn(1357);
+        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "**", Identifier, ",", "}" => ActionFn(1359);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant23(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant84(__symbols);
+        let __sym1 = __pop_Variant85(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1357::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1359::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 182)
     }
@@ -26918,17 +26940,17 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "**", Identifier, "}" => ActionFn(1358);
+        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "**", Identifier, "}" => ActionFn(1360);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant23(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant84(__symbols);
+        let __sym1 = __pop_Variant85(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1358::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1360::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (6, 182)
     }
@@ -26951,7 +26973,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym4.2;
         let __nt = super::__action1216::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant79(__nt), __end));
         (5, 183)
     }
     pub(crate) fn __reduce493<
@@ -26972,7 +26994,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1217::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant79(__nt), __end));
         (4, 183)
     }
     pub(crate) fn __reduce494<
@@ -26985,11 +27007,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // MatchCase+ = MatchCase => ActionFn(362);
-        let __sym0 = __pop_Variant78(__symbols);
+        let __sym0 = __pop_Variant79(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action362::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant79(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant80(__nt), __end));
         (1, 184)
     }
     pub(crate) fn __reduce495<
@@ -27003,12 +27025,12 @@ mod __parse__Top {
     {
         // MatchCase+ = MatchCase+, MatchCase => ActionFn(363);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant78(__symbols);
-        let __sym0 = __pop_Variant79(__symbols);
+        let __sym1 = __pop_Variant79(__symbols);
+        let __sym0 = __pop_Variant80(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action363::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant79(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant80(__nt), __end));
         (2, 184)
     }
     pub(crate) fn __reduce496<
@@ -27020,15 +27042,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchKeywordEntry = Identifier, "=", Pattern => ActionFn(1359);
+        // MatchKeywordEntry = Identifier, "=", Pattern => ActionFn(1361);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant35(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1359::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant80(__nt), __end));
+        let __nt = super::__action1361::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant81(__nt), __end));
         (3, 185)
     }
     pub(crate) fn __reduce497<
@@ -27048,7 +27070,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action133::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant81(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant82(__nt), __end));
         (3, 186)
     }
     pub(crate) fn __reduce498<
@@ -27060,11 +27082,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchName = Identifier => ActionFn(1360);
+        // MatchName = Identifier => ActionFn(1362);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1360::<>(source_code, mode, __sym0);
+        let __nt = super::__action1362::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 187)
     }
@@ -27077,14 +27099,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchNameOrAttr = MatchName, ".", Identifier => ActionFn(1361);
+        // MatchNameOrAttr = MatchName, ".", Identifier => ActionFn(1363);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant44(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1361::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1363::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (3, 188)
     }
@@ -27097,14 +27119,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchNameOrAttr = MatchNameOrAttr, ".", Identifier => ActionFn(1362);
+        // MatchNameOrAttr = MatchNameOrAttr, ".", Identifier => ActionFn(1364);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant44(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1362::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1364::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (3, 188)
     }
@@ -27120,7 +27142,7 @@ mod __parse__Top {
         // MatchStatement = "match", TestOrStarNamedExpr, ":", "\n", Indent, MatchCase+, Dedent => ActionFn(859);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
-        let __sym5 = __pop_Variant79(__symbols);
+        let __sym5 = __pop_Variant80(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -27144,7 +27166,7 @@ mod __parse__Top {
         // MatchStatement = "match", TestOrStarNamedExpr, ",", ":", "\n", Indent, MatchCase+, Dedent => ActionFn(860);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant0(__symbols);
-        let __sym6 = __pop_Variant79(__symbols);
+        let __sym6 = __pop_Variant80(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -27169,7 +27191,7 @@ mod __parse__Top {
         // MatchStatement = "match", TwoOrMore<TestOrStarNamedExpr, ",">, ",", ":", "\n", Indent, MatchCase+, Dedent => ActionFn(861);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant0(__symbols);
-        let __sym6 = __pop_Variant79(__symbols);
+        let __sym6 = __pop_Variant80(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -27194,7 +27216,7 @@ mod __parse__Top {
         // MatchStatement = "match", TwoOrMore<TestOrStarNamedExpr, ",">, ":", "\n", Indent, MatchCase+, Dedent => ActionFn(862);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
-        let __sym5 = __pop_Variant79(__symbols);
+        let __sym5 = __pop_Variant80(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -27300,14 +27322,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // NamedExpression = NamedExpressionName, ":=", Test<"all"> => ActionFn(1363);
+        // NamedExpression = NamedExpressionName, ":=", Test<"all"> => ActionFn(1365);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1363::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1365::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 191)
     }
@@ -27320,11 +27342,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // NamedExpressionName = Identifier => ActionFn(1364);
+        // NamedExpressionName = Identifier => ActionFn(1366);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1364::<>(source_code, mode, __sym0);
+        let __nt = super::__action1366::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 192)
     }
@@ -27405,13 +27427,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // NonlocalStatement = "nonlocal", OneOrMore<Identifier> => ActionFn(1365);
+        // NonlocalStatement = "nonlocal", OneOrMore<Identifier> => ActionFn(1367);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant82(__symbols);
+        let __sym1 = __pop_Variant83(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1365::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1367::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 195)
     }
@@ -27424,13 +27446,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // NotTest<"all"> = "not", NotTest<"all"> => ActionFn(1366);
+        // NotTest<"all"> = "not", NotTest<"all"> => ActionFn(1368);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1366::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1368::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 196)
     }
@@ -27460,13 +27482,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // NotTest<"no-withitems"> = "not", NotTest<"all"> => ActionFn(1367);
+        // NotTest<"no-withitems"> = "not", NotTest<"all"> => ActionFn(1369);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1367::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1369::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 197)
     }
@@ -27575,7 +27597,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action372::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant82(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant83(__nt), __end));
         (1, 200)
     }
     pub(crate) fn __reduce526<
@@ -27591,11 +27613,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant82(__symbols);
+        let __sym0 = __pop_Variant83(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action373::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant82(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant83(__nt), __end));
         (3, 200)
     }
     pub(crate) fn __reduce527<
@@ -27607,15 +27629,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<DottedName>> = DottedName, "as", Identifier => ActionFn(1580);
+        // OneOrMore<ImportAsAlias<DottedName>> = DottedName, "as", Identifier => ActionFn(1582);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1580::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1582::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (3, 201)
     }
     pub(crate) fn __reduce528<
@@ -27627,12 +27649,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<DottedName>> = DottedName => ActionFn(1581);
+        // OneOrMore<ImportAsAlias<DottedName>> = DottedName => ActionFn(1583);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1581::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1583::<>(source_code, mode, __sym0);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (1, 201)
     }
     pub(crate) fn __reduce529<
@@ -27644,17 +27666,17 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<DottedName>> = OneOrMore<ImportAsAlias<DottedName>>, ",", DottedName, "as", Identifier => ActionFn(1582);
+        // OneOrMore<ImportAsAlias<DottedName>> = OneOrMore<ImportAsAlias<DottedName>>, ",", DottedName, "as", Identifier => ActionFn(1584);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant23(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant74(__symbols);
+        let __sym0 = __pop_Variant75(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1582::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1584::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (5, 201)
     }
     pub(crate) fn __reduce530<
@@ -27666,15 +27688,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<DottedName>> = OneOrMore<ImportAsAlias<DottedName>>, ",", DottedName => ActionFn(1583);
+        // OneOrMore<ImportAsAlias<DottedName>> = OneOrMore<ImportAsAlias<DottedName>>, ",", DottedName => ActionFn(1585);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant74(__symbols);
+        let __sym0 = __pop_Variant75(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1583::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1585::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (3, 201)
     }
     pub(crate) fn __reduce531<
@@ -27686,15 +27708,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<Identifier>> = Identifier, "as", Identifier => ActionFn(1584);
+        // OneOrMore<ImportAsAlias<Identifier>> = Identifier, "as", Identifier => ActionFn(1586);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1584::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1586::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (3, 202)
     }
     pub(crate) fn __reduce532<
@@ -27706,12 +27728,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<Identifier>> = Identifier => ActionFn(1585);
+        // OneOrMore<ImportAsAlias<Identifier>> = Identifier => ActionFn(1587);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1585::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1587::<>(source_code, mode, __sym0);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (1, 202)
     }
     pub(crate) fn __reduce533<
@@ -27723,17 +27745,17 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<Identifier>> = OneOrMore<ImportAsAlias<Identifier>>, ",", Identifier, "as", Identifier => ActionFn(1586);
+        // OneOrMore<ImportAsAlias<Identifier>> = OneOrMore<ImportAsAlias<Identifier>>, ",", Identifier, "as", Identifier => ActionFn(1588);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant23(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant74(__symbols);
+        let __sym0 = __pop_Variant75(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1586::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1588::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (5, 202)
     }
     pub(crate) fn __reduce534<
@@ -27745,15 +27767,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<Identifier>> = OneOrMore<ImportAsAlias<Identifier>>, ",", Identifier => ActionFn(1587);
+        // OneOrMore<ImportAsAlias<Identifier>> = OneOrMore<ImportAsAlias<Identifier>>, ",", Identifier => ActionFn(1589);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant74(__symbols);
+        let __sym0 = __pop_Variant75(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1587::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        let __nt = super::__action1589::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (3, 202)
     }
     pub(crate) fn __reduce535<
@@ -27766,11 +27788,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // OneOrMore<MatchKeywordEntry> = MatchKeywordEntry => ActionFn(341);
-        let __sym0 = __pop_Variant80(__symbols);
+        let __sym0 = __pop_Variant81(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action341::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant83(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant84(__nt), __end));
         (1, 203)
     }
     pub(crate) fn __reduce536<
@@ -27784,13 +27806,13 @@ mod __parse__Top {
     {
         // OneOrMore<MatchKeywordEntry> = OneOrMore<MatchKeywordEntry>, ",", MatchKeywordEntry => ActionFn(342);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant80(__symbols);
+        let __sym2 = __pop_Variant81(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant83(__symbols);
+        let __sym0 = __pop_Variant84(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action342::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant83(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant84(__nt), __end));
         (3, 203)
     }
     pub(crate) fn __reduce537<
@@ -27803,11 +27825,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // OneOrMore<MatchMappingEntry> = MatchMappingEntry => ActionFn(345);
-        let __sym0 = __pop_Variant81(__symbols);
+        let __sym0 = __pop_Variant82(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action345::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant84(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (1, 204)
     }
     pub(crate) fn __reduce538<
@@ -27821,13 +27843,13 @@ mod __parse__Top {
     {
         // OneOrMore<MatchMappingEntry> = OneOrMore<MatchMappingEntry>, ",", MatchMappingEntry => ActionFn(346);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant81(__symbols);
+        let __sym2 = __pop_Variant82(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant84(__symbols);
+        let __sym0 = __pop_Variant85(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action346::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant84(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (3, 204)
     }
     pub(crate) fn __reduce539<
@@ -27844,7 +27866,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action483::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (1, 205)
     }
     pub(crate) fn __reduce540<
@@ -27860,11 +27882,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant11(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant86(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action484::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (3, 205)
     }
     pub(crate) fn __reduce541<
@@ -27881,7 +27903,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action472::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (1, 206)
     }
     pub(crate) fn __reduce542<
@@ -27897,11 +27919,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant11(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant86(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action473::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (3, 206)
     }
     pub(crate) fn __reduce543<
@@ -28062,11 +28084,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // OneOrMore<TypeParam> = TypeParam => ActionFn(282);
-        let __sym0 = __pop_Variant96(__symbols);
+        let __sym0 = __pop_Variant98(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action282::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
         (1, 211)
     }
     pub(crate) fn __reduce552<
@@ -28080,13 +28102,13 @@ mod __parse__Top {
     {
         // OneOrMore<TypeParam> = OneOrMore<TypeParam>, ",", TypeParam => ActionFn(283);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant96(__symbols);
+        let __sym2 = __pop_Variant98(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant86(__symbols);
+        let __sym0 = __pop_Variant87(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action283::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
         (3, 211)
     }
     pub(crate) fn __reduce553<
@@ -28115,11 +28137,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OrPattern = TwoOrMore<ClosedPattern, "|"> => ActionFn(1368);
+        // OrPattern = TwoOrMore<ClosedPattern, "|"> => ActionFn(1370);
         let __sym0 = __pop_Variant53(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1368::<>(source_code, mode, __sym0);
+        let __nt = super::__action1370::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 212)
     }
@@ -28132,13 +28154,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OrTest<"all"> = (<AndTest<"all">> "or")+, AndTest<"all"> => ActionFn(1369);
+        // OrTest<"all"> = (<AndTest<"all">> "or")+, AndTest<"all"> => ActionFn(1371);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant17(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1369::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1371::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 213)
     }
@@ -28168,13 +28190,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OrTest<"no-withitems"> = (<AndTest<"all">> "or")+, AndTest<"all"> => ActionFn(1370);
+        // OrTest<"no-withitems"> = (<AndTest<"all">> "or")+, AndTest<"all"> => ActionFn(1372);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant17(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1370::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1372::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 214)
     }
@@ -28221,14 +28243,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterDef<TypedParameter> = TypedParameter, "=", Test<"all"> => ActionFn(1371);
+        // ParameterDef<TypedParameter> = TypedParameter, "=", Test<"all"> => ActionFn(1373);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant11(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1371::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1373::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (3, 215)
     }
@@ -28258,14 +28280,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterDef<UntypedParameter> = UntypedParameter, "=", Test<"all"> => ActionFn(1372);
+        // ParameterDef<UntypedParameter> = UntypedParameter, "=", Test<"all"> => ActionFn(1374);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant11(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1372::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1374::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (3, 216)
     }
@@ -28279,11 +28301,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ParameterDefs<TypedParameter> = OneOrMore<ParameterDef<TypedParameter>> => ActionFn(439);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant86(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action439::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (1, 217)
     }
     pub(crate) fn __reduce564<
@@ -28299,11 +28321,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant86(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action694::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (3, 217)
     }
     pub(crate) fn __reduce565<
@@ -28320,11 +28342,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant12(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant86(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action695::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (4, 217)
     }
     pub(crate) fn __reduce566<
@@ -28337,11 +28359,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ParameterDefs<UntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>> => ActionFn(447);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant86(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action447::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (1, 218)
     }
     pub(crate) fn __reduce567<
@@ -28357,11 +28379,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant86(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action702::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (3, 218)
     }
     pub(crate) fn __reduce568<
@@ -28378,11 +28400,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant12(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant86(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action703::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (4, 218)
     }
     pub(crate) fn __reduce645<
@@ -28394,13 +28416,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1409);
+        // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1411);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant9(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1409::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1411::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant46(__nt), __end));
         (2, 219)
     }
@@ -28413,11 +28435,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = KwargParameter<DoubleStarTypedParameter> => ActionFn(1410);
+        // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = KwargParameter<DoubleStarTypedParameter> => ActionFn(1412);
         let __sym0 = __pop_Variant9(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1410::<>(source_code, mode, __sym0);
+        let __nt = super::__action1412::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant46(__nt), __end));
         (1, 219)
     }
@@ -28430,13 +28452,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = KwargParameter<StarUntypedParameter>, "," => ActionFn(1447);
+        // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = KwargParameter<StarUntypedParameter>, "," => ActionFn(1449);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant9(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1447::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1449::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant46(__nt), __end));
         (2, 220)
     }
@@ -28449,11 +28471,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = KwargParameter<StarUntypedParameter> => ActionFn(1448);
+        // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = KwargParameter<StarUntypedParameter> => ActionFn(1450);
         let __sym0 = __pop_Variant9(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1448::<>(source_code, mode, __sym0);
+        let __nt = super::__action1450::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant46(__nt), __end));
         (1, 220)
     }
@@ -28499,11 +28521,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // PassStatement = "pass" => ActionFn(1451);
+        // PassStatement = "pass" => ActionFn(1453);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1451::<>(source_code, mode, __sym0);
+        let __nt = super::__action1453::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 225)
     }
@@ -28555,7 +28577,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action422::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
         (1, 227)
     }
     pub(crate) fn __reduce749<
@@ -28571,7 +28593,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action423::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
         (0, 227)
     }
     pub(crate) fn __reduce750<
@@ -28583,18 +28605,18 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // PatternArguments = "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1452);
+        // PatternArguments = "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1454);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant83(__symbols);
+        let __sym3 = __pop_Variant84(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant53(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1452::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        let __nt = super::__action1454::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (6, 228)
     }
     pub(crate) fn __reduce751<
@@ -28606,17 +28628,17 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // PatternArguments = "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1453);
+        // PatternArguments = "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1455);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant83(__symbols);
+        let __sym3 = __pop_Variant84(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant53(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1453::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        let __nt = super::__action1455::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (5, 228)
     }
     pub(crate) fn __reduce752<
@@ -28628,7 +28650,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // PatternArguments = "(", OneOrMore<Pattern>, ",", ")" => ActionFn(1454);
+        // PatternArguments = "(", OneOrMore<Pattern>, ",", ")" => ActionFn(1456);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -28636,8 +28658,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1454::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        let __nt = super::__action1456::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (4, 228)
     }
     pub(crate) fn __reduce753<
@@ -28649,15 +28671,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // PatternArguments = "(", OneOrMore<Pattern>, ")" => ActionFn(1455);
+        // PatternArguments = "(", OneOrMore<Pattern>, ")" => ActionFn(1457);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant53(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1455::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        let __nt = super::__action1457::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (3, 228)
     }
     pub(crate) fn __reduce754<
@@ -28669,16 +28691,16 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // PatternArguments = "(", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1456);
+        // PatternArguments = "(", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1458);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant83(__symbols);
+        let __sym1 = __pop_Variant84(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1456::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        let __nt = super::__action1458::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (4, 228)
     }
     pub(crate) fn __reduce755<
@@ -28690,15 +28712,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // PatternArguments = "(", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1457);
+        // PatternArguments = "(", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1459);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant83(__symbols);
+        let __sym1 = __pop_Variant84(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1457::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        let __nt = super::__action1459::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (3, 228)
     }
     pub(crate) fn __reduce756<
@@ -28710,14 +28732,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // PatternArguments = "(", ")" => ActionFn(1458);
+        // PatternArguments = "(", ")" => ActionFn(1460);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1458::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        let __nt = super::__action1460::<>(source_code, mode, __sym0, __sym1);
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (2, 228)
     }
     pub(crate) fn __reduce757<
@@ -28729,13 +28751,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Patterns = Pattern, "," => ActionFn(1459);
+        // Patterns = Pattern, "," => ActionFn(1461);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant35(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1459::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1461::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 229)
     }
@@ -28748,13 +28770,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Patterns = TwoOrMore<Pattern, ",">, "," => ActionFn(1460);
+        // Patterns = TwoOrMore<Pattern, ",">, "," => ActionFn(1462);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant53(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1460::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1462::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 229)
     }
@@ -28767,11 +28789,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Patterns = TwoOrMore<Pattern, ","> => ActionFn(1461);
+        // Patterns = TwoOrMore<Pattern, ","> => ActionFn(1463);
         let __sym0 = __pop_Variant53(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1461::<>(source_code, mode, __sym0);
+        let __nt = super::__action1463::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 229)
     }
@@ -28801,14 +28823,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Power<"all"> = AtomExpr<"all">, "**", Factor<"all"> => ActionFn(1462);
+        // Power<"all"> = AtomExpr<"all">, "**", Factor<"all"> => ActionFn(1464);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1462::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1464::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 230)
     }
@@ -28838,14 +28860,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Power<"no-withitems"> = AtomExpr<"all">, "**", Factor<"all"> => ActionFn(1463);
+        // Power<"no-withitems"> = AtomExpr<"all">, "**", Factor<"all"> => ActionFn(1465);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1463::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1465::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 231)
     }
@@ -29013,11 +29035,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // RaiseStatement = "raise" => ActionFn(1464);
+        // RaiseStatement = "raise" => ActionFn(1466);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1464::<>(source_code, mode, __sym0);
+        let __nt = super::__action1466::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 233)
     }
@@ -29030,7 +29052,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // RaiseStatement = "raise", Test<"all">, "from", Test<"all"> => ActionFn(1465);
+        // RaiseStatement = "raise", Test<"all">, "from", Test<"all"> => ActionFn(1467);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant15(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -29038,7 +29060,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1465::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1467::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 233)
     }
@@ -29051,13 +29073,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // RaiseStatement = "raise", Test<"all"> => ActionFn(1466);
+        // RaiseStatement = "raise", Test<"all"> => ActionFn(1468);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1466::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1468::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 233)
     }
@@ -29070,14 +29092,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", Pattern, ")" => ActionFn(1467);
+        // SequencePattern = "(", Pattern, ")" => ActionFn(1469);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant35(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1467::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1469::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 234)
     }
@@ -29090,13 +29112,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", ")" => ActionFn(1468);
+        // SequencePattern = "(", ")" => ActionFn(1470);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1468::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1470::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 234)
     }
@@ -29109,7 +29131,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", Pattern, ",", ")" => ActionFn(1469);
+        // SequencePattern = "(", Pattern, ",", ")" => ActionFn(1471);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -29117,7 +29139,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1469::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1471::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 234)
     }
@@ -29130,7 +29152,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", (<Pattern> ",")+, Pattern, ",", ")" => ActionFn(1470);
+        // SequencePattern = "(", (<Pattern> ",")+, Pattern, ",", ")" => ActionFn(1472);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -29139,7 +29161,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1470::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1472::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (5, 234)
     }
@@ -29152,7 +29174,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", (<Pattern> ",")+, Pattern, ")" => ActionFn(1471);
+        // SequencePattern = "(", (<Pattern> ",")+, Pattern, ")" => ActionFn(1473);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant35(__symbols);
@@ -29160,7 +29182,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1471::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1473::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 234)
     }
@@ -29173,14 +29195,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "[", Pattern, "]" => ActionFn(1536);
+        // SequencePattern = "[", Pattern, "]" => ActionFn(1538);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant35(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1536::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1538::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 234)
     }
@@ -29193,13 +29215,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "[", "]" => ActionFn(1537);
+        // SequencePattern = "[", "]" => ActionFn(1539);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1537::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1539::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 234)
     }
@@ -29212,7 +29234,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "[", (<Pattern> ",")+, Pattern, "]" => ActionFn(1538);
+        // SequencePattern = "[", (<Pattern> ",")+, Pattern, "]" => ActionFn(1540);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant35(__symbols);
@@ -29220,7 +29242,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1538::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1540::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 234)
     }
@@ -29233,14 +29255,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "[", (<Pattern> ",")+, "]" => ActionFn(1539);
+        // SequencePattern = "[", (<Pattern> ",")+, "]" => ActionFn(1541);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant36(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1539::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1541::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 234)
     }
@@ -29289,14 +29311,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ShiftExpression<"all"> = ShiftExpression<"all">, ShiftOp, ArithmeticExpression<"all"> => ActionFn(1473);
+        // ShiftExpression<"all"> = ShiftExpression<"all">, ShiftOp, ArithmeticExpression<"all"> => ActionFn(1475);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant49(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1473::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1475::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 236)
     }
@@ -29326,14 +29348,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ShiftExpression<"no-withitems"> = ShiftExpression<"all">, ShiftOp, ArithmeticExpression<"all"> => ActionFn(1474);
+        // ShiftExpression<"no-withitems"> = ShiftExpression<"all">, ShiftOp, ArithmeticExpression<"all"> => ActionFn(1476);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant49(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1474::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1476::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 237)
     }
@@ -29397,7 +29419,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SingleForComprehension = "async", "for", ExpressionList, "in", OrTest<"all"> => ActionFn(1542);
+        // SingleForComprehension = "async", "for", ExpressionList, "in", OrTest<"all"> => ActionFn(1544);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant15(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -29406,8 +29428,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1542::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
+        let __nt = super::__action1544::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (5, 239)
     }
     pub(crate) fn __reduce793<
@@ -29419,7 +29441,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SingleForComprehension = "async", "for", ExpressionList, "in", OrTest<"all">, ComprehensionIf+ => ActionFn(1543);
+        // SingleForComprehension = "async", "for", ExpressionList, "in", OrTest<"all">, ComprehensionIf+ => ActionFn(1545);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant17(__symbols);
         let __sym4 = __pop_Variant15(__symbols);
@@ -29429,8 +29451,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
-        let __nt = super::__action1543::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
-        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
+        let __nt = super::__action1545::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (6, 239)
     }
     pub(crate) fn __reduce794<
@@ -29442,7 +29464,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SingleForComprehension = "for", ExpressionList, "in", OrTest<"all"> => ActionFn(1544);
+        // SingleForComprehension = "for", ExpressionList, "in", OrTest<"all"> => ActionFn(1546);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant15(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -29450,8 +29472,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1544::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
+        let __nt = super::__action1546::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (4, 239)
     }
     pub(crate) fn __reduce795<
@@ -29463,7 +29485,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SingleForComprehension = "for", ExpressionList, "in", OrTest<"all">, ComprehensionIf+ => ActionFn(1545);
+        // SingleForComprehension = "for", ExpressionList, "in", OrTest<"all">, ComprehensionIf+ => ActionFn(1547);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant17(__symbols);
         let __sym3 = __pop_Variant15(__symbols);
@@ -29472,8 +29494,8 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1545::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
+        let __nt = super::__action1547::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (5, 239)
     }
     pub(crate) fn __reduce796<
@@ -29486,11 +29508,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // SingleForComprehension+ = SingleForComprehension => ActionFn(254);
-        let __sym0 = __pop_Variant90(__symbols);
+        let __sym0 = __pop_Variant91(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action254::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (1, 240)
     }
     pub(crate) fn __reduce797<
@@ -29504,12 +29526,12 @@ mod __parse__Top {
     {
         // SingleForComprehension+ = SingleForComprehension+, SingleForComprehension => ActionFn(255);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant90(__symbols);
-        let __sym0 = __pop_Variant91(__symbols);
+        let __sym1 = __pop_Variant91(__symbols);
+        let __sym0 = __pop_Variant92(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action255::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (2, 240)
     }
     pub(crate) fn __reduce798<
@@ -29521,14 +29543,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SliceOp = ":", Test<"all"> => ActionFn(1720);
+        // SliceOp = ":", Test<"all"> => ActionFn(1722);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1720::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
+        let __nt = super::__action1722::<>(source_code, mode, __sym0, __sym1);
+        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (2, 241)
     }
     pub(crate) fn __reduce799<
@@ -29540,12 +29562,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SliceOp = ":" => ActionFn(1721);
+        // SliceOp = ":" => ActionFn(1723);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1721::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
+        let __nt = super::__action1723::<>(source_code, mode, __sym0);
+        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (1, 241)
     }
     pub(crate) fn __reduce800<
@@ -29558,11 +29580,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // SliceOp? = SliceOp => ActionFn(272);
-        let __sym0 = __pop_Variant92(__symbols);
+        let __sym0 = __pop_Variant93(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action272::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
         (1, 242)
     }
     pub(crate) fn __reduce801<
@@ -29578,7 +29600,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action273::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
         (0, 242)
     }
     pub(crate) fn __reduce802<
@@ -29777,13 +29799,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarExpr = "*", Expression<"all"> => ActionFn(1477);
+        // StarExpr = "*", Expression<"all"> => ActionFn(1479);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1477::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1479::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 244)
     }
@@ -29796,13 +29818,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarPattern = "*", Identifier => ActionFn(1478);
+        // StarPattern = "*", Identifier => ActionFn(1480);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1478::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1480::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 245)
     }
@@ -29815,14 +29837,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarTypedParameter = Identifier, ":", TestOrStarExpr => ActionFn(1479);
+        // StarTypedParameter = Identifier, ":", TestOrStarExpr => ActionFn(1481);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1479::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1481::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant64(__nt), __end));
         (3, 246)
     }
@@ -29835,11 +29857,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarTypedParameter = Identifier => ActionFn(1480);
+        // StarTypedParameter = Identifier => ActionFn(1482);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1480::<>(source_code, mode, __sym0);
+        let __nt = super::__action1482::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant64(__nt), __end));
         (1, 246)
     }
@@ -29885,11 +29907,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarUntypedParameter = Identifier => ActionFn(1481);
+        // StarUntypedParameter = Identifier => ActionFn(1483);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1481::<>(source_code, mode, __sym0);
+        let __nt = super::__action1483::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant64(__nt), __end));
         (1, 248)
     }
@@ -29943,7 +29965,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1187::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (3, 250)
     }
     pub(crate) fn __reduce823<
@@ -29964,7 +29986,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1188::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (4, 250)
     }
     pub(crate) fn __reduce824<
@@ -29983,7 +30005,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1189::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (2, 250)
     }
     pub(crate) fn __reduce825<
@@ -30003,7 +30025,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1190::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (3, 250)
     }
     pub(crate) fn __reduce826<
@@ -30020,7 +30042,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action10::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (1, 250)
     }
     pub(crate) fn __reduce827<
@@ -30035,11 +30057,11 @@ mod __parse__Top {
         // Statements = Statements, CompoundStatement => ActionFn(11);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant37(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant95(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action11::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (2, 250)
     }
     pub(crate) fn __reduce828<
@@ -30056,11 +30078,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant37(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant95(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1191::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (4, 250)
     }
     pub(crate) fn __reduce829<
@@ -30078,11 +30100,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant37(__symbols);
         let __sym1 = __pop_Variant38(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant95(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
         let __nt = super::__action1192::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (5, 250)
     }
     pub(crate) fn __reduce830<
@@ -30098,11 +30120,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant37(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant95(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1193::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (3, 250)
     }
     pub(crate) fn __reduce831<
@@ -30119,11 +30141,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant37(__symbols);
         let __sym1 = __pop_Variant38(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant95(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1194::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (4, 250)
     }
     pub(crate) fn __reduce833<
@@ -30136,11 +30158,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // StringLiteralOrFString = StringLiteral => ActionFn(212);
-        let __sym0 = __pop_Variant15(__symbols);
+        let __sym0 = __pop_Variant70(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action212::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant15(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (1, 252)
     }
     pub(crate) fn __reduce834<
@@ -30153,11 +30175,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // StringLiteralOrFString = FStringExpr => ActionFn(213);
-        let __sym0 = __pop_Variant15(__symbols);
+        let __sym0 = __pop_Variant70(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action213::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant15(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (1, 252)
     }
     pub(crate) fn __reduce835<
@@ -30170,11 +30192,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // StringLiteralOrFString+ = StringLiteralOrFString => ActionFn(347);
-        let __sym0 = __pop_Variant15(__symbols);
+        let __sym0 = __pop_Variant70(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action347::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant17(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
         (1, 253)
     }
     pub(crate) fn __reduce836<
@@ -30188,12 +30210,12 @@ mod __parse__Top {
     {
         // StringLiteralOrFString+ = StringLiteralOrFString+, StringLiteralOrFString => ActionFn(348);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant15(__symbols);
-        let __sym0 = __pop_Variant17(__symbols);
+        let __sym1 = __pop_Variant70(__symbols);
+        let __sym0 = __pop_Variant96(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action348::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant17(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
         (2, 253)
     }
     pub(crate) fn __reduce837<
@@ -30222,15 +30244,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = Test<"all">, ":", Test<"all">, SliceOp => ActionFn(1722);
+        // Subscript = Test<"all">, ":", Test<"all">, SliceOp => ActionFn(1724);
         assert!(__symbols.len() >= 4);
-        let __sym3 = __pop_Variant92(__symbols);
+        let __sym3 = __pop_Variant93(__symbols);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1722::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1724::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 254)
     }
@@ -30243,14 +30265,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = Test<"all">, ":", SliceOp => ActionFn(1723);
+        // Subscript = Test<"all">, ":", SliceOp => ActionFn(1725);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant92(__symbols);
+        let __sym2 = __pop_Variant93(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1723::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1725::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 254)
     }
@@ -30263,14 +30285,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = ":", Test<"all">, SliceOp => ActionFn(1724);
+        // Subscript = ":", Test<"all">, SliceOp => ActionFn(1726);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant92(__symbols);
+        let __sym2 = __pop_Variant93(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1724::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1726::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 254)
     }
@@ -30283,13 +30305,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = ":", SliceOp => ActionFn(1725);
+        // Subscript = ":", SliceOp => ActionFn(1727);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant92(__symbols);
+        let __sym1 = __pop_Variant93(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1725::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1727::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 254)
     }
@@ -30302,14 +30324,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = Test<"all">, ":", Test<"all"> => ActionFn(1726);
+        // Subscript = Test<"all">, ":", Test<"all"> => ActionFn(1728);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1726::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1728::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 254)
     }
@@ -30322,13 +30344,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = Test<"all">, ":" => ActionFn(1727);
+        // Subscript = Test<"all">, ":" => ActionFn(1729);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1727::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1729::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 254)
     }
@@ -30341,13 +30363,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = ":", Test<"all"> => ActionFn(1728);
+        // Subscript = ":", Test<"all"> => ActionFn(1730);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1728::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1730::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 254)
     }
@@ -30360,11 +30382,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = ":" => ActionFn(1729);
+        // Subscript = ":" => ActionFn(1731);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1729::<>(source_code, mode, __sym0);
+        let __nt = super::__action1731::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 254)
     }
@@ -30394,13 +30416,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SubscriptList = Subscript, "," => ActionFn(1483);
+        // SubscriptList = Subscript, "," => ActionFn(1485);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1483::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1485::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 255)
     }
@@ -30413,13 +30435,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SubscriptList = TwoOrMore<Subscript, ",">, "," => ActionFn(1484);
+        // SubscriptList = TwoOrMore<Subscript, ",">, "," => ActionFn(1486);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant33(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1484::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1486::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 255)
     }
@@ -30432,11 +30454,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SubscriptList = TwoOrMore<Subscript, ","> => ActionFn(1485);
+        // SubscriptList = TwoOrMore<Subscript, ","> => ActionFn(1487);
         let __sym0 = __pop_Variant33(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1485::<>(source_code, mode, __sym0);
+        let __nt = super::__action1487::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 255)
     }
@@ -30532,7 +30554,7 @@ mod __parse__Top {
         // Suite = "\n", Indent, Statements, Dedent => ActionFn(8);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant94(__symbols);
+        let __sym2 = __pop_Variant95(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -30550,14 +30572,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Term<"all"> = Term<"all">, MulOp, Factor<"all"> => ActionFn(1486);
+        // Term<"all"> = Term<"all">, MulOp, Factor<"all"> => ActionFn(1488);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant49(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1486::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1488::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 257)
     }
@@ -30587,14 +30609,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Term<"no-withitems"> = Term<"all">, MulOp, Factor<"all"> => ActionFn(1487);
+        // Term<"no-withitems"> = Term<"all">, MulOp, Factor<"all"> => ActionFn(1489);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant49(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1487::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1489::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 258)
     }
@@ -30624,7 +30646,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Test<"all"> = OrTest<"all">, "if", OrTest<"all">, "else", Test<"all"> => ActionFn(1488);
+        // Test<"all"> = OrTest<"all">, "if", OrTest<"all">, "else", Test<"all"> => ActionFn(1490);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant15(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -30633,7 +30655,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1488::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1490::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (5, 259)
     }
@@ -30713,7 +30735,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Test<"no-withitems"> = OrTest<"all">, "if", OrTest<"all">, "else", Test<"all"> => ActionFn(1489);
+        // Test<"no-withitems"> = OrTest<"all">, "if", OrTest<"all">, "else", Test<"all"> => ActionFn(1491);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant15(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -30722,7 +30744,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1489::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1491::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (5, 261)
     }
@@ -30786,11 +30808,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TestList? = GenericList<TestOrStarExpr> => ActionFn(1734);
+        // TestList? = GenericList<TestOrStarExpr> => ActionFn(1736);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1734::<>(source_code, mode, __sym0);
+        let __nt = super::__action1736::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (1, 263)
     }
@@ -30819,11 +30841,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TestListOrYieldExpr = GenericList<TestOrStarExpr> => ActionFn(1735);
+        // TestListOrYieldExpr = GenericList<TestOrStarExpr> => ActionFn(1737);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1735::<>(source_code, mode, __sym0);
+        let __nt = super::__action1737::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 264)
     }
@@ -30887,11 +30909,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TestOrStarExprList = GenericList<TestOrStarExpr> => ActionFn(1736);
+        // TestOrStarExprList = GenericList<TestOrStarExpr> => ActionFn(1738);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1736::<>(source_code, mode, __sym0);
+        let __nt = super::__action1738::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 266)
     }
@@ -30938,14 +30960,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Top = StartModule, Program => ActionFn(1490);
+        // Top = StartModule, Program => ActionFn(1492);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant25(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1490::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
+        let __nt = super::__action1492::<>(source_code, mode, __sym0, __sym1);
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (2, 268)
     }
     pub(crate) fn __reduce878<
@@ -30957,14 +30979,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Top = StartExpression, GenericList<TestOrStarExpr> => ActionFn(1737);
+        // Top = StartExpression, GenericList<TestOrStarExpr> => ActionFn(1739);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1737::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
+        let __nt = super::__action1739::<>(source_code, mode, __sym0, __sym1);
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (2, 268)
     }
     pub(crate) fn __reduce879<
@@ -30976,15 +30998,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Top = StartExpression, GenericList<TestOrStarExpr>, ("\n")+ => ActionFn(1738);
+        // Top = StartExpression, GenericList<TestOrStarExpr>, ("\n")+ => ActionFn(1740);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant22(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1738::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
+        let __nt = super::__action1740::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (3, 268)
     }
     pub(crate) fn __reduce880<
@@ -30996,7 +31018,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptClause+, "else", ":", Suite, "finally", ":", Suite => ActionFn(1493);
+        // TryStatement = "try", ":", Suite, ExceptClause+, "else", ":", Suite, "finally", ":", Suite => ActionFn(1495);
         assert!(__symbols.len() >= 10);
         let __sym9 = __pop_Variant25(__symbols);
         let __sym8 = __pop_Variant0(__symbols);
@@ -31010,7 +31032,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym9.2;
-        let __nt = super::__action1493::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
+        let __nt = super::__action1495::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (10, 269)
     }
@@ -31023,7 +31045,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptClause+, "else", ":", Suite => ActionFn(1494);
+        // TryStatement = "try", ":", Suite, ExceptClause+, "else", ":", Suite => ActionFn(1496);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -31034,7 +31056,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1494::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1496::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 269)
     }
@@ -31047,7 +31069,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptClause+, "finally", ":", Suite => ActionFn(1495);
+        // TryStatement = "try", ":", Suite, ExceptClause+, "finally", ":", Suite => ActionFn(1497);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -31058,7 +31080,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1495::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1497::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 269)
     }
@@ -31071,7 +31093,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptClause+ => ActionFn(1496);
+        // TryStatement = "try", ":", Suite, ExceptClause+ => ActionFn(1498);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant67(__symbols);
         let __sym2 = __pop_Variant25(__symbols);
@@ -31079,7 +31101,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1496::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1498::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 269)
     }
@@ -31092,7 +31114,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptStarClause+, "else", ":", Suite, "finally", ":", Suite => ActionFn(1497);
+        // TryStatement = "try", ":", Suite, ExceptStarClause+, "else", ":", Suite, "finally", ":", Suite => ActionFn(1499);
         assert!(__symbols.len() >= 10);
         let __sym9 = __pop_Variant25(__symbols);
         let __sym8 = __pop_Variant0(__symbols);
@@ -31106,7 +31128,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym9.2;
-        let __nt = super::__action1497::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
+        let __nt = super::__action1499::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (10, 269)
     }
@@ -31119,7 +31141,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptStarClause+, "else", ":", Suite => ActionFn(1498);
+        // TryStatement = "try", ":", Suite, ExceptStarClause+, "else", ":", Suite => ActionFn(1500);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -31130,7 +31152,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1498::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1500::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 269)
     }
@@ -31143,7 +31165,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptStarClause+, "finally", ":", Suite => ActionFn(1499);
+        // TryStatement = "try", ":", Suite, ExceptStarClause+, "finally", ":", Suite => ActionFn(1501);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -31154,7 +31176,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
-        let __nt = super::__action1499::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1501::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 269)
     }
@@ -31167,7 +31189,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptStarClause+ => ActionFn(1500);
+        // TryStatement = "try", ":", Suite, ExceptStarClause+ => ActionFn(1502);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant67(__symbols);
         let __sym2 = __pop_Variant25(__symbols);
@@ -31175,7 +31197,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1500::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1502::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 269)
     }
@@ -31371,11 +31393,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeAliasName = Identifier => ActionFn(1501);
+        // TypeAliasName = Identifier => ActionFn(1503);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1501::<>(source_code, mode, __sym0);
+        let __nt = super::__action1503::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 274)
     }
@@ -31388,16 +31410,16 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeAliasStatement = "type", TypeAliasName, TypeParams, "=", Test<"all"> => ActionFn(1770);
+        // TypeAliasStatement = "type", TypeAliasName, TypeParams, "=", Test<"all"> => ActionFn(1772);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant15(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant97(__symbols);
+        let __sym2 = __pop_Variant99(__symbols);
         let __sym1 = __pop_Variant44(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
-        let __nt = super::__action1770::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1772::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 275)
     }
@@ -31410,7 +31432,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeAliasStatement = "type", TypeAliasName, "=", Test<"all"> => ActionFn(1771);
+        // TypeAliasStatement = "type", TypeAliasName, "=", Test<"all"> => ActionFn(1773);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant15(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -31418,7 +31440,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1771::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1773::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 275)
     }
@@ -31431,15 +31453,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParam = Identifier, ":", Test<"all"> => ActionFn(1503);
+        // TypeParam = Identifier, ":", Test<"all"> => ActionFn(1505);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1503::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
+        let __nt = super::__action1505::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (3, 276)
     }
     pub(crate) fn __reduce901<
@@ -31451,12 +31473,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParam = Identifier => ActionFn(1504);
+        // TypeParam = Identifier => ActionFn(1506);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1504::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
+        let __nt = super::__action1506::<>(source_code, mode, __sym0);
+        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (1, 276)
     }
     pub(crate) fn __reduce902<
@@ -31468,14 +31490,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParam = "*", Identifier => ActionFn(1505);
+        // TypeParam = "*", Identifier => ActionFn(1507);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1505::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
+        let __nt = super::__action1507::<>(source_code, mode, __sym0, __sym1);
+        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (2, 276)
     }
     pub(crate) fn __reduce903<
@@ -31487,14 +31509,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParam = "**", Identifier => ActionFn(1506);
+        // TypeParam = "**", Identifier => ActionFn(1508);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1506::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
+        let __nt = super::__action1508::<>(source_code, mode, __sym0, __sym1);
+        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (2, 276)
     }
     pub(crate) fn __reduce904<
@@ -31506,16 +31528,16 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParams = "[", OneOrMore<TypeParam>, ",", "]" => ActionFn(1507);
+        // TypeParams = "[", OneOrMore<TypeParam>, ",", "]" => ActionFn(1509);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant86(__symbols);
+        let __sym1 = __pop_Variant87(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
-        let __nt = super::__action1507::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
+        let __nt = super::__action1509::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
+        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
         (4, 277)
     }
     pub(crate) fn __reduce905<
@@ -31527,15 +31549,15 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParams = "[", OneOrMore<TypeParam>, "]" => ActionFn(1508);
+        // TypeParams = "[", OneOrMore<TypeParam>, "]" => ActionFn(1510);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant86(__symbols);
+        let __sym1 = __pop_Variant87(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1508::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
+        let __nt = super::__action1510::<>(source_code, mode, __sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
         (3, 277)
     }
     pub(crate) fn __reduce906<
@@ -31548,11 +31570,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // TypeParams? = TypeParams => ActionFn(302);
-        let __sym0 = __pop_Variant97(__symbols);
+        let __sym0 = __pop_Variant99(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action302::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant100(__nt), __end));
         (1, 278)
     }
     pub(crate) fn __reduce907<
@@ -31568,7 +31590,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action303::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant100(__nt), __end));
         (0, 278)
     }
     pub(crate) fn __reduce908<
@@ -31580,14 +31602,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypedParameter = Identifier, ":", Test<"all"> => ActionFn(1509);
+        // TypedParameter = Identifier, ":", Test<"all"> => ActionFn(1511);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1509::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1511::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (3, 279)
     }
@@ -31600,11 +31622,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypedParameter = Identifier => ActionFn(1510);
+        // TypedParameter = Identifier => ActionFn(1512);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1510::<>(source_code, mode, __sym0);
+        let __nt = super::__action1512::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (1, 279)
     }
@@ -31622,7 +31644,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action203::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant101(__nt), __end));
         (1, 280)
     }
     pub(crate) fn __reduce911<
@@ -31639,7 +31661,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action204::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant101(__nt), __end));
         (1, 280)
     }
     pub(crate) fn __reduce912<
@@ -31656,7 +31678,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action205::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant101(__nt), __end));
         (1, 280)
     }
     pub(crate) fn __reduce913<
@@ -31668,11 +31690,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // UntypedParameter = Identifier => ActionFn(1511);
+        // UntypedParameter = Identifier => ActionFn(1513);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1511::<>(source_code, mode, __sym0);
+        let __nt = super::__action1513::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (1, 281)
     }
@@ -31685,11 +31707,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ValuePattern = MatchNameOrAttr => ActionFn(1512);
+        // ValuePattern = MatchNameOrAttr => ActionFn(1514);
         let __sym0 = __pop_Variant44(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1512::<>(source_code, mode, __sym0);
+        let __nt = super::__action1514::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 282)
     }
@@ -31815,14 +31837,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItemAs = Test<"all">, "as", Expression<"all"> => ActionFn(1513);
+        // WithItemAs = Test<"all">, "as", Expression<"all"> => ActionFn(1515);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1513::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1515::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (3, 286)
     }
@@ -32148,14 +32170,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // XorExpression<"all"> = XorExpression<"all">, "^", AndExpression<"all"> => ActionFn(1514);
+        // XorExpression<"all"> = XorExpression<"all">, "^", AndExpression<"all"> => ActionFn(1516);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1514::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1516::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 290)
     }
@@ -32185,14 +32207,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // XorExpression<"no-withitems"> = XorExpression<"all">, "^", AndExpression<"all"> => ActionFn(1515);
+        // XorExpression<"no-withitems"> = XorExpression<"all">, "^", AndExpression<"all"> => ActionFn(1517);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1515::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1517::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 291)
     }
@@ -32222,13 +32244,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // YieldExpr = "yield", GenericList<TestOrStarExpr> => ActionFn(1741);
+        // YieldExpr = "yield", GenericList<TestOrStarExpr> => ActionFn(1743);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
-        let __nt = super::__action1741::<>(source_code, mode, __sym0, __sym1);
+        let __nt = super::__action1743::<>(source_code, mode, __sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 292)
     }
@@ -32241,11 +32263,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // YieldExpr = "yield" => ActionFn(1742);
+        // YieldExpr = "yield" => ActionFn(1744);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
-        let __nt = super::__action1742::<>(source_code, mode, __sym0);
+        let __nt = super::__action1744::<>(source_code, mode, __sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 292)
     }
@@ -32258,14 +32280,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // YieldExpr = "yield", "from", Test<"all"> => ActionFn(1517);
+        // YieldExpr = "yield", "from", Test<"all"> => ActionFn(1519);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
-        let __nt = super::__action1517::<>(source_code, mode, __sym0, __sym1, __sym2);
+        let __nt = super::__action1519::<>(source_code, mode, __sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 292)
     }
@@ -34280,12 +34302,12 @@ fn __action120<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, strings, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, strings, _): (TextSize, alloc::vec::Vec<StringType>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::Pattern,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     Ok(ast::PatternMatchValue {
-        value: Box::new(concatenate_strings(strings, (location..end_location).into())?.into()),
+        value: Box::new(concatenate_strings(strings, (location..end_location).into())?),
         range: (location..end_location).into()
     }.into())
 }
@@ -34477,11 +34499,11 @@ fn __action132<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, strings, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, strings, _): (TextSize, alloc::vec::Vec<StringType>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    Ok(concatenate_strings(strings, (location..end_location).into())?.into())
+    Ok(concatenate_strings(strings, (location..end_location).into())?)
 }
 
 #[allow(unused_variables)]
@@ -36032,8 +36054,8 @@ fn __action212<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, StringType, TextSize),
+) -> StringType
 {
     __0
 }
@@ -36044,8 +36066,8 @@ fn __action213<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, StringType, TextSize),
+) -> StringType
 {
     __0
 }
@@ -36058,11 +36080,11 @@ fn __action214<
     mode: Mode,
     (_, start_location, _): (TextSize, TextSize, TextSize),
     (_, string, _): (TextSize, (String, StringKind, bool), TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(&source, kind, triple_quoted, start_location)?.into())
+        Ok(parse_string_literal(&source, kind, triple_quoted, start_location)?)
     }
 }
 
@@ -36077,14 +36099,14 @@ fn __action215<
     (_, values, _): (TextSize, alloc::vec::Vec<Option<ast::Expr>>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> StringType
 {
     {
-        ast::ExprFString {
+        StringType::FString(ast::ExprFString {
             values: values.into_iter().flatten().collect(),
             implicit_concatenated: false,
             range: (location..end_location).into()
-        }.into()
+        })
     }
 }
 
@@ -38074,8 +38096,8 @@ fn __action347<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, StringType, TextSize),
+) -> alloc::vec::Vec<StringType>
 {
     alloc::vec![__0]
 }
@@ -38086,9 +38108,9 @@ fn __action348<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, v, _): (TextSize, alloc::vec::Vec<StringType>, TextSize),
+    (_, e, _): (TextSize, StringType, TextSize),
+) -> alloc::vec::Vec<StringType>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -40804,11 +40826,11 @@ fn __action541<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, strings, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, strings, _): (TextSize, alloc::vec::Vec<StringType>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    Ok(concatenate_strings(strings, (location..end_location).into())?)
+    Ok(concatenate_strings(strings, (location..end_location).into())?.into())
 }
 
 #[allow(unused_variables)]
@@ -41531,11 +41553,11 @@ fn __action584<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, strings, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, strings, _): (TextSize, alloc::vec::Vec<StringType>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    Ok(concatenate_strings(strings, (location..end_location).into())?)
+    Ok(concatenate_strings(strings, (location..end_location).into())?.into())
 }
 
 #[allow(unused_variables)]
@@ -45949,13 +45971,12 @@ fn __action728<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<StringType>, TextSize),
+    __1: (TextSize, TextSize, TextSize),
 ) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
-    let __start1 = __0.2;
-    let __end1 = __0.2;
     let __temp0 = __action410(
         source_code,
         mode,
@@ -45963,19 +45984,12 @@ fn __action728<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    let __temp1 = __action410(
-        source_code,
-        mode,
-        &__start1,
-        &__end1,
-    );
-    let __temp1 = (__start1, __temp1, __end1);
     __action541(
         source_code,
         mode,
         __temp0,
         __0,
-        __temp1,
+        __1,
     )
 }
 
@@ -46621,13 +46635,12 @@ fn __action749<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<StringType>, TextSize),
+    __1: (TextSize, TextSize, TextSize),
 ) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
-    let __start1 = __0.2;
-    let __end1 = __0.2;
     let __temp0 = __action410(
         source_code,
         mode,
@@ -46635,19 +46648,12 @@ fn __action749<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    let __temp1 = __action410(
-        source_code,
-        mode,
-        &__start1,
-        &__end1,
-    );
-    let __temp1 = (__start1, __temp1, __end1);
     __action584(
         source_code,
         mode,
         __temp0,
         __0,
-        __temp1,
+        __1,
     )
 }
 
@@ -48197,7 +48203,7 @@ fn __action799<
     __1: (TextSize, alloc::vec::Vec<Option<ast::Expr>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> StringType
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49537,7 +49543,7 @@ fn __action842<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<StringType>, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Pattern,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -49649,7 +49655,7 @@ fn __action846<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<StringType>, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -52316,7 +52322,7 @@ fn __action930<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, (String, StringKind, bool), TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -61839,6 +61845,32 @@ fn __action1232<
 >(
     source_code: &str,
     mode: Mode,
+    __0: (TextSize, alloc::vec::Vec<StringType>, TextSize),
+) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.2;
+    let __end0 = __0.2;
+    let __temp0 = __action409(
+        source_code,
+        mode,
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action728(
+        source_code,
+        mode,
+        __0,
+        __temp0,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1233<
+>(
+    source_code: &str,
+    mode: Mode,
     __0: (TextSize, ast::Constant, TextSize),
 ) -> ast::ParenthesizedExpr
 {
@@ -61861,7 +61893,7 @@ fn __action1232<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1233<
+fn __action1234<
 >(
     source_code: &str,
     mode: Mode,
@@ -61887,7 +61919,7 @@ fn __action1233<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1234<
+fn __action1235<
 >(
     source_code: &str,
     mode: Mode,
@@ -61917,7 +61949,7 @@ fn __action1234<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1235<
+fn __action1236<
 >(
     source_code: &str,
     mode: Mode,
@@ -61949,7 +61981,7 @@ fn __action1235<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1236<
+fn __action1237<
 >(
     source_code: &str,
     mode: Mode,
@@ -61981,7 +62013,7 @@ fn __action1236<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1237<
+fn __action1238<
 >(
     source_code: &str,
     mode: Mode,
@@ -62011,7 +62043,7 @@ fn __action1237<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1238<
+fn __action1239<
 >(
     source_code: &str,
     mode: Mode,
@@ -62047,7 +62079,7 @@ fn __action1238<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1239<
+fn __action1240<
 >(
     source_code: &str,
     mode: Mode,
@@ -62079,7 +62111,7 @@ fn __action1239<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1240<
+fn __action1241<
 >(
     source_code: &str,
     mode: Mode,
@@ -62117,7 +62149,7 @@ fn __action1240<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1241<
+fn __action1242<
 >(
     source_code: &str,
     mode: Mode,
@@ -62151,7 +62183,7 @@ fn __action1241<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1242<
+fn __action1243<
 >(
     source_code: &str,
     mode: Mode,
@@ -62185,7 +62217,7 @@ fn __action1242<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1243<
+fn __action1244<
 >(
     source_code: &str,
     mode: Mode,
@@ -62215,7 +62247,7 @@ fn __action1243<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1244<
+fn __action1245<
 >(
     source_code: &str,
     mode: Mode,
@@ -62251,7 +62283,7 @@ fn __action1244<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1245<
+fn __action1246<
 >(
     source_code: &str,
     mode: Mode,
@@ -62283,7 +62315,7 @@ fn __action1245<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1246<
+fn __action1247<
 >(
     source_code: &str,
     mode: Mode,
@@ -62311,7 +62343,7 @@ fn __action1246<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1247<
+fn __action1248<
 >(
     source_code: &str,
     mode: Mode,
@@ -62341,7 +62373,7 @@ fn __action1247<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1248<
+fn __action1249<
 >(
     source_code: &str,
     mode: Mode,
@@ -62373,7 +62405,7 @@ fn __action1248<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1249<
+fn __action1250<
 >(
     source_code: &str,
     mode: Mode,
@@ -62405,7 +62437,7 @@ fn __action1249<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1250<
+fn __action1251<
 >(
     source_code: &str,
     mode: Mode,
@@ -62435,7 +62467,7 @@ fn __action1250<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1251<
+fn __action1252<
 >(
     source_code: &str,
     mode: Mode,
@@ -62467,7 +62499,7 @@ fn __action1251<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1252<
+fn __action1253<
 >(
     source_code: &str,
     mode: Mode,
@@ -62497,7 +62529,7 @@ fn __action1252<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1253<
+fn __action1254<
 >(
     source_code: &str,
     mode: Mode,
@@ -62529,7 +62561,7 @@ fn __action1253<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1254<
+fn __action1255<
 >(
     source_code: &str,
     mode: Mode,
@@ -62555,7 +62587,7 @@ fn __action1254<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1255<
+fn __action1256<
 >(
     source_code: &str,
     mode: Mode,
@@ -62581,7 +62613,7 @@ fn __action1255<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1256<
+fn __action1257<
 >(
     source_code: &str,
     mode: Mode,
@@ -62607,7 +62639,7 @@ fn __action1256<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1257<
+fn __action1258<
 >(
     source_code: &str,
     mode: Mode,
@@ -62633,7 +62665,33 @@ fn __action1257<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1258<
+fn __action1259<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, alloc::vec::Vec<StringType>, TextSize),
+) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.2;
+    let __end0 = __0.2;
+    let __temp0 = __action409(
+        source_code,
+        mode,
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action749(
+        source_code,
+        mode,
+        __0,
+        __temp0,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1260<
 >(
     source_code: &str,
     mode: Mode,
@@ -62659,7 +62717,7 @@ fn __action1258<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1259<
+fn __action1261<
 >(
     source_code: &str,
     mode: Mode,
@@ -62685,7 +62743,7 @@ fn __action1259<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1260<
+fn __action1262<
 >(
     source_code: &str,
     mode: Mode,
@@ -62715,7 +62773,7 @@ fn __action1260<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1261<
+fn __action1263<
 >(
     source_code: &str,
     mode: Mode,
@@ -62747,7 +62805,7 @@ fn __action1261<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1262<
+fn __action1264<
 >(
     source_code: &str,
     mode: Mode,
@@ -62783,7 +62841,7 @@ fn __action1262<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1263<
+fn __action1265<
 >(
     source_code: &str,
     mode: Mode,
@@ -62815,7 +62873,7 @@ fn __action1263<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1264<
+fn __action1266<
 >(
     source_code: &str,
     mode: Mode,
@@ -62853,7 +62911,7 @@ fn __action1264<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1265<
+fn __action1267<
 >(
     source_code: &str,
     mode: Mode,
@@ -62887,7 +62945,7 @@ fn __action1265<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1266<
+fn __action1268<
 >(
     source_code: &str,
     mode: Mode,
@@ -62921,7 +62979,7 @@ fn __action1266<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1267<
+fn __action1269<
 >(
     source_code: &str,
     mode: Mode,
@@ -62951,7 +63009,7 @@ fn __action1267<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1268<
+fn __action1270<
 >(
     source_code: &str,
     mode: Mode,
@@ -62987,7 +63045,7 @@ fn __action1268<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1269<
+fn __action1271<
 >(
     source_code: &str,
     mode: Mode,
@@ -63019,7 +63077,7 @@ fn __action1269<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1270<
+fn __action1272<
 >(
     source_code: &str,
     mode: Mode,
@@ -63047,7 +63105,7 @@ fn __action1270<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1271<
+fn __action1273<
 >(
     source_code: &str,
     mode: Mode,
@@ -63077,7 +63135,7 @@ fn __action1271<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1272<
+fn __action1274<
 >(
     source_code: &str,
     mode: Mode,
@@ -63109,7 +63167,7 @@ fn __action1272<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1273<
+fn __action1275<
 >(
     source_code: &str,
     mode: Mode,
@@ -63141,7 +63199,7 @@ fn __action1273<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1274<
+fn __action1276<
 >(
     source_code: &str,
     mode: Mode,
@@ -63171,7 +63229,7 @@ fn __action1274<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1275<
+fn __action1277<
 >(
     source_code: &str,
     mode: Mode,
@@ -63203,7 +63261,7 @@ fn __action1275<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1276<
+fn __action1278<
 >(
     source_code: &str,
     mode: Mode,
@@ -63233,7 +63291,7 @@ fn __action1276<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1277<
+fn __action1279<
 >(
     source_code: &str,
     mode: Mode,
@@ -63265,7 +63323,7 @@ fn __action1277<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1278<
+fn __action1280<
 >(
     source_code: &str,
     mode: Mode,
@@ -63291,7 +63349,7 @@ fn __action1278<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1279<
+fn __action1281<
 >(
     source_code: &str,
     mode: Mode,
@@ -63317,7 +63375,7 @@ fn __action1279<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1280<
+fn __action1282<
 >(
     source_code: &str,
     mode: Mode,
@@ -63343,7 +63401,7 @@ fn __action1280<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1281<
+fn __action1283<
 >(
     source_code: &str,
     mode: Mode,
@@ -63369,7 +63427,7 @@ fn __action1281<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1282<
+fn __action1284<
 >(
     source_code: &str,
     mode: Mode,
@@ -63397,7 +63455,7 @@ fn __action1282<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1283<
+fn __action1285<
 >(
     source_code: &str,
     mode: Mode,
@@ -63429,7 +63487,7 @@ fn __action1283<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1284<
+fn __action1286<
 >(
     source_code: &str,
     mode: Mode,
@@ -63459,7 +63517,7 @@ fn __action1284<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1285<
+fn __action1287<
 >(
     source_code: &str,
     mode: Mode,
@@ -63487,7 +63545,7 @@ fn __action1285<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1286<
+fn __action1288<
 >(
     source_code: &str,
     mode: Mode,
@@ -63519,7 +63577,7 @@ fn __action1286<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1287<
+fn __action1289<
 >(
     source_code: &str,
     mode: Mode,
@@ -63549,7 +63607,7 @@ fn __action1287<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1288<
+fn __action1290<
 >(
     source_code: &str,
     mode: Mode,
@@ -63577,7 +63635,7 @@ fn __action1288<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1289<
+fn __action1291<
 >(
     source_code: &str,
     mode: Mode,
@@ -63605,7 +63663,7 @@ fn __action1289<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1290<
+fn __action1292<
 >(
     source_code: &str,
     mode: Mode,
@@ -63631,7 +63689,7 @@ fn __action1290<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1291<
+fn __action1293<
 >(
     source_code: &str,
     mode: Mode,
@@ -63659,7 +63717,7 @@ fn __action1291<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1292<
+fn __action1294<
 >(
     source_code: &str,
     mode: Mode,
@@ -63687,7 +63745,7 @@ fn __action1292<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1293<
+fn __action1295<
 >(
     source_code: &str,
     mode: Mode,
@@ -63715,7 +63773,7 @@ fn __action1293<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1294<
+fn __action1296<
 >(
     source_code: &str,
     mode: Mode,
@@ -63743,7 +63801,7 @@ fn __action1294<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1295<
+fn __action1297<
 >(
     source_code: &str,
     mode: Mode,
@@ -63769,7 +63827,7 @@ fn __action1295<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1296<
+fn __action1298<
 >(
     source_code: &str,
     mode: Mode,
@@ -63797,7 +63855,7 @@ fn __action1296<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1297<
+fn __action1299<
 >(
     source_code: &str,
     mode: Mode,
@@ -63827,7 +63885,7 @@ fn __action1297<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1298<
+fn __action1300<
 >(
     source_code: &str,
     mode: Mode,
@@ -63855,7 +63913,7 @@ fn __action1298<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1299<
+fn __action1301<
 >(
     source_code: &str,
     mode: Mode,
@@ -63881,7 +63939,7 @@ fn __action1299<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1300<
+fn __action1302<
 >(
     source_code: &str,
     mode: Mode,
@@ -63909,7 +63967,7 @@ fn __action1300<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1301<
+fn __action1303<
 >(
     source_code: &str,
     mode: Mode,
@@ -63939,7 +63997,7 @@ fn __action1301<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1302<
+fn __action1304<
 >(
     source_code: &str,
     mode: Mode,
@@ -63965,7 +64023,7 @@ fn __action1302<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1303<
+fn __action1305<
 >(
     source_code: &str,
     mode: Mode,
@@ -63995,7 +64053,7 @@ fn __action1303<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1304<
+fn __action1306<
 >(
     source_code: &str,
     mode: Mode,
@@ -64025,7 +64083,7 @@ fn __action1304<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1305<
+fn __action1307<
 >(
     source_code: &str,
     mode: Mode,
@@ -64053,7 +64111,7 @@ fn __action1305<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1306<
+fn __action1308<
 >(
     source_code: &str,
     mode: Mode,
@@ -64083,7 +64141,7 @@ fn __action1306<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1307<
+fn __action1309<
 >(
     source_code: &str,
     mode: Mode,
@@ -64115,14 +64173,14 @@ fn __action1307<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1308<
+fn __action1310<
 >(
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<Option<ast::Expr>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> StringType
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -64145,7 +64203,7 @@ fn __action1308<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1309<
+fn __action1311<
 >(
     source_code: &str,
     mode: Mode,
@@ -64171,7 +64229,7 @@ fn __action1309<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1310<
+fn __action1312<
 >(
     source_code: &str,
     mode: Mode,
@@ -64207,7 +64265,7 @@ fn __action1310<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1311<
+fn __action1313<
 >(
     source_code: &str,
     mode: Mode,
@@ -64241,7 +64299,7 @@ fn __action1311<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1312<
+fn __action1314<
 >(
     source_code: &str,
     mode: Mode,
@@ -64269,7 +64327,7 @@ fn __action1312<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1313<
+fn __action1315<
 >(
     source_code: &str,
     mode: Mode,
@@ -64297,7 +64355,7 @@ fn __action1313<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1314<
+fn __action1316<
 >(
     source_code: &str,
     mode: Mode,
@@ -64323,7 +64381,7 @@ fn __action1314<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1315<
+fn __action1317<
 >(
     source_code: &str,
     mode: Mode,
@@ -64349,7 +64407,7 @@ fn __action1315<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1316<
+fn __action1318<
 >(
     source_code: &str,
     mode: Mode,
@@ -64377,7 +64435,7 @@ fn __action1316<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1317<
+fn __action1319<
 >(
     source_code: &str,
     mode: Mode,
@@ -64403,7 +64461,7 @@ fn __action1317<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1318<
+fn __action1320<
 >(
     source_code: &str,
     mode: Mode,
@@ -64431,7 +64489,7 @@ fn __action1318<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1319<
+fn __action1321<
 >(
     source_code: &str,
     mode: Mode,
@@ -64461,7 +64519,7 @@ fn __action1319<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1320<
+fn __action1322<
 >(
     source_code: &str,
     mode: Mode,
@@ -64489,7 +64547,7 @@ fn __action1320<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1321<
+fn __action1323<
 >(
     source_code: &str,
     mode: Mode,
@@ -64517,7 +64575,7 @@ fn __action1321<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1322<
+fn __action1324<
 >(
     source_code: &str,
     mode: Mode,
@@ -64545,7 +64603,7 @@ fn __action1322<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1323<
+fn __action1325<
 >(
     source_code: &str,
     mode: Mode,
@@ -64571,7 +64629,7 @@ fn __action1323<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1324<
+fn __action1326<
 >(
     source_code: &str,
     mode: Mode,
@@ -64599,7 +64657,7 @@ fn __action1324<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1325<
+fn __action1327<
 >(
     source_code: &str,
     mode: Mode,
@@ -64625,7 +64683,7 @@ fn __action1325<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1326<
+fn __action1328<
 >(
     source_code: &str,
     mode: Mode,
@@ -64653,7 +64711,7 @@ fn __action1326<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1327<
+fn __action1329<
 >(
     source_code: &str,
     mode: Mode,
@@ -64679,7 +64737,7 @@ fn __action1327<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1328<
+fn __action1330<
 >(
     source_code: &str,
     mode: Mode,
@@ -64709,7 +64767,7 @@ fn __action1328<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1329<
+fn __action1331<
 >(
     source_code: &str,
     mode: Mode,
@@ -64735,7 +64793,7 @@ fn __action1329<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1330<
+fn __action1332<
 >(
     source_code: &str,
     mode: Mode,
@@ -64765,7 +64823,7 @@ fn __action1330<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1331<
+fn __action1333<
 >(
     source_code: &str,
     mode: Mode,
@@ -64791,7 +64849,7 @@ fn __action1331<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1332<
+fn __action1334<
 >(
     source_code: &str,
     mode: Mode,
@@ -64817,7 +64875,7 @@ fn __action1332<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1333<
+fn __action1335<
 >(
     source_code: &str,
     mode: Mode,
@@ -64849,7 +64907,7 @@ fn __action1333<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1334<
+fn __action1336<
 >(
     source_code: &str,
     mode: Mode,
@@ -64879,7 +64937,7 @@ fn __action1334<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1335<
+fn __action1337<
 >(
     source_code: &str,
     mode: Mode,
@@ -64905,7 +64963,7 @@ fn __action1335<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1336<
+fn __action1338<
 >(
     source_code: &str,
     mode: Mode,
@@ -64933,7 +64991,7 @@ fn __action1336<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1337<
+fn __action1339<
 >(
     source_code: &str,
     mode: Mode,
@@ -64965,7 +65023,7 @@ fn __action1337<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1338<
+fn __action1340<
 >(
     source_code: &str,
     mode: Mode,
@@ -64991,7 +65049,7 @@ fn __action1338<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1339<
+fn __action1341<
 >(
     source_code: &str,
     mode: Mode,
@@ -65017,7 +65075,7 @@ fn __action1339<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1340<
+fn __action1342<
 >(
     source_code: &str,
     mode: Mode,
@@ -65045,7 +65103,7 @@ fn __action1340<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1341<
+fn __action1343<
 >(
     source_code: &str,
     mode: Mode,
@@ -65087,7 +65145,7 @@ fn __action1341<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1342<
+fn __action1344<
 >(
     source_code: &str,
     mode: Mode,
@@ -65113,7 +65171,7 @@ fn __action1342<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1343<
+fn __action1345<
 >(
     source_code: &str,
     mode: Mode,
@@ -65139,7 +65197,7 @@ fn __action1343<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1344<
+fn __action1346<
 >(
     source_code: &str,
     mode: Mode,
@@ -65165,7 +65223,7 @@ fn __action1344<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1345<
+fn __action1347<
 >(
     source_code: &str,
     mode: Mode,
@@ -65191,7 +65249,7 @@ fn __action1345<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1346<
+fn __action1348<
 >(
     source_code: &str,
     mode: Mode,
@@ -65217,11 +65275,11 @@ fn __action1346<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1347<
+fn __action1349<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<StringType>, TextSize),
 ) -> Result<ast::Pattern,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -65234,58 +65292,6 @@ fn __action1347<
     );
     let __temp0 = (__start0, __temp0, __end0);
     __action842(
-        source_code,
-        mode,
-        __0,
-        __temp0,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1348<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __0.2;
-    let __end0 = __0.2;
-    let __temp0 = __action409(
-        source_code,
-        mode,
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action843(
-        source_code,
-        mode,
-        __0,
-        __temp0,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1349<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __0.2;
-    let __end0 = __0.2;
-    let __temp0 = __action409(
-        source_code,
-        mode,
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action844(
         source_code,
         mode,
         __0,
@@ -65311,7 +65317,7 @@ fn __action1350<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action845(
+    __action843(
         source_code,
         mode,
         __0,
@@ -65325,7 +65331,59 @@ fn __action1351<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, token::Tok, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __0.2;
+    let __end0 = __0.2;
+    let __temp0 = __action409(
+        source_code,
+        mode,
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action844(
+        source_code,
+        mode,
+        __0,
+        __temp0,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1352<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, token::Tok, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __0.2;
+    let __end0 = __0.2;
+    let __temp0 = __action409(
+        source_code,
+        mode,
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action845(
+        source_code,
+        mode,
+        __0,
+        __temp0,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1353<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, alloc::vec::Vec<StringType>, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -65347,7 +65405,7 @@ fn __action1351<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1352<
+fn __action1354<
 >(
     source_code: &str,
     mode: Mode,
@@ -65375,7 +65433,7 @@ fn __action1352<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1353<
+fn __action1355<
 >(
     source_code: &str,
     mode: Mode,
@@ -65407,7 +65465,7 @@ fn __action1353<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1354<
+fn __action1356<
 >(
     source_code: &str,
     mode: Mode,
@@ -65437,7 +65495,7 @@ fn __action1354<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1355<
+fn __action1357<
 >(
     source_code: &str,
     mode: Mode,
@@ -65471,7 +65529,7 @@ fn __action1355<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1356<
+fn __action1358<
 >(
     source_code: &str,
     mode: Mode,
@@ -65503,7 +65561,7 @@ fn __action1356<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1357<
+fn __action1359<
 >(
     source_code: &str,
     mode: Mode,
@@ -65541,7 +65599,7 @@ fn __action1357<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1358<
+fn __action1360<
 >(
     source_code: &str,
     mode: Mode,
@@ -65577,7 +65635,7 @@ fn __action1358<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1359<
+fn __action1361<
 >(
     source_code: &str,
     mode: Mode,
@@ -65607,7 +65665,7 @@ fn __action1359<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1360<
+fn __action1362<
 >(
     source_code: &str,
     mode: Mode,
@@ -65633,7 +65691,7 @@ fn __action1360<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1361<
+fn __action1363<
 >(
     source_code: &str,
     mode: Mode,
@@ -65663,7 +65721,7 @@ fn __action1361<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1362<
+fn __action1364<
 >(
     source_code: &str,
     mode: Mode,
@@ -65693,7 +65751,7 @@ fn __action1362<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1363<
+fn __action1365<
 >(
     source_code: &str,
     mode: Mode,
@@ -65723,7 +65781,7 @@ fn __action1363<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1364<
+fn __action1366<
 >(
     source_code: &str,
     mode: Mode,
@@ -65749,7 +65807,7 @@ fn __action1364<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1365<
+fn __action1367<
 >(
     source_code: &str,
     mode: Mode,
@@ -65777,7 +65835,7 @@ fn __action1365<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1366<
+fn __action1368<
 >(
     source_code: &str,
     mode: Mode,
@@ -65805,7 +65863,7 @@ fn __action1366<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1367<
+fn __action1369<
 >(
     source_code: &str,
     mode: Mode,
@@ -65833,7 +65891,7 @@ fn __action1367<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1368<
+fn __action1370<
 >(
     source_code: &str,
     mode: Mode,
@@ -65859,7 +65917,7 @@ fn __action1368<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1369<
+fn __action1371<
 >(
     source_code: &str,
     mode: Mode,
@@ -65887,7 +65945,7 @@ fn __action1369<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1370<
+fn __action1372<
 >(
     source_code: &str,
     mode: Mode,
@@ -65915,7 +65973,7 @@ fn __action1370<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1371<
+fn __action1373<
 >(
     source_code: &str,
     mode: Mode,
@@ -65945,7 +66003,7 @@ fn __action1371<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1372<
+fn __action1374<
 >(
     source_code: &str,
     mode: Mode,
@@ -65975,7 +66033,7 @@ fn __action1372<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1373<
+fn __action1375<
 >(
     source_code: &str,
     mode: Mode,
@@ -66013,7 +66071,7 @@ fn __action1373<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1374<
+fn __action1376<
 >(
     source_code: &str,
     mode: Mode,
@@ -66049,7 +66107,7 @@ fn __action1374<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1375<
+fn __action1377<
 >(
     source_code: &str,
     mode: Mode,
@@ -66089,7 +66147,7 @@ fn __action1375<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1376<
+fn __action1378<
 >(
     source_code: &str,
     mode: Mode,
@@ -66127,7 +66185,7 @@ fn __action1376<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1377<
+fn __action1379<
 >(
     source_code: &str,
     mode: Mode,
@@ -66161,7 +66219,7 @@ fn __action1377<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1378<
+fn __action1380<
 >(
     source_code: &str,
     mode: Mode,
@@ -66193,7 +66251,7 @@ fn __action1378<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1379<
+fn __action1381<
 >(
     source_code: &str,
     mode: Mode,
@@ -66229,7 +66287,7 @@ fn __action1379<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1380<
+fn __action1382<
 >(
     source_code: &str,
     mode: Mode,
@@ -66263,7 +66321,7 @@ fn __action1380<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1381<
+fn __action1383<
 >(
     source_code: &str,
     mode: Mode,
@@ -66291,7 +66349,7 @@ fn __action1381<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1382<
+fn __action1384<
 >(
     source_code: &str,
     mode: Mode,
@@ -66327,7 +66385,7 @@ fn __action1382<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1383<
+fn __action1385<
 >(
     source_code: &str,
     mode: Mode,
@@ -66361,7 +66419,7 @@ fn __action1383<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1384<
+fn __action1386<
 >(
     source_code: &str,
     mode: Mode,
@@ -66399,7 +66457,7 @@ fn __action1384<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1385<
+fn __action1387<
 >(
     source_code: &str,
     mode: Mode,
@@ -66435,7 +66493,7 @@ fn __action1385<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1386<
+fn __action1388<
 >(
     source_code: &str,
     mode: Mode,
@@ -66467,7 +66525,7 @@ fn __action1386<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1387<
+fn __action1389<
 >(
     source_code: &str,
     mode: Mode,
@@ -66497,7 +66555,7 @@ fn __action1387<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1388<
+fn __action1390<
 >(
     source_code: &str,
     mode: Mode,
@@ -66531,7 +66589,7 @@ fn __action1388<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1389<
+fn __action1391<
 >(
     source_code: &str,
     mode: Mode,
@@ -66563,7 +66621,7 @@ fn __action1389<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1390<
+fn __action1392<
 >(
     source_code: &str,
     mode: Mode,
@@ -66589,7 +66647,7 @@ fn __action1390<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1391<
+fn __action1393<
 >(
     source_code: &str,
     mode: Mode,
@@ -66621,7 +66679,7 @@ fn __action1391<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1392<
+fn __action1394<
 >(
     source_code: &str,
     mode: Mode,
@@ -66651,7 +66709,7 @@ fn __action1392<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1393<
+fn __action1395<
 >(
     source_code: &str,
     mode: Mode,
@@ -66685,7 +66743,7 @@ fn __action1393<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1394<
+fn __action1396<
 >(
     source_code: &str,
     mode: Mode,
@@ -66717,7 +66775,7 @@ fn __action1394<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1395<
+fn __action1397<
 >(
     source_code: &str,
     mode: Mode,
@@ -66753,7 +66811,7 @@ fn __action1395<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1396<
+fn __action1398<
 >(
     source_code: &str,
     mode: Mode,
@@ -66787,7 +66845,7 @@ fn __action1396<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1397<
+fn __action1399<
 >(
     source_code: &str,
     mode: Mode,
@@ -66817,7 +66875,7 @@ fn __action1397<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1398<
+fn __action1400<
 >(
     source_code: &str,
     mode: Mode,
@@ -66845,7 +66903,7 @@ fn __action1398<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1399<
+fn __action1401<
 >(
     source_code: &str,
     mode: Mode,
@@ -66877,7 +66935,7 @@ fn __action1399<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1400<
+fn __action1402<
 >(
     source_code: &str,
     mode: Mode,
@@ -66907,7 +66965,7 @@ fn __action1400<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1401<
+fn __action1403<
 >(
     source_code: &str,
     mode: Mode,
@@ -66939,7 +66997,7 @@ fn __action1401<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1402<
+fn __action1404<
 >(
     source_code: &str,
     mode: Mode,
@@ -66969,7 +67027,7 @@ fn __action1402<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1403<
+fn __action1405<
 >(
     source_code: &str,
     mode: Mode,
@@ -67003,7 +67061,7 @@ fn __action1403<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1404<
+fn __action1406<
 >(
     source_code: &str,
     mode: Mode,
@@ -67035,7 +67093,7 @@ fn __action1404<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1405<
+fn __action1407<
 >(
     source_code: &str,
     mode: Mode,
@@ -67063,7 +67121,7 @@ fn __action1405<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1406<
+fn __action1408<
 >(
     source_code: &str,
     mode: Mode,
@@ -67089,7 +67147,7 @@ fn __action1406<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1407<
+fn __action1409<
 >(
     source_code: &str,
     mode: Mode,
@@ -67119,7 +67177,7 @@ fn __action1407<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1408<
+fn __action1410<
 >(
     source_code: &str,
     mode: Mode,
@@ -67147,7 +67205,7 @@ fn __action1408<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1409<
+fn __action1411<
 >(
     source_code: &str,
     mode: Mode,
@@ -67175,7 +67233,7 @@ fn __action1409<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1410<
+fn __action1412<
 >(
     source_code: &str,
     mode: Mode,
@@ -67201,7 +67259,7 @@ fn __action1410<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1411<
+fn __action1413<
 >(
     source_code: &str,
     mode: Mode,
@@ -67239,7 +67297,7 @@ fn __action1411<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1412<
+fn __action1414<
 >(
     source_code: &str,
     mode: Mode,
@@ -67275,7 +67333,7 @@ fn __action1412<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1413<
+fn __action1415<
 >(
     source_code: &str,
     mode: Mode,
@@ -67315,7 +67373,7 @@ fn __action1413<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1414<
+fn __action1416<
 >(
     source_code: &str,
     mode: Mode,
@@ -67353,7 +67411,7 @@ fn __action1414<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1415<
+fn __action1417<
 >(
     source_code: &str,
     mode: Mode,
@@ -67387,7 +67445,7 @@ fn __action1415<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1416<
+fn __action1418<
 >(
     source_code: &str,
     mode: Mode,
@@ -67419,7 +67477,7 @@ fn __action1416<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1417<
+fn __action1419<
 >(
     source_code: &str,
     mode: Mode,
@@ -67455,7 +67513,7 @@ fn __action1417<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1418<
+fn __action1420<
 >(
     source_code: &str,
     mode: Mode,
@@ -67489,7 +67547,7 @@ fn __action1418<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1419<
+fn __action1421<
 >(
     source_code: &str,
     mode: Mode,
@@ -67517,7 +67575,7 @@ fn __action1419<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1420<
+fn __action1422<
 >(
     source_code: &str,
     mode: Mode,
@@ -67553,7 +67611,7 @@ fn __action1420<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1421<
+fn __action1423<
 >(
     source_code: &str,
     mode: Mode,
@@ -67587,7 +67645,7 @@ fn __action1421<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1422<
+fn __action1424<
 >(
     source_code: &str,
     mode: Mode,
@@ -67625,7 +67683,7 @@ fn __action1422<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1423<
+fn __action1425<
 >(
     source_code: &str,
     mode: Mode,
@@ -67661,7 +67719,7 @@ fn __action1423<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1424<
+fn __action1426<
 >(
     source_code: &str,
     mode: Mode,
@@ -67693,7 +67751,7 @@ fn __action1424<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1425<
+fn __action1427<
 >(
     source_code: &str,
     mode: Mode,
@@ -67723,7 +67781,7 @@ fn __action1425<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1426<
+fn __action1428<
 >(
     source_code: &str,
     mode: Mode,
@@ -67757,7 +67815,7 @@ fn __action1426<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1427<
+fn __action1429<
 >(
     source_code: &str,
     mode: Mode,
@@ -67789,7 +67847,7 @@ fn __action1427<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1428<
+fn __action1430<
 >(
     source_code: &str,
     mode: Mode,
@@ -67815,7 +67873,7 @@ fn __action1428<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1429<
+fn __action1431<
 >(
     source_code: &str,
     mode: Mode,
@@ -67847,7 +67905,7 @@ fn __action1429<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1430<
+fn __action1432<
 >(
     source_code: &str,
     mode: Mode,
@@ -67877,7 +67935,7 @@ fn __action1430<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1431<
+fn __action1433<
 >(
     source_code: &str,
     mode: Mode,
@@ -67911,7 +67969,7 @@ fn __action1431<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1432<
+fn __action1434<
 >(
     source_code: &str,
     mode: Mode,
@@ -67943,7 +68001,7 @@ fn __action1432<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1433<
+fn __action1435<
 >(
     source_code: &str,
     mode: Mode,
@@ -67979,7 +68037,7 @@ fn __action1433<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1434<
+fn __action1436<
 >(
     source_code: &str,
     mode: Mode,
@@ -68013,7 +68071,7 @@ fn __action1434<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1435<
+fn __action1437<
 >(
     source_code: &str,
     mode: Mode,
@@ -68043,7 +68101,7 @@ fn __action1435<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1436<
+fn __action1438<
 >(
     source_code: &str,
     mode: Mode,
@@ -68071,7 +68129,7 @@ fn __action1436<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1437<
+fn __action1439<
 >(
     source_code: &str,
     mode: Mode,
@@ -68103,7 +68161,7 @@ fn __action1437<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1438<
+fn __action1440<
 >(
     source_code: &str,
     mode: Mode,
@@ -68133,7 +68191,7 @@ fn __action1438<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1439<
+fn __action1441<
 >(
     source_code: &str,
     mode: Mode,
@@ -68165,7 +68223,7 @@ fn __action1439<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1440<
+fn __action1442<
 >(
     source_code: &str,
     mode: Mode,
@@ -68195,7 +68253,7 @@ fn __action1440<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1441<
+fn __action1443<
 >(
     source_code: &str,
     mode: Mode,
@@ -68229,7 +68287,7 @@ fn __action1441<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1442<
+fn __action1444<
 >(
     source_code: &str,
     mode: Mode,
@@ -68261,7 +68319,7 @@ fn __action1442<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1443<
+fn __action1445<
 >(
     source_code: &str,
     mode: Mode,
@@ -68289,7 +68347,7 @@ fn __action1443<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1444<
+fn __action1446<
 >(
     source_code: &str,
     mode: Mode,
@@ -68315,7 +68373,7 @@ fn __action1444<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1445<
+fn __action1447<
 >(
     source_code: &str,
     mode: Mode,
@@ -68345,7 +68403,7 @@ fn __action1445<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1446<
+fn __action1448<
 >(
     source_code: &str,
     mode: Mode,
@@ -68373,7 +68431,7 @@ fn __action1446<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1447<
+fn __action1449<
 >(
     source_code: &str,
     mode: Mode,
@@ -68401,7 +68459,7 @@ fn __action1447<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1448<
+fn __action1450<
 >(
     source_code: &str,
     mode: Mode,
@@ -68427,7 +68485,7 @@ fn __action1448<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1449<
+fn __action1451<
 >(
     source_code: &str,
     mode: Mode,
@@ -68457,7 +68515,7 @@ fn __action1449<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1450<
+fn __action1452<
 >(
     source_code: &str,
     mode: Mode,
@@ -68485,7 +68543,7 @@ fn __action1450<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1451<
+fn __action1453<
 >(
     source_code: &str,
     mode: Mode,
@@ -68511,7 +68569,7 @@ fn __action1451<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1452<
+fn __action1454<
 >(
     source_code: &str,
     mode: Mode,
@@ -68547,7 +68605,7 @@ fn __action1452<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1453<
+fn __action1455<
 >(
     source_code: &str,
     mode: Mode,
@@ -68581,7 +68639,7 @@ fn __action1453<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1454<
+fn __action1456<
 >(
     source_code: &str,
     mode: Mode,
@@ -68613,7 +68671,7 @@ fn __action1454<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1455<
+fn __action1457<
 >(
     source_code: &str,
     mode: Mode,
@@ -68643,7 +68701,7 @@ fn __action1455<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1456<
+fn __action1458<
 >(
     source_code: &str,
     mode: Mode,
@@ -68675,7 +68733,7 @@ fn __action1456<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1457<
+fn __action1459<
 >(
     source_code: &str,
     mode: Mode,
@@ -68705,7 +68763,7 @@ fn __action1457<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1458<
+fn __action1460<
 >(
     source_code: &str,
     mode: Mode,
@@ -68733,7 +68791,7 @@ fn __action1458<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1459<
+fn __action1461<
 >(
     source_code: &str,
     mode: Mode,
@@ -68761,7 +68819,7 @@ fn __action1459<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1460<
+fn __action1462<
 >(
     source_code: &str,
     mode: Mode,
@@ -68789,7 +68847,7 @@ fn __action1460<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1461<
+fn __action1463<
 >(
     source_code: &str,
     mode: Mode,
@@ -68815,7 +68873,7 @@ fn __action1461<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1462<
+fn __action1464<
 >(
     source_code: &str,
     mode: Mode,
@@ -68845,7 +68903,7 @@ fn __action1462<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1463<
+fn __action1465<
 >(
     source_code: &str,
     mode: Mode,
@@ -68875,7 +68933,7 @@ fn __action1463<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1464<
+fn __action1466<
 >(
     source_code: &str,
     mode: Mode,
@@ -68901,7 +68959,7 @@ fn __action1464<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1465<
+fn __action1467<
 >(
     source_code: &str,
     mode: Mode,
@@ -68933,7 +68991,7 @@ fn __action1465<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1466<
+fn __action1468<
 >(
     source_code: &str,
     mode: Mode,
@@ -68961,7 +69019,7 @@ fn __action1466<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1467<
+fn __action1469<
 >(
     source_code: &str,
     mode: Mode,
@@ -68991,7 +69049,7 @@ fn __action1467<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1468<
+fn __action1470<
 >(
     source_code: &str,
     mode: Mode,
@@ -69019,7 +69077,7 @@ fn __action1468<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1469<
+fn __action1471<
 >(
     source_code: &str,
     mode: Mode,
@@ -69051,7 +69109,7 @@ fn __action1469<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1470<
+fn __action1472<
 >(
     source_code: &str,
     mode: Mode,
@@ -69085,7 +69143,7 @@ fn __action1470<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1471<
+fn __action1473<
 >(
     source_code: &str,
     mode: Mode,
@@ -69117,7 +69175,7 @@ fn __action1471<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1472<
+fn __action1474<
 >(
     source_code: &str,
     mode: Mode,
@@ -69147,7 +69205,7 @@ fn __action1472<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1473<
+fn __action1475<
 >(
     source_code: &str,
     mode: Mode,
@@ -69177,7 +69235,7 @@ fn __action1473<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1474<
+fn __action1476<
 >(
     source_code: &str,
     mode: Mode,
@@ -69207,7 +69265,7 @@ fn __action1474<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1475<
+fn __action1477<
 >(
     source_code: &str,
     mode: Mode,
@@ -69243,7 +69301,7 @@ fn __action1475<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1476<
+fn __action1478<
 >(
     source_code: &str,
     mode: Mode,
@@ -69277,7 +69335,7 @@ fn __action1476<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1477<
+fn __action1479<
 >(
     source_code: &str,
     mode: Mode,
@@ -69305,7 +69363,7 @@ fn __action1477<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1478<
+fn __action1480<
 >(
     source_code: &str,
     mode: Mode,
@@ -69333,7 +69391,7 @@ fn __action1478<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1479<
+fn __action1481<
 >(
     source_code: &str,
     mode: Mode,
@@ -69363,7 +69421,7 @@ fn __action1479<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1480<
+fn __action1482<
 >(
     source_code: &str,
     mode: Mode,
@@ -69389,7 +69447,7 @@ fn __action1480<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1481<
+fn __action1483<
 >(
     source_code: &str,
     mode: Mode,
@@ -69415,7 +69473,7 @@ fn __action1481<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1482<
+fn __action1484<
 >(
     source_code: &str,
     mode: Mode,
@@ -69447,7 +69505,7 @@ fn __action1482<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1483<
+fn __action1485<
 >(
     source_code: &str,
     mode: Mode,
@@ -69475,7 +69533,7 @@ fn __action1483<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1484<
+fn __action1486<
 >(
     source_code: &str,
     mode: Mode,
@@ -69503,7 +69561,7 @@ fn __action1484<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1485<
+fn __action1487<
 >(
     source_code: &str,
     mode: Mode,
@@ -69529,7 +69587,7 @@ fn __action1485<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1486<
+fn __action1488<
 >(
     source_code: &str,
     mode: Mode,
@@ -69559,7 +69617,7 @@ fn __action1486<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1487<
+fn __action1489<
 >(
     source_code: &str,
     mode: Mode,
@@ -69589,7 +69647,7 @@ fn __action1487<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1488<
+fn __action1490<
 >(
     source_code: &str,
     mode: Mode,
@@ -69623,7 +69681,7 @@ fn __action1488<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1489<
+fn __action1491<
 >(
     source_code: &str,
     mode: Mode,
@@ -69657,7 +69715,7 @@ fn __action1489<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1490<
+fn __action1492<
 >(
     source_code: &str,
     mode: Mode,
@@ -69685,7 +69743,7 @@ fn __action1490<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1491<
+fn __action1493<
 >(
     source_code: &str,
     mode: Mode,
@@ -69713,7 +69771,7 @@ fn __action1491<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1492<
+fn __action1494<
 >(
     source_code: &str,
     mode: Mode,
@@ -69743,7 +69801,7 @@ fn __action1492<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1493<
+fn __action1495<
 >(
     source_code: &str,
     mode: Mode,
@@ -69787,7 +69845,7 @@ fn __action1493<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1494<
+fn __action1496<
 >(
     source_code: &str,
     mode: Mode,
@@ -69825,7 +69883,7 @@ fn __action1494<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1495<
+fn __action1497<
 >(
     source_code: &str,
     mode: Mode,
@@ -69863,7 +69921,7 @@ fn __action1495<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1496<
+fn __action1498<
 >(
     source_code: &str,
     mode: Mode,
@@ -69895,7 +69953,7 @@ fn __action1496<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1497<
+fn __action1499<
 >(
     source_code: &str,
     mode: Mode,
@@ -69939,7 +69997,7 @@ fn __action1497<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1498<
+fn __action1500<
 >(
     source_code: &str,
     mode: Mode,
@@ -69977,7 +70035,7 @@ fn __action1498<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1499<
+fn __action1501<
 >(
     source_code: &str,
     mode: Mode,
@@ -70015,7 +70073,7 @@ fn __action1499<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1500<
+fn __action1502<
 >(
     source_code: &str,
     mode: Mode,
@@ -70047,7 +70105,7 @@ fn __action1500<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1501<
+fn __action1503<
 >(
     source_code: &str,
     mode: Mode,
@@ -70073,7 +70131,7 @@ fn __action1501<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1502<
+fn __action1504<
 >(
     source_code: &str,
     mode: Mode,
@@ -70107,7 +70165,7 @@ fn __action1502<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1503<
+fn __action1505<
 >(
     source_code: &str,
     mode: Mode,
@@ -70137,7 +70195,7 @@ fn __action1503<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1504<
+fn __action1506<
 >(
     source_code: &str,
     mode: Mode,
@@ -70163,7 +70221,7 @@ fn __action1504<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1505<
+fn __action1507<
 >(
     source_code: &str,
     mode: Mode,
@@ -70191,7 +70249,7 @@ fn __action1505<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1506<
+fn __action1508<
 >(
     source_code: &str,
     mode: Mode,
@@ -70219,7 +70277,7 @@ fn __action1506<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1507<
+fn __action1509<
 >(
     source_code: &str,
     mode: Mode,
@@ -70251,7 +70309,7 @@ fn __action1507<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1508<
+fn __action1510<
 >(
     source_code: &str,
     mode: Mode,
@@ -70281,7 +70339,7 @@ fn __action1508<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1509<
+fn __action1511<
 >(
     source_code: &str,
     mode: Mode,
@@ -70311,7 +70369,7 @@ fn __action1509<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1510<
+fn __action1512<
 >(
     source_code: &str,
     mode: Mode,
@@ -70337,7 +70395,7 @@ fn __action1510<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1511<
+fn __action1513<
 >(
     source_code: &str,
     mode: Mode,
@@ -70363,7 +70421,7 @@ fn __action1511<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1512<
+fn __action1514<
 >(
     source_code: &str,
     mode: Mode,
@@ -70389,7 +70447,7 @@ fn __action1512<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1513<
+fn __action1515<
 >(
     source_code: &str,
     mode: Mode,
@@ -70419,7 +70477,7 @@ fn __action1513<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1514<
+fn __action1516<
 >(
     source_code: &str,
     mode: Mode,
@@ -70449,7 +70507,7 @@ fn __action1514<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1515<
+fn __action1517<
 >(
     source_code: &str,
     mode: Mode,
@@ -70479,7 +70537,7 @@ fn __action1515<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1516<
+fn __action1518<
 >(
     source_code: &str,
     mode: Mode,
@@ -70507,7 +70565,7 @@ fn __action1516<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1517<
+fn __action1519<
 >(
     source_code: &str,
     mode: Mode,
@@ -70537,7 +70595,7 @@ fn __action1517<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1518<
+fn __action1520<
 >(
     source_code: &str,
     mode: Mode,
@@ -70573,7 +70631,7 @@ fn __action1518<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1519<
+fn __action1521<
 >(
     source_code: &str,
     mode: Mode,
@@ -70609,7 +70667,7 @@ fn __action1519<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1520<
+fn __action1522<
 >(
     source_code: &str,
     mode: Mode,
@@ -70625,7 +70683,7 @@ fn __action1520<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1305(
+    __action1307(
         source_code,
         mode,
         __0,
@@ -70635,7 +70693,7 @@ fn __action1520<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1521<
+fn __action1523<
 >(
     source_code: &str,
     mode: Mode,
@@ -70651,7 +70709,7 @@ fn __action1521<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1305(
+    __action1307(
         source_code,
         mode,
         __0,
@@ -70661,7 +70719,7 @@ fn __action1521<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1522<
+fn __action1524<
 >(
     source_code: &str,
     mode: Mode,
@@ -70679,7 +70737,7 @@ fn __action1522<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1307(
+    __action1309(
         source_code,
         mode,
         __0,
@@ -70691,7 +70749,7 @@ fn __action1522<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1523<
+fn __action1525<
 >(
     source_code: &str,
     mode: Mode,
@@ -70709,7 +70767,7 @@ fn __action1523<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1307(
+    __action1309(
         source_code,
         mode,
         __0,
@@ -70721,7 +70779,7 @@ fn __action1523<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1524<
+fn __action1526<
 >(
     source_code: &str,
     mode: Mode,
@@ -70745,7 +70803,7 @@ fn __action1524<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1525<
+fn __action1527<
 >(
     source_code: &str,
     mode: Mode,
@@ -70771,7 +70829,7 @@ fn __action1525<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1526<
+fn __action1528<
 >(
     source_code: &str,
     mode: Mode,
@@ -70797,7 +70855,7 @@ fn __action1526<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1527<
+fn __action1529<
 >(
     source_code: &str,
     mode: Mode,
@@ -70823,7 +70881,7 @@ fn __action1527<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1528<
+fn __action1530<
 >(
     source_code: &str,
     mode: Mode,
@@ -70834,7 +70892,7 @@ fn __action1528<
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
-    let __temp0 = __action1524(
+    let __temp0 = __action1526(
         source_code,
         mode,
         __1,
@@ -70851,7 +70909,7 @@ fn __action1528<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1529<
+fn __action1531<
 >(
     source_code: &str,
     mode: Mode,
@@ -70861,7 +70919,7 @@ fn __action1529<
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
-    let __temp0 = __action1525(
+    let __temp0 = __action1527(
         source_code,
         mode,
         &__start0,
@@ -70879,7 +70937,7 @@ fn __action1529<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1530<
+fn __action1532<
 >(
     source_code: &str,
     mode: Mode,
@@ -70891,7 +70949,7 @@ fn __action1530<
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
-    let __temp0 = __action1526(
+    let __temp0 = __action1528(
         source_code,
         mode,
         __1,
@@ -70909,7 +70967,7 @@ fn __action1530<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1531<
+fn __action1533<
 >(
     source_code: &str,
     mode: Mode,
@@ -70920,7 +70978,7 @@ fn __action1531<
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
-    let __temp0 = __action1527(
+    let __temp0 = __action1529(
         source_code,
         mode,
         __1,
@@ -70937,7 +70995,7 @@ fn __action1531<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1532<
+fn __action1534<
 >(
     source_code: &str,
     mode: Mode,
@@ -70961,7 +71019,7 @@ fn __action1532<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1533<
+fn __action1535<
 >(
     source_code: &str,
     mode: Mode,
@@ -70987,7 +71045,7 @@ fn __action1533<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1534<
+fn __action1536<
 >(
     source_code: &str,
     mode: Mode,
@@ -71013,7 +71071,7 @@ fn __action1534<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1535<
+fn __action1537<
 >(
     source_code: &str,
     mode: Mode,
@@ -71039,7 +71097,7 @@ fn __action1535<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1536<
+fn __action1538<
 >(
     source_code: &str,
     mode: Mode,
@@ -71050,13 +71108,13 @@ fn __action1536<
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
-    let __temp0 = __action1532(
+    let __temp0 = __action1534(
         source_code,
         mode,
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1472(
+    __action1474(
         source_code,
         mode,
         __0,
@@ -71067,7 +71125,7 @@ fn __action1536<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1537<
+fn __action1539<
 >(
     source_code: &str,
     mode: Mode,
@@ -71077,14 +71135,14 @@ fn __action1537<
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
-    let __temp0 = __action1533(
+    let __temp0 = __action1535(
         source_code,
         mode,
         &__start0,
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1472(
+    __action1474(
         source_code,
         mode,
         __0,
@@ -71095,7 +71153,7 @@ fn __action1537<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1538<
+fn __action1540<
 >(
     source_code: &str,
     mode: Mode,
@@ -71107,14 +71165,14 @@ fn __action1538<
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
-    let __temp0 = __action1534(
+    let __temp0 = __action1536(
         source_code,
         mode,
         __1,
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1472(
+    __action1474(
         source_code,
         mode,
         __0,
@@ -71125,7 +71183,7 @@ fn __action1538<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1539<
+fn __action1541<
 >(
     source_code: &str,
     mode: Mode,
@@ -71136,13 +71194,13 @@ fn __action1539<
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
-    let __temp0 = __action1535(
+    let __temp0 = __action1537(
         source_code,
         mode,
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1472(
+    __action1474(
         source_code,
         mode,
         __0,
@@ -71153,7 +71211,7 @@ fn __action1539<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1540<
+fn __action1542<
 >(
     source_code: &str,
     mode: Mode,
@@ -71169,7 +71227,7 @@ fn __action1540<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1318(
+    __action1320(
         source_code,
         mode,
         __0,
@@ -71179,7 +71237,7 @@ fn __action1540<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1541<
+fn __action1543<
 >(
     source_code: &str,
     mode: Mode,
@@ -71195,7 +71253,7 @@ fn __action1541<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1318(
+    __action1320(
         source_code,
         mode,
         __0,
@@ -71205,7 +71263,7 @@ fn __action1541<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1542<
+fn __action1544<
 >(
     source_code: &str,
     mode: Mode,
@@ -71225,7 +71283,7 @@ fn __action1542<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1475(
+    __action1477(
         source_code,
         mode,
         __0,
@@ -71239,7 +71297,7 @@ fn __action1542<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1543<
+fn __action1545<
 >(
     source_code: &str,
     mode: Mode,
@@ -71259,7 +71317,7 @@ fn __action1543<
         __5,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1475(
+    __action1477(
         source_code,
         mode,
         __0,
@@ -71273,7 +71331,7 @@ fn __action1543<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1544<
+fn __action1546<
 >(
     source_code: &str,
     mode: Mode,
@@ -71292,7 +71350,7 @@ fn __action1544<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1476(
+    __action1478(
         source_code,
         mode,
         __0,
@@ -71305,7 +71363,7 @@ fn __action1544<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1545<
+fn __action1547<
 >(
     source_code: &str,
     mode: Mode,
@@ -71324,7 +71382,7 @@ fn __action1545<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1476(
+    __action1478(
         source_code,
         mode,
         __0,
@@ -71337,7 +71395,7 @@ fn __action1545<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1546<
+fn __action1548<
 >(
     source_code: &str,
     mode: Mode,
@@ -71358,7 +71416,7 @@ fn __action1546<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1518(
+    __action1520(
         source_code,
         mode,
         __temp0,
@@ -71373,7 +71431,7 @@ fn __action1546<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1547<
+fn __action1549<
 >(
     source_code: &str,
     mode: Mode,
@@ -71394,7 +71452,7 @@ fn __action1547<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1518(
+    __action1520(
         source_code,
         mode,
         __temp0,
@@ -71409,7 +71467,7 @@ fn __action1547<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1548<
+fn __action1550<
 >(
     source_code: &str,
     mode: Mode,
@@ -71429,7 +71487,7 @@ fn __action1548<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1519(
+    __action1521(
         source_code,
         mode,
         __temp0,
@@ -71443,7 +71501,7 @@ fn __action1548<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1549<
+fn __action1551<
 >(
     source_code: &str,
     mode: Mode,
@@ -71463,7 +71521,7 @@ fn __action1549<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1519(
+    __action1521(
         source_code,
         mode,
         __temp0,
@@ -71477,7 +71535,7 @@ fn __action1549<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1550<
+fn __action1552<
 >(
     source_code: &str,
     mode: Mode,
@@ -71519,7 +71577,7 @@ fn __action1550<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1551<
+fn __action1553<
 >(
     source_code: &str,
     mode: Mode,
@@ -71561,7 +71619,7 @@ fn __action1551<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1552<
+fn __action1554<
 >(
     source_code: &str,
     mode: Mode,
@@ -71599,7 +71657,7 @@ fn __action1552<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1553<
+fn __action1555<
 >(
     source_code: &str,
     mode: Mode,
@@ -71637,7 +71695,7 @@ fn __action1553<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1554<
+fn __action1556<
 >(
     source_code: &str,
     mode: Mode,
@@ -71677,7 +71735,7 @@ fn __action1554<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1555<
+fn __action1557<
 >(
     source_code: &str,
     mode: Mode,
@@ -71717,7 +71775,7 @@ fn __action1555<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1556<
+fn __action1558<
 >(
     source_code: &str,
     mode: Mode,
@@ -71753,7 +71811,7 @@ fn __action1556<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1557<
+fn __action1559<
 >(
     source_code: &str,
     mode: Mode,
@@ -71789,62 +71847,6 @@ fn __action1557<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1558<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
-{
-    let __start0 = __1.0;
-    let __end0 = __1.2;
-    let __temp0 = __action560(
-        source_code,
-        mode,
-        __1,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1250(
-        source_code,
-        mode,
-        __0,
-        __temp0,
-        __2,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1559<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
-{
-    let __start0 = __0.2;
-    let __end0 = __1.0;
-    let __temp0 = __action561(
-        source_code,
-        mode,
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1250(
-        source_code,
-        mode,
-        __0,
-        __temp0,
-        __1,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
 fn __action1560<
 >(
     source_code: &str,
@@ -71862,7 +71864,7 @@ fn __action1560<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1274(
+    __action1251(
         source_code,
         mode,
         __0,
@@ -71890,7 +71892,7 @@ fn __action1561<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1274(
+    __action1251(
         source_code,
         mode,
         __0,
@@ -71902,6 +71904,62 @@ fn __action1561<
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
 fn __action1562<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> ast::ParenthesizedExpr
+{
+    let __start0 = __1.0;
+    let __end0 = __1.2;
+    let __temp0 = __action560(
+        source_code,
+        mode,
+        __1,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1276(
+        source_code,
+        mode,
+        __0,
+        __temp0,
+        __2,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1563<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> ast::ParenthesizedExpr
+{
+    let __start0 = __0.2;
+    let __end0 = __1.0;
+    let __temp0 = __action561(
+        source_code,
+        mode,
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1276(
+        source_code,
+        mode,
+        __0,
+        __temp0,
+        __1,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1564<
 >(
     source_code: &str,
     mode: Mode,
@@ -71927,7 +71985,7 @@ fn __action1562<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1563<
+fn __action1565<
 >(
     source_code: &str,
     mode: Mode,
@@ -71953,7 +72011,7 @@ fn __action1563<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1564<
+fn __action1566<
 >(
     source_code: &str,
     mode: Mode,
@@ -71973,7 +72031,7 @@ fn __action1564<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1310(
+    __action1312(
         source_code,
         mode,
         __0,
@@ -71987,7 +72045,7 @@ fn __action1564<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1565<
+fn __action1567<
 >(
     source_code: &str,
     mode: Mode,
@@ -72007,7 +72065,7 @@ fn __action1565<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1310(
+    __action1312(
         source_code,
         mode,
         __0,
@@ -72021,7 +72079,7 @@ fn __action1565<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1566<
+fn __action1568<
 >(
     source_code: &str,
     mode: Mode,
@@ -72040,7 +72098,7 @@ fn __action1566<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1311(
+    __action1313(
         source_code,
         mode,
         __0,
@@ -72053,7 +72111,7 @@ fn __action1566<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1567<
+fn __action1569<
 >(
     source_code: &str,
     mode: Mode,
@@ -72072,7 +72130,7 @@ fn __action1567<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1311(
+    __action1313(
         source_code,
         mode,
         __0,
@@ -72085,7 +72143,7 @@ fn __action1567<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1568<
+fn __action1570<
 >(
     source_code: &str,
     mode: Mode,
@@ -72105,7 +72163,7 @@ fn __action1568<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1564(
+    __action1566(
         source_code,
         mode,
         __0,
@@ -72119,7 +72177,7 @@ fn __action1568<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1569<
+fn __action1571<
 >(
     source_code: &str,
     mode: Mode,
@@ -72139,7 +72197,7 @@ fn __action1569<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1564(
+    __action1566(
         source_code,
         mode,
         __0,
@@ -72148,70 +72206,6 @@ fn __action1569<
         __3,
         __temp0,
         __4,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1570<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Expr, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-) -> Option<ast::Expr>
-{
-    let __start0 = __3.0;
-    let __end0 = __3.2;
-    let __temp0 = __action264(
-        source_code,
-        mode,
-        __3,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1565(
-        source_code,
-        mode,
-        __0,
-        __1,
-        __2,
-        __temp0,
-        __4,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1571<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-) -> Option<ast::Expr>
-{
-    let __start0 = __2.2;
-    let __end0 = __3.0;
-    let __temp0 = __action265(
-        source_code,
-        mode,
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1565(
-        source_code,
-        mode,
-        __0,
-        __1,
-        __2,
-        __temp0,
-        __3,
     )
 }
 
@@ -72223,7 +72217,7 @@ fn __action1572<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
+    __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Expr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
 ) -> Option<ast::Expr>
@@ -72236,7 +72230,7 @@ fn __action1572<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1566(
+    __action1567(
         source_code,
         mode,
         __0,
@@ -72255,7 +72249,7 @@ fn __action1573<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
+    __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
 ) -> Option<ast::Expr>
 {
@@ -72268,7 +72262,7 @@ fn __action1573<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1566(
+    __action1567(
         source_code,
         mode,
         __0,
@@ -72287,6 +72281,70 @@ fn __action1574<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
+    __3: (TextSize, ast::Expr, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+) -> Option<ast::Expr>
+{
+    let __start0 = __3.0;
+    let __end0 = __3.2;
+    let __temp0 = __action264(
+        source_code,
+        mode,
+        __3,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1568(
+        source_code,
+        mode,
+        __0,
+        __1,
+        __2,
+        __temp0,
+        __4,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1575<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+) -> Option<ast::Expr>
+{
+    let __start0 = __2.2;
+    let __end0 = __3.0;
+    let __temp0 = __action265(
+        source_code,
+        mode,
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1568(
+        source_code,
+        mode,
+        __0,
+        __1,
+        __2,
+        __temp0,
+        __3,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1576<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
 ) -> Option<ast::Expr>
@@ -72299,7 +72357,7 @@ fn __action1574<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1567(
+    __action1569(
         source_code,
         mode,
         __0,
@@ -72311,7 +72369,7 @@ fn __action1574<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1575<
+fn __action1577<
 >(
     source_code: &str,
     mode: Mode,
@@ -72329,7 +72387,7 @@ fn __action1575<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1567(
+    __action1569(
         source_code,
         mode,
         __0,
@@ -72341,13 +72399,13 @@ fn __action1575<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1576<
+fn __action1578<
 >(
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> StringType
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -72358,7 +72416,7 @@ fn __action1576<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1308(
+    __action1310(
         source_code,
         mode,
         __0,
@@ -72369,14 +72427,14 @@ fn __action1576<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1577<
+fn __action1579<
 >(
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<Option<ast::Expr>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> StringType
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -72386,7 +72444,7 @@ fn __action1577<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1308(
+    __action1310(
         source_code,
         mode,
         __0,
@@ -72397,7 +72455,7 @@ fn __action1577<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1578<
+fn __action1580<
 >(
     source_code: &str,
     mode: Mode,
@@ -72414,7 +72472,7 @@ fn __action1578<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1309(
+    __action1311(
         source_code,
         mode,
         __temp0,
@@ -72423,7 +72481,7 @@ fn __action1578<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1579<
+fn __action1581<
 >(
     source_code: &str,
     mode: Mode,
@@ -72438,59 +72496,7 @@ fn __action1579<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1309(
-        source_code,
-        mode,
-        __temp0,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1580<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __0.0;
-    let __end0 = __2.2;
-    let __temp0 = __action1328(
-        source_code,
-        mode,
-        __0,
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action386(
-        source_code,
-        mode,
-        __temp0,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1581<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __0.0;
-    let __end0 = __0.2;
-    let __temp0 = __action1329(
-        source_code,
-        mode,
-        __0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action386(
+    __action1311(
         source_code,
         mode,
         __temp0,
@@ -72503,66 +72509,6 @@ fn __action1582<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::Alias>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __2.0;
-    let __end0 = __4.2;
-    let __temp0 = __action1328(
-        source_code,
-        mode,
-        __2,
-        __3,
-        __4,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action387(
-        source_code,
-        mode,
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1583<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, Vec<ast::Alias>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __2.0;
-    let __end0 = __2.2;
-    let __temp0 = __action1329(
-        source_code,
-        mode,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action387(
-        source_code,
-        mode,
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1584<
->(
-    source_code: &str,
-    mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
@@ -72578,7 +72524,7 @@ fn __action1584<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action379(
+    __action386(
         source_code,
         mode,
         __temp0,
@@ -72587,7 +72533,7 @@ fn __action1584<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1585<
+fn __action1583<
 >(
     source_code: &str,
     mode: Mode,
@@ -72602,7 +72548,7 @@ fn __action1585<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action379(
+    __action386(
         source_code,
         mode,
         __temp0,
@@ -72611,7 +72557,7 @@ fn __action1585<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1586<
+fn __action1584<
 >(
     source_code: &str,
     mode: Mode,
@@ -72632,7 +72578,7 @@ fn __action1586<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action380(
+    __action387(
         source_code,
         mode,
         __0,
@@ -72643,7 +72589,7 @@ fn __action1586<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1587<
+fn __action1585<
 >(
     source_code: &str,
     mode: Mode,
@@ -72660,6 +72606,90 @@ fn __action1587<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
+    __action387(
+        source_code,
+        mode,
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1586<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __0.0;
+    let __end0 = __2.2;
+    let __temp0 = __action1332(
+        source_code,
+        mode,
+        __0,
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action379(
+        source_code,
+        mode,
+        __temp0,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1587<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __0.0;
+    let __end0 = __0.2;
+    let __temp0 = __action1333(
+        source_code,
+        mode,
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action379(
+        source_code,
+        mode,
+        __temp0,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1588<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, Vec<ast::Alias>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __2.0;
+    let __end0 = __4.2;
+    let __temp0 = __action1332(
+        source_code,
+        mode,
+        __2,
+        __3,
+        __4,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
     __action380(
         source_code,
         mode,
@@ -72671,7 +72701,35 @@ fn __action1587<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1588<
+fn __action1589<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, Vec<ast::Alias>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __2.0;
+    let __end0 = __2.2;
+    let __temp0 = __action1333(
+        source_code,
+        mode,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action380(
+        source_code,
+        mode,
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1590<
 >(
     source_code: &str,
     mode: Mode,
@@ -72697,7 +72755,7 @@ fn __action1588<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1589<
+fn __action1591<
 >(
     source_code: &str,
     mode: Mode,
@@ -72723,62 +72781,6 @@ fn __action1589<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1590<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
-{
-    let __start0 = __1.0;
-    let __end0 = __1.2;
-    let __temp0 = __action568(
-        source_code,
-        mode,
-        __1,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1234(
-        source_code,
-        mode,
-        __0,
-        __temp0,
-        __2,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1591<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
-{
-    let __start0 = __0.2;
-    let __end0 = __1.0;
-    let __temp0 = __action569(
-        source_code,
-        mode,
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1234(
-        source_code,
-        mode,
-        __0,
-        __temp0,
-        __1,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
 fn __action1592<
 >(
     source_code: &str,
@@ -72796,7 +72798,7 @@ fn __action1592<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1260(
+    __action1235(
         source_code,
         mode,
         __0,
@@ -72824,7 +72826,7 @@ fn __action1593<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1260(
+    __action1235(
         source_code,
         mode,
         __0,
@@ -72836,6 +72838,62 @@ fn __action1593<
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
 fn __action1594<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> ast::ParenthesizedExpr
+{
+    let __start0 = __1.0;
+    let __end0 = __1.2;
+    let __temp0 = __action568(
+        source_code,
+        mode,
+        __1,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1262(
+        source_code,
+        mode,
+        __0,
+        __temp0,
+        __2,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1595<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> ast::ParenthesizedExpr
+{
+    let __start0 = __0.2;
+    let __end0 = __1.0;
+    let __temp0 = __action569(
+        source_code,
+        mode,
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1262(
+        source_code,
+        mode,
+        __0,
+        __temp0,
+        __1,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1596<
 >(
     source_code: &str,
     mode: Mode,
@@ -72856,7 +72914,7 @@ fn __action1594<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1373(
+    __action1375(
         source_code,
         mode,
         __temp0,
@@ -72871,7 +72929,7 @@ fn __action1594<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1595<
+fn __action1597<
 >(
     source_code: &str,
     mode: Mode,
@@ -72896,7 +72954,7 @@ fn __action1595<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1373(
+    __action1375(
         source_code,
         mode,
         __temp0,
@@ -72911,7 +72969,7 @@ fn __action1595<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1596<
+fn __action1598<
 >(
     source_code: &str,
     mode: Mode,
@@ -72938,7 +72996,7 @@ fn __action1596<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1373(
+    __action1375(
         source_code,
         mode,
         __temp0,
@@ -72953,7 +73011,7 @@ fn __action1596<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1597<
+fn __action1599<
 >(
     source_code: &str,
     mode: Mode,
@@ -72973,7 +73031,7 @@ fn __action1597<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1374(
+    __action1376(
         source_code,
         mode,
         __temp0,
@@ -72987,7 +73045,7 @@ fn __action1597<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1598<
+fn __action1600<
 >(
     source_code: &str,
     mode: Mode,
@@ -73011,88 +73069,10 @@ fn __action1598<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1374(
+    __action1376(
         source_code,
         mode,
         __temp0,
-        __3,
-        __4,
-        __5,
-        __6,
-        __7,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1599<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
-    __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0;
-    let __end0 = __3.2;
-    let __temp0 = __action695(
-        source_code,
-        mode,
-        __0,
-        __1,
-        __2,
-        __3,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1374(
-        source_code,
-        mode,
-        __temp0,
-        __4,
-        __5,
-        __6,
-        __7,
-        __8,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1600<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Parameter, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
-    __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0;
-    let __end0 = __0.2;
-    let __temp0 = __action439(
-        source_code,
-        mode,
-        __0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1375(
-        source_code,
-        mode,
-        __temp0,
-        __1,
-        __2,
         __3,
         __4,
         __5,
@@ -73110,6 +73090,84 @@ fn __action1601<
     __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, token::Tok, TextSize),
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+    __8: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0;
+    let __end0 = __3.2;
+    let __temp0 = __action695(
+        source_code,
+        mode,
+        __0,
+        __1,
+        __2,
+        __3,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1376(
+        source_code,
+        mode,
+        __temp0,
+        __4,
+        __5,
+        __6,
+        __7,
+        __8,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1602<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+    __7: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0;
+    let __end0 = __0.2;
+    let __temp0 = __action439(
+        source_code,
+        mode,
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1377(
+        source_code,
+        mode,
+        __temp0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+        __6,
+        __7,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1603<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Parameter, TextSize),
@@ -73129,7 +73187,7 @@ fn __action1601<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1375(
+    __action1377(
         source_code,
         mode,
         __temp0,
@@ -73145,7 +73203,7 @@ fn __action1601<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1602<
+fn __action1604<
 >(
     source_code: &str,
     mode: Mode,
@@ -73173,7 +73231,7 @@ fn __action1602<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1375(
+    __action1377(
         source_code,
         mode,
         __temp0,
@@ -73189,7 +73247,7 @@ fn __action1602<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1603<
+fn __action1605<
 >(
     source_code: &str,
     mode: Mode,
@@ -73210,7 +73268,7 @@ fn __action1603<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1376(
+    __action1378(
         source_code,
         mode,
         __temp0,
@@ -73225,7 +73283,7 @@ fn __action1603<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1604<
+fn __action1606<
 >(
     source_code: &str,
     mode: Mode,
@@ -73250,7 +73308,7 @@ fn __action1604<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1376(
+    __action1378(
         source_code,
         mode,
         __temp0,
@@ -73265,7 +73323,7 @@ fn __action1604<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1605<
+fn __action1607<
 >(
     source_code: &str,
     mode: Mode,
@@ -73292,7 +73350,7 @@ fn __action1605<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1376(
+    __action1378(
         source_code,
         mode,
         __temp0,
@@ -73307,7 +73365,7 @@ fn __action1605<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1606<
+fn __action1608<
 >(
     source_code: &str,
     mode: Mode,
@@ -73326,7 +73384,7 @@ fn __action1606<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1377(
+    __action1379(
         source_code,
         mode,
         __temp0,
@@ -73339,7 +73397,7 @@ fn __action1606<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1607<
+fn __action1609<
 >(
     source_code: &str,
     mode: Mode,
@@ -73362,7 +73420,7 @@ fn __action1607<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1377(
+    __action1379(
         source_code,
         mode,
         __temp0,
@@ -73375,7 +73433,7 @@ fn __action1607<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1608<
+fn __action1610<
 >(
     source_code: &str,
     mode: Mode,
@@ -73400,7 +73458,7 @@ fn __action1608<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1377(
+    __action1379(
         source_code,
         mode,
         __temp0,
@@ -73413,7 +73471,7 @@ fn __action1608<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1609<
+fn __action1611<
 >(
     source_code: &str,
     mode: Mode,
@@ -73431,7 +73489,7 @@ fn __action1609<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1378(
+    __action1380(
         source_code,
         mode,
         __temp0,
@@ -73443,7 +73501,7 @@ fn __action1609<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1610<
+fn __action1612<
 >(
     source_code: &str,
     mode: Mode,
@@ -73465,7 +73523,7 @@ fn __action1610<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1378(
+    __action1380(
         source_code,
         mode,
         __temp0,
@@ -73477,7 +73535,7 @@ fn __action1610<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1611<
+fn __action1613<
 >(
     source_code: &str,
     mode: Mode,
@@ -73501,7 +73559,7 @@ fn __action1611<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1378(
+    __action1380(
         source_code,
         mode,
         __temp0,
@@ -73513,7 +73571,7 @@ fn __action1611<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1612<
+fn __action1614<
 >(
     source_code: &str,
     mode: Mode,
@@ -73533,7 +73591,7 @@ fn __action1612<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1379(
+    __action1381(
         source_code,
         mode,
         __temp0,
@@ -73547,7 +73605,7 @@ fn __action1612<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1613<
+fn __action1615<
 >(
     source_code: &str,
     mode: Mode,
@@ -73571,7 +73629,7 @@ fn __action1613<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1379(
+    __action1381(
         source_code,
         mode,
         __temp0,
@@ -73585,7 +73643,7 @@ fn __action1613<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1614<
+fn __action1616<
 >(
     source_code: &str,
     mode: Mode,
@@ -73611,7 +73669,7 @@ fn __action1614<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1379(
+    __action1381(
         source_code,
         mode,
         __temp0,
@@ -73625,7 +73683,7 @@ fn __action1614<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1615<
+fn __action1617<
 >(
     source_code: &str,
     mode: Mode,
@@ -73644,7 +73702,7 @@ fn __action1615<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1380(
+    __action1382(
         source_code,
         mode,
         __temp0,
@@ -73657,7 +73715,7 @@ fn __action1615<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1616<
+fn __action1618<
 >(
     source_code: &str,
     mode: Mode,
@@ -73680,7 +73738,7 @@ fn __action1616<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1380(
+    __action1382(
         source_code,
         mode,
         __temp0,
@@ -73693,7 +73751,7 @@ fn __action1616<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1617<
+fn __action1619<
 >(
     source_code: &str,
     mode: Mode,
@@ -73718,7 +73776,7 @@ fn __action1617<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1380(
+    __action1382(
         source_code,
         mode,
         __temp0,
@@ -73731,7 +73789,7 @@ fn __action1617<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1618<
+fn __action1620<
 >(
     source_code: &str,
     mode: Mode,
@@ -73747,7 +73805,7 @@ fn __action1618<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1381(
+    __action1383(
         source_code,
         mode,
         __temp0,
@@ -73757,7 +73815,7 @@ fn __action1618<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1619<
+fn __action1621<
 >(
     source_code: &str,
     mode: Mode,
@@ -73777,7 +73835,7 @@ fn __action1619<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1381(
+    __action1383(
         source_code,
         mode,
         __temp0,
@@ -73787,7 +73845,7 @@ fn __action1619<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1620<
+fn __action1622<
 >(
     source_code: &str,
     mode: Mode,
@@ -73809,7 +73867,7 @@ fn __action1620<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1381(
+    __action1383(
         source_code,
         mode,
         __temp0,
@@ -73819,7 +73877,7 @@ fn __action1620<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1621<
+fn __action1623<
 >(
     source_code: &str,
     mode: Mode,
@@ -73839,7 +73897,7 @@ fn __action1621<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1382(
+    __action1384(
         source_code,
         mode,
         __temp0,
@@ -73853,7 +73911,7 @@ fn __action1621<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1622<
+fn __action1624<
 >(
     source_code: &str,
     mode: Mode,
@@ -73877,7 +73935,7 @@ fn __action1622<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1382(
+    __action1384(
         source_code,
         mode,
         __temp0,
@@ -73891,7 +73949,7 @@ fn __action1622<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1623<
+fn __action1625<
 >(
     source_code: &str,
     mode: Mode,
@@ -73917,7 +73975,7 @@ fn __action1623<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1382(
+    __action1384(
         source_code,
         mode,
         __temp0,
@@ -73931,7 +73989,7 @@ fn __action1623<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1624<
+fn __action1626<
 >(
     source_code: &str,
     mode: Mode,
@@ -73950,7 +74008,7 @@ fn __action1624<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1383(
+    __action1385(
         source_code,
         mode,
         __temp0,
@@ -73963,7 +74021,7 @@ fn __action1624<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1625<
+fn __action1627<
 >(
     source_code: &str,
     mode: Mode,
@@ -73986,7 +74044,7 @@ fn __action1625<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1383(
+    __action1385(
         source_code,
         mode,
         __temp0,
@@ -73999,7 +74057,7 @@ fn __action1625<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1626<
+fn __action1628<
 >(
     source_code: &str,
     mode: Mode,
@@ -74024,7 +74082,7 @@ fn __action1626<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1383(
+    __action1385(
         source_code,
         mode,
         __temp0,
@@ -74037,7 +74095,7 @@ fn __action1626<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1627<
+fn __action1629<
 >(
     source_code: &str,
     mode: Mode,
@@ -74058,7 +74116,7 @@ fn __action1627<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1384(
+    __action1386(
         source_code,
         mode,
         __temp0,
@@ -74073,7 +74131,7 @@ fn __action1627<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1628<
+fn __action1630<
 >(
     source_code: &str,
     mode: Mode,
@@ -74098,7 +74156,7 @@ fn __action1628<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1384(
+    __action1386(
         source_code,
         mode,
         __temp0,
@@ -74113,7 +74171,7 @@ fn __action1628<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1629<
+fn __action1631<
 >(
     source_code: &str,
     mode: Mode,
@@ -74140,7 +74198,7 @@ fn __action1629<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1384(
+    __action1386(
         source_code,
         mode,
         __temp0,
@@ -74155,7 +74213,7 @@ fn __action1629<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1630<
+fn __action1632<
 >(
     source_code: &str,
     mode: Mode,
@@ -74175,7 +74233,7 @@ fn __action1630<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1385(
+    __action1387(
         source_code,
         mode,
         __temp0,
@@ -74189,7 +74247,7 @@ fn __action1630<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1631<
+fn __action1633<
 >(
     source_code: &str,
     mode: Mode,
@@ -74213,7 +74271,7 @@ fn __action1631<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1385(
+    __action1387(
         source_code,
         mode,
         __temp0,
@@ -74227,7 +74285,7 @@ fn __action1631<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1632<
+fn __action1634<
 >(
     source_code: &str,
     mode: Mode,
@@ -74253,7 +74311,7 @@ fn __action1632<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1385(
+    __action1387(
         source_code,
         mode,
         __temp0,
@@ -74267,7 +74325,7 @@ fn __action1632<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1633<
+fn __action1635<
 >(
     source_code: &str,
     mode: Mode,
@@ -74285,7 +74343,7 @@ fn __action1633<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1386(
+    __action1388(
         source_code,
         mode,
         __temp0,
@@ -74297,7 +74355,7 @@ fn __action1633<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1634<
+fn __action1636<
 >(
     source_code: &str,
     mode: Mode,
@@ -74319,7 +74377,7 @@ fn __action1634<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1386(
+    __action1388(
         source_code,
         mode,
         __temp0,
@@ -74331,7 +74389,7 @@ fn __action1634<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1635<
+fn __action1637<
 >(
     source_code: &str,
     mode: Mode,
@@ -74355,7 +74413,7 @@ fn __action1635<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1386(
+    __action1388(
         source_code,
         mode,
         __temp0,
@@ -74367,7 +74425,7 @@ fn __action1635<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1636<
+fn __action1638<
 >(
     source_code: &str,
     mode: Mode,
@@ -74384,7 +74442,7 @@ fn __action1636<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1387(
+    __action1389(
         source_code,
         mode,
         __temp0,
@@ -74395,7 +74453,7 @@ fn __action1636<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1637<
+fn __action1639<
 >(
     source_code: &str,
     mode: Mode,
@@ -74416,7 +74474,7 @@ fn __action1637<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1387(
+    __action1389(
         source_code,
         mode,
         __temp0,
@@ -74427,7 +74485,7 @@ fn __action1637<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1638<
+fn __action1640<
 >(
     source_code: &str,
     mode: Mode,
@@ -74450,7 +74508,7 @@ fn __action1638<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1387(
+    __action1389(
         source_code,
         mode,
         __temp0,
@@ -74461,7 +74519,7 @@ fn __action1638<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1639<
+fn __action1641<
 >(
     source_code: &str,
     mode: Mode,
@@ -74480,7 +74538,7 @@ fn __action1639<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1388(
+    __action1390(
         source_code,
         mode,
         __temp0,
@@ -74493,7 +74551,7 @@ fn __action1639<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1640<
+fn __action1642<
 >(
     source_code: &str,
     mode: Mode,
@@ -74516,7 +74574,7 @@ fn __action1640<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1388(
+    __action1390(
         source_code,
         mode,
         __temp0,
@@ -74529,7 +74587,7 @@ fn __action1640<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1641<
+fn __action1643<
 >(
     source_code: &str,
     mode: Mode,
@@ -74554,7 +74612,7 @@ fn __action1641<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1388(
+    __action1390(
         source_code,
         mode,
         __temp0,
@@ -74567,7 +74625,7 @@ fn __action1641<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1642<
+fn __action1644<
 >(
     source_code: &str,
     mode: Mode,
@@ -74585,7 +74643,7 @@ fn __action1642<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1389(
+    __action1391(
         source_code,
         mode,
         __temp0,
@@ -74597,7 +74655,7 @@ fn __action1642<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1643<
+fn __action1645<
 >(
     source_code: &str,
     mode: Mode,
@@ -74619,7 +74677,7 @@ fn __action1643<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1389(
+    __action1391(
         source_code,
         mode,
         __temp0,
@@ -74631,7 +74689,7 @@ fn __action1643<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1644<
+fn __action1646<
 >(
     source_code: &str,
     mode: Mode,
@@ -74655,7 +74713,7 @@ fn __action1644<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1389(
+    __action1391(
         source_code,
         mode,
         __temp0,
@@ -74667,7 +74725,7 @@ fn __action1644<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1645<
+fn __action1647<
 >(
     source_code: &str,
     mode: Mode,
@@ -74682,7 +74740,7 @@ fn __action1645<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1390(
+    __action1392(
         source_code,
         mode,
         __temp0,
@@ -74691,7 +74749,7 @@ fn __action1645<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1646<
+fn __action1648<
 >(
     source_code: &str,
     mode: Mode,
@@ -74710,7 +74768,7 @@ fn __action1646<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1390(
+    __action1392(
         source_code,
         mode,
         __temp0,
@@ -74719,7 +74777,7 @@ fn __action1646<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1647<
+fn __action1649<
 >(
     source_code: &str,
     mode: Mode,
@@ -74740,7 +74798,7 @@ fn __action1647<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1390(
+    __action1392(
         source_code,
         mode,
         __temp0,
@@ -74749,7 +74807,7 @@ fn __action1647<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1648<
+fn __action1650<
 >(
     source_code: &str,
     mode: Mode,
@@ -74767,7 +74825,7 @@ fn __action1648<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1391(
+    __action1393(
         source_code,
         mode,
         __temp0,
@@ -74779,7 +74837,7 @@ fn __action1648<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1649<
+fn __action1651<
 >(
     source_code: &str,
     mode: Mode,
@@ -74801,7 +74859,7 @@ fn __action1649<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1391(
+    __action1393(
         source_code,
         mode,
         __temp0,
@@ -74813,7 +74871,7 @@ fn __action1649<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1650<
+fn __action1652<
 >(
     source_code: &str,
     mode: Mode,
@@ -74837,7 +74895,7 @@ fn __action1650<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1391(
+    __action1393(
         source_code,
         mode,
         __temp0,
@@ -74849,7 +74907,7 @@ fn __action1650<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1651<
+fn __action1653<
 >(
     source_code: &str,
     mode: Mode,
@@ -74866,7 +74924,7 @@ fn __action1651<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1392(
+    __action1394(
         source_code,
         mode,
         __temp0,
@@ -74877,7 +74935,7 @@ fn __action1651<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1652<
+fn __action1654<
 >(
     source_code: &str,
     mode: Mode,
@@ -74898,7 +74956,7 @@ fn __action1652<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1392(
+    __action1394(
         source_code,
         mode,
         __temp0,
@@ -74909,7 +74967,7 @@ fn __action1652<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1653<
+fn __action1655<
 >(
     source_code: &str,
     mode: Mode,
@@ -74932,7 +74990,7 @@ fn __action1653<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1392(
+    __action1394(
         source_code,
         mode,
         __temp0,
@@ -74943,7 +75001,7 @@ fn __action1653<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1654<
+fn __action1656<
 >(
     source_code: &str,
     mode: Mode,
@@ -74964,7 +75022,7 @@ fn __action1654<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1411(
+    __action1413(
         source_code,
         mode,
         __temp0,
@@ -74979,7 +75037,7 @@ fn __action1654<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1655<
+fn __action1657<
 >(
     source_code: &str,
     mode: Mode,
@@ -75004,7 +75062,7 @@ fn __action1655<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1411(
+    __action1413(
         source_code,
         mode,
         __temp0,
@@ -75019,7 +75077,7 @@ fn __action1655<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1656<
+fn __action1658<
 >(
     source_code: &str,
     mode: Mode,
@@ -75046,7 +75104,7 @@ fn __action1656<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1411(
+    __action1413(
         source_code,
         mode,
         __temp0,
@@ -75061,7 +75119,7 @@ fn __action1656<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1657<
+fn __action1659<
 >(
     source_code: &str,
     mode: Mode,
@@ -75081,7 +75139,7 @@ fn __action1657<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1412(
+    __action1414(
         source_code,
         mode,
         __temp0,
@@ -75095,7 +75153,7 @@ fn __action1657<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1658<
+fn __action1660<
 >(
     source_code: &str,
     mode: Mode,
@@ -75119,88 +75177,10 @@ fn __action1658<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1412(
+    __action1414(
         source_code,
         mode,
         __temp0,
-        __3,
-        __4,
-        __5,
-        __6,
-        __7,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1659<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
-    __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0;
-    let __end0 = __3.2;
-    let __temp0 = __action703(
-        source_code,
-        mode,
-        __0,
-        __1,
-        __2,
-        __3,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1412(
-        source_code,
-        mode,
-        __temp0,
-        __4,
-        __5,
-        __6,
-        __7,
-        __8,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1660<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Parameter, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
-    __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0;
-    let __end0 = __0.2;
-    let __temp0 = __action447(
-        source_code,
-        mode,
-        __0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1413(
-        source_code,
-        mode,
-        __temp0,
-        __1,
-        __2,
         __3,
         __4,
         __5,
@@ -75218,6 +75198,84 @@ fn __action1661<
     __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, token::Tok, TextSize),
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+    __8: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0;
+    let __end0 = __3.2;
+    let __temp0 = __action703(
+        source_code,
+        mode,
+        __0,
+        __1,
+        __2,
+        __3,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1414(
+        source_code,
+        mode,
+        __temp0,
+        __4,
+        __5,
+        __6,
+        __7,
+        __8,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1662<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+    __7: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0;
+    let __end0 = __0.2;
+    let __temp0 = __action447(
+        source_code,
+        mode,
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1415(
+        source_code,
+        mode,
+        __temp0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+        __6,
+        __7,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1663<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Parameter, TextSize),
@@ -75237,7 +75295,7 @@ fn __action1661<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1413(
+    __action1415(
         source_code,
         mode,
         __temp0,
@@ -75253,7 +75311,7 @@ fn __action1661<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1662<
+fn __action1664<
 >(
     source_code: &str,
     mode: Mode,
@@ -75281,7 +75339,7 @@ fn __action1662<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1413(
+    __action1415(
         source_code,
         mode,
         __temp0,
@@ -75297,7 +75355,7 @@ fn __action1662<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1663<
+fn __action1665<
 >(
     source_code: &str,
     mode: Mode,
@@ -75318,7 +75376,7 @@ fn __action1663<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1414(
+    __action1416(
         source_code,
         mode,
         __temp0,
@@ -75333,7 +75391,7 @@ fn __action1663<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1664<
+fn __action1666<
 >(
     source_code: &str,
     mode: Mode,
@@ -75358,7 +75416,7 @@ fn __action1664<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1414(
+    __action1416(
         source_code,
         mode,
         __temp0,
@@ -75373,7 +75431,7 @@ fn __action1664<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1665<
+fn __action1667<
 >(
     source_code: &str,
     mode: Mode,
@@ -75400,7 +75458,7 @@ fn __action1665<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1414(
+    __action1416(
         source_code,
         mode,
         __temp0,
@@ -75415,7 +75473,7 @@ fn __action1665<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1666<
+fn __action1668<
 >(
     source_code: &str,
     mode: Mode,
@@ -75434,7 +75492,7 @@ fn __action1666<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1415(
+    __action1417(
         source_code,
         mode,
         __temp0,
@@ -75447,7 +75505,7 @@ fn __action1666<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1667<
+fn __action1669<
 >(
     source_code: &str,
     mode: Mode,
@@ -75470,7 +75528,7 @@ fn __action1667<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1415(
+    __action1417(
         source_code,
         mode,
         __temp0,
@@ -75483,7 +75541,7 @@ fn __action1667<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1668<
+fn __action1670<
 >(
     source_code: &str,
     mode: Mode,
@@ -75508,7 +75566,7 @@ fn __action1668<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1415(
+    __action1417(
         source_code,
         mode,
         __temp0,
@@ -75521,7 +75579,7 @@ fn __action1668<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1669<
+fn __action1671<
 >(
     source_code: &str,
     mode: Mode,
@@ -75539,7 +75597,7 @@ fn __action1669<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1416(
+    __action1418(
         source_code,
         mode,
         __temp0,
@@ -75551,7 +75609,7 @@ fn __action1669<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1670<
+fn __action1672<
 >(
     source_code: &str,
     mode: Mode,
@@ -75573,7 +75631,7 @@ fn __action1670<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1416(
+    __action1418(
         source_code,
         mode,
         __temp0,
@@ -75585,7 +75643,7 @@ fn __action1670<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1671<
+fn __action1673<
 >(
     source_code: &str,
     mode: Mode,
@@ -75609,7 +75667,7 @@ fn __action1671<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1416(
+    __action1418(
         source_code,
         mode,
         __temp0,
@@ -75621,7 +75679,7 @@ fn __action1671<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1672<
+fn __action1674<
 >(
     source_code: &str,
     mode: Mode,
@@ -75641,7 +75699,7 @@ fn __action1672<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1417(
+    __action1419(
         source_code,
         mode,
         __temp0,
@@ -75655,7 +75713,7 @@ fn __action1672<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1673<
+fn __action1675<
 >(
     source_code: &str,
     mode: Mode,
@@ -75679,7 +75737,7 @@ fn __action1673<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1417(
+    __action1419(
         source_code,
         mode,
         __temp0,
@@ -75693,7 +75751,7 @@ fn __action1673<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1674<
+fn __action1676<
 >(
     source_code: &str,
     mode: Mode,
@@ -75719,7 +75777,7 @@ fn __action1674<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1417(
+    __action1419(
         source_code,
         mode,
         __temp0,
@@ -75733,7 +75791,7 @@ fn __action1674<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1675<
+fn __action1677<
 >(
     source_code: &str,
     mode: Mode,
@@ -75752,7 +75810,7 @@ fn __action1675<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1418(
+    __action1420(
         source_code,
         mode,
         __temp0,
@@ -75765,7 +75823,7 @@ fn __action1675<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1676<
+fn __action1678<
 >(
     source_code: &str,
     mode: Mode,
@@ -75788,7 +75846,7 @@ fn __action1676<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1418(
+    __action1420(
         source_code,
         mode,
         __temp0,
@@ -75801,7 +75859,7 @@ fn __action1676<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1677<
+fn __action1679<
 >(
     source_code: &str,
     mode: Mode,
@@ -75826,7 +75884,7 @@ fn __action1677<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1418(
+    __action1420(
         source_code,
         mode,
         __temp0,
@@ -75839,7 +75897,7 @@ fn __action1677<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1678<
+fn __action1680<
 >(
     source_code: &str,
     mode: Mode,
@@ -75855,7 +75913,7 @@ fn __action1678<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1419(
+    __action1421(
         source_code,
         mode,
         __temp0,
@@ -75865,7 +75923,7 @@ fn __action1678<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1679<
+fn __action1681<
 >(
     source_code: &str,
     mode: Mode,
@@ -75885,7 +75943,7 @@ fn __action1679<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1419(
+    __action1421(
         source_code,
         mode,
         __temp0,
@@ -75895,7 +75953,7 @@ fn __action1679<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1680<
+fn __action1682<
 >(
     source_code: &str,
     mode: Mode,
@@ -75917,7 +75975,7 @@ fn __action1680<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1419(
+    __action1421(
         source_code,
         mode,
         __temp0,
@@ -75927,7 +75985,7 @@ fn __action1680<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1681<
+fn __action1683<
 >(
     source_code: &str,
     mode: Mode,
@@ -75947,7 +76005,7 @@ fn __action1681<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1420(
+    __action1422(
         source_code,
         mode,
         __temp0,
@@ -75961,7 +76019,7 @@ fn __action1681<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1682<
+fn __action1684<
 >(
     source_code: &str,
     mode: Mode,
@@ -75985,7 +76043,7 @@ fn __action1682<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1420(
+    __action1422(
         source_code,
         mode,
         __temp0,
@@ -75999,7 +76057,7 @@ fn __action1682<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1683<
+fn __action1685<
 >(
     source_code: &str,
     mode: Mode,
@@ -76025,7 +76083,7 @@ fn __action1683<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1420(
+    __action1422(
         source_code,
         mode,
         __temp0,
@@ -76039,7 +76097,7 @@ fn __action1683<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1684<
+fn __action1686<
 >(
     source_code: &str,
     mode: Mode,
@@ -76058,7 +76116,7 @@ fn __action1684<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1421(
+    __action1423(
         source_code,
         mode,
         __temp0,
@@ -76071,7 +76129,7 @@ fn __action1684<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1685<
+fn __action1687<
 >(
     source_code: &str,
     mode: Mode,
@@ -76094,7 +76152,7 @@ fn __action1685<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1421(
+    __action1423(
         source_code,
         mode,
         __temp0,
@@ -76107,7 +76165,7 @@ fn __action1685<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1686<
+fn __action1688<
 >(
     source_code: &str,
     mode: Mode,
@@ -76132,7 +76190,7 @@ fn __action1686<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1421(
+    __action1423(
         source_code,
         mode,
         __temp0,
@@ -76145,7 +76203,7 @@ fn __action1686<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1687<
+fn __action1689<
 >(
     source_code: &str,
     mode: Mode,
@@ -76166,7 +76224,7 @@ fn __action1687<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1422(
+    __action1424(
         source_code,
         mode,
         __temp0,
@@ -76181,7 +76239,7 @@ fn __action1687<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1688<
+fn __action1690<
 >(
     source_code: &str,
     mode: Mode,
@@ -76206,7 +76264,7 @@ fn __action1688<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1422(
+    __action1424(
         source_code,
         mode,
         __temp0,
@@ -76221,7 +76279,7 @@ fn __action1688<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1689<
+fn __action1691<
 >(
     source_code: &str,
     mode: Mode,
@@ -76248,7 +76306,7 @@ fn __action1689<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1422(
+    __action1424(
         source_code,
         mode,
         __temp0,
@@ -76263,7 +76321,7 @@ fn __action1689<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1690<
+fn __action1692<
 >(
     source_code: &str,
     mode: Mode,
@@ -76283,7 +76341,7 @@ fn __action1690<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1423(
+    __action1425(
         source_code,
         mode,
         __temp0,
@@ -76297,7 +76355,7 @@ fn __action1690<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1691<
+fn __action1693<
 >(
     source_code: &str,
     mode: Mode,
@@ -76321,7 +76379,7 @@ fn __action1691<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1423(
+    __action1425(
         source_code,
         mode,
         __temp0,
@@ -76335,7 +76393,7 @@ fn __action1691<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1692<
+fn __action1694<
 >(
     source_code: &str,
     mode: Mode,
@@ -76361,7 +76419,7 @@ fn __action1692<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1423(
+    __action1425(
         source_code,
         mode,
         __temp0,
@@ -76375,7 +76433,7 @@ fn __action1692<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1693<
+fn __action1695<
 >(
     source_code: &str,
     mode: Mode,
@@ -76393,7 +76451,7 @@ fn __action1693<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1424(
+    __action1426(
         source_code,
         mode,
         __temp0,
@@ -76405,7 +76463,7 @@ fn __action1693<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1694<
+fn __action1696<
 >(
     source_code: &str,
     mode: Mode,
@@ -76427,7 +76485,7 @@ fn __action1694<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1424(
+    __action1426(
         source_code,
         mode,
         __temp0,
@@ -76439,7 +76497,7 @@ fn __action1694<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1695<
+fn __action1697<
 >(
     source_code: &str,
     mode: Mode,
@@ -76463,7 +76521,7 @@ fn __action1695<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1424(
+    __action1426(
         source_code,
         mode,
         __temp0,
@@ -76475,7 +76533,7 @@ fn __action1695<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1696<
+fn __action1698<
 >(
     source_code: &str,
     mode: Mode,
@@ -76492,7 +76550,7 @@ fn __action1696<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1425(
+    __action1427(
         source_code,
         mode,
         __temp0,
@@ -76503,7 +76561,7 @@ fn __action1696<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1697<
+fn __action1699<
 >(
     source_code: &str,
     mode: Mode,
@@ -76524,7 +76582,7 @@ fn __action1697<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1425(
+    __action1427(
         source_code,
         mode,
         __temp0,
@@ -76535,7 +76593,7 @@ fn __action1697<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1698<
+fn __action1700<
 >(
     source_code: &str,
     mode: Mode,
@@ -76558,7 +76616,7 @@ fn __action1698<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1425(
+    __action1427(
         source_code,
         mode,
         __temp0,
@@ -76569,7 +76627,7 @@ fn __action1698<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1699<
+fn __action1701<
 >(
     source_code: &str,
     mode: Mode,
@@ -76588,7 +76646,7 @@ fn __action1699<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1426(
+    __action1428(
         source_code,
         mode,
         __temp0,
@@ -76601,7 +76659,7 @@ fn __action1699<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1700<
+fn __action1702<
 >(
     source_code: &str,
     mode: Mode,
@@ -76624,7 +76682,7 @@ fn __action1700<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1426(
+    __action1428(
         source_code,
         mode,
         __temp0,
@@ -76637,7 +76695,7 @@ fn __action1700<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1701<
+fn __action1703<
 >(
     source_code: &str,
     mode: Mode,
@@ -76662,7 +76720,7 @@ fn __action1701<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1426(
+    __action1428(
         source_code,
         mode,
         __temp0,
@@ -76675,7 +76733,7 @@ fn __action1701<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1702<
+fn __action1704<
 >(
     source_code: &str,
     mode: Mode,
@@ -76693,7 +76751,7 @@ fn __action1702<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1427(
+    __action1429(
         source_code,
         mode,
         __temp0,
@@ -76705,7 +76763,7 @@ fn __action1702<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1703<
+fn __action1705<
 >(
     source_code: &str,
     mode: Mode,
@@ -76727,7 +76785,7 @@ fn __action1703<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1427(
+    __action1429(
         source_code,
         mode,
         __temp0,
@@ -76739,7 +76797,7 @@ fn __action1703<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1704<
+fn __action1706<
 >(
     source_code: &str,
     mode: Mode,
@@ -76763,7 +76821,7 @@ fn __action1704<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1427(
+    __action1429(
         source_code,
         mode,
         __temp0,
@@ -76775,7 +76833,7 @@ fn __action1704<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1705<
+fn __action1707<
 >(
     source_code: &str,
     mode: Mode,
@@ -76790,7 +76848,7 @@ fn __action1705<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1428(
+    __action1430(
         source_code,
         mode,
         __temp0,
@@ -76799,7 +76857,7 @@ fn __action1705<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1706<
+fn __action1708<
 >(
     source_code: &str,
     mode: Mode,
@@ -76818,7 +76876,7 @@ fn __action1706<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1428(
+    __action1430(
         source_code,
         mode,
         __temp0,
@@ -76827,7 +76885,7 @@ fn __action1706<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1707<
+fn __action1709<
 >(
     source_code: &str,
     mode: Mode,
@@ -76848,7 +76906,7 @@ fn __action1707<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1428(
+    __action1430(
         source_code,
         mode,
         __temp0,
@@ -76857,7 +76915,7 @@ fn __action1707<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1708<
+fn __action1710<
 >(
     source_code: &str,
     mode: Mode,
@@ -76875,7 +76933,7 @@ fn __action1708<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1429(
+    __action1431(
         source_code,
         mode,
         __temp0,
@@ -76887,7 +76945,7 @@ fn __action1708<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1709<
+fn __action1711<
 >(
     source_code: &str,
     mode: Mode,
@@ -76909,7 +76967,7 @@ fn __action1709<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1429(
+    __action1431(
         source_code,
         mode,
         __temp0,
@@ -76921,7 +76979,7 @@ fn __action1709<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1710<
+fn __action1712<
 >(
     source_code: &str,
     mode: Mode,
@@ -76945,7 +77003,7 @@ fn __action1710<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1429(
+    __action1431(
         source_code,
         mode,
         __temp0,
@@ -76957,7 +77015,7 @@ fn __action1710<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1711<
+fn __action1713<
 >(
     source_code: &str,
     mode: Mode,
@@ -76974,7 +77032,7 @@ fn __action1711<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1430(
+    __action1432(
         source_code,
         mode,
         __temp0,
@@ -76985,7 +77043,7 @@ fn __action1711<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1712<
+fn __action1714<
 >(
     source_code: &str,
     mode: Mode,
@@ -77006,7 +77064,7 @@ fn __action1712<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1430(
+    __action1432(
         source_code,
         mode,
         __temp0,
@@ -77017,7 +77075,7 @@ fn __action1712<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1713<
+fn __action1715<
 >(
     source_code: &str,
     mode: Mode,
@@ -77040,7 +77098,7 @@ fn __action1713<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1430(
+    __action1432(
         source_code,
         mode,
         __temp0,
@@ -77051,7 +77109,7 @@ fn __action1713<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1714<
+fn __action1716<
 >(
     source_code: &str,
     mode: Mode,
@@ -77069,7 +77127,7 @@ fn __action1714<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1341(
+    __action1343(
         source_code,
         mode,
         __0,
@@ -77081,7 +77139,7 @@ fn __action1714<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1715<
+fn __action1717<
 >(
     source_code: &str,
     mode: Mode,
@@ -77099,7 +77157,7 @@ fn __action1715<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1341(
+    __action1343(
         source_code,
         mode,
         __0,
@@ -77111,7 +77169,7 @@ fn __action1715<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1716<
+fn __action1718<
 >(
     source_code: &str,
     mode: Mode,
@@ -77129,7 +77187,7 @@ fn __action1716<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1482(
+    __action1484(
         source_code,
         mode,
         __0,
@@ -77141,7 +77199,7 @@ fn __action1716<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1717<
+fn __action1719<
 >(
     source_code: &str,
     mode: Mode,
@@ -77159,7 +77217,7 @@ fn __action1717<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1482(
+    __action1484(
         source_code,
         mode,
         __0,
@@ -77171,7 +77229,7 @@ fn __action1717<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1718<
+fn __action1720<
 >(
     source_code: &str,
     mode: Mode,
@@ -77201,7 +77259,7 @@ fn __action1718<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1719<
+fn __action1721<
 >(
     source_code: &str,
     mode: Mode,
@@ -77231,7 +77289,7 @@ fn __action1719<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1720<
+fn __action1722<
 >(
     source_code: &str,
     mode: Mode,
@@ -77257,7 +77315,7 @@ fn __action1720<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1721<
+fn __action1723<
 >(
     source_code: &str,
     mode: Mode,
@@ -77283,7 +77341,7 @@ fn __action1721<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1722<
+fn __action1724<
 >(
     source_code: &str,
     mode: Mode,
@@ -77309,7 +77367,7 @@ fn __action1722<
         __2,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1716(
+    __action1718(
         source_code,
         mode,
         __temp0,
@@ -77321,7 +77379,7 @@ fn __action1722<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1723<
+fn __action1725<
 >(
     source_code: &str,
     mode: Mode,
@@ -77347,7 +77405,7 @@ fn __action1723<
         &__end1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1716(
+    __action1718(
         source_code,
         mode,
         __temp0,
@@ -77359,7 +77417,7 @@ fn __action1723<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1724<
+fn __action1726<
 >(
     source_code: &str,
     mode: Mode,
@@ -77385,7 +77443,7 @@ fn __action1724<
         __1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1716(
+    __action1718(
         source_code,
         mode,
         __temp0,
@@ -77397,7 +77455,7 @@ fn __action1724<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1725<
+fn __action1727<
 >(
     source_code: &str,
     mode: Mode,
@@ -77423,7 +77481,7 @@ fn __action1725<
         &__end1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1716(
+    __action1718(
         source_code,
         mode,
         __temp0,
@@ -77435,7 +77493,7 @@ fn __action1725<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1726<
+fn __action1728<
 >(
     source_code: &str,
     mode: Mode,
@@ -77460,7 +77518,7 @@ fn __action1726<
         __2,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1717(
+    __action1719(
         source_code,
         mode,
         __temp0,
@@ -77471,7 +77529,7 @@ fn __action1726<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1727<
+fn __action1729<
 >(
     source_code: &str,
     mode: Mode,
@@ -77496,7 +77554,7 @@ fn __action1727<
         &__end1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1717(
+    __action1719(
         source_code,
         mode,
         __temp0,
@@ -77507,7 +77565,7 @@ fn __action1727<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1728<
+fn __action1730<
 >(
     source_code: &str,
     mode: Mode,
@@ -77532,7 +77590,7 @@ fn __action1728<
         __1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1717(
+    __action1719(
         source_code,
         mode,
         __temp0,
@@ -77543,7 +77601,7 @@ fn __action1728<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1729<
+fn __action1731<
 >(
     source_code: &str,
     mode: Mode,
@@ -77568,7 +77626,7 @@ fn __action1729<
         &__end1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1717(
+    __action1719(
         source_code,
         mode,
         __temp0,
@@ -77579,7 +77637,7 @@ fn __action1729<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1730<
+fn __action1732<
 >(
     source_code: &str,
     mode: Mode,
@@ -77621,7 +77679,7 @@ fn __action1730<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1731<
+fn __action1733<
 >(
     source_code: &str,
     mode: Mode,
@@ -77657,7 +77715,7 @@ fn __action1731<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1732<
+fn __action1734<
 >(
     source_code: &str,
     mode: Mode,
@@ -77697,7 +77755,7 @@ fn __action1732<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1733<
+fn __action1735<
 >(
     source_code: &str,
     mode: Mode,
@@ -77731,7 +77789,7 @@ fn __action1733<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1734<
+fn __action1736<
 >(
     source_code: &str,
     mode: Mode,
@@ -77755,7 +77813,7 @@ fn __action1734<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1735<
+fn __action1737<
 >(
     source_code: &str,
     mode: Mode,
@@ -77779,7 +77837,7 @@ fn __action1735<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1736<
+fn __action1738<
 >(
     source_code: &str,
     mode: Mode,
@@ -77803,7 +77861,7 @@ fn __action1736<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1737<
+fn __action1739<
 >(
     source_code: &str,
     mode: Mode,
@@ -77819,7 +77877,7 @@ fn __action1737<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1491(
+    __action1493(
         source_code,
         mode,
         __0,
@@ -77829,7 +77887,7 @@ fn __action1737<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1738<
+fn __action1740<
 >(
     source_code: &str,
     mode: Mode,
@@ -77846,64 +77904,12 @@ fn __action1738<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1492(
+    __action1494(
         source_code,
         mode,
         __0,
         __temp0,
         __2,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1739<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __1.0;
-    let __end0 = __1.2;
-    let __temp0 = __action1734(
-        source_code,
-        mode,
-        __1,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1316(
-        source_code,
-        mode,
-        __0,
-        __temp0,
-    )
-}
-
-#[allow(unused_variables)]
-#[allow(clippy::too_many_arguments)]
-fn __action1740<
->(
-    source_code: &str,
-    mode: Mode,
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __0.2;
-    let __end0 = __0.2;
-    let __temp0 = __action393(
-        source_code,
-        mode,
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1316(
-        source_code,
-        mode,
-        __0,
-        __temp0,
     )
 }
 
@@ -77915,17 +77921,17 @@ fn __action1741<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+) -> ast::Stmt
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
-    let __temp0 = __action1734(
+    let __temp0 = __action1736(
         source_code,
         mode,
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1516(
+    __action1318(
         source_code,
         mode,
         __0,
@@ -77940,7 +77946,7 @@ fn __action1742<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> ast::Stmt
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -77951,7 +77957,7 @@ fn __action1742<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1516(
+    __action1318(
         source_code,
         mode,
         __0,
@@ -77965,20 +77971,22 @@ fn __action1743<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::Stmt
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+) -> ast::ParenthesizedExpr
 {
-    let __start0 = __0.0;
-    let __end0 = __0.2;
+    let __start0 = __1.0;
+    let __end0 = __1.2;
     let __temp0 = __action1736(
         source_code,
         mode,
-        __0,
+        __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1520(
+    __action1518(
         source_code,
         mode,
+        __0,
         __temp0,
     )
 }
@@ -77989,23 +77997,23 @@ fn __action1744<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-) -> ast::Stmt
+    __0: (TextSize, token::Tok, TextSize),
+) -> ast::ParenthesizedExpr
 {
-    let __start0 = __0.0;
+    let __start0 = __0.2;
     let __end0 = __0.2;
-    let __temp0 = __action1736(
+    let __temp0 = __action393(
+        source_code,
+        mode,
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1518(
         source_code,
         mode,
         __0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1521(
-        source_code,
-        mode,
         __temp0,
-        __1,
     )
 }
 
@@ -78016,19 +78024,69 @@ fn __action1745<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __0.0;
+    let __end0 = __0.2;
+    let __temp0 = __action1738(
+        source_code,
+        mode,
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1522(
+        source_code,
+        mode,
+        __temp0,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1746<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __0.0;
+    let __end0 = __0.2;
+    let __temp0 = __action1738(
+        source_code,
+        mode,
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1523(
+        source_code,
+        mode,
+        __temp0,
+        __1,
+    )
+}
+
+#[allow(unused_variables)]
+#[allow(clippy::too_many_arguments)]
+fn __action1747<
+>(
+    source_code: &str,
+    mode: Mode,
+    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
     __2: (TextSize, ast::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
-    let __temp0 = __action1736(
+    let __temp0 = __action1738(
         source_code,
         mode,
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1306(
+    __action1308(
         source_code,
         mode,
         __temp0,
@@ -78039,7 +78097,7 @@ fn __action1745<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1746<
+fn __action1748<
 >(
     source_code: &str,
     mode: Mode,
@@ -78059,7 +78117,7 @@ fn __action1746<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1546(
+    __action1548(
         source_code,
         mode,
         __0,
@@ -78073,7 +78131,7 @@ fn __action1746<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1747<
+fn __action1749<
 >(
     source_code: &str,
     mode: Mode,
@@ -78093,7 +78151,7 @@ fn __action1747<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1546(
+    __action1548(
         source_code,
         mode,
         __0,
@@ -78107,7 +78165,7 @@ fn __action1747<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1748<
+fn __action1750<
 >(
     source_code: &str,
     mode: Mode,
@@ -78128,7 +78186,7 @@ fn __action1748<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1547(
+    __action1549(
         source_code,
         mode,
         __0,
@@ -78143,7 +78201,7 @@ fn __action1748<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1749<
+fn __action1751<
 >(
     source_code: &str,
     mode: Mode,
@@ -78164,7 +78222,7 @@ fn __action1749<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1547(
+    __action1549(
         source_code,
         mode,
         __0,
@@ -78179,7 +78237,7 @@ fn __action1749<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1750<
+fn __action1752<
 >(
     source_code: &str,
     mode: Mode,
@@ -78198,7 +78256,7 @@ fn __action1750<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1548(
+    __action1550(
         source_code,
         mode,
         __0,
@@ -78211,7 +78269,7 @@ fn __action1750<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1751<
+fn __action1753<
 >(
     source_code: &str,
     mode: Mode,
@@ -78230,7 +78288,7 @@ fn __action1751<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1548(
+    __action1550(
         source_code,
         mode,
         __0,
@@ -78243,7 +78301,7 @@ fn __action1751<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1752<
+fn __action1754<
 >(
     source_code: &str,
     mode: Mode,
@@ -78263,7 +78321,7 @@ fn __action1752<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1549(
+    __action1551(
         source_code,
         mode,
         __0,
@@ -78277,7 +78335,7 @@ fn __action1752<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1753<
+fn __action1755<
 >(
     source_code: &str,
     mode: Mode,
@@ -78297,7 +78355,7 @@ fn __action1753<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1549(
+    __action1551(
         source_code,
         mode,
         __0,
@@ -78311,7 +78369,7 @@ fn __action1753<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1754<
+fn __action1756<
 >(
     source_code: &str,
     mode: Mode,
@@ -78334,7 +78392,7 @@ fn __action1754<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1550(
+    __action1552(
         source_code,
         mode,
         __0,
@@ -78351,7 +78409,7 @@ fn __action1754<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1755<
+fn __action1757<
 >(
     source_code: &str,
     mode: Mode,
@@ -78374,7 +78432,7 @@ fn __action1755<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1550(
+    __action1552(
         source_code,
         mode,
         __0,
@@ -78391,7 +78449,7 @@ fn __action1755<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1756<
+fn __action1758<
 >(
     source_code: &str,
     mode: Mode,
@@ -78415,7 +78473,7 @@ fn __action1756<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1551(
+    __action1553(
         source_code,
         mode,
         __0,
@@ -78433,7 +78491,7 @@ fn __action1756<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1757<
+fn __action1759<
 >(
     source_code: &str,
     mode: Mode,
@@ -78457,7 +78515,7 @@ fn __action1757<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1551(
+    __action1553(
         source_code,
         mode,
         __0,
@@ -78475,7 +78533,7 @@ fn __action1757<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1758<
+fn __action1760<
 >(
     source_code: &str,
     mode: Mode,
@@ -78496,7 +78554,7 @@ fn __action1758<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1552(
+    __action1554(
         source_code,
         mode,
         __0,
@@ -78511,7 +78569,7 @@ fn __action1758<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1759<
+fn __action1761<
 >(
     source_code: &str,
     mode: Mode,
@@ -78532,7 +78590,7 @@ fn __action1759<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1552(
+    __action1554(
         source_code,
         mode,
         __0,
@@ -78547,7 +78605,7 @@ fn __action1759<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1760<
+fn __action1762<
 >(
     source_code: &str,
     mode: Mode,
@@ -78569,7 +78627,7 @@ fn __action1760<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1553(
+    __action1555(
         source_code,
         mode,
         __0,
@@ -78585,7 +78643,7 @@ fn __action1760<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1761<
+fn __action1763<
 >(
     source_code: &str,
     mode: Mode,
@@ -78607,7 +78665,7 @@ fn __action1761<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1553(
+    __action1555(
         source_code,
         mode,
         __0,
@@ -78623,7 +78681,7 @@ fn __action1761<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1762<
+fn __action1764<
 >(
     source_code: &str,
     mode: Mode,
@@ -78645,7 +78703,7 @@ fn __action1762<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1554(
+    __action1556(
         source_code,
         mode,
         __0,
@@ -78661,7 +78719,7 @@ fn __action1762<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1763<
+fn __action1765<
 >(
     source_code: &str,
     mode: Mode,
@@ -78683,7 +78741,7 @@ fn __action1763<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1554(
+    __action1556(
         source_code,
         mode,
         __0,
@@ -78699,7 +78757,7 @@ fn __action1763<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1764<
+fn __action1766<
 >(
     source_code: &str,
     mode: Mode,
@@ -78722,7 +78780,7 @@ fn __action1764<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1555(
+    __action1557(
         source_code,
         mode,
         __0,
@@ -78739,7 +78797,7 @@ fn __action1764<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1765<
+fn __action1767<
 >(
     source_code: &str,
     mode: Mode,
@@ -78762,7 +78820,7 @@ fn __action1765<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1555(
+    __action1557(
         source_code,
         mode,
         __0,
@@ -78779,7 +78837,7 @@ fn __action1765<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1766<
+fn __action1768<
 >(
     source_code: &str,
     mode: Mode,
@@ -78799,7 +78857,7 @@ fn __action1766<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1556(
+    __action1558(
         source_code,
         mode,
         __0,
@@ -78813,7 +78871,7 @@ fn __action1766<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1767<
+fn __action1769<
 >(
     source_code: &str,
     mode: Mode,
@@ -78833,7 +78891,7 @@ fn __action1767<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1556(
+    __action1558(
         source_code,
         mode,
         __0,
@@ -78847,7 +78905,7 @@ fn __action1767<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1768<
+fn __action1770<
 >(
     source_code: &str,
     mode: Mode,
@@ -78868,7 +78926,7 @@ fn __action1768<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1557(
+    __action1559(
         source_code,
         mode,
         __0,
@@ -78883,7 +78941,7 @@ fn __action1768<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1769<
+fn __action1771<
 >(
     source_code: &str,
     mode: Mode,
@@ -78904,7 +78962,7 @@ fn __action1769<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1557(
+    __action1559(
         source_code,
         mode,
         __0,
@@ -78919,7 +78977,7 @@ fn __action1769<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1770<
+fn __action1772<
 >(
     source_code: &str,
     mode: Mode,
@@ -78938,7 +78996,7 @@ fn __action1770<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1502(
+    __action1504(
         source_code,
         mode,
         __0,
@@ -78951,7 +79009,7 @@ fn __action1770<
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
-fn __action1771<
+fn __action1773<
 >(
     source_code: &str,
     mode: Mode,
@@ -78970,7 +79028,7 @@ fn __action1771<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1502(
+    __action1504(
         source_code,
         mode,
         __0,
