@@ -276,7 +276,7 @@ impl<'a> ParsedModule<'a> {
             comment_ranges.visit_token(token, *range);
         }
         let comment_ranges = comment_ranges.finish();
-        let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
+        let module = parse_tokens(tokens, source, Mode::Module, ".").map_err(into_error)?;
 
         Ok(Self {
             source_code: source,

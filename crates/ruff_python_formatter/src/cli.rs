@@ -44,7 +44,7 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_type: &Path) -> Re
 
     // Parse the AST.
     let module =
-        parse_ok_tokens(tokens, Mode::Module, "<filename>").context("Syntax error in input")?;
+        parse_ok_tokens(tokens, source, Mode::Module, "<filename>").context("Syntax error in input")?;
 
     let options = PyFormatOptions::from_extension(source_type);
 
