@@ -301,38 +301,13 @@ pub(crate) fn parse_fstring_middle(
     source: &str,
     is_raw: bool,
     start_location: TextSize,
-) -> Result<Option<Expr>, LexicalError> {
-    // This is to account for the empty `FStringMiddle` token that is created
-    // to check for non-parenthesized lambda expressions. `FStringMiddle` token
-    // is created for anything which is not part of the f-string expression nor
-    // an opening or closing brace. With that in mind take following example:
-    //
-    // ```python
-    // f"{lambda x:{x}}"
-    // ```
-    //
-    // Here, when the lexer encounters the `:` token, we'll enter format spec
-    // mode which means to look out for `FStringMiddle` tokens until we end
-    // format spec mode. However, there's `{` right after the `:` token which
-    // means we exit format spec mode immediately and start lexing the expression
-    // and not emit any `FStringMiddle` tokens.
-    //
-    // This becomes a problem because lambda expression without parentheses aren't
-    // allowed in f-strings but here the lambda pattern matches and thus we would
-    // parse it as a lambda expression. To prevent this, we create an empty
-    // `FStringMiddle` token so that the parser will fail when it encounters it
-    // as it's not defined in the lambda expression grammar.
-    if source.is_empty() {
-        return Ok(None);
-    }
+) -> Result<Expr, LexicalError> {
     let kind = if is_raw {
         StringKind::RawString
     } else {
         StringKind::String
     };
-    StringParser::new(source, kind, start_location)
-        .parse_fstring_middle()
-        .map(Some)
+    StringParser::new(source, kind, start_location).parse_fstring_middle()
 }
 
 /// Concatenate a list of string literals into a single string expression.
@@ -523,13 +498,17 @@ pub enum FStringErrorType {
     UnterminatedString,
     /// Unterminated triple-quoted string.
     UnterminatedTripleQuotedString,
+    // TODO(dhruvmanila): The parser can't catch all cases of this error, but
+    // wherever it can, we'll display the correct error message.
+    /// A lambda expression without parentheses was encountered.
+    LambdaWithoutParentheses,
 }
 
 impl std::fmt::Display for FStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use FStringErrorType::{
-            InvalidConversionFlag, SingleRbrace, UnclosedLbrace, UnterminatedString,
-            UnterminatedTripleQuotedString,
+            InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
+            UnterminatedString, UnterminatedTripleQuotedString,
         };
         match self {
             UnclosedLbrace => write!(f, "expecting '}}'"),
@@ -537,6 +516,9 @@ impl std::fmt::Display for FStringErrorType {
             SingleRbrace => write!(f, "single '}}' is not allowed"),
             UnterminatedString => write!(f, "unterminated string"),
             UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
+            LambdaWithoutParentheses => {
+                write!(f, "lambda expressions are not allowed without parentheses")
+            }
         }
     }
 }
@@ -624,9 +606,17 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_fstring() {
-        use FStringErrorType::InvalidConversionFlag;
+        use FStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
 
         assert_eq!(parse_fstring_error(r#"f"{5!x}""#), InvalidConversionFlag);
+        assert_eq!(
+            parse_fstring_error("f'{lambda x:{x}}'"),
+            LambdaWithoutParentheses
+        );
+        assert_eq!(
+            parse_fstring_error("f'{lambda x: {x}}'"),
+            LambdaWithoutParentheses
+        );
         assert!(parse_suite(r#"f"{class}""#, "<test>").is_err());
     }
 
