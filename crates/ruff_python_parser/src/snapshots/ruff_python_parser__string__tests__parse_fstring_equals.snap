@@ -3,38 +3,51 @@ source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
 [
-    FormattedValue(
-        ExprFormattedValue {
-            range: 2..12,
-            value: Compare(
-                ExprCompare {
-                    range: 3..11,
-                    left: Constant(
-                        ExprConstant {
-                            range: 3..5,
-                            value: Int(
-                                42,
-                            ),
-                        },
-                    ),
-                    ops: [
-                        Eq,
-                    ],
-                    comparators: [
-                        Constant(
-                            ExprConstant {
-                                range: 9..11,
-                                value: Int(
-                                    42,
+    Expr(
+        StmtExpr {
+            range: 0..13,
+            value: FString(
+                ExprFString {
+                    range: 0..13,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 2..12,
+                                value: Compare(
+                                    ExprCompare {
+                                        range: 3..11,
+                                        left: Constant(
+                                            ExprConstant {
+                                                range: 3..5,
+                                                value: Int(
+                                                    42,
+                                                ),
+                                            },
+                                        ),
+                                        ops: [
+                                            Eq,
+                                        ],
+                                        comparators: [
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 9..11,
+                                                    value: Int(
+                                                        42,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
                                 ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
                             },
                         ),
                     ],
+                    implicit_concatenated: false,
                 },
             ),
-            debug_text: None,
-            conversion: None,
-            format_spec: None,
         },
     ),
 ]
