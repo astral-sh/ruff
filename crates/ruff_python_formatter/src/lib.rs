@@ -139,7 +139,7 @@ pub fn format_module(
     let comment_ranges = comment_ranges.finish();
 
     // Parse the AST.
-    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")?;
+    let python_ast = parse_tokens(tokens, contents, Mode::Module, "<filename>")?;
 
     let formatted = format_node(&python_ast, &comment_ranges, contents, options)?;
 
@@ -237,7 +237,7 @@ if True:
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let python_ast = parse_tokens(tokens, Mode::Module, source_path).unwrap();
+        let python_ast = parse_tokens(tokens, src, Mode::Module, source_path).unwrap();
         let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_node(&python_ast, &comment_ranges, src, options).unwrap();
 
