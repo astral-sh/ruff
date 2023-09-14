@@ -85,7 +85,7 @@
 //!    return bool(i & 1)
 //! "#;
 //! let tokens = lex(python_source, Mode::Module);
-//! let ast = parse_tokens(tokens, Mode::Module, "<embedded>");
+//! let ast = parse_tokens(tokens, python_source, Mode::Module, "<embedded>");
 //!
 //! assert!(ast.is_ok());
 //! ```
