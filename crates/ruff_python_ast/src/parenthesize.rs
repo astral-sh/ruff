@@ -1,4 +1,4 @@
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::node::AnyNodeRef;
@@ -34,15 +34,9 @@ pub fn parenthesized_range(
             .skip_trivia()
             .take_while(|token| token.kind == SimpleTokenKind::RParen);
 
-    let mut left_cursor = SimpleTokenizer::up_to_without_back_comment(expr.start(), source);
-    let left_tokenizer = std::iter::from_fn(move || {
-        let token = left_cursor.previous_token(comment_ranges);
-        if token.kind() == SimpleTokenKind::LParen {
-            Some(token.range())
-        } else {
-            None
-        }
-    });
+    let left_tokenizer = BackwardsTokenizer::up_to(expr.start(), source, comment_ranges)
+        .skip_trivia()
+        .take_while(|token| token.kind == SimpleTokenKind::LParen);
 
     // Zip closing parenthesis with opening parenthesis. The order is intentional, as testing for
     // closing parentheses is cheaper, and `zip` will avoid progressing the `left_tokenizer` if

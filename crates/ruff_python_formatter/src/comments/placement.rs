@@ -5,7 +5,8 @@ use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters};
 use ruff_python_index::CommentRanges;
 use ruff_python_trivia::{
-    find_only_token_in_range, indentation_at_offset, SimpleToken, SimpleTokenKind, SimpleTokenizer,
+    find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, SimpleToken,
+    SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange};
@@ -974,12 +975,13 @@ fn handle_slice_comments<'a>(
 
     // Check for `foo[ # comment`, but only if they are on the same line
     let after_lbracket = matches!(
-        SimpleTokenizer::up_to_without_back_comment(comment.start(), locator.contents())
-            .previous_token(comment_ranges),
-        SimpleToken {
+        BackwardsTokenizer::up_to(comment.start(), locator.contents(), comment_ranges)
+            .skip_trivia()
+            .next(),
+        Some(SimpleToken {
             kind: SimpleTokenKind::LBracket,
             ..
-        }
+        })
     );
     if comment.line_position().is_end_of_line() && after_lbracket {
         // Keep comments after the opening bracket there by formatting them outside the

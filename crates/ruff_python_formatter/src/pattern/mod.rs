@@ -2,7 +2,9 @@ use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatR
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::Pattern;
 use ruff_python_index::CommentRanges;
-use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{
+    first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
+};
 use ruff_text_size::Ranged;
 
 use crate::expression::parentheses::{
@@ -117,12 +119,13 @@ fn is_pattern_parenthesized(
         })
     ) {
         matches!(
-            SimpleTokenizer::up_to_without_back_comment(pattern.start(), contents)
-                .previous_token(comment_ranges),
-            SimpleToken {
+            BackwardsTokenizer::up_to(pattern.start(), contents, comment_ranges)
+                .skip_trivia()
+                .next(),
+            Some(SimpleToken {
                 kind: SimpleTokenKind::LParen,
                 ..
-            }
+            })
         )
     } else {
         false
