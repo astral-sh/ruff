@@ -988,3 +988,82 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     }
     checker.diagnostics.push(diagnostic);
 }
+
+/// SIM401
+// var = a_dict[key] if key in a_dict else "default3"
+pub(crate) fn if_expr_with_dict(
+    checker: &mut Checker,
+    expr: &Expr,
+    test: &Expr,
+    body: &Expr,
+    orelse: &Expr,
+) {
+    let Expr::Compare(ast::ExprCompare {
+        left: test_key,
+        ops,
+        comparators: test_dict,
+        range: _,
+    }) = test
+    else {
+        return;
+    };
+    let [test_dict] = test_dict.as_slice() else {
+        return;
+    };
+
+    if let [CmpOp::NotIn] = ops[..] {
+        return;
+    }
+
+    let Expr::Subscript(ast::ExprSubscript {
+        value: expected_subscript,
+        slice: expected_slice,
+        ..
+    }) = body
+    else {
+        return;
+    };
+
+    if !compare_expr(&expected_slice.into(), &test_key.into())
+        || !compare_expr(&test_dict.into(), &expected_subscript.into())
+    {
+        return;
+    }
+
+    let node = orelse.clone();
+    let node1 = *test_key.clone();
+    let node2 = ast::ExprAttribute {
+        value: expected_subscript.clone(),
+        attr: Identifier::new("get".to_string(), TextRange::default()),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    };
+    let node3 = ast::ExprCall {
+        func: Box::new(node2.into()),
+        arguments: Arguments {
+            args: vec![node1, node],
+            keywords: vec![],
+            range: TextRange::default(),
+        },
+        range: TextRange::default(),
+    };
+
+    let contents = checker.generator().expr(&node3.into());
+
+    let mut diagnostic = Diagnostic::new(
+        IfElseBlockInsteadOfDictGet {
+            contents: contents.clone(),
+        },
+        expr.range(),
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        if !checker.indexer().has_comments(expr, checker.locator()) {
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                contents,
+                expr.range(),
+            )));
+        }
+    }
+
+    checker.diagnostics.push(diagnostic);
+}

@@ -159,4 +159,19 @@ SIM401.py:45:5: SIM401 [*] Use `vars[idx] = a_dict.get(key, "default")` instead 
 50 47 | ###
 51 48 | # Negative cases
 
+SIM401.py:119:7: SIM401 [*] Use `a_dict.get(key, "default3")` instead of an `if` block
+    |
+118 | # SIM401 (pattern-3)
+119 | var = a_dict[key] if key in a_dict else "default3"
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM401
+    |
+    = help: Replace with `a_dict.get(key, "default3")`
+
+ℹ Suggested fix
+116 116 |     vars[idx] = "default"
+117 117 | 
+118 118 | # SIM401 (pattern-3)
+119     |-var = a_dict[key] if key in a_dict else "default3"
+    119 |+var = a_dict.get(key, "default3")
+
 

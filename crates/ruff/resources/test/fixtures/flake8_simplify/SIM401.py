@@ -114,3 +114,6 @@ elif key in a_dict:
     vars[idx] = a_dict[key]
 else:
     vars[idx] = "default"
+
+# SIM401 (pattern-3)
+var = a_dict[key] if key in a_dict else "default3"
