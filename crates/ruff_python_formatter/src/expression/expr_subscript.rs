@@ -4,7 +4,9 @@ use ruff_python_ast::{Expr, ExprSubscript};
 
 use crate::comments::SourceComment;
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{
+    is_expression_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+};
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
 
@@ -81,6 +83,8 @@ impl NeedsParentheses for ExprSubscript {
                 == CallChainLayout::Fluent
             {
                 OptionalParentheses::Multiline
+            } else if is_expression_parenthesized(self.value.as_ref().into(), context.source()) {
+                OptionalParentheses::Never
             } else {
                 match self.value.needs_parentheses(self.into(), context) {
                     OptionalParentheses::BestFit => OptionalParentheses::Never,
