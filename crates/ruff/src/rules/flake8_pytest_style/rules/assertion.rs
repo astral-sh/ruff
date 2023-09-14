@@ -4,7 +4,7 @@ use anyhow::Result;
 use anyhow::{bail, Context};
 use libcst_native::{
     self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizedNode, SimpleStatementLine,
-    SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace, UnaryOperation,
+    SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -21,7 +21,7 @@ use ruff_text_size::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
-use crate::cst::helpers::space;
+use crate::cst::helpers::negate;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::importer::ImportRequest;
@@ -565,23 +565,6 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
         _ => {}
     }
     CompositionKind::None
-}
-
-/// Negate a condition, i.e., `a` => `not a` and `not a` => `a`.
-fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
-    if let Expression::UnaryOperation(ref expression) = expression {
-        if matches!(expression.operator, libcst_native::UnaryOp::Not { .. }) {
-            return *expression.expression.clone();
-        }
-    }
-    Expression::UnaryOperation(Box::new(UnaryOperation {
-        operator: libcst_native::UnaryOp::Not {
-            whitespace_after: space(),
-        },
-        expression: Box::new(expression.clone()),
-        lpar: vec![],
-        rpar: vec![],
-    }))
 }
 
 /// Propagate parentheses from a parent to a child expression, if necessary.

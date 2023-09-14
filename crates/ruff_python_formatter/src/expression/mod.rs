@@ -19,6 +19,7 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 
+mod binary_like;
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
@@ -48,6 +49,7 @@ pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
 pub(crate) mod number;
+mod operator;
 pub(crate) mod parentheses;
 pub(crate) mod string;
 
@@ -383,14 +385,21 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
         // Only use the more complex IR when there is any expression that we can possibly split by
         false
     } else {
+        fn is_parenthesized(expr: &Expr, context: &PyFormatContext) -> bool {
+            // Don't break subscripts except in parenthesized context. It looks weird.
+            !matches!(expr, Expr::Subscript(_))
+                && has_parentheses(expr, context).is_some_and(OwnParentheses::is_non_empty)
+        }
+
         // Only use the layout if the first or last expression has parentheses of some sort, and
         // those parentheses are non-empty.
-        let first_parenthesized = visitor.first.is_some_and(|first| {
-            has_parentheses(first, context).is_some_and(|parentheses| parentheses.is_non_empty())
-        });
-        let last_parenthesized = visitor.last.is_some_and(|last| {
-            has_parentheses(last, context).is_some_and(|parentheses| parentheses.is_non_empty())
-        });
+        let first_parenthesized = visitor
+            .first
+            .is_some_and(|first| is_parenthesized(first, context));
+        let last_parenthesized = visitor
+            .last
+            .is_some_and(|last| is_parenthesized(last, context));
+
         first_parenthesized || last_parenthesized
     }
 }
@@ -500,6 +509,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the subscript is always parenthesized
                 self.visit_expr(value);
+                self.last = Some(expr);
                 // Don't walk the slice, because the slice is always parenthesized.
                 return;
             }
@@ -704,12 +714,18 @@ impl CallChainLayout {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, is_macro::Is)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum OwnParentheses {
     /// The node has parentheses, but they are empty (e.g., `[]` or `f()`).
     Empty,
     /// The node has parentheses, and they are non-empty (e.g., `[1]` or `f(1)`).
     NonEmpty,
+}
+
+impl OwnParentheses {
+    const fn is_non_empty(self) -> bool {
+        matches!(self, OwnParentheses::NonEmpty)
+    }
 }
 
 /// Returns the [`OwnParentheses`] value for a given [`Expr`], to indicate whether it has its
@@ -784,7 +800,7 @@ pub(crate) fn has_own_parentheses(
 }
 
 /// The precedence of [python operators](https://docs.python.org/3/reference/expressions.html#operator-precedence) from
-/// lowest to highest priority.
+/// highest to lowest priority.
 ///
 /// Ruff uses the operator precedence to decide in which order to split operators:
 /// Operators with a lower precedence split before higher-precedence operators.

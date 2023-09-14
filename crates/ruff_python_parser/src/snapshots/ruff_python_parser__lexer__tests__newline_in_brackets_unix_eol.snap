@@ -1,0 +1,142 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: newline_in_brackets_eol(UNIX_EOL)
+---
+[
+    (
+        Name {
+            name: "x",
+        },
+        0..1,
+    ),
+    (
+        Equal,
+        2..3,
+    ),
+    (
+        Lsqb,
+        4..5,
+    ),
+    (
+        NonLogicalNewline,
+        5..6,
+    ),
+    (
+        NonLogicalNewline,
+        6..7,
+    ),
+    (
+        Int {
+            value: 1,
+        },
+        11..12,
+    ),
+    (
+        Comma,
+        12..13,
+    ),
+    (
+        Int {
+            value: 2,
+        },
+        13..14,
+    ),
+    (
+        NonLogicalNewline,
+        14..15,
+    ),
+    (
+        Comma,
+        15..16,
+    ),
+    (
+        Lpar,
+        16..17,
+    ),
+    (
+        Int {
+            value: 3,
+        },
+        17..18,
+    ),
+    (
+        Comma,
+        18..19,
+    ),
+    (
+        NonLogicalNewline,
+        19..20,
+    ),
+    (
+        Int {
+            value: 4,
+        },
+        20..21,
+    ),
+    (
+        Comma,
+        21..22,
+    ),
+    (
+        NonLogicalNewline,
+        22..23,
+    ),
+    (
+        Rpar,
+        23..24,
+    ),
+    (
+        Comma,
+        24..25,
+    ),
+    (
+        Lbrace,
+        26..27,
+    ),
+    (
+        NonLogicalNewline,
+        27..28,
+    ),
+    (
+        Int {
+            value: 5,
+        },
+        28..29,
+    ),
+    (
+        Comma,
+        29..30,
+    ),
+    (
+        NonLogicalNewline,
+        30..31,
+    ),
+    (
+        Int {
+            value: 6,
+        },
+        31..32,
+    ),
+    (
+        Comma,
+        32..33,
+    ),
+    (
+        Int {
+            value: 7,
+        },
+        35..36,
+    ),
+    (
+        Rbrace,
+        36..37,
+    ),
+    (
+        Rsqb,
+        37..38,
+    ),
+    (
+        Newline,
+        38..39,
+    ),
+]

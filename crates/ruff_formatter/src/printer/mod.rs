@@ -367,7 +367,7 @@ impl<'a> Printer<'a> {
         if !self.state.pending_indent.is_empty() {
             let (indent_char, repeat_count) = match self.options.indent_style() {
                 IndentStyle::Tab => ('\t', 1),
-                IndentStyle::Space(count) => (' ', count),
+                IndentStyle::Space => (' ', self.options.indent_width()),
             };
 
             let indent = std::mem::take(&mut self.state.pending_indent);
@@ -764,7 +764,7 @@ impl<'a> Printer<'a> {
 
             #[allow(clippy::cast_possible_truncation)]
             let char_width = if char == '\t' {
-                self.options.tab_width.value()
+                self.options.indent_width.value()
             } else {
                 // SAFETY: A u32 is sufficient to represent the width of a file <= 4GB
                 char.width().unwrap_or(0) as u32
@@ -1347,7 +1347,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 } else {
                     for c in text.chars() {
                         let char_width = match c {
-                            '\t' => self.options().tab_width.value(),
+                            '\t' => self.options().indent_width.value(),
                             '\n' => {
                                 if self.must_be_flat {
                                     return Fits::No;
@@ -1501,7 +1501,7 @@ mod tests {
     use crate::printer::{LineEnding, Printer, PrinterOptions};
     use crate::source_code::SourceCode;
     use crate::{
-        format_args, write, Document, FormatState, IndentStyle, LineWidth, Printed, TabWidth,
+        format_args, write, Document, FormatState, IndentStyle, IndentWidth, LineWidth, Printed,
         VecBuffer,
     };
 
@@ -1509,7 +1509,7 @@ mod tests {
         format_with_options(
             root,
             PrinterOptions {
-                indent_style: IndentStyle::Space(2),
+                indent_style: IndentStyle::Space,
                 ..PrinterOptions::default()
             },
         )
@@ -1653,7 +1653,7 @@ two lines`,
     fn it_use_the_indent_character_specified_in_the_options() {
         let options = PrinterOptions {
             indent_style: IndentStyle::Tab,
-            tab_width: TabWidth::try_from(4).unwrap(),
+            indent_width: IndentWidth::try_from(4).unwrap(),
             line_width: LineWidth::try_from(19).unwrap(),
             ..PrinterOptions::default()
         };

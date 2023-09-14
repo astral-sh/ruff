@@ -1240,16 +1240,26 @@ pub struct Flake8SelfOptions {
     )]
     /// A list of names to ignore when considering `flake8-self` violations.
     pub ignore_names: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"extend-ignore-names = ["_base_manager", "_default_manager",  "_meta"]"#
+    )]
+    /// Additional names to ignore when considering `flake8-self` violations,
+    /// in addition to those included in `ignore-names`.
+    pub extend_ignore_names: Option<Vec<String>>,
 }
 
 impl Flake8SelfOptions {
     pub fn into_settings(self) -> flake8_self::settings::Settings {
+        let defaults = flake8_self::settings::Settings::default();
         flake8_self::settings::Settings {
-            ignore_names: self.ignore_names.unwrap_or_else(|| {
-                flake8_self::settings::IGNORE_NAMES
-                    .map(String::from)
-                    .to_vec()
-            }),
+            ignore_names: self
+                .ignore_names
+                .unwrap_or(defaults.ignore_names)
+                .into_iter()
+                .chain(self.extend_ignore_names.unwrap_or_default())
+                .collect(),
         }
     }
 }
@@ -2145,6 +2155,13 @@ pub struct PylintOptions {
     /// Maximum number of statements allowed for a function or method body (see:
     /// `PLR0915`).
     pub max_statements: Option<usize>,
+    #[option(
+        default = r"20",
+        value_type = "int",
+        example = r"max-public-methods = 20"
+    )]
+    /// Maximum number of public methods allowed for a class (see: `PLR0904`).
+    pub max_public_methods: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2158,6 +2175,9 @@ impl PylintOptions {
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
+            max_public_methods: self
+                .max_public_methods
+                .unwrap_or(defaults.max_public_methods),
         }
     }
 }
@@ -2214,5 +2234,58 @@ impl PyUpgradeOptions {
         pyupgrade::settings::Settings {
             keep_runtime_typing: self.keep_runtime_typing.unwrap_or_default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::options::Flake8SelfOptions;
+    use ruff::rules::flake8_self;
+
+    #[test]
+    fn flake8_self_options() {
+        let default_settings = flake8_self::settings::Settings::default();
+
+        // Uses defaults if no options are specified.
+        let options = Flake8SelfOptions {
+            ignore_names: None,
+            extend_ignore_names: None,
+        };
+        let settings = options.into_settings();
+        assert_eq!(settings.ignore_names, default_settings.ignore_names);
+
+        // Uses ignore_names if specified.
+        let options = Flake8SelfOptions {
+            ignore_names: Some(vec!["_foo".to_string()]),
+            extend_ignore_names: None,
+        };
+        let settings = options.into_settings();
+        assert_eq!(settings.ignore_names, vec!["_foo".to_string()]);
+
+        // Appends extend_ignore_names to defaults if only extend_ignore_names is specified.
+        let options = Flake8SelfOptions {
+            ignore_names: None,
+            extend_ignore_names: Some(vec!["_bar".to_string()]),
+        };
+        let settings = options.into_settings();
+        assert_eq!(
+            settings.ignore_names,
+            default_settings
+                .ignore_names
+                .into_iter()
+                .chain(["_bar".to_string()])
+                .collect::<Vec<String>>()
+        );
+
+        // Appends extend_ignore_names to ignore_names if both are specified.
+        let options = Flake8SelfOptions {
+            ignore_names: Some(vec!["_foo".to_string()]),
+            extend_ignore_names: Some(vec!["_bar".to_string()]),
+        };
+        let settings = options.into_settings();
+        assert_eq!(
+            settings.ignore_names,
+            vec!["_foo".to_string(), "_bar".to_string()]
+        );
     }
 }

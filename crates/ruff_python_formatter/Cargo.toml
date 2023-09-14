@@ -23,13 +23,13 @@ anyhow = { workspace = true }
 bitflags = { workspace = true }
 clap = { workspace = true }
 countme = "3.0.1"
-is-macro = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 unicode-width = { workspace = true }

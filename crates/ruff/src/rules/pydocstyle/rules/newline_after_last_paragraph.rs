@@ -63,6 +63,10 @@ pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Do
     let contents = docstring.contents;
     let body = docstring.body();
 
+    if !docstring.triple_quoted() {
+        return;
+    }
+
     let mut line_count = 0;
     for line in NewlineWithTrailingNewline::from(body.as_str()) {
         if !line.trim().is_empty() {

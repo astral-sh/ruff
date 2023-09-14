@@ -69,9 +69,12 @@ pub fn format_and_debug_print(input: &str, cli: &Cli, source_type: &Path) -> Res
         // Print preceding, following and enclosing nodes
         let source_code = SourceCode::new(input);
         let decorated_comments = collect_comments(&python_ast, source_code, &comment_ranges);
+        if !decorated_comments.is_empty() {
+            println!("# Comment decoration: Range, Preceding, Following, Enclosing, Comment");
+        }
         for comment in decorated_comments {
             println!(
-                "{:?} {:?} {:?} {:?} {:?}",
+                "{:?}, {:?}, {:?}, {:?}, {:?}",
                 comment.slice().range(),
                 comment
                     .preceding_node()

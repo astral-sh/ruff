@@ -74,6 +74,8 @@ from typing import Collection
 from typing import AsyncGenerator
 from typing import Reversible
 from typing import Generator
+from typing import Callable
+from typing import cast
 
 # OK
 from a import b

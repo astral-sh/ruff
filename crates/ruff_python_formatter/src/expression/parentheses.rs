@@ -47,7 +47,7 @@ where
     text_len > 5
         && text_len
             <= context.options().line_width().value() as usize
-                - context.options().indent_width() as usize
+                - context.options().indent_width().value() as usize
 }
 
 pub(crate) trait NeedsParentheses {
@@ -314,23 +314,41 @@ pub(crate) struct FormatInParenthesesOnlyGroup<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        match f.context().node_level() {
-            NodeLevel::Expression(Some(parentheses_id)) => {
-                // If this content is enclosed by a group that adds the optional parentheses, then *disable*
-                // this group *except* if the optional parentheses are shown.
-                conditional_group(
-                    &Arguments::from(&self.content),
-                    Condition::if_group_breaks(parentheses_id),
-                )
-                .fmt(f)
-            }
-            NodeLevel::ParenthesizedExpression => {
-                // Unconditionally group the content if it is not enclosed by an optional parentheses group.
-                group(&Arguments::from(&self.content)).fmt(f)
-            }
-            NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
-                Arguments::from(&self.content).fmt(f)
-            }
+        write_in_parentheses_only_group_start_tag(f);
+        Arguments::from(&self.content).fmt(f)?;
+        write_in_parentheses_only_group_end_tag(f);
+        Ok(())
+    }
+}
+
+pub(super) fn write_in_parentheses_only_group_start_tag(f: &mut PyFormatter) {
+    match f.context().node_level() {
+        NodeLevel::Expression(Some(parentheses_id)) => {
+            f.write_element(FormatElement::Tag(tag::Tag::StartConditionalGroup(
+                tag::ConditionalGroup::new(Condition::if_group_breaks(parentheses_id)),
+            )));
+        }
+        NodeLevel::ParenthesizedExpression => {
+            // Unconditionally group the content if it is not enclosed by an optional parentheses group.
+            f.write_element(FormatElement::Tag(tag::Tag::StartGroup(tag::Group::new())));
+        }
+        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+            // No group
+        }
+    }
+}
+
+pub(super) fn write_in_parentheses_only_group_end_tag(f: &mut PyFormatter) {
+    match f.context().node_level() {
+        NodeLevel::Expression(Some(_)) => {
+            f.write_element(FormatElement::Tag(tag::Tag::EndConditionalGroup));
+        }
+        NodeLevel::ParenthesizedExpression => {
+            // Unconditionally group the content if it is not enclosed by an optional parentheses group.
+            f.write_element(FormatElement::Tag(tag::Tag::EndGroup));
+        }
+        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+            // No group
         }
     }
 }

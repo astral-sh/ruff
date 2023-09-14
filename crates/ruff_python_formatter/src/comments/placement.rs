@@ -38,7 +38,7 @@ pub(super) fn place_comment<'a>(
 /// ):
 ///     ...
 /// ```
-/// The parentheses enclose `True`, but the range of `True`doesn't include the `# comment`.
+/// The parentheses enclose `True`, but the range of `True` doesn't include the `# comment`.
 ///
 /// Default handling can get parenthesized comments wrong in a number of ways. For example, the
 /// comment here is marked (by default) as a trailing comment of `x`, when it should be a leading
@@ -120,10 +120,8 @@ fn handle_parenthesized_comment<'a>(
     // For now, we _can_ assert, but to do so, we stop lexing when we hit a token that precedes an
     // identifier.
     if comment.line_position().is_end_of_line() {
-        let tokenizer = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(preceding.end(), comment.start()),
-        );
+        let range = TextRange::new(preceding.end(), comment.start());
+        let tokenizer = SimpleTokenizer::new(locator.contents(), range);
         if tokenizer
             .skip_trivia()
             .take_while(|token| {
@@ -136,7 +134,7 @@ fn handle_parenthesized_comment<'a>(
                 debug_assert!(
                     !matches!(token.kind, SimpleTokenKind::Bogus),
                     "Unexpected token between nodes: `{:?}`",
-                    locator.slice(TextRange::new(preceding.end(), comment.start()),)
+                    locator.slice(range)
                 );
 
                 token.kind() == SimpleTokenKind::LParen
@@ -145,10 +143,8 @@ fn handle_parenthesized_comment<'a>(
             return CommentPlacement::leading(following, comment);
         }
     } else {
-        let tokenizer = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(comment.end(), following.start()),
-        );
+        let range = TextRange::new(comment.end(), following.start());
+        let tokenizer = SimpleTokenizer::new(locator.contents(), range);
         if tokenizer
             .skip_trivia()
             .take_while(|token| {
@@ -161,7 +157,7 @@ fn handle_parenthesized_comment<'a>(
                 debug_assert!(
                     !matches!(token.kind, SimpleTokenKind::Bogus),
                     "Unexpected token between nodes: `{:?}`",
-                    locator.slice(TextRange::new(comment.end(), following.start()))
+                    locator.slice(range)
                 );
                 token.kind() == SimpleTokenKind::RParen
             })
@@ -204,6 +200,9 @@ fn handle_enclosed_comment<'a>(
                 binary_expression,
                 locator,
             )
+        }
+        AnyNodeRef::ExprBoolOp(_) | AnyNodeRef::ExprCompare(_) => {
+            handle_trailing_binary_like_comment(comment, locator)
         }
         AnyNodeRef::Keyword(keyword) => handle_keyword_comment(comment, keyword, locator),
         AnyNodeRef::PatternKeyword(pattern_keyword) => {
@@ -832,6 +831,47 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
         //      3
         // )
         // ```
+        CommentPlacement::Default(comment)
+    }
+}
+
+/// Attaches comments between two bool or compare expression operands to the preceding operand if the comment is before the operator.
+///
+/// ```python
+/// a = (
+///     5 > 3
+///     # trailing comment
+///     and 3 == 3
+/// )
+/// ```
+fn handle_trailing_binary_like_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    debug_assert!(
+        comment.enclosing_node().is_expr_bool_op() || comment.enclosing_node().is_expr_compare()
+    );
+
+    // Only if there's a preceding node (in which case, the preceding node is `left` or middle node).
+    let (Some(left_operand), Some(right_operand)) =
+        (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let between_operands_range = TextRange::new(left_operand.end(), right_operand.start());
+
+    let mut tokens = SimpleTokenizer::new(locator.contents(), between_operands_range)
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+    let operator_offset = tokens
+        .next()
+        .expect("Expected a token for the operator")
+        .start();
+
+    if comment.end() < operator_offset {
+        CommentPlacement::trailing(left_operand, comment)
+    } else {
         CommentPlacement::Default(comment)
     }
 }

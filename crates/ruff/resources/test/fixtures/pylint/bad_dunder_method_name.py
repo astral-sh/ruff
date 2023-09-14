@@ -1,3 +1,6 @@
+from typing import override
+
+
 class Apples:
     def _init_(self):  # [bad-dunder-name]
         pass
@@ -19,6 +22,11 @@ class Apples:
 
     def __inv__(self):  # [bad-dunder-name]
         # author likely meant to call the invert dunder method
+        pass
+
+    @override
+    def _ignore__(self):  # [bad-dunder-name]
+        # overridden dunder methods should be ignored
         pass
 
     def hello(self):

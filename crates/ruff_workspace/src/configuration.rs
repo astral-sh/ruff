@@ -27,7 +27,7 @@ use ruff::settings::types::{
     Version,
 };
 use ruff::settings::{defaults, resolve_per_file_ignores, AllSettings, CliSettings, Settings};
-use ruff::{fs, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION};
+use ruff::{fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION};
 use ruff_cache::cache_dir;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
@@ -440,13 +440,16 @@ impl Configuration {
     }
 
     pub fn as_rule_table(&self) -> RuleTable {
+        let preview = self.preview.unwrap_or_default();
+
         // The select_set keeps track of which rules have been selected.
-        let mut select_set: RuleSet = defaults::PREFIXES.iter().flatten().collect();
-        // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All
-            .into_iter()
-            .chain(&RuleSelector::Nursery)
+        let mut select_set: RuleSet = defaults::PREFIXES
+            .iter()
+            .flat_map(|selector| selector.rules(preview))
             .collect();
+
+        // The fixable set keeps track of which rules are fixable.
+        let mut fixable_set: RuleSet = RuleSelector::All.rules(preview).collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
@@ -457,7 +460,10 @@ impl Configuration {
         let mut carryover_ignores: Option<&[RuleSelector]> = None;
         let mut carryover_unfixables: Option<&[RuleSelector]> = None;
 
+        // Store selectors for displaying warnings
         let mut redirects = FxHashMap::default();
+        let mut deprecated_nursery_selectors = FxHashSet::default();
+        let mut ignored_preview_selectors = FxHashSet::default();
 
         for selection in &self.rule_selections {
             // If a selection only specifies extend-select we cannot directly
@@ -482,7 +488,7 @@ impl Configuration {
                     .chain(selection.extend_select.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector {
+                    for rule in selector.rules(preview) {
                         select_map_updates.insert(rule, true);
                     }
                 }
@@ -492,7 +498,7 @@ impl Configuration {
                     .chain(carriedover_ignores.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector {
+                    for rule in selector.rules(preview) {
                         select_map_updates.insert(rule, false);
                     }
                 }
@@ -504,7 +510,7 @@ impl Configuration {
                     .chain(selection.extend_fixable.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector {
+                    for rule in selector.rules(preview) {
                         fixable_map_updates.insert(rule, true);
                     }
                 }
@@ -514,7 +520,7 @@ impl Configuration {
                     .chain(carriedover_unfixables.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector {
+                    for rule in selector.rules(preview) {
                         fixable_map_updates.insert(rule, false);
                     }
                 }
@@ -568,8 +574,7 @@ impl Configuration {
                 }
             }
 
-            // We insert redirects into the hashmap so that we
-            // can warn the users about remapped rule codes.
+            // Check for selections that require a warning
             for selector in selection
                 .select
                 .iter()
@@ -580,6 +585,30 @@ impl Configuration {
                 .chain(selection.unfixable.iter())
                 .chain(selection.extend_fixable.iter())
             {
+                #[allow(deprecated)]
+                if matches!(selector, RuleSelector::Nursery) {
+                    let suggestion = if preview.is_disabled() {
+                        " Use the `--preview` flag instead."
+                    } else {
+                        // We have no suggested alternative since there is intentionally no "PREVIEW" selector
+                        ""
+                    };
+                    warn_user_once!("The `NURSERY` selector has been deprecated.{suggestion}");
+                }
+
+                if preview.is_disabled() {
+                    if let RuleSelector::Rule { prefix, .. } = selector {
+                        if prefix.rules().any(|rule| rule.is_nursery()) {
+                            deprecated_nursery_selectors.insert(selector);
+                        }
+                    }
+
+                    // Check if the selector is empty because preview mode is disabled
+                    if selector.rules(PreviewMode::Disabled).next().is_none() {
+                        ignored_preview_selectors.insert(selector);
+                    }
+                }
+
                 if let RuleSelector::Prefix {
                     prefix,
                     redirected_from: Some(redirect_from),
@@ -597,6 +626,18 @@ impl Configuration {
                 "`{from}` has been remapped to `{}{}`.",
                 target.linter().common_prefix(),
                 target.short_code()
+            );
+        }
+
+        for selection in deprecated_nursery_selectors {
+            let (prefix, code) = selection.prefix_and_code();
+            warn_user!("Selection of nursery rule `{prefix}{code}` without the `--preview` flag is deprecated.",);
+        }
+
+        for selection in ignored_preview_selectors {
+            let (prefix, code) = selection.prefix_and_code();
+            warn_user!(
+                "Selection `{prefix}{code}` has no effect because the `--preview` flag was not included.",
             );
         }
 
@@ -761,26 +802,124 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 #[cfg(test)]
 mod tests {
     use crate::configuration::{Configuration, RuleSelection};
-    use ruff::codes::Pycodestyle;
-    use ruff::registry::{Rule, RuleSet};
+    use ruff::codes::{Flake8Copyright, Pycodestyle, Refurb};
+    use ruff::registry::{Linter, Rule, RuleSet};
+    use ruff::settings::types::PreviewMode;
+    use ruff::RuleSelector;
+
+    const NURSERY_RULES: &[Rule] = &[
+        Rule::MissingCopyrightNotice,
+        Rule::IndentationWithInvalidMultiple,
+        Rule::NoIndentedBlock,
+        Rule::UnexpectedIndentation,
+        Rule::IndentationWithInvalidMultipleComment,
+        Rule::NoIndentedBlockComment,
+        Rule::UnexpectedIndentationComment,
+        Rule::OverIndented,
+        Rule::WhitespaceAfterOpenBracket,
+        Rule::WhitespaceBeforeCloseBracket,
+        Rule::WhitespaceBeforePunctuation,
+        Rule::WhitespaceBeforeParameters,
+        Rule::MultipleSpacesBeforeOperator,
+        Rule::MultipleSpacesAfterOperator,
+        Rule::TabBeforeOperator,
+        Rule::TabAfterOperator,
+        Rule::MissingWhitespaceAroundOperator,
+        Rule::MissingWhitespaceAroundArithmeticOperator,
+        Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
+        Rule::MissingWhitespaceAroundModuloOperator,
+        Rule::MissingWhitespace,
+        Rule::MultipleSpacesAfterComma,
+        Rule::TabAfterComma,
+        Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+        Rule::MissingWhitespaceAroundParameterEquals,
+        Rule::TooFewSpacesBeforeInlineComment,
+        Rule::NoSpaceAfterInlineComment,
+        Rule::NoSpaceAfterBlockComment,
+        Rule::MultipleLeadingHashesForBlockComment,
+        Rule::MultipleSpacesAfterKeyword,
+        Rule::MultipleSpacesBeforeKeyword,
+        Rule::TabAfterKeyword,
+        Rule::TabBeforeKeyword,
+        Rule::MissingWhitespaceAfterKeyword,
+        Rule::CompareToEmptyString,
+        Rule::NoSelfUse,
+        Rule::EqWithoutHash,
+        Rule::BadDunderMethodName,
+        Rule::RepeatedAppend,
+        Rule::DeleteFullSlice,
+        Rule::CheckAndRemoveFromSet,
+        Rule::QuadraticListSummation,
+    ];
+
+    const PREVIEW_RULES: &[Rule] = &[Rule::TooManyPublicMethods, Rule::SliceCopy];
 
     #[allow(clippy::needless_pass_by_value)]
-    fn resolve_rules(selections: impl IntoIterator<Item = RuleSelection>) -> RuleSet {
+    fn resolve_rules(
+        selections: impl IntoIterator<Item = RuleSelection>,
+        preview: Option<PreviewMode>,
+    ) -> RuleSet {
         Configuration {
             rule_selections: selections.into_iter().collect(),
+            preview,
             ..Configuration::default()
         }
         .as_rule_table()
         .iter_enabled()
+        // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is off-by-default
+        .filter(|rule| rule.noqa_code() != "RUF014")
         .collect()
     }
 
     #[test]
-    fn rule_codes() {
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W.into()]),
-            ..RuleSelection::default()
-        }]);
+    fn select_linter() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Linter::Pycodestyle.into()]),
+                ..RuleSelection::default()
+            }],
+            None,
+        );
+
+        let expected = RuleSet::from_rules(&[
+            Rule::MixedSpacesAndTabs,
+            Rule::MultipleImportsOnOneLine,
+            Rule::ModuleImportNotAtTopOfFile,
+            Rule::LineTooLong,
+            Rule::MultipleStatementsOnOneLineColon,
+            Rule::MultipleStatementsOnOneLineSemicolon,
+            Rule::UselessSemicolon,
+            Rule::NoneComparison,
+            Rule::TrueFalseComparison,
+            Rule::NotInTest,
+            Rule::NotIsTest,
+            Rule::TypeComparison,
+            Rule::BareExcept,
+            Rule::LambdaAssignment,
+            Rule::AmbiguousVariableName,
+            Rule::AmbiguousClassName,
+            Rule::AmbiguousFunctionName,
+            Rule::IOError,
+            Rule::SyntaxError,
+            Rule::TabIndentation,
+            Rule::TrailingWhitespace,
+            Rule::MissingNewlineAtEndOfFile,
+            Rule::BlankLineWithWhitespace,
+            Rule::DocLineTooLong,
+            Rule::InvalidEscapeSequence,
+        ]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_one_char_prefix() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W.into()]),
+                ..RuleSelection::default()
+            }],
+            None,
+        );
 
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
@@ -791,19 +930,31 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+    }
 
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W6.into()]),
-            ..RuleSelection::default()
-        }]);
+    #[test]
+    fn select_two_char_prefix() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W6.into()]),
+                ..RuleSelection::default()
+            }],
+            None,
+        );
         let expected = RuleSet::from_rule(Rule::InvalidEscapeSequence);
         assert_eq!(actual, expected);
+    }
 
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W.into()]),
-            ignore: vec![Pycodestyle::W292.into()],
-            ..RuleSelection::default()
-        }]);
+    #[test]
+    fn select_prefix_ignore_code() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W.into()]),
+                ignore: vec![Pycodestyle::W292.into()],
+                ..RuleSelection::default()
+            }],
+            None,
+        );
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
@@ -812,73 +963,100 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+    }
 
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W292.into()]),
-            ignore: vec![Pycodestyle::W.into()],
-            ..RuleSelection::default()
-        }]);
-        let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W605.into()]),
-            ignore: vec![Pycodestyle::W605.into()],
-            ..RuleSelection::default()
-        }]);
-        let expected = RuleSet::empty();
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                extend_select: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-        ]);
-        let expected = RuleSet::from_rules(&[
-            Rule::TrailingWhitespace,
-            Rule::MissingNewlineAtEndOfFile,
-            Rule::BlankLineWithWhitespace,
-            Rule::DocLineTooLong,
-            Rule::InvalidEscapeSequence,
-            Rule::TabIndentation,
-        ]);
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                extend_select: vec![Pycodestyle::W292.into()],
+    #[test]
+    fn select_code_ignore_prefix() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W292.into()]),
                 ignore: vec![Pycodestyle::W.into()],
                 ..RuleSelection::default()
-            },
-        ]);
+            }],
+            None,
+        );
         let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
         assert_eq!(actual, expected);
     }
 
     #[test]
-    fn carry_over_ignore() {
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![]),
-                ignore: vec![Pycodestyle::W292.into()],
+    fn select_code_ignore_code() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Pycodestyle::W605.into()]),
+                ignore: vec![Pycodestyle::W605.into()],
                 ..RuleSelection::default()
-            },
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ..RuleSelection::default()
-            },
+            }],
+            None,
+        );
+        let expected = RuleSet::empty();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_prefix_ignore_code_then_extend_select_code() {
+        let actual = resolve_rules(
+            [
+                RuleSelection {
+                    select: Some(vec![Pycodestyle::W.into()]),
+                    ignore: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    extend_select: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+            ],
+            None,
+        );
+        let expected = RuleSet::from_rules(&[
+            Rule::TrailingWhitespace,
+            Rule::MissingNewlineAtEndOfFile,
+            Rule::BlankLineWithWhitespace,
+            Rule::DocLineTooLong,
+            Rule::InvalidEscapeSequence,
+            Rule::TabIndentation,
         ]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_prefix_ignore_code_then_extend_select_code_ignore_prefix() {
+        let actual = resolve_rules(
+            [
+                RuleSelection {
+                    select: Some(vec![Pycodestyle::W.into()]),
+                    ignore: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    extend_select: vec![Pycodestyle::W292.into()],
+                    ignore: vec![Pycodestyle::W.into()],
+                    ..RuleSelection::default()
+                },
+            ],
+            None,
+        );
+        let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn ignore_code_then_select_prefix() {
+        let actual = resolve_rules(
+            [
+                RuleSelection {
+                    select: Some(vec![]),
+                    ignore: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    select: Some(vec![Pycodestyle::W.into()]),
+                    ..RuleSelection::default()
+                },
+            ],
+            None,
+        );
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
@@ -887,25 +1065,172 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+    }
 
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W505.into()],
-                ..RuleSelection::default()
-            },
-        ]);
+    #[test]
+    fn ignore_code_then_select_prefix_ignore_code() {
+        let actual = resolve_rules(
+            [
+                RuleSelection {
+                    select: Some(vec![]),
+                    ignore: vec![Pycodestyle::W292.into()],
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    select: Some(vec![Pycodestyle::W.into()]),
+                    ignore: vec![Pycodestyle::W505.into()],
+                    ..RuleSelection::default()
+                },
+            ],
+            None,
+        );
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
             Rule::InvalidEscapeSequence,
             Rule::TabIndentation,
         ]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_all_preview() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::All]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        assert!(!actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::All]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        assert!(actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
+    }
+
+    #[test]
+    fn select_linter_preview() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Linter::Flake8Copyright.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::empty();
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Linter::Flake8Copyright.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_prefix_preview() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Flake8Copyright::_0.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::empty();
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Flake8Copyright::_0.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_rule_preview() {
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Refurb::_145.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::empty();
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Refurb::_145.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rule(Rule::SliceCopy);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn nursery_select_code() {
+        // Backwards compatible behavior allows selection of nursery rules with their exact code
+        // when preview is disabled
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Flake8Copyright::_001.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Flake8Copyright::_001.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn select_nursery() {
+        // Backwards compatible behavior allows selection of nursery rules with the nursery selector
+        // when preview is disabled
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::Nursery]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Disabled),
+        );
+        let expected = RuleSet::from_rules(NURSERY_RULES);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![RuleSelector::Nursery]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewMode::Enabled),
+        );
+        let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
     }
 }

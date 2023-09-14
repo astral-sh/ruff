@@ -1,17 +1,16 @@
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
-use ruff::line_width::LineLength;
 use rustc_hash::FxHashMap;
 
+use ruff::line_width::LineLength;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
 };
-use ruff::RuleSelector;
+use ruff::{RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::resolver::ConfigProcessor;
 
@@ -116,7 +115,7 @@ pub struct CheckCommand {
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
     /// Enable preview mode; checks will include unstable rules and fixes.
-    #[arg(long, overrides_with("no_preview"), hide = true)]
+    #[arg(long, overrides_with("no_preview"))]
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
@@ -129,7 +128,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -139,7 +138,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -149,7 +148,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -159,7 +158,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
@@ -191,7 +190,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -201,7 +200,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -211,7 +210,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -221,7 +220,7 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = parse_rule_selector,
+        value_parser = RuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
@@ -368,6 +367,12 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
+
+    /// Enable preview mode; checks will include unstable rules and fixes.
+    #[arg(long, overrides_with("no_preview"), hide = true)]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -496,17 +501,13 @@ impl FormatCommand {
                     self.respect_gitignore,
                     self.no_respect_gitignore,
                 ),
+                preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..Overrides::default()
             },
         )
     }
-}
-
-fn parse_rule_selector(env: &str) -> Result<RuleSelector, std::io::Error> {
-    RuleSelector::from_str(env)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))
 }
 
 fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {

@@ -43,6 +43,11 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             write!(f, [dangling_comments(dangling)])?;
         }
 
+        // Insert hard line break if body has leading comment to ensure consistent formatting
+        if comments.has_leading(body.as_ref()) {
+            write!(f, [hard_line_break()])?;
+        }
+
         write!(f, [body.format()])
     }
 

@@ -1,5 +1,5 @@
 use ruff_formatter::printer::{LineEnding, PrinterOptions, SourceMapGeneration};
-use ruff_formatter::{FormatOptions, IndentStyle, LineWidth, TabWidth};
+use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_python_ast::PySourceType;
 use std::path::Path;
 use std::str::FromStr;
@@ -25,8 +25,8 @@ pub struct PyFormatOptions {
     line_width: LineWidth,
 
     /// The visual width of a tab character.
-    #[cfg_attr(feature = "serde", serde(default = "default_tab_width"))]
-    tab_width: TabWidth,
+    #[cfg_attr(feature = "serde", serde(default = "default_indent_width"))]
+    indent_width: IndentWidth,
 
     line_ending: LineEnding,
 
@@ -39,6 +39,9 @@ pub struct PyFormatOptions {
     /// Should the formatter generate a source map that allows mapping source positions to positions
     /// in the formatted document.
     source_map_generation: SourceMapGeneration,
+
+    /// Whether preview style formatting is enabled or not
+    preview: PreviewMode,
 }
 
 fn default_line_width() -> LineWidth {
@@ -46,11 +49,11 @@ fn default_line_width() -> LineWidth {
 }
 
 fn default_indent_style() -> IndentStyle {
-    IndentStyle::Space(4)
+    IndentStyle::Space
 }
 
-fn default_tab_width() -> TabWidth {
-    TabWidth::try_from(4).unwrap()
+fn default_indent_width() -> IndentWidth {
+    IndentWidth::try_from(4).unwrap()
 }
 
 impl Default for PyFormatOptions {
@@ -59,11 +62,12 @@ impl Default for PyFormatOptions {
             source_type: PySourceType::default(),
             indent_style: default_indent_style(),
             line_width: default_line_width(),
-            tab_width: default_tab_width(),
+            indent_width: default_indent_width(),
             quote_style: QuoteStyle::default(),
             line_ending: LineEnding::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
+            preview: PreviewMode::default(),
         }
     }
 }
@@ -101,9 +105,13 @@ impl PyFormatOptions {
         self.line_ending
     }
 
+    pub fn preview(&self) -> PreviewMode {
+        self.preview
+    }
+
     #[must_use]
-    pub fn with_tab_width(mut self, tab_width: TabWidth) -> Self {
-        self.tab_width = tab_width;
+    pub fn with_indent_width(mut self, indent_width: IndentWidth) -> Self {
+        self.indent_width = indent_width;
         self
     }
 
@@ -136,6 +144,12 @@ impl PyFormatOptions {
         self.line_ending = line_ending;
         self
     }
+
+    #[must_use]
+    pub fn with_preview(mut self, preview: PreviewMode) -> Self {
+        self.preview = preview;
+        self
+    }
 }
 
 impl FormatOptions for PyFormatOptions {
@@ -143,8 +157,8 @@ impl FormatOptions for PyFormatOptions {
         self.indent_style
     }
 
-    fn tab_width(&self) -> TabWidth {
-        self.tab_width
+    fn indent_width(&self) -> IndentWidth {
+        self.indent_width
     }
 
     fn line_width(&self) -> LineWidth {
@@ -153,7 +167,7 @@ impl FormatOptions for PyFormatOptions {
 
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
-            tab_width: self.tab_width,
+            indent_width: self.indent_width,
             line_width: self.line_width,
             line_ending: self.line_ending,
             indent_style: self.indent_style,
@@ -244,5 +258,20 @@ impl FromStr for MagicTrailingComma {
             // TODO: replace this error with a diagnostic
             _ => Err("Value not supported for MagicTrailingComma"),
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum PreviewMode {
+    #[default]
+    Disabled,
+
+    Enabled,
+}
+
+impl PreviewMode {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, PreviewMode::Enabled)
     }
 }

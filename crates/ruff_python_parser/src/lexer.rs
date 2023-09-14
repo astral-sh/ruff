@@ -28,7 +28,6 @@
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
-use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::{char, cmp::Ordering, str::FromStr};
 
@@ -36,8 +35,7 @@ use num_bigint::BigInt;
 use num_traits::{Num, Zero};
 use ruff_python_ast::IpyEscapeKind;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use unic_emoji_char::is_emoji_presentation;
-use unic_ucd_ident::{is_xid_continue, is_xid_start};
+use unicode_ident::{is_xid_continue, is_xid_start};
 
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::indentation::{Indentation, Indentations};
@@ -264,9 +262,10 @@ impl<'source> Lexer<'source> {
             'x' | 'o' | 'b'
         ));
 
-        let value_text = self.radix_run(None, radix);
+        let mut number = LexedText::new(self.offset(), self.source);
+        self.radix_run(&mut number, radix);
         let value =
-            BigInt::from_str_radix(&value_text, radix.as_u32()).map_err(|e| LexicalError {
+            BigInt::from_str_radix(number.as_str(), radix.as_u32()).map_err(|e| LexicalError {
                 error: LexicalErrorType::OtherError(format!("{e:?}")),
                 location: self.token_range().start(),
             })?;
@@ -279,15 +278,14 @@ impl<'source> Lexer<'source> {
         debug_assert!(self.cursor.previous().is_ascii_digit() || self.cursor.previous() == '.');
         let start_is_zero = first_digit_or_dot == '0';
 
-        let mut value_text = if first_digit_or_dot == '.' {
-            String::new()
-        } else {
-            self.radix_run(Some(first_digit_or_dot), Radix::Decimal)
-                .into_owned()
+        let mut number = LexedText::new(self.token_start(), self.source);
+        if first_digit_or_dot != '.' {
+            number.push(first_digit_or_dot);
+            self.radix_run(&mut number, Radix::Decimal);
         };
 
         let is_float = if first_digit_or_dot == '.' || self.cursor.eat_char('.') {
-            value_text.push('.');
+            number.push('.');
 
             if self.cursor.eat_char('_') {
                 return Err(LexicalError {
@@ -296,7 +294,7 @@ impl<'source> Lexer<'source> {
                 });
             }
 
-            value_text.push_str(&self.radix_run(None, Radix::Decimal));
+            self.radix_run(&mut number, Radix::Decimal);
             true
         } else {
             // Normal number:
@@ -305,14 +303,14 @@ impl<'source> Lexer<'source> {
 
         let is_float = match self.cursor.rest().as_bytes() {
             [b'e' | b'E', b'0'..=b'9', ..] | [b'e' | b'E', b'-' | b'+', b'0'..=b'9', ..] => {
-                value_text.push('e');
-                self.cursor.bump(); // e | E
+                // 'e' | 'E'
+                number.push(self.cursor.bump().unwrap());
 
                 if let Some(sign) = self.cursor.eat_if(|c| matches!(c, '+' | '-')) {
-                    value_text.push(sign);
+                    number.push(sign);
                 }
 
-                value_text.push_str(&self.radix_run(None, Radix::Decimal));
+                self.radix_run(&mut number, Radix::Decimal);
 
                 true
             }
@@ -321,7 +319,7 @@ impl<'source> Lexer<'source> {
 
         if is_float {
             // Improvement: Use `Cow` instead of pushing to value text
-            let value = f64::from_str(&value_text).map_err(|_| LexicalError {
+            let value = f64::from_str(number.as_str()).map_err(|_| LexicalError {
                 error: LexicalErrorType::OtherError("Invalid decimal literal".to_owned()),
                 location: self.token_start(),
             })?;
@@ -338,10 +336,10 @@ impl<'source> Lexer<'source> {
         } else {
             // Parse trailing 'j':
             if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
-                let imag = f64::from_str(&value_text).unwrap();
+                let imag = f64::from_str(number.as_str()).unwrap();
                 Ok(Tok::Complex { real: 0.0, imag })
             } else {
-                let value = value_text.parse::<BigInt>().unwrap();
+                let value = number.as_str().parse::<BigInt>().unwrap();
                 if start_is_zero && !value.is_zero() {
                     // leading zeros in decimal integer literals are not permitted
                     return Err(LexicalError {
@@ -357,34 +355,19 @@ impl<'source> Lexer<'source> {
     /// Consume a sequence of numbers with the given radix,
     /// the digits can be decorated with underscores
     /// like this: '`1_2_3_4`' == '1234'
-    fn radix_run(&mut self, first: Option<char>, radix: Radix) -> Cow<'source, str> {
-        let start = if let Some(first) = first {
-            self.offset() - first.text_len()
-        } else {
-            self.offset()
-        };
-        self.cursor.eat_while(|c| radix.is_digit(c));
-
-        let number = &self.source[TextRange::new(start, self.offset())];
-
-        // Number that contains `_` separators. Remove them from the parsed text.
-        if radix.is_digit(self.cursor.second()) && self.cursor.eat_char('_') {
-            let mut value_text = number.to_string();
-
-            loop {
-                if let Some(c) = self.cursor.eat_if(|c| radix.is_digit(c)) {
-                    value_text.push(c);
-                } else if self.cursor.first() == '_' && radix.is_digit(self.cursor.second()) {
-                    // Skip over `_`
-                    self.cursor.bump();
-                } else {
-                    break;
-                }
+    fn radix_run(&mut self, number: &mut LexedText, radix: Radix) {
+        loop {
+            if let Some(c) = self.cursor.eat_if(|c| radix.is_digit(c)) {
+                number.push(c);
             }
-
-            Cow::Owned(value_text)
-        } else {
-            Cow::Borrowed(number)
+            // Number that contains `_` separators. Remove them from the parsed text.
+            else if self.cursor.first() == '_' && radix.is_digit(self.cursor.second()) {
+                // Skip over `_`
+                self.cursor.bump();
+                number.skip_char();
+            } else {
+                break;
+            }
         }
     }
 
@@ -597,15 +580,6 @@ impl<'source> Lexer<'source> {
                 self.state = State::Other;
 
                 Ok((identifier, self.token_range()))
-            } else if is_emoji_presentation(c) {
-                self.state = State::Other;
-
-                Ok((
-                    Tok::Name {
-                        name: c.to_string(),
-                    },
-                    self.token_range(),
-                ))
             } else {
                 Err(LexicalError {
                     error: LexicalErrorType::UnrecognizedToken { tok: c },
@@ -1246,13 +1220,52 @@ const fn is_python_whitespace(c: char) -> bool {
     )
 }
 
+enum LexedText<'a> {
+    Source { source: &'a str, range: TextRange },
+    Owned(String),
+}
+
+impl<'a> LexedText<'a> {
+    fn new(start: TextSize, source: &'a str) -> Self {
+        Self::Source {
+            range: TextRange::empty(start),
+            source,
+        }
+    }
+
+    fn push(&mut self, c: char) {
+        match self {
+            LexedText::Source { range, source } => {
+                *range = range.add_end(c.text_len());
+                debug_assert!(source[*range].ends_with(c));
+            }
+            LexedText::Owned(owned) => owned.push(c),
+        }
+    }
+
+    fn as_str<'b>(&'b self) -> &'b str
+    where
+        'b: 'a,
+    {
+        match self {
+            LexedText::Source { range, source } => &source[*range],
+            LexedText::Owned(owned) => owned,
+        }
+    }
+
+    fn skip_char(&mut self) {
+        match self {
+            LexedText::Source { range, source } => {
+                *self = LexedText::Owned(source[*range].to_string());
+            }
+            LexedText::Owned(_) => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use num_bigint::BigInt;
-    use ruff_python_ast::IpyEscapeKind;
-
     use insta::assert_debug_snapshot;
-    use test_case::test_case;
 
     use super::*;
 
@@ -1260,50 +1273,63 @@ mod tests {
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
-    pub(crate) fn lex_source(source: &str) -> Vec<Tok> {
-        let lexer = lex(source, Mode::Module);
-        lexer.map(|x| x.unwrap().0).collect()
+    fn lex_source_with_mode(source: &str, mode: Mode) -> Vec<Spanned> {
+        let lexer = lex(source, mode);
+        lexer.map(std::result::Result::unwrap).collect()
     }
 
-    pub(crate) fn lex_jupyter_source(source: &str) -> Vec<Tok> {
-        let lexer = lex(source, Mode::Ipython);
-        lexer.map(|x| x.unwrap().0).collect()
+    fn lex_source(source: &str) -> Vec<Spanned> {
+        lex_source_with_mode(source, Mode::Module)
     }
 
-    #[test_case(UNIX_EOL)]
-    #[test_case(MAC_EOL)]
-    #[test_case(WINDOWS_EOL)]
-    fn test_ipython_escape_command_line_continuation_eol(eol: &str) {
+    fn lex_jupyter_source(source: &str) -> Vec<Spanned> {
+        lex_source_with_mode(source, Mode::Ipython)
+    }
+
+    fn ipython_escape_command_line_continuation_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("%matplotlib \\{eol}  --inline");
-        let tokens = lex_jupyter_source(&source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::IpyEscapeCommand {
-                    value: "matplotlib   --inline".to_string(),
-                    kind: IpyEscapeKind::Magic
-                },
-                Tok::Newline
-            ]
-        );
+        lex_jupyter_source(&source)
     }
 
-    #[test_case(UNIX_EOL)]
-    #[test_case(MAC_EOL)]
-    #[test_case(WINDOWS_EOL)]
-    fn test_ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) {
+    #[test]
+    fn test_ipython_escape_command_line_continuation_unix_eol() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_mac_eol() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_windows_eol() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(WINDOWS_EOL));
+    }
+
+    fn ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) -> Vec<Spanned> {
         let source = format!("%matplotlib \\{eol}");
-        let tokens = lex_jupyter_source(&source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::IpyEscapeCommand {
-                    value: "matplotlib ".to_string(),
-                    kind: IpyEscapeKind::Magic
-                },
-                Tok::Newline
-            ]
-        );
+        lex_jupyter_source(&source)
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_with_unix_eol_and_eof() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
+            UNIX_EOL
+        ));
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_with_mac_eol_and_eof() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
+            MAC_EOL
+        ));
+    }
+
+    #[test]
+    fn test_ipython_escape_command_line_continuation_with_windows_eol_and_eof() {
+        assert_debug_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
+            WINDOWS_EOL
+        ));
     }
 
     #[test]
@@ -1380,8 +1406,8 @@ baz = %matplotlib \
         assert_debug_snapshot!(lex_jupyter_source(source));
     }
 
-    fn assert_no_ipython_escape_command(tokens: &[Tok]) {
-        for tok in tokens {
+    fn assert_no_ipython_escape_command(tokens: &[Spanned]) {
+        for (tok, _) in tokens {
             if let Tok::IpyEscapeCommand { .. } = tok {
                 panic!("Unexpected escape command token: {tok:?}")
             }
@@ -1411,45 +1437,48 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(source));
     }
 
-    #[test_case(" foo"; "long")]
-    #[test_case("  "; "whitespace")]
-    #[test_case(" "; "single whitespace")]
-    #[test_case(""; "empty")]
-    fn test_line_comment(comment: &str) {
-        let source = format!("99232  # {comment}");
-        let tokens = lex_source(&source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Int {
-                    value: BigInt::from(99232)
-                },
-                Tok::Comment(format!("# {comment}")),
-                Tok::Newline
-            ]
-        );
+    #[test]
+    fn test_line_comment_long() {
+        let source = "99232  # foo".to_string();
+        assert_debug_snapshot!(lex_source(&source));
     }
 
-    #[test_case(UNIX_EOL)]
-    #[test_case(MAC_EOL)]
-    #[test_case(WINDOWS_EOL)]
-    fn test_comment_until_eol(eol: &str) {
+    #[test]
+    fn test_line_comment_whitespace() {
+        let source = "99232  #  ".to_string();
+        assert_debug_snapshot!(lex_source(&source));
+    }
+
+    #[test]
+    fn test_line_comment_single_whitespace() {
+        let source = "99232  # ".to_string();
+        assert_debug_snapshot!(lex_source(&source));
+    }
+
+    #[test]
+    fn test_line_comment_empty() {
+        let source = "99232  #".to_string();
+        assert_debug_snapshot!(lex_source(&source));
+    }
+
+    fn comment_until_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("123  # Foo{eol}456");
-        let tokens = lex_source(&source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Int {
-                    value: BigInt::from(123)
-                },
-                Tok::Comment("# Foo".to_string()),
-                Tok::Newline,
-                Tok::Int {
-                    value: BigInt::from(456)
-                },
-                Tok::Newline,
-            ]
-        );
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_comment_until_unix_eol() {
+        assert_debug_snapshot!(comment_until_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_comment_until_mac_eol() {
+        assert_debug_snapshot!(comment_until_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_comment_until_windows_eol() {
+        assert_debug_snapshot!(comment_until_eol(WINDOWS_EOL));
     }
 
     #[test]
@@ -1458,115 +1487,67 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(source));
     }
 
-    #[test_case(UNIX_EOL)]
-    #[test_case(MAC_EOL)]
-    #[test_case(WINDOWS_EOL)]
-    fn test_indentation_with_eol(eol: &str) {
+    fn indentation_with_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("def foo():{eol}    return 99{eol}{eol}");
-        let tokens = lex_source(&source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Def,
-                Tok::Name {
-                    name: String::from("foo"),
-                },
-                Tok::Lpar,
-                Tok::Rpar,
-                Tok::Colon,
-                Tok::Newline,
-                Tok::Indent,
-                Tok::Return,
-                Tok::Int {
-                    value: BigInt::from(99)
-                },
-                Tok::Newline,
-                Tok::NonLogicalNewline,
-                Tok::Dedent,
-            ]
-        );
+        lex_source(&source)
     }
 
-    #[test_case(UNIX_EOL)]
-    #[test_case(MAC_EOL)]
-    #[test_case(WINDOWS_EOL)]
-    fn test_double_dedent_with_eol(eol: &str) {
+    #[test]
+    fn test_indentation_with_unix_eol() {
+        assert_debug_snapshot!(indentation_with_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_indentation_with_mac_eol() {
+        assert_debug_snapshot!(indentation_with_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_indentation_with_windows_eol() {
+        assert_debug_snapshot!(indentation_with_eol(WINDOWS_EOL));
+    }
+
+    fn double_dedent_with_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("def foo():{eol} if x:{eol}{eol}  return 99{eol}{eol}");
-        let tokens = lex_source(&source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Def,
-                Tok::Name {
-                    name: String::from("foo"),
-                },
-                Tok::Lpar,
-                Tok::Rpar,
-                Tok::Colon,
-                Tok::Newline,
-                Tok::Indent,
-                Tok::If,
-                Tok::Name {
-                    name: String::from("x"),
-                },
-                Tok::Colon,
-                Tok::Newline,
-                Tok::NonLogicalNewline,
-                Tok::Indent,
-                Tok::Return,
-                Tok::Int {
-                    value: BigInt::from(99)
-                },
-                Tok::Newline,
-                Tok::NonLogicalNewline,
-                Tok::Dedent,
-                Tok::Dedent,
-            ]
-        );
+        lex_source(&source)
     }
 
-    #[test_case(UNIX_EOL)]
-    #[test_case(MAC_EOL)]
-    #[test_case(WINDOWS_EOL)]
-    fn test_double_dedent_with_tabs(eol: &str) {
+    #[test]
+    fn test_double_dedent_with_unix_eol() {
+        assert_debug_snapshot!(double_dedent_with_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_double_dedent_with_mac_eol() {
+        assert_debug_snapshot!(double_dedent_with_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_double_dedent_with_windows_eol() {
+        assert_debug_snapshot!(double_dedent_with_eol(WINDOWS_EOL));
+    }
+
+    fn double_dedent_with_tabs_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("def foo():{eol}\tif x:{eol}{eol}\t\t return 99{eol}{eol}");
-        let tokens = lex_source(&source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Def,
-                Tok::Name {
-                    name: String::from("foo"),
-                },
-                Tok::Lpar,
-                Tok::Rpar,
-                Tok::Colon,
-                Tok::Newline,
-                Tok::Indent,
-                Tok::If,
-                Tok::Name {
-                    name: String::from("x"),
-                },
-                Tok::Colon,
-                Tok::Newline,
-                Tok::NonLogicalNewline,
-                Tok::Indent,
-                Tok::Return,
-                Tok::Int {
-                    value: BigInt::from(99)
-                },
-                Tok::Newline,
-                Tok::NonLogicalNewline,
-                Tok::Dedent,
-                Tok::Dedent,
-            ]
-        );
+        lex_source(&source)
     }
 
-    #[test_case(UNIX_EOL)]
-    #[test_case(MAC_EOL)]
-    #[test_case(WINDOWS_EOL)]
-    fn test_newline_in_brackets(eol: &str) {
+    #[test]
+    fn test_double_dedent_with_tabs_unix_eol() {
+        assert_debug_snapshot!(double_dedent_with_tabs_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_double_dedent_with_tabs_mac_eol() {
+        assert_debug_snapshot!(double_dedent_with_tabs_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_double_dedent_with_tabs_windows_eol() {
+        assert_debug_snapshot!(double_dedent_with_tabs_eol(WINDOWS_EOL));
+    }
+
+    fn newline_in_brackets_eol(eol: &str) -> Vec<Spanned> {
         let source = r"x = [
 
     1,2
@@ -1578,59 +1559,22 @@ def f(arg=%timeit a = b):
 7}]
 "
         .replace('\n', eol);
-        let tokens = lex_source(&source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Name {
-                    name: String::from("x"),
-                },
-                Tok::Equal,
-                Tok::Lsqb,
-                Tok::NonLogicalNewline,
-                Tok::NonLogicalNewline,
-                Tok::Int {
-                    value: BigInt::from(1)
-                },
-                Tok::Comma,
-                Tok::Int {
-                    value: BigInt::from(2)
-                },
-                Tok::NonLogicalNewline,
-                Tok::Comma,
-                Tok::Lpar,
-                Tok::Int {
-                    value: BigInt::from(3)
-                },
-                Tok::Comma,
-                Tok::NonLogicalNewline,
-                Tok::Int {
-                    value: BigInt::from(4)
-                },
-                Tok::Comma,
-                Tok::NonLogicalNewline,
-                Tok::Rpar,
-                Tok::Comma,
-                Tok::Lbrace,
-                Tok::NonLogicalNewline,
-                Tok::Int {
-                    value: BigInt::from(5)
-                },
-                Tok::Comma,
-                Tok::NonLogicalNewline,
-                Tok::Int {
-                    value: BigInt::from(6)
-                },
-                Tok::Comma,
-                // Continuation here - no NonLogicalNewline.
-                Tok::Int {
-                    value: BigInt::from(7)
-                },
-                Tok::Rbrace,
-                Tok::Rsqb,
-                Tok::Newline,
-            ]
-        );
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_newline_in_brackets_unix_eol() {
+        assert_debug_snapshot!(newline_in_brackets_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_newline_in_brackets_mac_eol() {
+        assert_debug_snapshot!(newline_in_brackets_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_newline_in_brackets_windows_eol() {
+        assert_debug_snapshot!(newline_in_brackets_eol(WINDOWS_EOL));
     }
 
     #[test]
@@ -1663,60 +1607,50 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(lex_source(source));
     }
 
-    #[test_case(UNIX_EOL)]
-    #[test_case(MAC_EOL)]
-    #[test_case(WINDOWS_EOL)]
-    fn test_string_continuation_with_eol(eol: &str) {
+    fn string_continuation_with_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("\"abc\\{eol}def\"");
-        let tokens = lex_source(&source);
+        lex_source(&source)
+    }
 
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::String {
-                    value: format!("abc\\{eol}def"),
-                    kind: StringKind::String,
-                    triple_quoted: false,
-                },
-                Tok::Newline,
-            ]
-        );
+    #[test]
+    fn test_string_continuation_with_unix_eol() {
+        assert_debug_snapshot!(string_continuation_with_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_string_continuation_with_mac_eol() {
+        assert_debug_snapshot!(string_continuation_with_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_string_continuation_with_windows_eol() {
+        assert_debug_snapshot!(string_continuation_with_eol(WINDOWS_EOL));
     }
 
     #[test]
     fn test_escape_unicode_name() {
         let source = r#""\N{EN SPACE}""#;
-        let tokens = lex_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::String {
-                    value: r"\N{EN SPACE}".to_string(),
-                    kind: StringKind::String,
-                    triple_quoted: false,
-                },
-                Tok::Newline
-            ]
-        );
+        assert_debug_snapshot!(lex_source(source));
     }
 
-    #[test_case(UNIX_EOL)]
-    #[test_case(MAC_EOL)]
-    #[test_case(WINDOWS_EOL)]
-    fn test_triple_quoted(eol: &str) {
+    fn triple_quoted_eol(eol: &str) -> Vec<Spanned> {
         let source = format!("\"\"\"{eol} test string{eol} \"\"\"");
-        let tokens = lex_source(&source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::String {
-                    value: format!("{eol} test string{eol} "),
-                    kind: StringKind::String,
-                    triple_quoted: true,
-                },
-                Tok::Newline,
-            ]
-        );
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_triple_quoted_unix_eol() {
+        assert_debug_snapshot!(triple_quoted_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_triple_quoted_mac_eol() {
+        assert_debug_snapshot!(triple_quoted_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_triple_quoted_windows_eol() {
+        assert_debug_snapshot!(triple_quoted_eol(WINDOWS_EOL));
     }
 
     // This test case is to just make sure that the lexer doesn't go into
@@ -1725,5 +1659,23 @@ def f(arg=%timeit a = b):
     fn test_infite_loop() {
         let source = "[1";
         let _ = lex(source, Mode::Module).collect::<Vec<_>>();
+    }
+
+    /// Emoji identifiers are a non-standard python feature and are not supported by our lexer.
+    #[test]
+    fn test_emoji_identifier() {
+        let source = "🐦";
+
+        let lexed: Vec<_> = lex(source, Mode::Module).collect();
+
+        match lexed.as_slice() {
+            [Err(error)] => {
+                assert_eq!(
+                    error.error,
+                    LexicalErrorType::UnrecognizedToken { tok: '🐦' }
+                );
+            }
+            result => panic!("Expected an error token but found {result:?}"),
+        }
     }
 }

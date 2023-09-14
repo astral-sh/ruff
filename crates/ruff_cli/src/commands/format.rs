@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use anyhow::Result;
 use colored::Colorize;
+use log::error;
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
@@ -13,6 +14,7 @@ use tracing::{debug, warn};
 
 use ruff::fs;
 use ruff::logging::LogLevel;
+use ruff::settings::types::PreviewMode;
 use ruff::warn_user_once;
 use ruff_formatter::LineWidth;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -21,6 +23,7 @@ use ruff_source_file::{find_newline, LineEnding};
 use ruff_workspace::resolver::python_files_in_path;
 
 use crate::args::{FormatArguments, Overrides};
+use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
 use crate::ExitStatus;
 
@@ -72,11 +75,25 @@ pub(crate) fn format(
                         return None;
                     };
 
-                    let line_length = resolver.resolve(path, &pyproject_config).line_length;
+                    let resolved_settings = resolver.resolve(path, &pyproject_config);
+
+                    let preview = match resolved_settings.preview {
+                        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+                        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+                    };
+                    let line_length = resolved_settings.line_length;
+
                     let options = PyFormatOptions::from_source_type(source_type)
-                        .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
+                        .with_line_width(LineWidth::from(NonZeroU16::from(line_length)))
+                        .with_preview(preview);
                     debug!("Formatting {} with {:?}", path.display(), options);
-                    Some(format_path(path, options, mode))
+
+                    Some(match catch_unwind(|| format_path(path, options, mode)) {
+                        Ok(inner) => inner,
+                        Err(error) => {
+                            Err(FormatCommandError::Panic(Some(path.to_path_buf()), error))
+                        }
+                    })
                 }
                 Err(err) => Some(Err(FormatCommandError::Ignore(err))),
             }
@@ -86,21 +103,19 @@ pub(crate) fn format(
             Err(err) => Right(err),
         });
     let duration = start.elapsed();
+
     debug!(
         "Formatted {} files in {:.2?}",
         results.len() + errors.len(),
         duration
     );
 
-    let summary = FormatResultSummary::new(results, mode);
-
     // Report on any errors.
-    if !errors.is_empty() {
-        warn!("Encountered {} errors while formatting:", errors.len());
-        for error in &errors {
-            warn!("{error}");
-        }
+    for error in &errors {
+        error!("{error}");
     }
+
+    let summary = FormatResultSummary::new(results, mode);
 
     // Report on the formatting changes.
     if log_level >= LogLevel::Default {
@@ -246,6 +261,7 @@ pub(crate) enum FormatCommandError {
     Read(Option<PathBuf>, io::Error),
     Write(Option<PathBuf>, io::Error),
     FormatModule(Option<PathBuf>, FormatModuleError),
+    Panic(Option<PathBuf>, PanicError),
 }
 
 impl Display for FormatCommandError {
@@ -309,6 +325,29 @@ impl Display for FormatCommandError {
                     )
                 } else {
                     write!(f, "{}{} {err}", "Failed to format".bold(), ":".bold())
+                }
+            }
+            Self::Panic(path, err) => {
+                let message = r#"This indicates a bug in Ruff. If you could open an issue at:
+
+    https://github.com/astral-sh/ruff/issues/new?title=%5BFormatter%20panic%5D
+
+...with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
+"#;
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{}{}{} {message}\n{err}",
+                        "Panicked while formatting ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{} {message}\n{err}",
+                        "Panicked while formatting.".bold()
+                    )
                 }
             }
         }

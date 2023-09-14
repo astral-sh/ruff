@@ -150,6 +150,8 @@ impl NeedsParentheses for ExprAttribute {
             OptionalParentheses::Always
         } else if self.value.is_name_expr() {
             OptionalParentheses::BestFit
+        } else if is_expression_parenthesized(self.value.as_ref().into(), context.source()) {
+            OptionalParentheses::Never
         } else {
             self.value.needs_parentheses(self.into(), context)
         }

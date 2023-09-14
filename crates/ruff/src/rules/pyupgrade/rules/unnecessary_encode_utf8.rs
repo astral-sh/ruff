@@ -42,13 +42,16 @@ pub struct UnnecessaryEncodeUTF8 {
 impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary call to `encode` as UTF-8")
+        match self.reason {
+            Reason::BytesLiteral => format!("Unnecessary call to `encode` as UTF-8"),
+            Reason::DefaultArgument => format!("Unnecessary UTF-8 `encoding` argument to `encode`"),
+        }
     }
 
     fn autofix_title(&self) -> String {
         match self.reason {
             Reason::BytesLiteral => "Rewrite as bytes literal".to_string(),
-            Reason::DefaultArgument => "Remove unnecessary encoding argument".to_string(),
+            Reason::DefaultArgument => "Remove unnecessary `encoding` argument".to_string(),
         }
     }
 }

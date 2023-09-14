@@ -90,8 +90,7 @@ a = (
     + b
     + c
     + d
-    +
-    (  # Hello
+    + (  # Hello
         e + f + g
     )
 )

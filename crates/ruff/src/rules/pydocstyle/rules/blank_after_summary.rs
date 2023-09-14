@@ -70,6 +70,10 @@ impl Violation for BlankLineAfterSummary {
 pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
+    if !docstring.triple_quoted() {
+        return;
+    }
+
     let mut lines_count: usize = 1;
     let mut blanks_count = 0;
     for line in body.trim().universal_newlines().skip(1) {

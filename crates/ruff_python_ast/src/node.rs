@@ -1,9 +1,9 @@
 use crate::visitor::preorder::PreorderVisitor;
 use crate::{
-    self as ast, Alias, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
-    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments,
-    PatternKeyword, Stmt, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    TypeParams, WithItem,
+    self as ast, Alias, ArgOrKeyword, Arguments, Comprehension, Decorator, ExceptHandler, Expr,
+    Keyword, MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern,
+    PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+    TypeParamTypeVarTuple, TypeParams, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange};
 use std::ptr::NonNull;
@@ -3549,18 +3549,11 @@ impl AstNode for Arguments {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::Arguments {
-            range: _,
-            args,
-            keywords,
-        } = self;
-
-        for arg in args {
-            visitor.visit_expr(arg);
-        }
-
-        for keyword in keywords {
-            visitor.visit_keyword(keyword);
+        for arg_or_keyword in self.arguments_source_order() {
+            match arg_or_keyword {
+                ArgOrKeyword::Arg(arg) => visitor.visit_expr(arg),
+                ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
+            }
         }
     }
 }

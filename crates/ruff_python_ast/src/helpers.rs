@@ -207,6 +207,8 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             range: _,
         }) => {
             any_over_expr(call_func, func)
+                // Note that this is the evaluation order but not necessarily the declaration order
+                // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
                 || args.iter().any(|expr| any_over_expr(expr, func))
                 || keywords
                     .iter()
@@ -347,6 +349,8 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             decorator_list,
             ..
         }) => {
+            // Note that e.g. `class A(*args, a=2, *args2, **kwargs): pass` is a valid class
+            // definition
             arguments
                 .as_deref()
                 .is_some_and(|Arguments { args, keywords, .. }| {
