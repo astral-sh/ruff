@@ -1270,6 +1270,9 @@ f'{f"{3.1415=:.1f}":*^20}'
 match foo:
     case "foo " f"bar {x + y} " "baz":
         pass
+
+f"\{foo}\{bar:\}"
+f"\\{{foo\\}}"
 "#
             .trim(),
             "<test>",
