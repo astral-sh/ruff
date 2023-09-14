@@ -1616,7 +1616,7 @@ FStringReplacementField: ast::Expr = {
             return Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
                 location: value.start(),
-            })?; 
+            })?;
         }
         let debug_text = debug.map(|_| {
             let start_offset = location + "{".text_len();
