@@ -3,7 +3,9 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprCall};
 
 use crate::comments::{dangling_comments, SourceComment};
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{
+    is_expression_parenthesized, NeedsParentheses, OptionalParentheses,
+};
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
 
@@ -86,6 +88,8 @@ impl NeedsParentheses for ExprCall {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
+        } else if is_expression_parenthesized(self.func.as_ref().into(), context.source()) {
+            OptionalParentheses::Never
         } else {
             self.func.needs_parentheses(self.into(), context)
         }
