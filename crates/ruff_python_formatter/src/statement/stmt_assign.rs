@@ -18,8 +18,6 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             value,
         } = item;
 
-        panic!("TODO: FormatStmtAssign::fmt_fields");
-
         let (first, rest) = targets.split_first().ok_or(FormatError::syntax_error(
             "Expected at least on assignment target",
         ))?;
