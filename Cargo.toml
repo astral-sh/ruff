@@ -30,7 +30,7 @@ num-bigint = { version = "0.4.3" }
 num-traits = { version = "0.2.15" }
 once_cell = { version = "1.17.1" }
 path-absolutize = { version = "3.1.1" }
-proc-macro2 = { version = "1.0.51" }
+proc-macro2 = { version = "1.0.67" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
 rustc-hash = { version = "1.1.0" }
