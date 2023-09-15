@@ -386,9 +386,9 @@ jobs:
           # Switch to the commit we want to release
           git checkout 0c030b5bf31e425cb6070db7386243eca6dbd8f1
           version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
-          if [ "${{ inputs.tag }}" != "${version}" ]; then
+          if [ "0.0.290" != "${version}" ]; then
             echo "The input tag does not match the version from pyproject.toml:" >&2
-            echo "${{ inputs.tag }}" >&2
+            echo "0.0.290" >&2
             echo "${version}" >&2
             exit 1
           else
