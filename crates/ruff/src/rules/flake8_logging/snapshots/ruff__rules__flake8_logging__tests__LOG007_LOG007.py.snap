@@ -1,22 +1,31 @@
 ---
 source: crates/ruff/src/rules/flake8_logging/mod.rs
 ---
-LOG007.py:8:1: LOG007 Use of `logging.exception` with falsy `exc_info`
+LOG007.py:4:1: LOG007 Use of `logging.exception` with falsy `exc_info`
   |
-8 | logging.exception("foo", exc_info=False)  # LOG007
+3 | logging.exception("foo")  # OK
+4 | logging.exception("foo", exc_info=False)  # LOG007
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG007
+5 | logging.exception("foo", exc_info=[])  # LOG007
   |
 
-LOG007.py:11:1: LOG007 Use of `logging.exception` with falsy `exc_info`
-   |
-11 | logging.exception("foo", exc_info=[])  # LOG007
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG007
-   |
+LOG007.py:5:1: LOG007 Use of `logging.exception` with falsy `exc_info`
+  |
+3 | logging.exception("foo")  # OK
+4 | logging.exception("foo", exc_info=False)  # LOG007
+5 | logging.exception("foo", exc_info=[])  # LOG007
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG007
+6 | 
+7 | from logging import exception
+  |
 
-LOG007.py:14:1: LOG007 Use of `logging.exception` with falsy `exc_info`
+LOG007.py:9:1: LOG007 Use of `logging.exception` with falsy `exc_info`
    |
-14 | exception("foo", exc_info=False)  # LOG007
+ 7 | from logging import exception
+ 8 | 
+ 9 | exception("foo", exc_info=False)  # LOG007
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG007
+10 | exception("foo", exc_info=True)  # OK
    |
 
 

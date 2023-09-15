@@ -1,17 +1,10 @@
 import logging
-from logging import exception
-
 
 logging.exception("foo")  # OK
-
-
 logging.exception("foo", exc_info=False)  # LOG007
-
-
 logging.exception("foo", exc_info=[])  # LOG007
 
+from logging import exception
 
 exception("foo", exc_info=False)  # LOG007
-
-
-logging.exception("foo", exc_info=True)  # OK
+exception("foo", exc_info=True)  # OK
