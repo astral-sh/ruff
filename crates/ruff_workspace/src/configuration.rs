@@ -852,7 +852,11 @@ mod tests {
         Rule::QuadraticListSummation,
     ];
 
-    const PREVIEW_RULES: &[Rule] = &[Rule::TooManyPublicMethods, Rule::SliceCopy];
+    const PREVIEW_RULES: &[Rule] = &[
+        Rule::TooManyPublicMethods,
+        Rule::SliceCopy,
+        Rule::UndocumentedWarn,
+    ];
 
     #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(

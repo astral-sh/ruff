@@ -274,6 +274,7 @@ quality tools, including:
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
 - [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-logging](https://pypi.org/project/flake8-logging/)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
 - [flake8-pie](https://pypi.org/project/flake8-pie/)

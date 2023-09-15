@@ -13,10 +13,10 @@ use crate::registry::Rule;
 use crate::rules::{
     flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
     flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
-    flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging_format,
-    flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self, flake8_simplify,
-    flake8_tidy_imports, flake8_use_pathlib, flynt, numpy, pandas_vet, pep8_naming, pycodestyle,
-    pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff,
+    flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
+    flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
+    flake8_simplify, flake8_tidy_imports, flake8_use_pathlib, flynt, numpy, pandas_vet,
+    pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -260,6 +260,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
             }
+            if checker.enabled(Rule::UndocumentedWarn) {
+                flake8_logging::rules::undocumented_warn(checker, expr);
+            }
             if checker.enabled(Rule::LoadBeforeGlobalDeclaration) {
                 pylint::rules::load_before_global_declaration(checker, id, expr);
             }
@@ -325,6 +328,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CollectionsNamedTuple) {
                 flake8_pyi::rules::collections_named_tuple(checker, expr);
+            }
+            if checker.enabled(Rule::UndocumentedWarn) {
+                flake8_logging::rules::undocumented_warn(checker, expr);
             }
             pandas_vet::rules::attr(checker, attribute);
         }
