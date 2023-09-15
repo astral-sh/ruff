@@ -270,3 +270,6 @@ result = (
     f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
     + 1
 )()
+
+
+result = (object[complicate_caller])("argument").a["b"].test(argument)

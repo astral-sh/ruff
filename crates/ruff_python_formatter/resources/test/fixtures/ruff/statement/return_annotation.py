@@ -180,3 +180,9 @@ def double(a: int) -> (
     int | list[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]  # Hello
 ):
     pass
+
+
+def process_board_action(
+    payload: WildValue, action_type: Optional[str]
+) -> Optional[Tuple[str, str]]:
+    pass
