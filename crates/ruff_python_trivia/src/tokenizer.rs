@@ -1024,13 +1024,14 @@ mod tests {
         }
 
         fn tokenize_reverse(&self) -> Vec<SimpleToken> {
-            let mut comment_ranges = Vec::new();
-            for result in lex(self.source, Mode::Module) {
-                let (token, range) = result.expect("Input to be a valid python program.");
+            let comment_ranges: Vec<_> = lex(self.source, Mode::Module).filter_map(|result| {
+	             let (token, range) = result.expect("Input to be a valid python program.");
                 if matches!(token, Tok::Comment(_)) {
-                    comment_ranges.push(range);
-                }
-            }
+                    Some(range)
+                } else {
+                	None
+              	}
+            }).collect()
             BackwardsTokenizer::new(self.source, self.range, &comment_ranges).collect()
         }
 
