@@ -17,8 +17,20 @@ use crate::{registry::AsRule, settings::types::PythonVersion};
 /// Checks for use of `TypeAlias` annotation for declaring type aliases.
 ///
 /// ## Why is this bad?
-/// The `type` keyword was introduced in Python 3.12 by PEP-695 for defining type aliases.
-/// The type keyword is easier to read and provides cleaner support for generics.
+/// The `type` keyword was introduced in Python 3.12 by [PEP 695] for defining
+/// type aliases. The `type` keyword is easier to read and provides cleaner
+/// support for generics.
+///
+/// ## Known problems
+/// [PEP 695] uses inferred variance for type parameters, instead of the
+/// `covariant` and `contravariant` keywords used by `TypeParam` variables. As
+/// such, rewriting a `TypeParam` variable to a `type` alias may change its
+/// variance.
+///
+/// Unlike `TypeParam` variables, [PEP 695]-style `type` aliases cannot be used
+/// at runtime. For example, calling `isinstance` on a `type` alias will throw
+/// a `TypeError`. As such, rewriting a `TypeParam` via the `type` keyword will
+/// cause issues for parameters that are used for such runtime checks.
 ///
 /// ## Example
 /// ```python
@@ -29,6 +41,8 @@ use crate::{registry::AsRule, settings::types::PythonVersion};
 /// ```python
 /// type ListOfInt = list[int]
 /// ```
+///
+/// [PEP 695]: https://peps.python.org/pep-0695/
 #[violation]
 pub struct NonPEP695TypeAlias {
     name: String,
