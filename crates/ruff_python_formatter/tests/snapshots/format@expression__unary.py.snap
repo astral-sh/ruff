@@ -152,6 +152,11 @@ if (
   # comment
   a):
     ...
+
+if (
+  not  # comment
+  a):
+    ...
 ```
 
 ## Output
@@ -315,6 +320,11 @@ if (
     not
     # comment
     a
+):
+    ...
+
+if (
+    not a  # comment
 ):
     ...
 ```
