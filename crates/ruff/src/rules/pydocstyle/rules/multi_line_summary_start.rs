@@ -48,7 +48,7 @@ use crate::registry::{AsRule, Rule};
 ///     """
 /// ```
 ///
-/// [D213]: https://beta.ruff.rs/docs/rules/multi-line-summary-second-line
+/// [D213]: https://docs.astral.sh/ruff/rules/multi-line-summary-second-line
 #[violation]
 pub struct MultiLineSummaryFirstLine;
 
@@ -102,7 +102,7 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
 ///     """
 /// ```
 ///
-/// [D212]: https://beta.ruff.rs/docs/rules/multi-line-summary-first-line
+/// [D212]: https://docs.astral.sh/ruff/rules/multi-line-summary-first-line
 #[violation]
 pub struct MultiLineSummarySecondLine;
 

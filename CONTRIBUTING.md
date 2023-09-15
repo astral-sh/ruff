@@ -719,8 +719,8 @@ Module {
 - `cargo dev generate-cli-help`, `cargo dev generate-docs` and `cargo dev generate-json-schema`:
     Update just `docs/configuration.md`, `docs/rules` and `ruff.schema.json` respectively.
 - `cargo dev generate-options`: Generate a markdown-compatible table of all `pyproject.toml`
-    options. Used for <https://beta.ruff.rs/docs/settings/>
-- `cargo dev generate-rules-table`: Generate a markdown-compatible table of all rules. Used for <https://beta.ruff.rs/docs/rules/>
+    options. Used for <https://docs.astral.sh/ruff/settings/>.
+- `cargo dev generate-rules-table`: Generate a markdown-compatible table of all rules. Used for <https://docs.astral.sh/ruff/rules/>.
 - `cargo dev round-trip <python file or jupyter notebook>`: Read a Python file or Jupyter Notebook,
     parse it, serialize the parsed representation and write it back. Used to check how good our
     representation is so that fixes don't rewrite irrelevant parts of a file.
@@ -778,7 +778,7 @@ To understand Ruff's import categorization system, we first need to define two c
 - "Package root": The top-most directory defining the Python package that includes a given Python
     file. To find the package root for a given Python file, traverse up its parent directories until
     you reach a parent directory that doesn't contain an `__init__.py` file (and isn't marked as
-    a [namespace package](https://beta.ruff.rs/docs/settings/#namespace-packages)); take the directory
+    a [namespace package](https://docs.astral.sh/ruff/settings/#namespace-packages)); take the directory
     just before that, i.e., the first directory in the package.
 
 For example, given:
@@ -867,7 +867,7 @@ There are three ways in which an import can be categorized as "first-party":
     package (e.g., `from foo import bar` or `import foo.bar`), they'll be classified as first-party
     automatically. This check is as simple as comparing the first segment of the current file's
     module path to the first segment of the import.
-1. **Source roots**: Ruff supports a `[src](https://beta.ruff.rs/docs/settings/#src)` setting, which
+1. **Source roots**: Ruff supports a `[src](https://docs.astral.sh/ruff/settings/#src)` setting, which
     sets the directories to scan when identifying first-party imports. The algorithm is
     straightforward: given an import, like `import foo`, iterate over the directories enumerated in
     the `src` setting and, for each directory, check for the existence of a subdirectory `foo` or a

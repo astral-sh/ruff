@@ -52,4 +52,4 @@ jobs:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
-          command: pages deploy site --project-name=ruff-docs --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}
+          command: pages deploy site --project-name=astral-docs --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}

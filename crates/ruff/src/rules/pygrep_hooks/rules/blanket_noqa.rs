@@ -28,7 +28,7 @@ use crate::noqa::Directive;
 /// ```
 ///
 /// ## References
-/// - [Ruff documentation](https://beta.ruff.rs/docs/configuration/#error-suppression)
+/// - [Ruff documentation](https://docs.astral.sh/ruff/configuration/#error-suppression)
 #[violation]
 pub struct BlanketNOQA;
 

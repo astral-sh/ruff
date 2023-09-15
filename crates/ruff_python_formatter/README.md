@@ -102,7 +102,7 @@ on-save by adding `"editor.formatOnSave": true` to your `settings.json`:
 
 ### Configuration
 
-The Ruff formatter respects Ruff's [`line-length`](https://beta.ruff.rs/docs/settings/#line-length)
+The Ruff formatter respects Ruff's [`line-length`](https://docs.astral.sh/ruff/settings/#line-length)
 setting, which can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as in:
 
 ```console

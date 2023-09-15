@@ -35,20 +35,20 @@ SECTIONS: list[Section] = [
 
 
 LINK_REWRITES: dict[str, str] = {
-    "https://beta.ruff.rs/docs/": "index.md",
-    "https://beta.ruff.rs/docs/configuration/": "configuration.md",
-    "https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery": (
+    "https://docs.astral.sh/ruff/": "index.md",
+    "https://docs.astral.sh/ruff/configuration/": "configuration.md",
+    "https://docs.astral.sh/ruff/configuration/#pyprojecttoml-discovery": (
         "configuration.md#pyprojecttoml-discovery"
     ),
-    "https://beta.ruff.rs/docs/contributing/": "contributing.md",
-    "https://beta.ruff.rs/docs/editor-integrations/": "editor-integrations.md",
-    "https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8": (
+    "https://docs.astral.sh/ruff/contributing/": "contributing.md",
+    "https://docs.astral.sh/ruff/editor-integrations/": "editor-integrations.md",
+    "https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8": (
         "faq.md#how-does-ruff-compare-to-flake8"
     ),
-    "https://beta.ruff.rs/docs/installation/": "installation.md",
-    "https://beta.ruff.rs/docs/rules/": "rules.md",
-    "https://beta.ruff.rs/docs/rules/#error-e": "rules.md#error-e",
-    "https://beta.ruff.rs/docs/settings/": "settings.md",
+    "https://docs.astral.sh/ruff/installation/": "installation.md",
+    "https://docs.astral.sh/ruff/rules/": "rules.md",
+    "https://docs.astral.sh/ruff/rules/#error-e": "rules.md#error-e",
+    "https://docs.astral.sh/ruff/settings/": "settings.md",
 }
 
 
@@ -94,7 +94,7 @@ def main() -> None:
             raise ValueError(msg)
         content = after
 
-    if m := re.search(r"\(https://beta.ruff.rs/docs/.*\)", content):
+    if m := re.search(r"\(https://docs.astral.sh/ruff/.*\)", content):
         msg = f"Unexpected absolute link to documentation: {m.group(0)}"
         raise ValueError(msg)
 
