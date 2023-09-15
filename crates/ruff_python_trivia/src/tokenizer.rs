@@ -1,4 +1,3 @@
-use memchr::{memchr2, memchr3, memrchr3_iter};
 use unicode_ident::{is_xid_continue, is_xid_start};
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -462,15 +461,14 @@ impl SimpleTokenKind {
     }
 }
 
-/// Simple zero allocation tokenizer for tokenizing trivia (and some tokens).
+/// Simple zero allocation tokenizer handling most tokens.
 ///
 /// The tokenizer must start at an offset that is trivia (e.g. not inside of a multiline string).
 ///
-/// The tokenizer doesn't guarantee any correctness after it returned a [`SimpleTokenKind::Other`]. That's why it
-/// will return [`SimpleTokenKind::Bogus`] for every character after until it reaches the end of the file.
+/// In case it finds something it can't parse, the tokenizer will return a
+/// [`SimpleTokenKind::Other`] and then only a final [`SimpleTokenKind::Bogus`] afterwards.
 pub struct SimpleTokenizer<'a> {
     offset: TextSize,
-    back_offset: TextSize,
     /// `true` when it is known that the current `back` line has no comment for sure.
     back_line_has_no_comment: bool,
     bogus: bool,
@@ -482,7 +480,6 @@ impl<'a> SimpleTokenizer<'a> {
     pub fn new(source: &'a str, range: TextRange) -> Self {
         Self {
             offset: range.start(),
-            back_offset: range.end(),
             back_line_has_no_comment: false,
             bogus: false,
             source,
@@ -534,7 +531,22 @@ impl<'a> SimpleTokenizer<'a> {
             return token;
         }
 
-        let kind = match first {
+        let kind = self.next_token_inner(first);
+
+        let token_len = self.cursor.token_len();
+
+        let token = SimpleToken {
+            kind,
+            range: TextRange::at(self.offset, token_len),
+        };
+
+        self.offset += token_len;
+
+        token
+    }
+
+    fn next_token_inner(&mut self, first: char) -> SimpleTokenKind {
+        match first {
             // Keywords and identifiers
             c if is_identifier_start(c) => {
                 self.cursor.eat_while(is_identifier_continuation);
@@ -719,364 +731,12 @@ impl<'a> SimpleTokenizer<'a> {
                 self.bogus = true;
                 SimpleTokenKind::Other
             }
-        };
-
-        let token_len = self.cursor.token_len();
-
-        let token = SimpleToken {
-            kind,
-            range: TextRange::at(self.offset, token_len),
-        };
-
-        self.offset += token_len;
-
-        token
-    }
-
-    /// Returns the next token from the back. Prefer iterating forwards. Iterating backwards is significantly more expensive
-    /// because it needs to check if the line has any comments when encountering any non-trivia token.
-    pub fn next_token_back(&mut self) -> SimpleToken {
-        self.cursor.start_token();
-
-        let Some(last) = self.cursor.bump_back() else {
-            return SimpleToken {
-                kind: SimpleTokenKind::EndOfFile,
-                range: TextRange::empty(self.back_offset),
-            };
-        };
-
-        if self.bogus {
-            let token = SimpleToken {
-                kind: SimpleTokenKind::Bogus,
-                range: TextRange::at(self.back_offset - last.text_len(), last.text_len()),
-            };
-
-            self.back_offset -= last.text_len();
-            return token;
         }
-
-        let kind = match last {
-            // This may not be 100% correct because it will lex-out trailing whitespace from a comment
-            // as whitespace rather than being part of the token. This shouldn't matter for what we use the lexer for.
-            ' ' | '\t' => {
-                self.cursor.eat_back_while(|c| matches!(c, ' ' | '\t'));
-                SimpleTokenKind::Whitespace
-            }
-
-            '\r' => {
-                self.back_line_has_no_comment = false;
-                SimpleTokenKind::Newline
-            }
-
-            '\n' => {
-                self.back_line_has_no_comment = false;
-                self.cursor.eat_char_back('\r');
-                SimpleTokenKind::Newline
-            }
-
-            // Empty comment (could also be a comment nested in another comment, but this shouldn't matter for what we use the lexer for)
-            '#' => SimpleTokenKind::Comment,
-
-            // For all other tokens, test if the character isn't part of a comment.
-            c => {
-                // Skip the test whether there's a preceding comment if it has been performed before.
-                let comment_length = if self.back_line_has_no_comment {
-                    None
-                } else {
-                    let bytes = self.cursor.chars().as_str().as_bytes();
-                    let mut potential_comment_starts: smallvec::SmallVec<[TextSize; 2]> =
-                        smallvec::SmallVec::new();
-
-                    // Find the start of the line, or any potential comments.
-                    for index in memrchr3_iter(b'\n', b'\r', b'#', bytes) {
-                        if bytes[index] == b'#' {
-                            // Potentially a comment, but not guaranteed
-                            // SAFETY: Safe, because ruff only supports files up to 4GB
-                            potential_comment_starts.push(TextSize::try_from(index).unwrap());
-                        } else {
-                            break;
-                        }
-                    }
-
-                    // No comments
-                    if potential_comment_starts.is_empty() {
-                        None
-                    } else {
-                        // The line contains at least one `#` token. The `#` can indicate the start of a
-                        // comment, meaning the current token is commented out, or it is a regular `#` inside of a string.
-                        self.comment_from_hash_positions(&potential_comment_starts)
-                    }
-                };
-
-                // From here on it is guaranteed that this line has no other comment.
-                self.back_line_has_no_comment = true;
-
-                if let Some(comment_length) = comment_length {
-                    // It is a comment, bump all tokens
-                    for _ in 0..usize::from(comment_length) {
-                        self.cursor.bump_back().unwrap();
-                    }
-
-                    SimpleTokenKind::Comment
-                } else {
-                    match c {
-                        // Keywords and identifiers
-                        c if is_identifier_continuation(c) => {
-                            // if we only have identifier continuations but no start (e.g. 555) we
-                            // don't want to consume the chars, so in that case, we want to rewind the
-                            // cursor to here
-                            let savepoint = self.cursor.clone();
-                            self.cursor.eat_back_while(is_identifier_continuation);
-
-                            let token_len = self.cursor.token_len();
-                            let range = TextRange::at(self.back_offset - token_len, token_len);
-
-                            if self.source[range]
-                                .chars()
-                                .next()
-                                .is_some_and(is_identifier_start)
-                            {
-                                to_keyword_or_other(&self.source[range])
-                            } else {
-                                self.cursor = savepoint;
-                                self.bogus = true;
-                                SimpleTokenKind::Other
-                            }
-                        }
-
-                        // Non-trivia tokens that are unambiguous when lexing backwards.
-                        // In other words: these are characters that _don't_ appear at the
-                        // end of a multi-character token (like `!=`).
-                        '\\' => SimpleTokenKind::Continuation,
-                        ':' => SimpleTokenKind::Colon,
-                        '~' => SimpleTokenKind::Tilde,
-                        '%' => SimpleTokenKind::Percent,
-                        '|' => SimpleTokenKind::Vbar,
-                        ',' => SimpleTokenKind::Comma,
-                        ';' => SimpleTokenKind::Semi,
-                        '(' => SimpleTokenKind::LParen,
-                        ')' => SimpleTokenKind::RParen,
-                        '[' => SimpleTokenKind::LBracket,
-                        ']' => SimpleTokenKind::RBracket,
-                        '{' => SimpleTokenKind::LBrace,
-                        '}' => SimpleTokenKind::RBrace,
-                        '&' => SimpleTokenKind::Ampersand,
-                        '^' => SimpleTokenKind::Circumflex,
-                        '+' => SimpleTokenKind::Plus,
-                        '-' => SimpleTokenKind::Minus,
-
-                        // Non-trivia tokens that _are_ ambiguous when lexing backwards.
-                        // In other words: these are characters that _might_ mark the end
-                        // of a multi-character token (like `!=` or `->` or `//` or `**`).
-                        '=' | '*' | '/' | '@' | '!' | '<' | '>' | '.' => {
-                            // This could be a single-token token, like `+` in `x + y`, or a
-                            // multi-character token, like `+=` in `x += y`. It could also be a sequence
-                            // of multi-character tokens, like `x ==== y`, which is invalid, _but_ it's
-                            // important that we produce the same token stream when lexing backwards as
-                            // we do when lexing forwards. So, identify the range of the sequence, lex
-                            // forwards, and return the last token.
-                            let mut cursor = self.cursor.clone();
-                            cursor.eat_back_while(|c| {
-                                matches!(
-                                    c,
-                                    ':' | '~'
-                                        | '%'
-                                        | '|'
-                                        | '&'
-                                        | '^'
-                                        | '+'
-                                        | '-'
-                                        | '='
-                                        | '*'
-                                        | '/'
-                                        | '@'
-                                        | '!'
-                                        | '<'
-                                        | '>'
-                                        | '.'
-                                )
-                            });
-
-                            let token_len = cursor.token_len();
-                            let range = TextRange::at(self.back_offset - token_len, token_len);
-
-                            let forward_lexer = Self::new(self.source, range);
-                            if let Some(token) = forward_lexer.last() {
-                                // If the token spans multiple characters, bump the cursor. Note,
-                                // though, that we already bumped the cursor to past the last character
-                                // in the token at the very start of `next_token_back`.
-                                for _ in self.source[token.range].chars().rev().skip(1) {
-                                    self.cursor.bump_back().unwrap();
-                                }
-                                token.kind()
-                            } else {
-                                self.bogus = true;
-                                SimpleTokenKind::Other
-                            }
-                        }
-
-                        _ => {
-                            self.bogus = true;
-                            SimpleTokenKind::Other
-                        }
-                    }
-                }
-            }
-        };
-
-        let token_len = self.cursor.token_len();
-
-        let start = self.back_offset - token_len;
-
-        let token = SimpleToken {
-            kind,
-            range: TextRange::at(start, token_len),
-        };
-
-        self.back_offset = start;
-
-        token
     }
 
     pub fn skip_trivia(self) -> impl Iterator<Item = SimpleToken> + 'a {
         self.filter(|t| !t.kind().is_trivia())
     }
-
-    /// Given the position of `#` tokens on a line, test if any `#` is the start of a comment and, if so, return the
-    /// length of the comment.
-    ///
-    /// The challenge is that `#` tokens can also appear inside of strings:
-    ///
-    /// ```python
-    /// ' #not a comment'
-    /// ```
-    ///
-    /// This looks innocent but is the `'` really the start of the new string or could it be a closing delimiter
-    /// of a previously started string:
-    ///
-    /// ```python
-    /// ' a string\
-    /// ` # a comment '
-    /// ```
-    ///
-    /// The only way to reliability tell whether the `#` is a comment when the comment contains a quote char is
-    /// to forward lex all strings and comments and test if there's any unclosed string literal. If so, then
-    /// the hash cannot be a comment.
-    fn comment_from_hash_positions(&self, hash_positions: &[TextSize]) -> Option<TextSize> {
-        // Iterate over the `#` positions from the start to the end of the line.
-        // This is necessary to correctly support `a # comment # comment`.
-        for possible_start in hash_positions.iter().rev() {
-            let comment_bytes =
-                self.source[TextRange::new(*possible_start, self.back_offset)].as_bytes();
-
-            // Test if the comment contains any quotes. If so, then it's possible that the `#` token isn't
-            // the start of a comment, but instead part of a string:
-            // ```python
-            // a + 'a string # not a comment'
-            // a + '''a string
-            // # not a comment'''
-            // ```
-            match memchr2(b'\'', b'"', comment_bytes) {
-                // Most comments don't contain quotes, and most strings don't contain comments.
-                // For these it's safe to assume that they are comments.
-                None => return Some(self.cursor.chars().as_str().text_len() - possible_start),
-                // Now it gets complicated... There's no good way to know whether this is a string or not.
-                // It is necessary to lex all strings and comments from the start to know if it is one or the other.
-                Some(_) => {
-                    if find_unterminated_string_kind(
-                        &self.cursor.chars().as_str()[TextRange::up_to(*possible_start)],
-                    )
-                    .is_none()
-                    {
-                        // There's no unterminated string at the comment's start position. This *must*
-                        // be a comment.
-                        return Some(self.cursor.chars().as_str().text_len() - possible_start);
-                    }
-
-                    // This is a hash inside of a string: `'test # not a comment'` continue with the next potential comment on the line.
-                }
-            }
-        }
-
-        None
-    }
-}
-
-fn find_unterminated_string_kind(input: &str) -> Option<StringKind> {
-    let mut rest = input;
-
-    while let Some(comment_or_string_start) = memchr3(b'#', b'\'', b'\"', rest.as_bytes()) {
-        let c = rest.as_bytes()[comment_or_string_start] as char;
-        let after = &rest[comment_or_string_start + 1..];
-
-        if c == '#' {
-            let comment_end = memchr2(b'\n', b'\r', after.as_bytes()).unwrap_or(after.len());
-            rest = &after[comment_end..];
-        } else {
-            let mut cursor = Cursor::new(after);
-            let quote_kind = if c == '\'' {
-                QuoteKind::Single
-            } else {
-                QuoteKind::Double
-            };
-
-            let string_kind = if cursor.eat_char(quote_kind.as_char()) {
-                // `''` or `""`
-                if cursor.eat_char(quote_kind.as_char()) {
-                    // `'''` or `"""`
-                    StringKind::Triple(quote_kind)
-                } else {
-                    // empty string literal, nothing more to lex
-                    rest = cursor.chars().as_str();
-                    continue;
-                }
-            } else {
-                StringKind::Single(quote_kind)
-            };
-
-            if !is_string_terminated(string_kind, &mut cursor) {
-                return Some(string_kind);
-            }
-
-            rest = cursor.chars().as_str();
-        }
-    }
-
-    None
-}
-
-fn is_string_terminated(kind: StringKind, cursor: &mut Cursor) -> bool {
-    let quote_char = kind.quote_kind().as_char();
-
-    while let Some(c) = cursor.bump() {
-        match c {
-            '\n' | '\r' if kind.is_single() => {
-                // Reached the end of the line without a closing quote, this is an unterminated string literal.
-                return false;
-            }
-            '\\' => {
-                // Skip over escaped quotes that match this strings quotes or double escaped backslashes
-                if cursor.eat_char(quote_char) || cursor.eat_char('\\') {
-                    continue;
-                }
-                // Eat over line continuation
-                cursor.eat_char('\r');
-                cursor.eat_char('\n');
-            }
-            c if c == quote_char => {
-                if kind.is_single() || (cursor.eat_char(quote_char) && cursor.eat_char(quote_char))
-                {
-                    return true;
-                }
-            }
-            _ => {
-                // continue
-            }
-        }
-    }
-
-    // Reached end without a closing quote
-    false
 }
 
 impl Iterator for SimpleTokenizer<'_> {
@@ -1093,60 +753,22 @@ impl Iterator for SimpleTokenizer<'_> {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum StringKind {
-    /// `'...'` or `"..."`
-    Single(QuoteKind),
-    /// `'''...'''` or `"""..."""`
-    Triple(QuoteKind),
-}
-
-impl StringKind {
-    const fn quote_kind(self) -> QuoteKind {
-        match self {
-            StringKind::Single(kind) => kind,
-            StringKind::Triple(kind) => kind,
-        }
-    }
-
-    const fn is_single(self) -> bool {
-        matches!(self, StringKind::Single(_))
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum QuoteKind {
-    /// `'``
-    Single,
-
-    /// `"`
-    Double,
-}
-
-impl QuoteKind {
-    const fn as_char(self) -> char {
-        match self {
-            QuoteKind::Single => '\'',
-            QuoteKind::Double => '"',
-        }
-    }
-}
-
-/// TODO
-///
-/// Simple zero allocation backwards tokenizer for finding preceding tokens. Fails on strings.
+/// Simple zero allocation backwards tokenizer for finding preceding tokens.
 ///
 /// The tokenizer must start at an offset that is trivia (e.g. not inside of a multiline string).
+/// It will fail when reaching a string.
 ///
-/// The tokenizer doesn't guarantee any correctness after it returned a [`SimpleTokenKind::Other`]. That's why it
-/// will return [`SimpleTokenKind::Bogus`] for every character after until it reaches the end of the file.
+/// In case it finds something it can't parse, the tokenizer will return a
+/// [`SimpleTokenKind::Other`] and then only a final [`SimpleTokenKind::Bogus`] afterwards.
 pub struct BackwardsTokenizer<'a> {
     offset: TextSize,
     back_offset: TextSize,
     /// Remember if we have check for comments
     after_newline: bool,
-    // Not `&CommentRanges` to avoid a circular dependency
+    /// Not `&CommentRanges` to avoid a circular dependency
     comment_ranges: &'a [TextRange],
+    /// The index the previously line ending comment
+    previous_comment_idx: Option<usize>,
     bogus: bool,
     source: &'a str,
     cursor: Cursor<'a>,
@@ -1160,6 +782,7 @@ impl<'a> BackwardsTokenizer<'a> {
             // We could start tokenizing at a comment
             after_newline: true,
             comment_ranges: comment_range,
+            previous_comment_idx: None,
             bogus: false,
             source,
             cursor: Cursor::new(&source[range]),
@@ -1179,24 +802,28 @@ impl<'a> BackwardsTokenizer<'a> {
         self.back_offset = self.cursor.text_len() + self.offset;
 
         if self.after_newline {
-            // TODO: perf
-            if let Ok(comment_idx) = self
-                .comment_ranges
-                .binary_search_by(|comment| comment.end().cmp(&self.back_offset))
-            {
-                let comment = self.comment_ranges[comment_idx];
-                // TODO: no loop
-                while self.cursor.text_len() + self.offset > comment.start() {
-                    self.cursor.bump_back();
+            // This comment ended a line with a higher line number, not the current one
+            let previous_comment_idx = self.previous_comment_idx.unwrap_or_else(|| {
+                self.comment_ranges
+                    .partition_point(|comment| comment.end() <= self.back_offset)
+            });
+            // If `previous_comment_idx == 0`, we're in a comment free region
+            if previous_comment_idx > 0 {
+                let comment = self.comment_ranges[previous_comment_idx - 1];
+                if comment.end() == self.back_offset {
+                    // Skip the comment without iterating over the chars manually
+                    self.cursor =
+                        Cursor::new(&self.source[TextRange::new(self.offset, comment.start())]);
+                    debug_assert_eq!(self.cursor.text_len() + self.offset, comment.start());
+                    self.after_newline = false;
+                    self.previous_comment_idx = Some(previous_comment_idx - 1);
+                    return SimpleToken {
+                        kind: SimpleTokenKind::Comment,
+                        range: comment.range(),
+                    };
                 }
-                assert_eq!(self.cursor.text_len() + self.offset, comment.start());
-                let token_len = self.cursor.token_len();
-                self.after_newline = false;
-                let start = self.back_offset - token_len;
-                return SimpleToken {
-                    kind: SimpleTokenKind::Comment,
-                    range: TextRange::at(start, token_len),
-                };
+                // At least memoize the binary search
+                self.previous_comment_idx = Some(previous_comment_idx);
             }
             self.after_newline = false;
         }
@@ -1239,7 +866,7 @@ impl<'a> BackwardsTokenizer<'a> {
                 SimpleTokenKind::Newline
             }
             '#' => unreachable!(),
-            _ => self.next_token_back_inner(last),
+            _ => self.next_token_inner(last),
         };
 
         let token_len = self.cursor.token_len();
@@ -1251,7 +878,7 @@ impl<'a> BackwardsTokenizer<'a> {
     }
 
     /// Helper to parser the previous token once we skipped all whitespace
-    fn next_token_back_inner(&mut self, last: char) -> SimpleTokenKind {
+    fn next_token_inner(&mut self, last: char) -> SimpleTokenKind {
         match last {
             // Keywords and identifiers
             c if is_identifier_continuation(c) => {
