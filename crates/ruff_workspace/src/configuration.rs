@@ -853,6 +853,7 @@ mod tests {
     ];
 
     const PREVIEW_RULES: &[Rule] = &[
+        Rule::ManualDictComprehension,
         Rule::TooManyPublicMethods,
         Rule::SliceCopy,
         Rule::UndocumentedWarn,
