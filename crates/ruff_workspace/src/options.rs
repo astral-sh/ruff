@@ -320,6 +320,7 @@ pub struct Options {
     )]
     /// The line length to use when enforcing long-lines violations (like
     /// `E501`). Must be greater than `0`.
+    #[schemars(range(min = 1, max = 320))]
     pub line_length: Option<LineLength>,
     #[option(
         default = "4",
