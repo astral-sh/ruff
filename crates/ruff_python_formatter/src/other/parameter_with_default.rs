@@ -2,7 +2,6 @@ use ruff_formatter::write;
 use ruff_python_ast::ParameterWithDefault;
 
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatParameterWithDefault;
@@ -19,7 +18,7 @@ impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
 
         if let Some(default) = default {
             let space = parameter.annotation.is_some().then_some(space());
-            write!(f, [space, text("="), space, group(&default.format())])?;
+            write!(f, [space, token("="), space, group(&default.format())])?;
         }
 
         Ok(())

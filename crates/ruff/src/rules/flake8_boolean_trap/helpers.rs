@@ -4,7 +4,8 @@ use ruff_python_ast::{self as ast, Constant, Expr};
 pub(super) fn is_allowed_func_call(name: &str) -> bool {
     matches!(
         name,
-        "append"
+        "__setattr__"
+            | "append"
             | "assertEqual"
             | "assertEquals"
             | "assertNotEqual"
@@ -26,13 +27,13 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
             | "int"
             | "is_"
             | "is_not"
+            | "next"
             | "param"
             | "pop"
             | "remove"
             | "set_blocking"
             | "set_enabled"
             | "setattr"
-            | "__setattr__"
             | "setdefault"
             | "str"
     )

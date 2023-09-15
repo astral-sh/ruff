@@ -36,13 +36,34 @@ a.aaaaaaaaaaaaaaaaaaaaa.lllllllllllllllllllllllllllloooooooooong.chaaaaaaaaaaaaa
 # Test that we add parentheses around the outermost attribute access in an attribute
 # chain if and only if we need them, that is if there are own line comments inside
 # the chain.
-x1 = (
+x10 = (
     a
     .b
     # comment 1
     .  # comment 2
     # comment 3
     c
+    .d
+)
+
+x11 = (
+    a
+    .b
+    # comment 1
+    .  # comment 2
+    # comment 3
+    c
+    ).d
+
+x12 = (
+    (
+    a
+    .b
+    # comment 1
+    .  # comment 2
+    # comment 3
+    c
+    )
     .d
 )
 
@@ -106,6 +127,28 @@ x6 = (
     a.b
 )
 
-# regression: https://github.com/astral-sh/ruff/issues/6181
+# Regression test for: https://github.com/astral-sh/ruff/issues/6181
 (#
 ()).a
+
+(
+    (
+        a # trailing end-of-line
+        # trailing own-line
+    ) # dangling before dot end-of-line
+    .b # trailing end-of-line
+)
+
+(
+    (
+        a
+    )
+            # dangling before dot own-line
+    .b
+)
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7370
+result = (
+    f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
+    + 1
+).bit_length()

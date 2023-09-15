@@ -177,7 +177,7 @@ impl Printer {
             return Ok(());
         }
 
-        let context = EmitterContext::new(&diagnostics.notebooks);
+        let context = EmitterContext::new(&diagnostics.notebook_indexes);
 
         match self.format {
             SerializationFormat::Json => {
@@ -364,7 +364,7 @@ impl Printer {
                 writeln!(writer)?;
             }
 
-            let context = EmitterContext::new(&diagnostics.notebooks);
+            let context = EmitterContext::new(&diagnostics.notebook_indexes);
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.autofix_level))
                 .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))

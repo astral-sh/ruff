@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::{PySourceType, Ranged};
-use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Debug)]
 pub(crate) struct Comment<'a> {
@@ -21,20 +20,15 @@ impl Ranged for Comment<'_> {
 pub(crate) fn collect_comments<'a>(
     range: TextRange,
     locator: &'a Locator,
-    source_type: PySourceType,
+    indexer: &'a Indexer,
 ) -> Vec<Comment<'a>> {
-    let contents = locator.slice(range);
-    lexer::lex_starts_at(contents, source_type.as_mode(), range.start())
-        .flatten()
-        .filter_map(|(tok, range)| {
-            if let Tok::Comment(value) = tok {
-                Some(Comment {
-                    value: value.into(),
-                    range,
-                })
-            } else {
-                None
-            }
+    indexer
+        .comment_ranges()
+        .comments_in_range(range)
+        .iter()
+        .map(|range| Comment {
+            value: locator.slice(*range).into(),
+            range: *range,
         })
         .collect()
 }

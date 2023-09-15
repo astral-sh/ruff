@@ -1,25 +1,23 @@
 //! An equivalent object hierarchy to the `RustPython` AST hierarchy, but with the
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
+//!
+//! Two [`ComparableExpr`]s are considered equal if the underlying AST nodes have the
+//! same shape, ignoring trivia (e.g., parentheses, comments, and whitespace), the
+//! location in the source code, and other contextual information (e.g., whether they
+//! represent reads or writes, which is typically encoded in the Python AST).
+//!
+//! For example, in `[(a, b) for a, b in c]`, the `(a, b)` and `a, b` expressions are
+//! considered equal, despite the former being parenthesized, and despite the former
+//! being a write ([`ast::ExprContext::Store`]) and the latter being a read
+//! ([`ast::ExprContext::Load`]).
+//!
+//! Similarly, `"a" "b"` and `"ab"` would be considered equal, despite the former being
+//! an implicit concatenation of string literals, as these expressions are considered to
+//! have the same shape in that they evaluate to the same value.
 
-use crate as ast;
 use num_bigint::BigInt;
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableExprContext {
-    Load,
-    Store,
-    Del,
-}
-
-impl From<&ast::ExprContext> for ComparableExprContext {
-    fn from(ctx: &ast::ExprContext) -> Self {
-        match ctx {
-            ast::ExprContext::Load => Self::Load,
-            ast::ExprContext::Store => Self::Store,
-            ast::ExprContext::Del => Self::Del,
-        }
-    }
-}
+use crate as ast;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableBoolOp {
@@ -154,6 +152,36 @@ impl<'a> From<&'a ast::WithItem> for ComparableWithItem<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparablePatternArguments<'a> {
+    patterns: Vec<ComparablePattern<'a>>,
+    keywords: Vec<ComparablePatternKeyword<'a>>,
+}
+
+impl<'a> From<&'a ast::PatternArguments> for ComparablePatternArguments<'a> {
+    fn from(parameters: &'a ast::PatternArguments) -> Self {
+        Self {
+            patterns: parameters.patterns.iter().map(Into::into).collect(),
+            keywords: parameters.keywords.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparablePatternKeyword<'a> {
+    attr: &'a str,
+    pattern: ComparablePattern<'a>,
+}
+
+impl<'a> From<&'a ast::PatternKeyword> for ComparablePatternKeyword<'a> {
+    fn from(keyword: &'a ast::PatternKeyword) -> Self {
+        Self {
+            attr: keyword.attr.as_str(),
+            pattern: (&keyword.pattern).into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct PatternMatchValue<'a> {
     value: ComparableExpr<'a>,
 }
@@ -178,9 +206,7 @@ pub struct PatternMatchMapping<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct PatternMatchClass<'a> {
     cls: ComparableExpr<'a>,
-    patterns: Vec<ComparablePattern<'a>>,
-    kwd_attrs: Vec<&'a str>,
-    kwd_patterns: Vec<ComparablePattern<'a>>,
+    arguments: ComparablePatternArguments<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -240,18 +266,12 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
                 patterns: patterns.iter().map(Into::into).collect(),
                 rest: rest.as_deref(),
             }),
-            ast::Pattern::MatchClass(ast::PatternMatchClass {
-                cls,
-                patterns,
-                kwd_attrs,
-                kwd_patterns,
-                ..
-            }) => Self::MatchClass(PatternMatchClass {
-                cls: cls.into(),
-                patterns: patterns.iter().map(Into::into).collect(),
-                kwd_attrs: kwd_attrs.iter().map(ast::Identifier::as_str).collect(),
-                kwd_patterns: kwd_patterns.iter().map(Into::into).collect(),
-            }),
+            ast::Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
+                Self::MatchClass(PatternMatchClass {
+                    cls: cls.into(),
+                    arguments: arguments.into(),
+                })
+            }
             ast::Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
                 Self::MatchStar(PatternMatchStar {
                     name: name.as_deref(),
@@ -312,7 +332,7 @@ impl<'a> From<&'a ast::Decorator> for ComparableDecorator<'a> {
 pub enum ComparableConstant<'a> {
     None,
     Bool(&'a bool),
-    Str(&'a str),
+    Str { value: &'a str, unicode: bool },
     Bytes(&'a [u8]),
     Int(&'a BigInt),
     Tuple(Vec<ComparableConstant<'a>>),
@@ -331,7 +351,11 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
                 // Compare strings based on resolved value, not representation (i.e., ignore whether
                 // the string was implicitly concatenated).
                 implicit_concatenated: _,
-            }) => Self::Str(value),
+                unicode,
+            }) => Self::Str {
+                value,
+                unicode: *unicode,
+            },
             ast::Constant::Bytes(ast::BytesConstant {
                 value,
                 // Compare bytes based on resolved value, not representation (i.e., ignore whether
@@ -633,45 +657,38 @@ pub struct ExprFString<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprConstant<'a> {
     value: ComparableConstant<'a>,
-    kind: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprAttribute<'a> {
     value: Box<ComparableExpr<'a>>,
     attr: &'a str,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprSubscript<'a> {
     value: Box<ComparableExpr<'a>>,
     slice: Box<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprStarred<'a> {
     value: Box<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprName<'a> {
     id: &'a str,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprList<'a> {
     elts: Vec<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprTuple<'a> {
     elts: Vec<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -882,61 +899,54 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }) => Self::FString(ExprFString {
                 values: values.iter().map(Into::into).collect(),
             }),
-            ast::Expr::Constant(ast::ExprConstant {
-                value,
-                kind,
-                range: _,
-            }) => Self::Constant(ExprConstant {
-                value: value.into(),
-                kind: kind.as_ref().map(String::as_str),
-            }),
+            ast::Expr::Constant(ast::ExprConstant { value, range: _ }) => {
+                Self::Constant(ExprConstant {
+                    value: value.into(),
+                })
+            }
             ast::Expr::Attribute(ast::ExprAttribute {
                 value,
                 attr,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::Attribute(ExprAttribute {
                 value: value.into(),
                 attr: attr.as_str(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Subscript(ast::ExprSubscript {
                 value,
                 slice,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::Subscript(ExprSubscript {
                 value: value.into(),
                 slice: slice.into(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Starred(ast::ExprStarred {
                 value,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::Starred(ExprStarred {
                 value: value.into(),
-                ctx: ctx.into(),
             }),
-            ast::Expr::Name(ast::ExprName { id, ctx, range: _ }) => Self::Name(ExprName {
-                id: id.as_str(),
-                ctx: ctx.into(),
-            }),
+            ast::Expr::Name(ast::ExprName {
+                id,
+                ctx: _,
+                range: _,
+            }) => Self::Name(ExprName { id: id.as_str() }),
             ast::Expr::List(ast::ExprList {
                 elts,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::List(ExprList {
                 elts: elts.iter().map(Into::into).collect(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Tuple(ast::ExprTuple {
                 elts,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::Tuple(ExprTuple {
                 elts: elts.iter().map(Into::into).collect(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Slice(ast::ExprSlice {
                 lower,

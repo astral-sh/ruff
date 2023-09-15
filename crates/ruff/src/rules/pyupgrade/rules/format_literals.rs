@@ -2,16 +2,19 @@ use anyhow::{anyhow, Result};
 use libcst_native::{Arg, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_attribute, match_call_mut, match_expression};
+use crate::cst::matchers::{
+    match_attribute, match_call_mut, match_expression, transform_expression_text,
+};
 use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
 
@@ -58,8 +61,8 @@ impl Violation for FormatLiterals {
 /// UP030
 pub(crate) fn format_literals(
     checker: &mut Checker,
-    summary: &FormatSummary,
     call: &ast::ExprCall,
+    summary: &FormatSummary,
 ) {
     // The format we expect is, e.g.: `"{0} {1}".format(...)`
     if summary.has_nested_parts {
@@ -112,10 +115,8 @@ pub(crate) fn format_literals(
     let mut diagnostic = Diagnostic::new(FormatLiterals, call.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            Ok(Fix::suggested(Edit::range_replacement(
-                generate_call(call, arguments, checker.locator(), checker.stylist())?,
-                call.range(),
-            )))
+            generate_call(call, arguments, checker.locator(), checker.stylist())
+                .map(|suggestion| Fix::suggested(Edit::range_replacement(suggestion, call.range())))
         });
     }
     checker.diagnostics.push(diagnostic);
@@ -165,7 +166,7 @@ fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Are
 }
 
 /// Return the corrected argument vector.
-fn generate_arguments<'a>(arguments: &[Arg<'a>], order: &'a [usize]) -> Result<Vec<Arg<'a>>> {
+fn generate_arguments<'a>(arguments: &[Arg<'a>], order: &[usize]) -> Result<Vec<Arg<'a>>> {
     let mut new_arguments: Vec<Arg> = Vec::with_capacity(arguments.len());
     for (idx, given) in order.iter().enumerate() {
         // We need to keep the formatting in the same order but move the values.
@@ -205,28 +206,27 @@ fn generate_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let content = locator.slice(call.range());
-    let parenthesized_content = format!("({content})");
-    let mut expression = match_expression(&parenthesized_content)?;
+    let source_code = locator.slice(call);
 
-    // Fix the call arguments.
-    let call = match_call_mut(&mut expression)?;
-    if let Arguments::Reorder(order) = arguments {
-        call.args = generate_arguments(&call.args, order)?;
-    }
+    let output = transform_expression_text(source_code, |source_code| {
+        let mut expression = match_expression(&source_code)?;
 
-    // Fix the string itself.
-    let item = match_attribute(&mut call.func)?;
-    let arena = typed_arena::Arena::new();
-    remove_specifiers(&mut item.value, &arena);
+        // Fix the call arguments.
+        let call = match_call_mut(&mut expression)?;
+        if let Arguments::Reorder(order) = arguments {
+            call.args = generate_arguments(&call.args, order)?;
+        }
 
-    // Remove the parentheses (first and last characters).
-    let mut output = expression.codegen_stylist(stylist);
-    output.remove(0);
-    output.pop();
+        // Fix the string itself.
+        let item = match_attribute(&mut call.func)?;
+        let arena = typed_arena::Arena::new();
+        remove_specifiers(&mut item.value, &arena);
+
+        Ok(expression.codegen_stylist(stylist))
+    })?;
 
     // Ex) `'{' '0}'.format(1)`
-    if output == content {
+    if output == source_code {
         return Err(anyhow!("Unable to identify format literals"));
     }
 

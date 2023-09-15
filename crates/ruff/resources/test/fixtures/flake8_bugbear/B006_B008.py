@@ -230,6 +230,10 @@ def timedelta_okay(value=dt.timedelta(hours=1)):
 def path_okay(value=Path(".")):
     pass
 
+# B008 allow arbitrary call with immutable annotation
+def immutable_annotation_call(value: Sequence[int] = foo()):
+    pass
+
 # B006 and B008
 # We should handle arbitrary nesting of these B008.
 def nested_combo(a=[float(3), dt.datetime.now()]):
@@ -304,3 +308,7 @@ def single_line_func_wrong(value: dict[str, str] = {
 def single_line_func_wrong(value: dict[str, str] = {}) \
     : \
     """Docstring"""
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring without newline"""

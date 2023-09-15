@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
@@ -73,8 +74,7 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
                     base,
                     arguments,
                     Parentheses::Remove,
-                    checker.locator(),
-                    checker.source_type,
+                    checker.locator().contents(),
                 )
                 .map(Fix::automatic)
             });

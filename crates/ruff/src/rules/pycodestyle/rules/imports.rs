@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Alias, Ranged, Stmt};
+use ruff_python_ast::{Alias, Stmt};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 

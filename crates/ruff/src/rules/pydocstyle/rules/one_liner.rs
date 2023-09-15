@@ -1,8 +1,8 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::Ranged;
 use ruff_source_file::NewlineWithTrailingNewline;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -74,7 +74,8 @@ pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 // characters, avoid applying the fix.
                 let body = docstring.body();
                 let trimmed = body.trim();
-                if !trimmed.ends_with(trailing.chars().last().unwrap())
+                if trimmed.chars().rev().take_while(|c| *c == '\\').count() % 2 == 0
+                    && !trimmed.ends_with(trailing.chars().last().unwrap())
                     && !trimmed.starts_with(leading.chars().last().unwrap())
                 {
                     diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

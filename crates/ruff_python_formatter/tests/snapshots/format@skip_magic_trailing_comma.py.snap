@@ -42,8 +42,9 @@ with (a,):  # magic trailing comma
 ## Outputs
 ### Output 1
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -93,8 +94,9 @@ with (
 
 ### Output 2
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Ignore
 ```

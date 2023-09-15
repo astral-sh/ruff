@@ -65,3 +65,42 @@ def foo():
         test, # comment 4
         1
     )
+
+    yield (
+        "#   * Make sure each ForeignKey and OneToOneField has `on_delete` set "
+        "to the desired behavior"
+    )
+
+    yield aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb + ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+yield ("Cache key will cause errors if used with memcached: %r " "(longer than %s)" % (
+    key,
+    MEMCACHE_MAX_KEY_LENGTH,
+)
+       )
+
+yield "Cache key will cause errors if used with memcached: %r " "(longer than %s)" % (
+    key,
+    MEMCACHE_MAX_KEY_LENGTH,
+)
+
+
+yield ("Unnecessary")
+
+
+yield (
+    "#   * Make sure each ForeignKey and OneToOneField has `on_delete` set "
+    "to the desired behavior"
+)
+yield (
+    "#   * Remove `managed = False` lines if you wish to allow "
+    "Django to create, modify, and delete the table"
+)
+yield (
+    "# Feel free to rename the models, but don't rename db_table values or "
+    "field names."
+)
+
+yield "#   * Make sure each ForeignKey and OneToOneField has `on_delete` set "    "to the desired behavior"
+yield "#   * Remove `managed = False` lines if you wish to allow " "Django to create, modify, and delete the table"
+yield "# Feel free to rename the models, but don't rename db_table values or "    "field names."

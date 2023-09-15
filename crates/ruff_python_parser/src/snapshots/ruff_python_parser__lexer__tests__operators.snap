@@ -1,0 +1,30 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        DoubleSlash,
+        0..2,
+    ),
+    (
+        DoubleSlash,
+        2..4,
+    ),
+    (
+        DoubleSlashEqual,
+        4..7,
+    ),
+    (
+        Slash,
+        7..8,
+    ),
+    (
+        Slash,
+        9..10,
+    ),
+    (
+        Newline,
+        10..10,
+    ),
+]

@@ -2,7 +2,8 @@ use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -70,7 +71,7 @@ pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
         // `await` is allowed at the top level of a Jupyter notebook.
         // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
         if scope.kind.is_module()
-            && checker.source_type.is_jupyter()
+            && checker.source_type.is_ipynb()
             && keyword == DeferralKeyword::Await
         {
             return;

@@ -1,14 +1,12 @@
 use ruff_formatter::prelude::{
-    format_args, format_with, group, soft_line_break_or_space, space, text,
+    format_args, format_with, group, soft_line_break_or_space, space, token,
 };
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprDictComp;
 
-use crate::context::PyFormatContext;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
-use crate::AsFormat;
-use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprDictComp;
@@ -37,7 +35,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
                 "{",
                 &group(&format_args!(
                     group(&key.format()),
-                    text(":"),
+                    token(":"),
                     space(),
                     value.format(),
                     soft_line_break_or_space(),

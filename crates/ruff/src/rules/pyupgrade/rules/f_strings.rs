@@ -1,18 +1,19 @@
 use std::borrow::Cow;
 
 use anyhow::{Context, Result};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged};
-use ruff_python_literal::format::{
-    FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
-};
-use ruff_python_parser::{lexer, Mode, Tok};
-use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
+use ruff_python_literal::format::{
+    FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
+};
+use ruff_python_parser::{lexer, Mode, Tok};
+
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineLength;
@@ -21,10 +22,10 @@ use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
 /// ## What it does
-/// Checks for `str#format` calls that can be replaced with f-strings.
+/// Checks for `str.format` calls that can be replaced with f-strings.
 ///
 /// ## Why is this bad?
-/// f-strings are more readable and generally preferred over `str#format`
+/// f-strings are more readable and generally preferred over `str.format`
 /// calls.
 ///
 /// ## Example
@@ -67,39 +68,32 @@ struct FormatSummaryValues<'a> {
 }
 
 impl<'a> FormatSummaryValues<'a> {
-    fn try_from_expr(expr: &'a Expr, locator: &'a Locator) -> Option<Self> {
+    fn try_from_call(call: &'a ast::ExprCall, locator: &'a Locator) -> Option<Self> {
         let mut extracted_args: Vec<&Expr> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
-        if let Expr::Call(ast::ExprCall {
-            arguments: Arguments { args, keywords, .. },
-            ..
-        }) = expr
-        {
-            for arg in args {
-                if matches!(arg, Expr::Starred(..))
-                    || contains_quotes(locator.slice(arg.range()))
-                    || locator.contains_line_break(arg.range())
-                {
-                    return None;
-                }
-                extracted_args.push(arg);
+
+        for arg in &call.arguments.args {
+            if matches!(arg, Expr::Starred(..))
+                || contains_quotes(locator.slice(arg))
+                || locator.contains_line_break(arg.range())
+            {
+                return None;
             }
-            for keyword in keywords {
-                let Keyword {
-                    arg,
-                    value,
-                    range: _,
-                } = keyword;
-                let Some(key) = arg else {
-                    return None;
-                };
-                if contains_quotes(locator.slice(value.range()))
-                    || locator.contains_line_break(value.range())
-                {
-                    return None;
-                }
-                extracted_kwargs.insert(key, value);
+            extracted_args.push(arg);
+        }
+        for keyword in &call.arguments.keywords {
+            let Keyword {
+                arg,
+                value,
+                range: _,
+            } = keyword;
+            let Some(key) = arg else {
+                return None;
+            };
+            if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
+                return None;
             }
+            extracted_kwargs.insert(key, value);
         }
 
         if extracted_args.is_empty() && extracted_kwargs.is_empty() {
@@ -146,7 +140,7 @@ enum FormatContext {
 
 /// Given an [`Expr`], format it for use in a formatted expression within an f-string.
 fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>) -> Cow<'a, str> {
-    let text = locator.slice(expr.range());
+    let text = locator.slice(expr);
     let parenthesize = match (context, expr) {
         // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
         (
@@ -309,8 +303,8 @@ fn try_convert_to_f_string(
 /// UP032
 pub(crate) fn f_strings(
     checker: &mut Checker,
+    call: &ast::ExprCall,
     summary: &FormatSummary,
-    expr: &Expr,
     template: &Expr,
     line_length: LineLength,
 ) {
@@ -318,14 +312,7 @@ pub(crate) fn f_strings(
         return;
     }
 
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
-        return;
-    };
-
-    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { value, .. }) = call.func.as_ref() else {
         return;
     };
 
@@ -339,14 +326,14 @@ pub(crate) fn f_strings(
         return;
     };
 
-    let Some(mut summary) = FormatSummaryValues::try_from_expr(expr, checker.locator()) else {
+    let Some(mut summary) = FormatSummaryValues::try_from_call(call, checker.locator()) else {
         return;
     };
     let mut patches: Vec<(TextRange, String)> = vec![];
     let mut lex = lexer::lex_starts_at(
-        checker.locator().slice(func.range()),
+        checker.locator().slice(call.func.range()),
         Mode::Expression,
-        expr.start(),
+        call.start(),
     )
     .flatten();
     let end = loop {
@@ -384,8 +371,8 @@ pub(crate) fn f_strings(
         return;
     }
 
-    let mut contents = String::with_capacity(checker.locator().slice(expr.range()).len());
-    let mut prev_end = expr.start();
+    let mut contents = String::with_capacity(checker.locator().slice(call).len());
+    let mut prev_end = call.start();
     for (range, fstring) in patches {
         contents.push_str(
             checker
@@ -408,14 +395,14 @@ pub(crate) fn f_strings(
         // """.format(0, 1) -> offset = 0
         // ```
         let offset = if idx == 0 { col_offset.to_usize() } else { 0 };
-        offset + line.chars().count() > line_length.get()
+        offset + line.chars().count() > line_length.value() as usize
     }) {
         return;
     }
 
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
-    let existing = checker.locator().slice(TextRange::up_to(expr.start()));
+    let existing = checker.locator().slice(TextRange::up_to(call.start()));
     if existing
         .chars()
         .last()
@@ -424,7 +411,7 @@ pub(crate) fn f_strings(
         contents.insert(0, ' ');
     }
 
-    let mut diagnostic = Diagnostic::new(FString, expr.range());
+    let mut diagnostic = Diagnostic::new(FString, call.range());
 
     // Avoid autofix if there are comments within the call:
     // ```
@@ -436,11 +423,11 @@ pub(crate) fn f_strings(
         && !checker
             .indexer()
             .comment_ranges()
-            .intersects(arguments.range())
+            .intersects(call.arguments.range())
     {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents,
-            expr.range(),
+            call.range(),
         )));
     };
     checker.diagnostics.push(diagnostic);

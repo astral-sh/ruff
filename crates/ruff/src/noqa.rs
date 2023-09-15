@@ -8,8 +8,7 @@ use std::path::Path;
 use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_trivia::indentation_at_offset;
@@ -60,7 +59,7 @@ impl<'a> Directive<'a> {
             if text[..comment_start]
                 .chars()
                 .last()
-                .is_some_and(|c| c != '#')
+                .map_or(true, |c| c != '#')
             {
                 continue;
             }
@@ -537,7 +536,7 @@ fn add_noqa_inner(
                     let rule = diagnostic.kind.rule();
                     if !includes(rule, codes) {
                         matches_by_line
-                            .entry(directive_line.range.start())
+                            .entry(directive_line.start())
                             .or_insert_with(|| {
                                 (RuleSet::default(), Some(&directive_line.directive))
                             })
@@ -562,7 +561,7 @@ fn add_noqa_inner(
     let mut prev_end = TextSize::default();
 
     for (offset, (rules, directive)) in matches_by_line {
-        output.push_str(&locator.contents()[TextRange::new(prev_end, offset)]);
+        output.push_str(locator.slice(TextRange::new(prev_end, offset)));
 
         let line = locator.full_line(offset);
 
@@ -619,7 +618,7 @@ fn add_noqa_inner(
         prev_end = offset + line.text_len();
     }
 
-    output.push_str(&locator.contents()[usize::from(prev_end)..]);
+    output.push_str(locator.after(prev_end));
 
     (count, output)
 }
@@ -643,6 +642,13 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
     pub(crate) matches: Vec<NoqaCode>,
+}
+
+impl Ranged for NoqaDirectiveLine<'_> {
+    /// The range of the `noqa` directive.
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 #[derive(Debug, Default)]

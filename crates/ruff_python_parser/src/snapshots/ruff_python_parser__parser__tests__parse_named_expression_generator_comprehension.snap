@@ -32,7 +32,6 @@ GeneratorExp(
                                 value: Int(
                                     1,
                                 ),
-                                kind: None,
                             },
                         ),
                     },

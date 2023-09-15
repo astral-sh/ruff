@@ -1,20 +1,20 @@
+def bar(): ...  # OK
 def bar():
-    ...  # OK
+    pass  # OK
 
+def bar():
+    """oof"""  # OK
 
-def oof():   # OK, docstrings are handled by another rule
-  """oof"""
-  print("foo")
+def oof():  # ERROR PYI048
+    """oof"""
+    print("foo")
 
-
-
-def foo():   # ERROR PYI048
+def foo():  # ERROR PYI048
     """foo"""
     print("foo")
     print("foo")
 
-
-def buzz():   # ERROR PYI048
+def buzz():  # ERROR PYI048
     print("fizz")
     print("buzz")
     print("test")

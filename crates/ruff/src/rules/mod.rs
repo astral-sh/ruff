@@ -52,5 +52,6 @@ pub mod pyflakes;
 pub mod pygrep_hooks;
 pub mod pylint;
 pub mod pyupgrade;
+pub mod refurb;
 pub mod ruff;
 pub mod tryceratops;

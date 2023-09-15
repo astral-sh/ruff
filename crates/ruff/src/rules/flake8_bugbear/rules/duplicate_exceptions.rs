@@ -1,6 +1,6 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -90,8 +90,7 @@ impl AlwaysAutofixableViolation for DuplicateHandlerException {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DuplicateHandlerException { names } = self;
-        if names.len() == 1 {
-            let name = &names[0];
+        if let [name] = names.as_slice() {
             format!("Exception handler with duplicate exception: `{name}`")
         } else {
             let names = names.iter().map(|name| format!("`{name}`")).join(", ");

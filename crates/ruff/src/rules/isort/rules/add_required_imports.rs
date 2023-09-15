@@ -1,14 +1,14 @@
 use log::error;
-use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
-use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
+use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::parse_suite;
 use ruff_source_file::Locator;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::importer::Importer;
 use crate::registry::Rule;

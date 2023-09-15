@@ -3,11 +3,9 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprListComp;
 
 use crate::comments::SourceComment;
-use crate::context::PyFormatContext;
+
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::AsFormat;
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatExprListComp;

@@ -1,10 +1,10 @@
-use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::docstrings::clean_space;
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlines};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -62,6 +62,10 @@ impl AlwaysAutofixableViolation for NewLineAfterLastParagraph {
 pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body();
+
+    if !docstring.triple_quoted() {
+        return;
+    }
 
     let mut line_count = 0;
     for line in NewlineWithTrailingNewline::from(body.as_str()) {

@@ -1,9 +1,11 @@
 use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct DebugGroupId {
     value: NonZeroU32,
+    #[cfg_attr(feature = "serde", serde(skip))]
     name: &'static str,
 }
 
@@ -28,6 +30,7 @@ impl std::fmt::Debug for DebugGroupId {
 /// See [`crate::Formatter::group_id`] on how to get a unique id.
 #[repr(transparent)]
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReleaseGroupId {
     value: NonZeroU32,
 }

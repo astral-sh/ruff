@@ -10,6 +10,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+
     use test_case::test_case;
 
     use crate::line_width::LineLength;
@@ -170,7 +171,7 @@ mod tests {
             Path::new("pycodestyle/W505.py"),
             &settings::Settings {
                 pycodestyle: Settings {
-                    max_doc_length: Some(LineLength::from(50)),
+                    max_doc_length: Some(LineLength::try_from(50).unwrap()),
                     ..Settings::default()
                 },
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)
@@ -186,7 +187,7 @@ mod tests {
             Path::new("pycodestyle/W505_utf_8.py"),
             &settings::Settings {
                 pycodestyle: Settings {
-                    max_doc_length: Some(LineLength::from(50)),
+                    max_doc_length: Some(LineLength::try_from(50).unwrap()),
                     ..Settings::default()
                 },
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)
@@ -206,7 +207,7 @@ mod tests {
             Path::new("pycodestyle/E501_2.py"),
             &settings::Settings {
                 tab_size: NonZeroU8::new(tab_size).unwrap().into(),
-                line_length: LineLength::from(6),
+                line_length: LineLength::try_from(6).unwrap(),
                 ..settings::Settings::for_rule(Rule::LineTooLong)
             },
         )?;

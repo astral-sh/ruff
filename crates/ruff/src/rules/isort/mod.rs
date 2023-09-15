@@ -19,14 +19,14 @@ use sorting::cmp_either_import;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, EitherImport, TrailingComma};
 
-use crate::line_width::{LineLength, LineWidth};
+use crate::line_width::{LineLength, LineWidthBuilder};
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
 
 mod annotate;
 pub(crate) mod block;
-mod categorize;
+pub mod categorize;
 mod comments;
 mod format;
 mod helpers;
@@ -69,7 +69,7 @@ pub(crate) fn format_imports(
     comments: Vec<Comment>,
     locator: &Locator,
     line_length: LineLength,
-    indentation_width: LineWidth,
+    indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -82,6 +82,7 @@ pub(crate) fn format_imports(
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
     order_by_type: bool,
+    detect_same_package: bool,
     relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
     split_on_trailing_comma: bool,
@@ -129,6 +130,7 @@ pub(crate) fn format_imports(
             force_to_top,
             known_modules,
             order_by_type,
+            detect_same_package,
             relative_imports_order,
             split_on_trailing_comma,
             classes,
@@ -177,7 +179,7 @@ pub(crate) fn format_imports(
 fn format_import_block(
     block: ImportBlock,
     line_length: LineLength,
-    indentation_width: LineWidth,
+    indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -187,6 +189,7 @@ fn format_import_block(
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
     order_by_type: bool,
+    detect_same_package: bool,
     relative_imports_order: RelativeImportsOrder,
     split_on_trailing_comma: bool,
     classes: &BTreeSet<String>,
@@ -198,7 +201,14 @@ fn format_import_block(
     section_order: &[ImportSection],
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
-    let mut block_by_type = categorize_imports(block, src, package, known_modules, target_version);
+    let mut block_by_type = categorize_imports(
+        block,
+        src,
+        package,
+        detect_same_package,
+        known_modules,
+        target_version,
+    );
 
     let mut output = String::new();
 
@@ -307,11 +317,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_text_size::Ranged;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use crate::assert_messages;
-    use crate::message::Message;
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::Settings;
@@ -650,7 +660,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -678,7 +688,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -708,7 +718,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -736,7 +746,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -756,7 +766,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -927,7 +937,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -952,7 +962,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -973,7 +983,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -992,7 +1002,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -1082,6 +1092,40 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn detect_same_package() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("isort/detect_same_package/foo/bar.py"),
+            &Settings {
+                src: vec![],
+                isort: super::settings::Settings {
+                    detect_same_package: true,
+                    ..super::settings::Settings::default()
+                },
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn no_detect_same_package() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("isort/detect_same_package/foo/bar.py"),
+            &Settings {
+                src: vec![],
+                isort: super::settings::Settings {
+                    detect_same_package: false,
+                    ..super::settings::Settings::default()
+                },
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Constant, Expr, ExprConstant, Ranged, Stmt, StmtExpr};
+use ruff_python_ast::{Constant, Expr, ExprConstant, Stmt, StmtExpr};
+use ruff_text_size::Ranged;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -69,7 +70,9 @@ pub(crate) fn ellipsis_in_non_empty_class_body(checker: &mut Checker, body: &[St
                     checker.locator(),
                     checker.indexer(),
                 );
-                diagnostic.set_fix(Fix::automatic(edit).isolate(checker.statement_isolation()));
+                diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(Some(
+                    checker.semantic().current_statement_id(),
+                ))));
             }
             checker.diagnostics.push(diagnostic);
         }

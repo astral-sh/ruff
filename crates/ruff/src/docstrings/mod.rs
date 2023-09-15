@@ -1,9 +1,9 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 use ruff_python_semantic::Definition;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 pub(crate) mod extraction;
 pub(crate) mod google;
@@ -29,6 +29,11 @@ impl<'a> Docstring<'a> {
 
     pub(crate) fn leading_quote(&self) -> &'a str {
         &self.contents[TextRange::up_to(self.body_range.start())]
+    }
+
+    pub(crate) fn triple_quoted(&self) -> bool {
+        let leading_quote = self.leading_quote();
+        leading_quote.ends_with("\"\"\"") || leading_quote.ends_with("'''")
     }
 }
 

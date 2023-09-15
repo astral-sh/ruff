@@ -3,8 +3,8 @@ use strum::IntoEnumIterator;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Ranged;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::SectionKind;
@@ -88,6 +88,17 @@ pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring
         let mut lines = UniversalNewlineIterator::with_offset(&body, body.start()).skip(index);
         let line = lines.next().unwrap();
         let trimmed = line.trim_end();
+
+        if trimmed.ends_with('\\') {
+            // Ignore the edge case whether a single quoted string is multiple lines through an
+            // escape (https://github.com/astral-sh/ruff/issues/7139). Single quote docstrings are
+            // flagged by D300.
+            // ```python
+            // "\
+            // "
+            // ```
+            return;
+        }
 
         if !trimmed.ends_with(['.', '!', '?']) {
             let mut diagnostic = Diagnostic::new(EndsInPunctuation, docstring.range());

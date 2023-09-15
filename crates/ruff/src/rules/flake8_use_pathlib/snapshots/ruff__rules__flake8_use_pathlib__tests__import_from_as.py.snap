@@ -239,7 +239,7 @@ import_from_as.py:37:1: PTH121 `os.path.samefile()` should be replaced by `Path.
 38 | xsplitext(p)
    |
 
-import_from_as.py:38:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`
+import_from_as.py:38:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`
    |
 36 | xdirname(p)
 37 | xsamefile(p)

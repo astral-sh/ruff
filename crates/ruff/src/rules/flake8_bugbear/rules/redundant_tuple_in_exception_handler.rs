@@ -1,8 +1,10 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Ranged};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_starred;
+use ruff_python_ast::{self as ast, ExceptHandler, Expr};
+use ruff_text_size::Ranged;
 
+use crate::autofix::edits::pad;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -40,11 +42,7 @@ pub struct RedundantTupleInExceptionHandler {
 impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedundantTupleInExceptionHandler { name } = self;
-        format!(
-            "A length-one tuple literal is redundant. Write `except {name}` instead of `except \
-             ({name},)`."
-        )
+        format!("A length-one tuple literal is redundant in exception handlers")
     }
 
     fn autofix_title(&self) -> String {
@@ -69,9 +67,10 @@ pub(crate) fn redundant_tuple_in_exception_handler(
         let Expr::Tuple(ast::ExprTuple { elts, .. }) = type_.as_ref() else {
             continue;
         };
-        let [elt] = &elts[..] else {
+        let [elt] = elts.as_slice() else {
             continue;
         };
+        let elt = map_starred(elt);
         let mut diagnostic = Diagnostic::new(
             RedundantTupleInExceptionHandler {
                 name: checker.generator().expr(elt),
@@ -79,9 +78,19 @@ pub(crate) fn redundant_tuple_in_exception_handler(
             type_.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
+            // If there's no space between the `except` and the tuple, we need to insert a space,
+            // as in:
+            // ```python
+            // except(ValueError,):
+            // ```
+            // Otherwise, the output will be invalid syntax, since we're removing a set of
+            // parentheses.
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                checker.generator().expr(elt),
+                pad(
+                    checker.generator().expr(elt),
+                    type_.range(),
+                    checker.locator(),
+                ),
                 type_.range(),
             )));
         }

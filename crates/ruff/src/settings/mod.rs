@@ -2,19 +2,16 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use globset::{Glob, GlobMatcher};
 use regex::Regex;
-use rustc_hash::{FxHashMap, FxHashSet};
-use strum::IntoEnumIterator;
+use rustc_hash::FxHashSet;
 
-use ruff_cache::cache_dir;
 use ruff_macros::CacheKey;
 
-use crate::registry::{Rule, RuleNamespace, RuleSet, INCOMPATIBLE_CODES};
-use crate::rule_selector::{RuleSelector, Specificity};
+use crate::registry::{Rule, RuleSet};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
@@ -22,47 +19,22 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
-use crate::warn_user_once_by_id;
 
-use self::rule_table::RuleTable;
 use super::line_width::{LineLength, TabSize};
 
-pub mod configuration;
+use self::rule_table::RuleTable;
+use self::types::PreviewMode;
+
 pub mod defaults;
 pub mod flags;
-pub mod options;
-pub mod options_base;
-pub mod pyproject;
 pub mod rule_table;
 pub mod types;
-
-const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Default)]
 pub struct AllSettings {
     pub cli: CliSettings,
     pub lib: Settings,
-}
-
-impl AllSettings {
-    pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
-        Ok(Self {
-            cli: CliSettings {
-                cache_dir: config
-                    .cache_dir
-                    .clone()
-                    .unwrap_or_else(|| cache_dir(project_root)),
-                fix: config.fix.unwrap_or(false),
-                fix_only: config.fix_only.unwrap_or(false),
-                format: config.format.unwrap_or_default(),
-                show_fixes: config.show_fixes.unwrap_or(false),
-                show_source: config.show_source.unwrap_or(false),
-            },
-            lib: Settings::from_configuration(config, project_root)?,
-        })
-    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -84,6 +56,7 @@ pub struct Settings {
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 
     pub target_version: PythonVersion,
+    pub preview: PreviewMode,
 
     // Resolver settings
     pub exclude: FilePatternSet,
@@ -135,167 +108,6 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
-        if let Some(required_version) = &config.required_version {
-            if &**required_version != CARGO_PKG_VERSION {
-                return Err(anyhow!(
-                    "Required version `{}` does not match the running version `{}`",
-                    &**required_version,
-                    CARGO_PKG_VERSION
-                ));
-            }
-        }
-
-        Ok(Self {
-            rules: (&config).into(),
-            allowed_confusables: config
-                .allowed_confusables
-                .map(FxHashSet::from_iter)
-                .unwrap_or_default(),
-            builtins: config.builtins.unwrap_or_default(),
-            dummy_variable_rgx: config
-                .dummy_variable_rgx
-                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone()),
-            exclude: FilePatternSet::try_from_vec(
-                config.exclude.unwrap_or_else(|| defaults::EXCLUDE.clone()),
-            )?,
-            extend_exclude: FilePatternSet::try_from_vec(config.extend_exclude)?,
-            extend_include: FilePatternSet::try_from_vec(config.extend_include)?,
-            external: FxHashSet::from_iter(config.external.unwrap_or_default()),
-            force_exclude: config.force_exclude.unwrap_or(false),
-            include: FilePatternSet::try_from_vec(
-                config.include.unwrap_or_else(|| defaults::INCLUDE.clone()),
-            )?,
-            ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
-            line_length: config.line_length.unwrap_or_default(),
-            tab_size: config.tab_size.unwrap_or_default(),
-            namespace_packages: config.namespace_packages.unwrap_or_default(),
-            per_file_ignores: resolve_per_file_ignores(
-                config
-                    .per_file_ignores
-                    .unwrap_or_default()
-                    .into_iter()
-                    .chain(config.extend_per_file_ignores)
-                    .collect(),
-            )?,
-            respect_gitignore: config.respect_gitignore.unwrap_or(true),
-            src: config
-                .src
-                .unwrap_or_else(|| vec![project_root.to_path_buf()]),
-            project_root: project_root.to_path_buf(),
-            target_version: config.target_version.unwrap_or_default(),
-            task_tags: config.task_tags.unwrap_or_else(|| {
-                defaults::TASK_TAGS
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect()
-            }),
-            logger_objects: config.logger_objects.unwrap_or_default(),
-            typing_modules: config.typing_modules.unwrap_or_default(),
-            // Plugins
-            flake8_annotations: config
-                .flake8_annotations
-                .map(flake8_annotations::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_bandit: config
-                .flake8_bandit
-                .map(flake8_bandit::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_bugbear: config
-                .flake8_bugbear
-                .map(flake8_bugbear::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_builtins: config
-                .flake8_builtins
-                .map(flake8_builtins::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_comprehensions: config
-                .flake8_comprehensions
-                .map(flake8_comprehensions::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_copyright: config
-                .flake8_copyright
-                .map(flake8_copyright::settings::Settings::try_from)
-                .transpose()?
-                .unwrap_or_default(),
-            flake8_errmsg: config
-                .flake8_errmsg
-                .map(flake8_errmsg::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_implicit_str_concat: config
-                .flake8_implicit_str_concat
-                .map(flake8_implicit_str_concat::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_import_conventions: config
-                .flake8_import_conventions
-                .map(flake8_import_conventions::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_pytest_style: config
-                .flake8_pytest_style
-                .map(flake8_pytest_style::settings::Settings::try_from)
-                .transpose()?
-                .unwrap_or_default(),
-            flake8_quotes: config
-                .flake8_quotes
-                .map(flake8_quotes::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_self: config
-                .flake8_self
-                .map(flake8_self::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_tidy_imports: config
-                .flake8_tidy_imports
-                .map(flake8_tidy_imports::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_type_checking: config
-                .flake8_type_checking
-                .map(flake8_type_checking::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_unused_arguments: config
-                .flake8_unused_arguments
-                .map(flake8_unused_arguments::settings::Settings::from)
-                .unwrap_or_default(),
-            flake8_gettext: config
-                .flake8_gettext
-                .map(flake8_gettext::settings::Settings::from)
-                .unwrap_or_default(),
-            isort: config
-                .isort
-                .map(isort::settings::Settings::try_from)
-                .transpose()?
-                .unwrap_or_default(),
-            mccabe: config
-                .mccabe
-                .map(mccabe::settings::Settings::from)
-                .unwrap_or_default(),
-            pep8_naming: config
-                .pep8_naming
-                .map(pep8_naming::settings::Settings::try_from)
-                .transpose()?
-                .unwrap_or_default(),
-            pycodestyle: config
-                .pycodestyle
-                .map(pycodestyle::settings::Settings::from)
-                .unwrap_or_default(),
-            pydocstyle: config
-                .pydocstyle
-                .map(pydocstyle::settings::Settings::from)
-                .unwrap_or_default(),
-            pyflakes: config
-                .pyflakes
-                .map(pyflakes::settings::Settings::from)
-                .unwrap_or_default(),
-            pylint: config
-                .pylint
-                .map(pylint::settings::Settings::from)
-                .unwrap_or_default(),
-            pyupgrade: config
-                .pyupgrade
-                .map(pyupgrade::settings::Settings::from)
-                .unwrap_or_default(),
-        })
-    }
-
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
@@ -320,200 +132,6 @@ impl Settings {
     }
 }
 
-impl From<&Configuration> for RuleTable {
-    fn from(config: &Configuration) -> Self {
-        // The select_set keeps track of which rules have been selected.
-        let mut select_set: RuleSet = defaults::PREFIXES.iter().flatten().collect();
-        // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All
-            .into_iter()
-            .chain(&RuleSelector::Nursery)
-            .collect();
-
-        // Ignores normally only subtract from the current set of selected
-        // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
-        // would be effectless. Instead we carry over the ignores to the next
-        // selection in that case, creating a way for ignores to be reused
-        // across config files (which otherwise wouldn't be possible since ruff
-        // only has `extended` but no `extended-by`).
-        let mut carryover_ignores: Option<&[RuleSelector]> = None;
-        let mut carryover_unfixables: Option<&[RuleSelector]> = None;
-
-        let mut redirects = FxHashMap::default();
-
-        for selection in &config.rule_selections {
-            // If a selection only specifies extend-select we cannot directly
-            // apply its rule selectors to the select_set because we firstly have
-            // to resolve the effectively selected rules within the current rule selection
-            // (taking specificity into account since more specific selectors take
-            // precedence over less specific selectors within a rule selection).
-            // We do this via the following HashMap where the bool indicates
-            // whether to enable or disable the given rule.
-            let mut select_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
-            let mut fixable_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
-
-            let carriedover_ignores = carryover_ignores.take();
-            let carriedover_unfixables = carryover_unfixables.take();
-
-            for spec in Specificity::iter() {
-                // Iterate over rule selectors in order of specificity.
-                for selector in selection
-                    .select
-                    .iter()
-                    .flatten()
-                    .chain(selection.extend_select.iter())
-                    .filter(|s| s.specificity() == spec)
-                {
-                    for rule in selector {
-                        select_map_updates.insert(rule, true);
-                    }
-                }
-                for selector in selection
-                    .ignore
-                    .iter()
-                    .chain(carriedover_ignores.into_iter().flatten())
-                    .filter(|s| s.specificity() == spec)
-                {
-                    for rule in selector {
-                        select_map_updates.insert(rule, false);
-                    }
-                }
-                // Apply the same logic to `fixable` and `unfixable`.
-                for selector in selection
-                    .fixable
-                    .iter()
-                    .flatten()
-                    .chain(selection.extend_fixable.iter())
-                    .filter(|s| s.specificity() == spec)
-                {
-                    for rule in selector {
-                        fixable_map_updates.insert(rule, true);
-                    }
-                }
-                for selector in selection
-                    .unfixable
-                    .iter()
-                    .chain(carriedover_unfixables.into_iter().flatten())
-                    .filter(|s| s.specificity() == spec)
-                {
-                    for rule in selector {
-                        fixable_map_updates.insert(rule, false);
-                    }
-                }
-            }
-
-            if let Some(select) = &selection.select {
-                // If the `select` option is given we reassign the whole select_set
-                // (overriding everything that has been defined previously).
-                select_set = select_map_updates
-                    .into_iter()
-                    .filter_map(|(rule, enabled)| enabled.then_some(rule))
-                    .collect();
-
-                if select.is_empty()
-                    && selection.extend_select.is_empty()
-                    && !selection.ignore.is_empty()
-                {
-                    carryover_ignores = Some(&selection.ignore);
-                }
-            } else {
-                // Otherwise we apply the updates on top of the existing select_set.
-                for (rule, enabled) in select_map_updates {
-                    if enabled {
-                        select_set.insert(rule);
-                    } else {
-                        select_set.remove(rule);
-                    }
-                }
-            }
-
-            // Apply the same logic to `fixable` and `unfixable`.
-            if let Some(fixable) = &selection.fixable {
-                fixable_set = fixable_map_updates
-                    .into_iter()
-                    .filter_map(|(rule, enabled)| enabled.then_some(rule))
-                    .collect();
-
-                if fixable.is_empty()
-                    && selection.extend_fixable.is_empty()
-                    && !selection.unfixable.is_empty()
-                {
-                    carryover_unfixables = Some(&selection.unfixable);
-                }
-            } else {
-                for (rule, enabled) in fixable_map_updates {
-                    if enabled {
-                        fixable_set.insert(rule);
-                    } else {
-                        fixable_set.remove(rule);
-                    }
-                }
-            }
-
-            // We insert redirects into the hashmap so that we
-            // can warn the users about remapped rule codes.
-            for selector in selection
-                .select
-                .iter()
-                .chain(selection.fixable.iter())
-                .flatten()
-                .chain(selection.ignore.iter())
-                .chain(selection.extend_select.iter())
-                .chain(selection.unfixable.iter())
-                .chain(selection.extend_fixable.iter())
-            {
-                if let RuleSelector::Prefix {
-                    prefix,
-                    redirected_from: Some(redirect_from),
-                } = selector
-                {
-                    redirects.insert(redirect_from, prefix);
-                }
-            }
-        }
-
-        for (from, target) in redirects {
-            // TODO(martin): This belongs into the ruff_cli crate.
-            warn_user_once_by_id!(
-                from,
-                "`{from}` has been remapped to `{}{}`.",
-                target.linter().common_prefix(),
-                target.short_code()
-            );
-        }
-
-        let mut rules = Self::empty();
-
-        for rule in select_set {
-            let fix = fixable_set.contains(rule);
-            rules.enable(rule, fix);
-        }
-
-        // If a docstring convention is specified, force-disable any incompatible error
-        // codes.
-        if let Some(convention) = config
-            .pydocstyle
-            .as_ref()
-            .and_then(|pydocstyle| pydocstyle.convention)
-        {
-            for rule in convention.rules_to_be_ignored() {
-                rules.disable(*rule);
-            }
-        }
-
-        // Validate that we didn't enable any incompatible rules. Use this awkward
-        // approach to give each pair it's own `warn_user_once`.
-        for (preferred, expendable, message) in INCOMPATIBLE_CODES {
-            if rules.enabled(*preferred) && rules.enabled(*expendable) {
-                warn_user_once_by_id!(expendable.as_ref(), "{}", message);
-                rules.disable(*expendable);
-            }
-        }
-
-        rules
-    }
-}
-
 /// Given a list of patterns, create a `GlobSet`.
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
@@ -531,158 +149,4 @@ pub fn resolve_per_file_ignores(
             Ok((absolute, basename, per_file_ignore.rules))
         })
         .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::codes::Pycodestyle;
-    use crate::registry::{Rule, RuleSet};
-    use crate::settings::configuration::Configuration;
-    use crate::settings::rule_table::RuleTable;
-
-    use super::configuration::RuleSelection;
-
-    #[allow(clippy::needless_pass_by_value)]
-    fn resolve_rules(selections: impl IntoIterator<Item = RuleSelection>) -> RuleSet {
-        RuleTable::from(&Configuration {
-            rule_selections: selections.into_iter().collect(),
-            ..Configuration::default()
-        })
-        .iter_enabled()
-        .collect()
-    }
-
-    #[test]
-    fn rule_codes() {
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W.into()]),
-            ..RuleSelection::default()
-        }]);
-
-        let expected = RuleSet::from_rules(&[
-            Rule::TrailingWhitespace,
-            Rule::MissingNewlineAtEndOfFile,
-            Rule::BlankLineWithWhitespace,
-            Rule::DocLineTooLong,
-            Rule::InvalidEscapeSequence,
-            Rule::TabIndentation,
-        ]);
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W6.into()]),
-            ..RuleSelection::default()
-        }]);
-        let expected = RuleSet::from_rule(Rule::InvalidEscapeSequence);
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W.into()]),
-            ignore: vec![Pycodestyle::W292.into()],
-            ..RuleSelection::default()
-        }]);
-        let expected = RuleSet::from_rules(&[
-            Rule::TrailingWhitespace,
-            Rule::BlankLineWithWhitespace,
-            Rule::DocLineTooLong,
-            Rule::InvalidEscapeSequence,
-            Rule::TabIndentation,
-        ]);
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W292.into()]),
-            ignore: vec![Pycodestyle::W.into()],
-            ..RuleSelection::default()
-        }]);
-        let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([RuleSelection {
-            select: Some(vec![Pycodestyle::W605.into()]),
-            ignore: vec![Pycodestyle::W605.into()],
-            ..RuleSelection::default()
-        }]);
-        let expected = RuleSet::empty();
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                extend_select: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-        ]);
-        let expected = RuleSet::from_rules(&[
-            Rule::TrailingWhitespace,
-            Rule::MissingNewlineAtEndOfFile,
-            Rule::BlankLineWithWhitespace,
-            Rule::DocLineTooLong,
-            Rule::InvalidEscapeSequence,
-            Rule::TabIndentation,
-        ]);
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                extend_select: vec![Pycodestyle::W292.into()],
-                ignore: vec![Pycodestyle::W.into()],
-                ..RuleSelection::default()
-            },
-        ]);
-        let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn carry_over_ignore() {
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ..RuleSelection::default()
-            },
-        ]);
-        let expected = RuleSet::from_rules(&[
-            Rule::TrailingWhitespace,
-            Rule::BlankLineWithWhitespace,
-            Rule::DocLineTooLong,
-            Rule::InvalidEscapeSequence,
-            Rule::TabIndentation,
-        ]);
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules([
-            RuleSelection {
-                select: Some(vec![]),
-                ignore: vec![Pycodestyle::W292.into()],
-                ..RuleSelection::default()
-            },
-            RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W505.into()],
-                ..RuleSelection::default()
-            },
-        ]);
-        let expected = RuleSet::from_rules(&[
-            Rule::TrailingWhitespace,
-            Rule::BlankLineWithWhitespace,
-            Rule::InvalidEscapeSequence,
-            Rule::TabIndentation,
-        ]);
-        assert_eq!(actual, expected);
-    }
 }

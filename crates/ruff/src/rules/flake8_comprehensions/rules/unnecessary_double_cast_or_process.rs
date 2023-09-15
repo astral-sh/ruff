@@ -1,7 +1,8 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableKeyword;
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -130,13 +131,13 @@ pub(crate) fn unnecessary_double_cast_or_process(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| {
+            diagnostic.try_set_fix(|| {
                 fixes::fix_unnecessary_double_cast_or_process(
+                    expr,
                     checker.locator(),
                     checker.stylist(),
-                    expr,
                 )
+                .map(Fix::suggested)
             });
         }
         checker.diagnostics.push(diagnostic);

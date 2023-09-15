@@ -4,8 +4,8 @@ use anyhow::{bail, Result};
 use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
-use ruff_python_ast::{Ranged, Stmt};
 
+use ruff_python_ast::Stmt;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
@@ -38,7 +38,7 @@ pub(crate) fn remove_imports<'a>(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Option<String>> {
-    let module_text = locator.slice(stmt.range());
+    let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text)?;
 
     let Statement::Simple(body) = &mut tree else {
@@ -117,7 +117,7 @@ pub(crate) fn retain_imports(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(stmt.range());
+    let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text)?;
 
     let Statement::Simple(body) = &mut tree else {

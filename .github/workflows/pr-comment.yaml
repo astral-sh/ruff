@@ -2,7 +2,7 @@ name: PR Check Comment
 
 on:
   workflow_run:
-    workflows: [CI, Benchmark]
+    workflows: [CI]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -43,42 +43,34 @@ jobs:
           path: pr/ecosystem
           if_no_artifact_found: ignore
 
-      - uses: dawidd6/action-download-artifact@v2
-        name: "Download Benchmark Result"
-        id: download-benchmark-result
-        if: steps.pr-number.outputs.pr-number
-        with:
-          name: summary
-          workflow: benchmark.yaml
-          pr: ${{ steps.pr-number.outputs.pr-number }}
-          path: pr/benchmark
-          if_no_artifact_found: ignore
-
       - name: Generate Comment
         id: generate-comment
-        if: steps.download-ecosystem-result.outputs.found_artifact == 'true' || steps.download-benchmark-result.outputs.found_artifact == 'true'
+        if: steps.download-ecosystem-result.outputs.found_artifact == 'true'
         run: |
+          echo '## PR Check Results' >> comment.txt
+
+          echo "### Ecosystem" >> comment.txt
+          cat pr/ecosystem/ecosystem-result >> comment.txt
+          echo "" >> comment.txt
+
           echo 'comment<<EOF' >> $GITHUB_OUTPUT
-          echo '## PR Check Results' >> $GITHUB_OUTPUT
-
-          if [[ -f pr/ecosystem/ecosystem-result ]]
-          then
-            echo "### Ecosystem" >> $GITHUB_OUTPUT
-            cat pr/ecosystem/ecosystem-result >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-          fi
-
-          if [[ -f pr/benchmark/summary.md ]]
-          then
-            cat pr/benchmark/summary.md >> $GITHUB_OUTPUT
-          fi
-
+          cat comment.txt >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
-      - name: Create or update comment
-        if: steps.generate-comment.outputs.comment
-        uses: thollander/actions-comment-pull-request@v2
+      - name: Find Comment
+        uses: peter-evans/find-comment@v2
+        if: steps.generate-comment.outcome == 'success'
+        id: find-comment
         with:
-          pr_number: ${{ steps.pr-number.outputs.pr-number }}
-          message: ${{ steps.generate-comment.outputs.comment }}
-          comment_tag: PR Check Results
+          issue-number: ${{ steps.pr-number.outputs.pr-number }}
+          comment-author: "github-actions[bot]"
+          body-includes: PR Check Results
+
+      - name: Create or update comment
+        if: steps.find-comment.outcome == 'success'
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ steps.pr-number.outputs.pr-number }}
+          body-path: comment.txt
+          edit-mode: replace

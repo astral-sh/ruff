@@ -1,320 +1,307 @@
-# Rust Python Formatter
+# Ruff Formatter
 
-The goal of our formatter is to be compatible with Black except for rare edge cases (mostly
-involving comment placement).
+The Ruff formatter is an extremely fast Python code formatter that ships as part of the `ruff`
+CLI (as of Ruff v0.0.289).
 
-## Implementing a node
+The formatter is currently in an **Alpha** state. The Alpha is primarily intended for
+experimentation: our focus is on collecting feedback that we can address prior to a production-ready
+Beta release later this year. (While we're using the formatter in production on our own projects,
+the CLI, configuration options, and code style may change arbitrarily between the Alpha and Beta.)
 
-Formatting each node follows roughly the same structure. We start with a `Format{{Node}}` struct
-that implements Default (and `AsFormat`/`IntoFormat` impls in `generated.rs`, see orphan rules below).
+[_We'd love to hear your feedback._](https://github.com/astral-sh/ruff/discussions/7310)
 
-```rust
-#[derive(Default)]
-pub struct FormatStmtReturn;
+## Goals
+
+The formatter is designed to be a drop-in replacement for [Black](https://github.com/psf/black),
+but with an excessive focus on performance and direct integration with Ruff.
+
+Specifically, the formatter is intended to emit near-identical output when run over Black-formatted
+code. When run over extensive Black-formatted projects like Django and Zulip, > 99.9% of lines
+are formatted identically. When migrating an existing project from Black to Ruff, you should expect
+to see a few differences on the margins, but the vast majority of your code should be unchanged.
+
+If you identify deviations in your project, spot-check them against the [intentional deviations](#intentional-deviations)
+enumerated below, as well as the [unintentional deviations](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3Aformatter)
+filed in the issue tracker. If you've identified a new deviation, please [file an issue](https://github.com/astral-sh/ruff/issues/new).
+
+When run over _non_-Black-formatted code, the formatter makes some different decisions than Black,
+and so more deviations should be expected, especially around the treatment of end-of-line comments.
+For details, see [Black compatibility](#black-compatibility).
+
+## Getting started
+
+The Ruff formatter shipped in an Alpha state as part of Ruff v0.0.289.
+
+### CLI
+
+The Ruff formatter is available as a standalone subcommand on the `ruff` CLI:
+
+```console
+❯ ruff format --help
+Run the Ruff formatter on the given files or directories
+
+Usage: ruff format [OPTIONS] [FILES]...
+
+Arguments:
+  [FILES]...  List of files or directories to format
+
+Options:
+      --check            Avoid writing any formatted files back; instead, exit with a non-zero status code if any files would have been modified, and zero otherwise
+      --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+  -h, --help             Print help
+
+File selection:
+      --respect-gitignore  Respect file exclusions via `.gitignore` and other standard ignore files
+      --force-exclude      Enforce exclusions, even for paths passed to Ruff directly on the command-line
+
+Miscellaneous:
+      --isolated                         Ignore all configuration files
+      --stdin-filename <STDIN_FILENAME>  The name of the file when passing it through stdin
+
+Log levels:
+  -v, --verbose  Enable verbose logging
+  -q, --quiet    Print diagnostics, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
 ```
 
-We implement `FormatNodeRule<{{Node}}> for Format{{Node}}`. Inside, we destructure the item to make
-sure we're not missing any field. If we want to write multiple items, we use an efficient `write!`
-call, for single items `.format().fmt(f)` or `.fmt(f)` is sufficient.
+Note: `ruff format` is currently hidden by default and will not be visible when running
+`ruff --help`.
 
-```rust
-impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
-    fn fmt_fields(&self, item: &StmtReturn, f: &mut PyFormatter) -> FormatResult<()> {
-        // Here we destructure item and make sure each field is listed.
-        // We generally don't need range is it's underscore-ignored
-        let StmtReturn { range: _, value } = item;
-        // Implement some formatting logic, in this case no space (and no value) after a return with
-        // no value
-        if let Some(value) = value {
-            write!(
-                f,
-                [
-                    text("return"),
-                    // There are multiple different space and newline types (e.g.
-                    // `soft_line_break_or_space()`, check the builders module), this one will
-                    // always be translate to a normal ascii whitespace character
-                    space(),
-                    // `return a, b` is valid, but if it wraps we'd need parentheses.
-                    // This is different from `(a, b).count(1)` where the parentheses around the
-                    // tuple are mandatory
-                    value.format().with_options(Parenthesize::IfBreaks)
-                ]
-            )
-        } else {
-            text("return").fmt(f)
-        }
-    }
+Similar to Black, running `ruff format /path/to/file.py` will format the given file or directory
+in-place, while `ruff format --check /path/to/file.py` will avoid writing any formatted files back,
+instead exiting with a non-zero status code if any files are not already formatted.
+
+### VS Code
+
+As of `v2023.36.0`, the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
+ships with support for the Ruff formatter. To enable formatting capabilities, set the
+`ruff.enableExperimentalFormatter` setting to `true` in your `settings.json`, and mark the Ruff
+extension as your default Python formatter:
+
+```json
+{
+  "ruff.enableExperimentalFormatter": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  }
 }
 ```
 
-Check the `builders` module for the primitives that you can use.
+From there, you can format a file by running the `Format Document` command, or enable formatting
+on-save by adding `"editor.formatOnSave": true` to your `settings.json`:
 
-If something such as list or a tuple can break into multiple lines if it is too long for a single
-line, wrap it into a `group`. Ignoring comments, we could format a tuple with two items like this:
-
-```rust
-write!(
-    f,
-    [group(&format_args![
-        text("("),
-        soft_block_indent(&format_args![
-            item1.format()
-            text(","),
-            soft_line_break_or_space(),
-            item2.format(),
-            if_group_breaks(&text(","))
-        ]),
-        text(")")
-    ])]
-)
+```json
+{
+  "ruff.enableExperimentalFormatter": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  }
+}
 ```
 
-If everything fits on a single line, the group doesn't break and we get something like `("a", "b")`.
-If it doesn't, we get something like
+### Configuration
 
-```Python
-(
-    "a",
-    "b",
-)
+The Ruff formatter respects Ruff's [`line-length`](https://beta.ruff.rs/docs/settings/#line-length)
+setting, which can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as in:
+
+```console
+ruff format --line-length 100 /path/to/file.py
 ```
 
-For a list of expression, you don't need to format it manually but can use the `JoinBuilder` util,
-accessible through `.join_comma_separated`. Finish will write to the formatter internally.
+In future releases, the Ruff formatter will likely support configuration of:
 
-```rust
-f.join_comma_separated(item.end())
-    .nodes(elts.iter())
-    .finish()
-// Here we have a builder that separates each element by a `,` and a [`soft_line_break_or_space`].
-// It emits a trailing `,` that is only shown if the enclosing group expands. It forces the enclosing
-// group to expand if the last item has a trailing `comma` and the magical comma option is enabled.
-```
+- Quote style (single vs. double).
+- Line endings (LF vs. CRLF).
+- Indentation (tabs vs. spaces).
+- Tab width.
 
-If you need avoid second mutable borrows with a builder, you can use `format_with(|f| { ... })` as
-a formattable element similar to `text()` or `group()`.
+### Excluding code from formatting
 
-## Comments
+Ruff supports Black's `# fmt: off`, `# fmt: on`, and `# fmt: skip` pragmas, with a few caveats.
 
-Comments can either be own line or end-of-line and can be marked as `Leading`, `Trailing` and `Dangling`.
+See Ruff's [suppression comment proposal](https://github.com/astral-sh/ruff/discussions/6338) for
+details.
+
+## Black compatibility
+
+The formatter is designed to be a drop-in replacement for [Black](https://github.com/psf/black).
+
+Specifically, the formatter is intended to emit near-identical output when run over Black-formatted
+code. When migrating an existing project from Black to Ruff, you should expect to see a few
+differences on the margins, but the vast majority of your code should be formatted identically.
+Note, however, that the formatter does not yet implement or support Black's preview style.
+
+When run over _non_-Black-formatted code, the formatter makes some different decisions than Black,
+and so more deviations should be expected.
+
+### Intentional deviations
+
+This section enumerates the known, intentional deviations between the Ruff formatter and Black's
+stable style. (Unintentional deviations are tracked in the [issue tracker](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3Aformatter).)
+
+#### Trailing end-of-line comments
+
+Black's priority is to fit an entire statement on a line, even if it contains end-of-line comments.
+In such cases, Black collapses the statement, and moves the comment to the end of the collapsed
+statement:
 
 ```python
-# Leading comment (always own line)
-print("hello world")  # Trailing comment (end-of-line)
-# Trailing comment (own line)
+# Input
+while (
+    cond1  # almost always true
+    and cond2  # almost never true
+):
+    print("Do something")
+
+# Black
+while cond1 and cond2:  # almost always true  # almost never true
+    print("Do something")
 ```
 
-Comments are automatically attached as `Leading` or `Trailing` to a node close to them, or `Dangling`
-if there are only tokens and no nodes surrounding it. Categorization is automatic but sometimes
-needs to be overridden in
-[`place_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L13)
-in `placement.rs`, which this section is about.
+Ruff, like [Prettier](https://prettier.io/), expands any statement that contains trailing
+end-of-line comments. For example, Ruff would avoid collapsing the `while` test in the snippet
+above. This ensures that the comments remain close to their original position and retain their
+original intent, at the cost of retaining additional vertical space.
 
-```Python
+This deviation only impacts unformatted code, in that Ruff's output should not deviate for code that
+has already been formatted by Black.
+
+### Pragma comments are ignored when computing line width
+
+Pragma comments (`# type`, `# noqa`, `# pyright`, `# pylint`, etc.) are ignored when computing the width of a line.
+This prevents Ruff from moving pragma comments around, thereby modifying their meaning and behavior:
+
+See Ruff's [pragma comment handling proposal](https://github.com/astral-sh/ruff/discussions/6670)
+for details.
+
+This is similar to [Pyink](https://github.com/google/pyink) but a deviation from Black. Black avoids
+splitting any lines that contain a `# type` comment ([#997](https://github.com/psf/black/issues/997)),
+but otherwise avoids special-casing pragma comments.
+
+As Ruff expands trailing end-of-line comments, Ruff will also avoid moving pragma comments in cases
+like the following, where moving the `# noqa` to the end of the line causes it to suppress errors
+on both `first()` and `second()`:
+
+```python
+# Input
 [
-    # This needs to be handled as a dangling comment
+    first(),  # noqa
+    second()
+]
+
+# Black
+[first(), second()]  # noqa
+
+# Ruff
+[
+    first(),  # noqa
+    second(),
 ]
 ```
 
-Here, the comment is dangling because it is preceded by `[`, which is a non-trivia token but not a
-node, and  followed by `]`, which is also a non-trivia token but not a node. In the `FormatExprList`
-implementation, we have to call `dangling_comments` manually and stub out the
-`fmt_dangling_comments` default from `FormatNodeRule`.
+### Line width vs. line length
 
-```rust
-impl FormatNodeRule<ExprList> for FormatExprList {
-    fn fmt_fields(&self, item: &ExprList, f: &mut PyFormatter) -> FormatResult<()> {
-        // ...
+Ruff uses the Unicode width of a line to determine if a line fits. Black's stable style uses
+character width, while Black's preview style uses Unicode width for strings ([#3445](https://github.com/psf/black/pull/3445)),
+and character width for all other tokens. Ruff's behavior is closer to Black's preview style than
+Black's stable style, although Ruff _also_ uses Unicode width for identifiers and comments.
 
-        write!(
-            f,
-            [group(&format_args![
-                text("["),
-                dangling_comments(dangling), // Gets all the comments marked as dangling for the node
-                soft_block_indent(&items),
-                text("]")
-            ])]
-        )
-    }
+### Walruses in slice expressions
 
-    fn fmt_dangling_comments(&self, _node: &ExprList, _f: &mut PyFormatter) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
-        Ok(())
-    }
-}
-```
-
-A related common challenge is that we want to attach comments to tokens (think keywords and
-syntactically meaningful characters such as `:`) that have no node on their own. A slightly
-simplified version of the `while` node in our AST looks like the following:
-
-```rust
-pub struct StmtWhile {
-    pub range: TextRange,
-    pub test: Box<Expr<TextRange>>,
-    pub body: Vec<Stmt<TextRange>>,
-    pub orelse: Vec<Stmt<TextRange>>,
-}
-```
-
-That means in
+Black avoids inserting space around `:=` operators within slices. For example, the following adheres
+to Black stable style:
 
 ```python
-while True:  # Trailing condition comment
-    if f():
-        break
-    # trailing while comment
-# leading else comment
-else:
-    print("while-else")
+# Input
+x[y:=1]
+
+# Black
+x[y:=1]
 ```
 
-the `else` has no node, we're just getting the statements in its body.
+Ruff will instead add space around the `:=` operator:
 
-The preceding token of the leading else comment is the `break`, which has a node, the following
-token is the `else`, which lacks a node, so by default the comment would be marked as trailing
-the `break` and wrongly formatted as such. We can identify these cases by looking for comments
-between two bodies that have the same indentation level as the keyword, e.g. in our case the
-leading else comment is inside the `while` node (which spans the entire snippet) and on the same
-level as the `else`. We identify those case in
-[`handle_in_between_bodies_own_line_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L196)
-and mark them as dangling for manual formatting later. Similarly, we find and mark comment after
-the colon(s) in
-[`handle_trailing_end_of_line_condition_comment`](https://github.com/astral-sh/ruff/blob/main/crates/ruff_python_formatter/src/comments/placement.rs#L518)
-.
+```python
+# Input
+x[y:=1]
 
-The comments don't carry any extra information such as why we marked the comment as trailing,
-instead they are sorted into one list of leading, one list of trailing and one list of dangling
-comments per node. In `FormatStmtWhile`, we can have multiple types of dangling comments, so we
-have to split the dangling list into after-colon-comments, before-else-comments, etc. by some
-element separating them (e.g. all comments trailing the colon come before the first statement in
-the body) and manually insert them in the right position.
-
-A simplified implementation with only those two kinds of comments:
-
-```rust
-fn fmt_fields(&self, item: &StmtWhile, f: &mut PyFormatter) -> FormatResult<()> {
-
-    // ...
-
-    // See FormatStmtWhile for the real, more complex implementation
-    let first_while_body_stmt = item.body.first().unwrap().end();
-    let trailing_condition_comments_end =
-        dangling_comments.partition_point(|comment| comment.slice().end() < first_while_body_stmt);
-    let (trailing_condition_comments, or_else_comments) =
-        dangling_comments.split_at(trailing_condition_comments_end);
-
-    write!(
-        f,
-        [
-            text("while"),
-            space(),
-            test.format(),
-            text(":"),
-            trailing_comments(trailing_condition_comments),
-            block_indent(&body.format())
-            leading_comments(or_else_comments),
-            text("else:"),
-            block_indent(&orelse.format())
-        ]
-    )?;
-}
+# Ruff
+x[y := 1]
 ```
 
-## Development notes
+This will likely be incorporated into Black's preview style ([#3823](https://github.com/psf/black/pull/3823)).
 
-Handling parentheses and comments are two major challenges in a Python formatter.
+### `global` and `nonlocal` names are broken across multiple lines by continuations
 
-We have copied the majority of tests over from Black and use [insta](https://insta.rs/docs/cli/) for
-snapshot testing with the diff between Ruff and Black, Black output and Ruff output. We put
-additional test cases in `resources/test/fixtures/ruff`.
+If a `global` or `nonlocal` statement includes multiple names, and exceeds the configured line
+width, Ruff will break them across multiple lines using continuations:
 
-The full Ruff test suite is slow, `cargo test -p ruff_python_formatter` is a lot faster.
+```python
+# Input
+global analyze_featuremap_layer, analyze_featuremapcompression_layer, analyze_latencies_post, analyze_motions_layer, analyze_size_model
 
-You can check the black compatibility on a number of projects using
-`scripts/formatter_ecosystem_checks.sh`. It will print the similarity index, the percentage of lines
-that remains unchanged between black's formatting and our formatting. You could compute it as the
-number of neutral lines in a diff divided by the neutral plus the removed lines. It also checks for
-common problems such unstable formatting, internal formatter errors and printing invalid syntax. We
-run this script in CI and you can view the results in a PR page under "Checks" > "CI" > "Summary" at
-the bottom of the page.
-
-There is a `ruff_python_formatter` binary that avoid building and linking the main `ruff` crate.
-
-You can use `scratch.py` as a playground, e.g.
-`cargo run --bin ruff_python_formatter -- --emit stdout scratch.py`, which additional `--print-ir`
-and `--print-comments` options.
-
-The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/tools/tree/main/crates/rome_json_formatter),
-e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
-The Rome repository can be a helpful reference when implementing something in the Ruff formatter.
-
-### Checking entire projects
-
-It's possible to format an entire project:
-
-```shell
-cargo run --bin ruff_dev -- format-dev --write my_project
+# Ruff
+global \
+    analyze_featuremap_layer, \
+    analyze_featuremapcompression_layer, \
+    analyze_latencies_post, \
+    analyze_motions_layer, \
+    analyze_size_model
 ```
 
-This will format all files that `ruff check` would lint and computes the similarity index, the
-fraction of changed lines. The similarity index is 1 if there were no changes at all, while 0 means
-we changed every single line. If you run this on a black formatted projects, this tells you how
-similar the ruff formatter is to black for the given project, with our goal being as close to 1 as
-possible.
+### Newlines are inserted after all class docstrings
 
-There are three common problems with the formatter: The second formatting pass looks different than
-the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
-parentheses around multiline expressions) and panics (mostly in debug assertions). We test for all
-of these using the `--stability-check` option in the `format-dev` subcommand:
+Black typically enforces a single newline after a class docstring. However, it does not apply such
+formatting if the docstring is single-quoted rather than triple-quoted, while Ruff enforces a
+single newline in both cases:
 
-The easiest is to check CPython:
+```python
+# Input
+class IntFromGeom(GEOSFuncFactory):
+    "Argument is a geometry, return type is an integer."
+    argtypes = [GEOM_PTR]
+    restype = c_int
+    errcheck = staticmethod(check_minus_one)
 
-```shell
-git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
-cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
+# Black
+class IntFromGeom(GEOSFuncFactory):
+    "Argument is a geometry, return type is an integer."
+    argtypes = [GEOM_PTR]
+    restype = c_int
+    errcheck = staticmethod(check_minus_one)
+
+# Ruff
+class IntFromGeom(GEOSFuncFactory):
+    "Argument is a geometry, return type is an integer."
+
+    argtypes = [GEOM_PTR]
+    restype = c_int
+    errcheck = staticmethod(check_minus_one)
 ```
 
-Compared to `ruff check`, `cargo run --bin ruff_dev -- format-dev` has 4 additional options:
+### Trailing own-line comments on imports are not moved to the next line
 
-- `--write`: Format the files and write them back to disk
-- `--stability-check`: Format twice (but don't write to disk) and check for differences and crashes
-- `--multi-project`: Treat every subdirectory as a separate project. Useful for ecosystem checks.
-- `--error-file`: Use together with `--multi-project`, this writes all errors (but not status
-    messages) to a file.
+Black enforces a single empty line between an import and a trailing own-line comment. Ruff leaves
+such comments in-place:
 
-It is also possible to check a large number of repositories. This dataset is large (~60GB), so we
-only do this occasionally:
+```python
+# Input
+import os
+# comment
 
-```shell
-# Get the list of projects
-curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
-# Repurpose this script to download the repositories for us
-python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
-# Check each project for formatter stability
-cargo run --bin ruff_dev -- format-dev --stability-check --error-file target/formatter-ecosystem-errors.txt --multi-project target/checkouts
+import sys
+
+# Black
+import os
+
+# comment
+
+import sys
+
+# Ruff
+import os
+# comment
+
+import sys
 ```
-
-To shrink a formatter error from an entire file to a minimal reproducible example, you can use
-`ruff_shrinking`:
-
-```shell
-cargo run --bin ruff_shrinking -- <your_file> target/shrinking.py "Unstable formatting" "target/release/ruff_dev format-dev --stability-check target/shrinking.py"
-```
-
-The first argument is the input file, the second is the output file where the candidates
-and the eventual minimized version will be written to. The third argument is a regex matching the
-error message, e.g. "Unstable formatting" or "Formatter error". The last argument is the command
-with the error, e.g. running the stability check on the candidate file. The script will try various
-strategies to remove parts of the code. If the output of the command still matches, it will use that
-slightly smaller code as starting point for the next iteration, otherwise it will revert and try
-a different strategy until all strategies are exhausted.
-
-## The orphan rules and trait structure
-
-For the formatter, we would like to implement `Format` from the rust_formatter crate for all AST
-nodes, defined in the rustpython_parser crate. This violates Rust's orphan rules. We therefore
-generate in `generate.py` a newtype for each AST node with implementations of `FormatNodeRule`,
-`FormatRule`, `AsFormat` and `IntoFormat` on it.
-
-![excalidraw showing the relationships between the different types](orphan_rules_in_the_formatter.svg)

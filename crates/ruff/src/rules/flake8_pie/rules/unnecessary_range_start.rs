@@ -3,7 +3,8 @@ use num_bigint::BigInt;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_text_size::Ranged;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
@@ -85,8 +86,7 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
                 &start,
                 &call.arguments,
                 Parentheses::Preserve,
-                checker.locator(),
-                checker.source_type,
+                checker.locator().contents(),
             )
             .map(Fix::automatic)
         });

@@ -4,7 +4,7 @@ use libcst_native::{
     ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -13,6 +13,7 @@ use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
@@ -149,7 +150,7 @@ fn format_import(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(stmt.range());
+    let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text)?;
     let import = match_import(&mut tree)?;
 
@@ -176,7 +177,7 @@ fn format_import_from(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(stmt.range());
+    let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text).unwrap();
     let import = match_import_from(&mut tree)?;
 
@@ -335,10 +336,10 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator(), stmt) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             format_import_from(stmt, indent, checker.locator(), checker.stylist())
                                 .map(|content| Edit::range_replacement(content, stmt.range()))
+                                .map(Fix::suggested)
                         });
                     }
                 }

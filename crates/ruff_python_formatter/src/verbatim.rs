@@ -5,12 +5,12 @@ use unicode_width::UnicodeWidthStr;
 
 use ruff_formatter::{write, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_python_parser::lexer::{lex_starts_at, LexResult};
 use ruff_python_parser::{Mode, Tok};
 use ruff_python_trivia::lines_before;
 use ruff_source_file::Locator;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::format::{empty_lines, format_comment};
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
@@ -709,7 +709,7 @@ impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
                 }
             } else {
                 // Non empty line, write the text of the line
-                verbatim_text(trimmed_line_range, logical_line.contains_newlines).fmt(f)?;
+                verbatim_text(trimmed_line_range).fmt(f)?;
 
                 // Write the line separator that terminates the line, except if it is the last line (that isn't separated by a hard line break).
                 if logical_line.has_trailing_newline {
@@ -760,7 +760,6 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut parens = 0u32;
-        let mut contains_newlines = ContainsNewlines::No;
 
         let (content_end, full_end) = loop {
             match self.lexer.next() {
@@ -768,17 +767,11 @@ where
                     Tok::Newline => break (range.start(), range.end()),
                     // Ignore if inside an expression
                     Tok::NonLogicalNewline if parens == 0 => break (range.start(), range.end()),
-                    Tok::NonLogicalNewline => {
-                        contains_newlines = ContainsNewlines::Yes;
-                    }
                     Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
                         parens = parens.saturating_add(1);
                     }
                     Tok::Rbrace | Tok::Rpar | Tok::Rsqb => {
                         parens = parens.saturating_sub(1);
-                    }
-                    Tok::String { value, .. } if value.contains(['\n', '\r']) => {
-                        contains_newlines = ContainsNewlines::Yes;
                     }
                     _ => {}
                 },
@@ -790,7 +783,6 @@ where
                         self.last_line_end = self.content_end;
                         Some(Ok(LogicalLine {
                             content_range: TextRange::new(content_start, self.content_end),
-                            contains_newlines: ContainsNewlines::No,
                             has_trailing_newline: false,
                         }))
                     } else {
@@ -810,7 +802,6 @@ where
 
         Some(Ok(LogicalLine {
             content_range: TextRange::new(line_start, content_end),
-            contains_newlines,
             has_trailing_newline: true,
         }))
     }
@@ -822,8 +813,6 @@ impl<I> FusedIterator for LogicalLinesIter<I> where I: Iterator<Item = LexResult
 struct LogicalLine {
     /// The range of this lines content (excluding the trailing newline)
     content_range: TextRange,
-    /// Whether the content in `content_range` contains any newlines.
-    contains_newlines: ContainsNewlines,
     /// Does this logical line have a trailing newline or does it just happen to be the last line.
     has_trailing_newline: bool,
 }
@@ -836,16 +825,14 @@ impl Ranged for LogicalLine {
 
 struct VerbatimText {
     verbatim_range: TextRange,
-    contains_newlines: ContainsNewlines,
 }
 
-fn verbatim_text<T>(item: T, contains_newlines: ContainsNewlines) -> VerbatimText
+fn verbatim_text<T>(item: T) -> VerbatimText
 where
     T: Ranged,
 {
     VerbatimText {
         verbatim_range: item.range(),
-        contains_newlines,
     }
 }
 
@@ -859,19 +846,13 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
 
         match normalize_newlines(f.context().locator().slice(self.verbatim_range), ['\r']) {
             Cow::Borrowed(_) => {
-                write!(
-                    f,
-                    [source_text_slice(
-                        self.verbatim_range,
-                        self.contains_newlines
-                    )]
-                )?;
+                write!(f, [source_text_slice(self.verbatim_range,)])?;
             }
             Cow::Owned(cleaned) => {
                 write!(
                     f,
                     [
-                        dynamic_text(&cleaned, Some(self.verbatim_range.start())),
+                        text(&cleaned, Some(self.verbatim_range.start())),
                         source_position(self.verbatim_range.end())
                     ]
                 )?;
@@ -924,7 +905,7 @@ impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
             f,
             [
                 leading_comments(node_comments.leading),
-                verbatim_text(self.node, ContainsNewlines::Detect),
+                verbatim_text(self.node),
                 trailing_comments(node_comments.trailing)
             ]
         )
@@ -937,13 +918,7 @@ pub(crate) fn write_suppressed_clause_header(
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
     // Write the outer comments and format the node as verbatim
-    write!(
-        f,
-        [verbatim_text(
-            header.range(f.context().source())?,
-            ContainsNewlines::Detect
-        )]
-    )?;
+    write!(f, [verbatim_text(header.range(f.context().source())?)])?;
 
     let comments = f.context().comments();
     header.visit(&mut |child| {

@@ -109,15 +109,16 @@
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
-use crate::lexer::LexResult;
 pub use parser::{
     parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
     parse_suite, parse_tokens, ParseError, ParseErrorType,
 };
-use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Ranged, Suite};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Suite};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok, TokenKind};
+
+use crate::lexer::LexResult;
 
 mod function;
 // Skip flattening lexer to distinguish from full ruff_python_parser
@@ -149,7 +150,7 @@ pub fn parse_program_tokens(
     is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
     let mode = if is_jupyter_notebook {
-        Mode::Jupyter
+        Mode::Ipython
     } else {
         Mode::Module
     };
@@ -157,25 +158,6 @@ pub fn parse_program_tokens(
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
-}
-
-/// Return the `Range` of the first `Tok::Colon` token in a `Range`.
-pub fn first_colon_range(
-    range: TextRange,
-    source: &str,
-    is_jupyter_notebook: bool,
-) -> Option<TextRange> {
-    let contents = &source[range];
-    let mode = if is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-    let range = lexer::lex_starts_at(contents, mode, range.start())
-        .flatten()
-        .find(|(tok, _)| tok.is_colon())
-        .map(|(_, range)| range);
-    range
 }
 
 /// Extract all [`CmpOp`] operators from an expression snippet, with appropriate
@@ -285,15 +267,8 @@ pub enum Mode {
     Module,
     /// The code consists of a single expression.
     Expression,
-    /// The code consists of a sequence of statements which are part of a
-    /// Jupyter Notebook and thus could include escape commands scoped to
-    /// a single line.
-    ///
-    /// ## Limitations:
-    ///
-    /// For [Dynamic object information], the escape characters (`?`, `??`)
-    /// must be used before an object. For example, `?foo` will be recognized,
-    /// but `foo?` will not.
+    /// The code consists of a sequence of statements which can include the
+    /// escape commands that are part of IPython syntax.
     ///
     /// ## Supported escape commands:
     ///
@@ -308,7 +283,7 @@ pub enum Mode {
     /// [Dynamic object information]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#dynamic-object-information
     /// [System shell access]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#system-shell-access
     /// [Automatic parentheses and quotes]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#automatic-parentheses-and-quotes
-    Jupyter,
+    Ipython,
 }
 
 impl std::str::FromStr for Mode {
@@ -317,7 +292,7 @@ impl std::str::FromStr for Mode {
         match s {
             "exec" | "single" => Ok(Mode::Module),
             "eval" => Ok(Mode::Expression),
-            "jupyter" => Ok(Mode::Jupyter),
+            "ipython" => Ok(Mode::Ipython),
             _ => Err(ModeParseError),
         }
     }
@@ -331,7 +306,7 @@ impl AsMode for PySourceType {
     fn as_mode(&self) -> Mode {
         match self {
             PySourceType::Python | PySourceType::Stub => Mode::Module,
-            PySourceType::Jupyter => Mode::Jupyter,
+            PySourceType::Ipynb => Mode::Ipython,
         }
     }
 }
@@ -342,7 +317,7 @@ pub struct ModeParseError;
 
 impl std::fmt::Display for ModeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, r#"mode must be "exec", "eval", "jupyter", or "single""#)
+        write!(f, r#"mode must be "exec", "eval", "ipython", or "single""#)
     }
 }
 
@@ -373,24 +348,12 @@ mod python {
 
 #[cfg(test)]
 mod tests {
-    use crate::{first_colon_range, locate_cmp_ops, parse_expression, LocatedCmpOp};
     use anyhow::Result;
+
     use ruff_python_ast::CmpOp;
+    use ruff_text_size::TextSize;
 
-    use ruff_text_size::{TextLen, TextRange, TextSize};
-
-    #[test]
-    fn extract_first_colon_range() {
-        let contents = "with a: pass";
-        let range = first_colon_range(
-            TextRange::new(TextSize::from(0), contents.text_len()),
-            contents,
-            false,
-        )
-        .unwrap();
-        assert_eq!(&contents[range], ":");
-        assert_eq!(range, TextRange::new(TextSize::from(6), TextSize::from(7)));
-    }
+    use crate::{locate_cmp_ops, parse_expression, LocatedCmpOp};
 
     #[test]
     fn extract_cmp_op_location() -> Result<()> {

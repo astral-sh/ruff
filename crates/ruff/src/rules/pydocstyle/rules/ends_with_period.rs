@@ -3,8 +3,8 @@ use strum::IntoEnumIterator;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Ranged;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::SectionKind;
@@ -90,13 +90,21 @@ pub(crate) fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
         let line = lines.nth(index).unwrap();
         let trimmed = line.trim_end();
 
+        if trimmed.ends_with('\\') {
+            // Ignore the edge case whether a single quoted string is multiple lines through an
+            // escape (https://github.com/astral-sh/ruff/issues/7139). Single quote docstrings are
+            // flagged by D300.
+            // ```python
+            // "\
+            // "
+            // ```
+            return;
+        }
+
         if !trimmed.ends_with('.') {
             let mut diagnostic = Diagnostic::new(EndsInPeriod, docstring.range());
             // Best-effort autofix: avoid adding a period after other punctuation marks.
-            if checker.patch(diagnostic.kind.rule())
-                && !trimmed.ends_with(':')
-                && !trimmed.ends_with(';')
-            {
+            if checker.patch(diagnostic.kind.rule()) && !trimmed.ends_with([':', ';']) {
                 diagnostic.set_fix(Fix::suggested(Edit::insertion(
                     ".".to_string(),
                     line.start() + trimmed.text_len(),

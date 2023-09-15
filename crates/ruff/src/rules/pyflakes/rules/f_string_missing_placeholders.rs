@@ -1,10 +1,9 @@
-use ruff_python_ast::{Expr, PySourceType, Ranged};
-use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{Expr, PySourceType};
+use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -54,7 +53,7 @@ fn find_useless_f_strings<'a>(
     locator: &'a Locator,
     source_type: PySourceType,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
-    let contents = locator.slice(expr.range());
+    let contents = locator.slice(expr);
     lexer::lex_starts_at(contents, source_type.as_mode(), expr.start())
         .flatten()
         .filter_map(|(tok, range)| match tok {
@@ -62,8 +61,7 @@ fn find_useless_f_strings<'a>(
                 kind: StringKind::FString | StringKind::RawFString,
                 ..
             } => {
-                let first_char =
-                    &locator.contents()[TextRange::at(range.start(), TextSize::from(1))];
+                let first_char = locator.slice(TextRange::at(range.start(), TextSize::from(1)));
                 // f"..."  => f_position = 0
                 // fr"..." => f_position = 0
                 // rf"..." => f_position = 1

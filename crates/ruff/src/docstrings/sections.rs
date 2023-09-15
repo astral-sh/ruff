@@ -2,8 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use ruff_python_ast::docstrings::{leading_space, leading_words};
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
 use ruff_source_file::{Line, UniversalNewlineIterator, UniversalNewlines};
@@ -165,7 +164,7 @@ impl<'a> SectionContexts<'a> {
                     lines.peek(),
                 ) {
                     if let Some(mut last) = last.take() {
-                        last.range = TextRange::new(last.range.start(), line.start());
+                        last.range = TextRange::new(last.start(), line.start());
                         contexts.push(last);
                     }
 
@@ -182,7 +181,7 @@ impl<'a> SectionContexts<'a> {
         }
 
         if let Some(mut last) = last.take() {
-            last.range = TextRange::new(last.range.start(), contents.text_len());
+            last.range = TextRange::new(last.start(), contents.text_len());
             contexts.push(last);
         }
 
@@ -266,6 +265,12 @@ struct SectionContextData {
 
     /// End of the summary, relative to the [`Docstring::body`]
     summary_full_end: TextSize,
+}
+
+impl Ranged for SectionContextData {
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 pub(crate) struct SectionContext<'a> {

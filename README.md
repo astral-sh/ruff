@@ -140,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.285
+  rev: v0.0.289
   hooks:
     - id: ruff
 ```
@@ -398,6 +398,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
 - [Reflex](https://github.com/reflex-dev/reflex)
+- [Rippling](https://rippling.com)
 - [Robyn](https://github.com/sansyrox/robyn)
 - Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
 - Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))

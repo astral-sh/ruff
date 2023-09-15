@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Ranged};
+use ruff_python_ast::{self as ast};
+use ruff_text_size::Ranged;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -36,7 +37,9 @@ pub(crate) fn pass_in_class_body(checker: &mut Checker, class_def: &ast::StmtCla
         if checker.patch(diagnostic.kind.rule()) {
             let edit =
                 autofix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
-            diagnostic.set_fix(Fix::automatic(edit).isolate(checker.statement_isolation()));
+            diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(Some(
+                checker.semantic().current_statement_id(),
+            ))));
         }
         checker.diagnostics.push(diagnostic);
     }

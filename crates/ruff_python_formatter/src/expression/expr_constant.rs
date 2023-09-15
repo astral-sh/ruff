@@ -1,16 +1,15 @@
-use crate::comments::SourceComment;
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Constant, ExprConstant, Ranged};
-use ruff_text_size::{TextLen, TextRange};
+use ruff_python_ast::{Constant, ExprConstant};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
+use crate::comments::SourceComment;
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
 use crate::expression::string::{
     AnyString, FormatString, StringLayout, StringPrefix, StringQuotes,
 };
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprConstant {
@@ -36,18 +35,14 @@ impl FormatRuleWithOptions<ExprConstant, PyFormatContext<'_>> for FormatExprCons
 
 impl FormatNodeRule<ExprConstant> for FormatExprConstant {
     fn fmt_fields(&self, item: &ExprConstant, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprConstant {
-            range: _,
-            value,
-            kind: _,
-        } = item;
+        let ExprConstant { range: _, value } = item;
 
         match value {
-            Constant::Ellipsis => text("...").fmt(f),
-            Constant::None => text("None").fmt(f),
+            Constant::Ellipsis => token("...").fmt(f),
+            Constant::None => token("None").fmt(f),
             Constant::Bool(value) => match value {
-                true => text("True").fmt(f),
-                false => text("False").fmt(f),
+                true => token("True").fmt(f),
+                false => token("False").fmt(f),
             },
             Constant::Int(_) => FormatInt::new(item).fmt(f),
             Constant::Float(_) => FormatFloat::new(item).fmt(f),
@@ -80,12 +75,15 @@ impl NeedsParentheses for ExprConstant {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
-            // Don't wrap triple quoted strings
-            if is_multiline_string(self, context.source()) {
-                OptionalParentheses::Never
-            } else {
-                OptionalParentheses::Multiline
-            }
+            OptionalParentheses::Multiline
+        } else if is_multiline_string(self, context.source())
+            || self.value.is_none()
+            || self.value.is_bool()
+            || self.value.is_ellipsis()
+        {
+            OptionalParentheses::Never
+        } else if should_use_best_fit(self, context) {
+            OptionalParentheses::BestFit
         } else {
             OptionalParentheses::Never
         }
@@ -99,7 +97,8 @@ pub(super) fn is_multiline_string(constant: &ExprConstant, source: &str) -> bool
         let quotes =
             StringQuotes::parse(&contents[TextRange::new(prefix.text_len(), contents.text_len())]);
 
-        quotes.is_some_and(StringQuotes::is_triple) && contents.contains(['\n', '\r'])
+        quotes.is_some_and(StringQuotes::is_triple)
+            && memchr::memchr2(b'\n', b'\r', contents.as_bytes()).is_some()
     } else {
         false
     }

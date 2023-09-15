@@ -1,13 +1,10 @@
-use crate::comments::{dangling_comments, SourceComment};
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{
-    format_args, group, hard_line_break, soft_line_break_or_space, space, text,
-};
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprNamedExpr;
+
+use crate::comments::{dangling_comments, SourceComment};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprNamedExpr;
@@ -28,7 +25,7 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
             f,
             [
                 group(&format_args!(target.format(), soft_line_break_or_space())),
-                text(":=")
+                token(":=")
             ]
         )?;
 
@@ -75,7 +72,7 @@ impl NeedsParentheses for ExprNamedExpr {
         {
             OptionalParentheses::Always
         } else {
-            OptionalParentheses::Never
+            OptionalParentheses::Multiline
         }
     }
 }

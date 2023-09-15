@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Ranged;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -69,6 +69,10 @@ impl Violation for BlankLineAfterSummary {
 /// D205
 pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
+
+    if !docstring.triple_quoted() {
+        return;
+    }
 
     let mut lines_count: usize = 1;
     let mut blanks_count = 0;

@@ -5,14 +5,14 @@ use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::call_path::format_call_path;
-use ruff_python_ast::Ranged;
+use ruff_python_ast::Stmt;
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
+use crate::nodes::NodeId;
 use crate::reference::ResolvedReferenceId;
-use crate::statements::StatementId;
 use crate::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub struct Binding<'a> {
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
-    pub source: Option<StatementId>,
+    pub source: Option<NodeId>,
     /// The references to the [`Binding`].
     pub references: Vec<ResolvedReferenceId>,
     /// The exceptions that were handled when the [`Binding`] was defined.
@@ -182,17 +182,21 @@ impl<'a> Binding<'a> {
         locator.slice(self.range)
     }
 
-    /// Returns the range of the binding's parent.
-    pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
+    /// Returns the statement in which the binding was defined.
+    pub fn statement<'b>(&self, semantic: &'b SemanticModel) -> Option<&'b Stmt> {
         self.source
             .map(|statement_id| semantic.statement(statement_id))
-            .and_then(|parent| {
-                if parent.is_import_from_stmt() {
-                    Some(parent.range())
-                } else {
-                    None
-                }
-            })
+    }
+
+    /// Returns the range of the binding's parent.
+    pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
+        self.statement(semantic).and_then(|parent| {
+            if parent.is_import_from_stmt() {
+                Some(parent.range())
+            } else {
+                None
+            }
+        })
     }
 
     pub fn as_any_import(&'a self) -> Option<AnyImport<'a>> {

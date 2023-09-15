@@ -1,14 +1,14 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::{ExceptHandler, Ranged, StmtTry};
+use ruff_python_ast::{ExceptHandler, StmtTry};
+use ruff_text_size::Ranged;
 
 use crate::comments;
 use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
 use crate::other::except_handler_except_handler::ExceptHandlerKind;
 use crate::prelude::*;
-use crate::statement::clause::{clause_header, ClauseHeader, ElseClause};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
 use crate::statement::{FormatRefWithRule, Stmt};
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatStmtTry;
@@ -105,9 +105,9 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
 }
 
 fn format_case<'a>(
-    try_statement: &StmtTry,
+    try_statement: &'a StmtTry,
     kind: CaseKind,
-    previous_node: Option<&Stmt>,
+    previous_node: Option<&'a Stmt>,
     dangling_comments: &'a [SourceComment],
     f: &mut PyFormatter,
 ) -> FormatResult<(Option<&'a Stmt>, &'a [SourceComment])> {
@@ -119,7 +119,7 @@ fn format_case<'a>(
 
     Ok(if let Some(last) = body.last() {
         let case_comments_start =
-            dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
+            dangling_comments.partition_point(|comment| comment.end() <= last.end());
         let (case_comments, rest) = dangling_comments.split_at(case_comments_start);
         let partition_point =
             case_comments.partition_point(|comment| comment.line_position().is_own_line());
@@ -136,14 +136,14 @@ fn format_case<'a>(
         write!(
             f,
             [
-                clause_header(header, trailing_case_comments, &text(kind.keyword()))
+                clause_header(header, trailing_case_comments, &token(kind.keyword()))
                     .with_leading_comments(leading_case_comments, previous_node),
-                block_indent(&body.format())
+                clause_body(body, trailing_case_comments),
             ]
         )?;
-        (None, rest)
+        (Some(last), rest)
     } else {
-        (None, dangling_comments)
+        (previous_node, dangling_comments)
     })
 }
 

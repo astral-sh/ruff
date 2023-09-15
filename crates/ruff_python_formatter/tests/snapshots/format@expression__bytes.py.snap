@@ -129,8 +129,9 @@ test_particular = [
 ## Outputs
 ### Output 1
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -221,8 +222,7 @@ b"Let's" b"start" b"with" b"a" b"simple" b"example" b"now repeat after me:" b"I 
 )
 
 if (
-    a
-    + b"Let's"
+    a + b"Let's"
     b"start"
     b"with"
     b"a"
@@ -277,8 +277,9 @@ test_particular = [
 
 ### Output 2
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Single
 magic-trailing-comma    = Respect
 ```
@@ -369,8 +370,7 @@ b"Let's" b'start' b'with' b'a' b'simple' b'example' b'now repeat after me:' b'I 
 )
 
 if (
-    a
-    + b"Let's"
+    a + b"Let's"
     b'start'
     b'with'
     b'a'

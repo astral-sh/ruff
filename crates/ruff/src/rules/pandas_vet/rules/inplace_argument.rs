@@ -1,8 +1,10 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::{self as ast, Keyword, PySourceType, Ranged};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{self as ast, Keyword, Stmt};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
@@ -74,14 +76,15 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                     //    the star argument _doesn't_ contain an override).
                     // 2. The call is part of a larger expression (we're converting an expression to a
                     //    statement, and expressions can't contain statements).
+                    let statement = checker.semantic().current_statement();
                     if !seen_star
-                        && checker.semantic().current_statement().is_expr_stmt()
                         && checker.semantic().current_expression_parent().is_none()
+                        && statement.is_expr_stmt()
                     {
                         if let Some(fix) = convert_inplace_argument_to_assignment(
                             call,
                             keyword,
-                            checker.source_type,
+                            statement,
                             checker.locator(),
                         ) {
                             diagnostic.set_fix(fix);
@@ -103,14 +106,16 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
 fn convert_inplace_argument_to_assignment(
     call: &ast::ExprCall,
     keyword: &Keyword,
-    source_type: PySourceType,
+    statement: &Stmt,
     locator: &Locator,
 ) -> Option<Fix> {
     // Add the assignment.
     let attr = call.func.as_attribute_expr()?;
     let insert_assignment = Edit::insertion(
         format!("{name} = ", name = locator.slice(attr.value.range())),
-        call.start(),
+        parenthesized_range(call.into(), statement.into(), locator.contents())
+            .unwrap_or(call.range())
+            .start(),
     );
 
     // Remove the `inplace` argument.
@@ -118,8 +123,7 @@ fn convert_inplace_argument_to_assignment(
         keyword,
         &call.arguments,
         Parentheses::Preserve,
-        locator,
-        source_type,
+        locator.contents(),
     )
     .ok()?;
 

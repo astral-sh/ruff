@@ -1,7 +1,8 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
+use ruff_python_ast::{Expr, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -58,9 +59,8 @@ pub(crate) fn unnecessary_list_comprehension_set(
     if argument.is_list_comp_expr() {
         let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| {
-                fixes::fix_unnecessary_list_comprehension_set(checker, expr)
+            diagnostic.try_set_fix(|| {
+                fixes::fix_unnecessary_list_comprehension_set(expr, checker).map(Fix::suggested)
             });
         }
         checker.diagnostics.push(diagnostic);

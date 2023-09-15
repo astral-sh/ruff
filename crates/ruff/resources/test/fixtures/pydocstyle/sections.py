@@ -529,3 +529,16 @@ def replace_equals_with_dash2():
     Parameters
     ===========
     """
+
+
+@expect(_D213)
+def non_empty_blank_line_before_section():  # noqa: D416
+    """Toggle the gizmo.
+
+    The function's description.
+    
+    Returns
+    -------
+    A value of some sort.
+
+    """

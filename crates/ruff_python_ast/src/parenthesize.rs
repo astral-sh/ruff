@@ -1,15 +1,15 @@
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::node::AnyNodeRef;
-use crate::{ExpressionRef, Ranged};
+use crate::ExpressionRef;
 
 /// Returns the [`TextRange`] of a given expression including parentheses, if the expression is
 /// parenthesized; or `None`, if the expression is not parenthesized.
 pub fn parenthesized_range(
     expr: ExpressionRef,
     parent: AnyNodeRef,
-    contents: &str,
+    source: &str,
 ) -> Option<TextRange> {
     // If the parent is a node that brings its own parentheses, exclude the closing parenthesis
     // from our search range. Otherwise, we risk matching on calls, like `func(x)`, for which
@@ -28,20 +28,21 @@ pub fn parenthesized_range(
         parent.end()
     };
 
-    // First, test if there's a closing parenthesis because it tends to be cheaper.
-    let tokenizer =
-        SimpleTokenizer::new(contents, TextRange::new(expr.end(), exclusive_parent_end));
-    let right = tokenizer.skip_trivia().next()?;
+    let right_tokenizer =
+        SimpleTokenizer::new(source, TextRange::new(expr.end(), exclusive_parent_end))
+            .skip_trivia()
+            .take_while(|token| token.kind == SimpleTokenKind::RParen);
 
-    if right.kind == SimpleTokenKind::RParen {
-        // Next, test for the opening parenthesis.
-        let mut tokenizer =
-            SimpleTokenizer::up_to_without_back_comment(expr.start(), contents).skip_trivia();
-        let left = tokenizer.next_back()?;
-        if left.kind == SimpleTokenKind::LParen {
-            return Some(TextRange::new(left.start(), right.end()));
-        }
-    }
+    let left_tokenizer = SimpleTokenizer::up_to_without_back_comment(expr.start(), source)
+        .skip_trivia()
+        .rev()
+        .take_while(|token| token.kind == SimpleTokenKind::LParen);
 
-    None
+    // Zip closing parenthesis with opening parenthesis. The order is intentional, as testing for
+    // closing parentheses is cheaper, and `zip` will avoid progressing the `left_tokenizer` if
+    // the `right_tokenizer` is exhausted.
+    right_tokenizer
+        .zip(left_tokenizer)
+        .last()
+        .map(|(right, left)| TextRange::new(left.start(), right.end()))
 }

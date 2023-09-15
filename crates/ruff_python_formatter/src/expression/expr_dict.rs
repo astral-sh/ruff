@@ -1,15 +1,13 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::Ranged;
 use ruff_python_ast::{Expr, ExprDict};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, SourceComment};
 use crate::expression::parentheses::{
     empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprDict;
@@ -36,12 +34,14 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
                 f,
                 [group(&format_args![
                     key.format(),
-                    text(":"),
+                    token(":"),
                     space(),
                     self.value.format()
                 ])]
             )
         } else {
+            // TODO(charlie): Make these dangling comments on the `ExprDict`, and identify them
+            // dynamically, so as to avoid the parent rendering its child's comments.
             let comments = f.context().comments().clone();
             let leading_value_comments = comments.leading(self.value);
             write!(
@@ -49,7 +49,7 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
                 [
                     // make sure the leading comments are hoisted past the `**`
                     leading_comments(leading_value_comments),
-                    group(&format_args![text("**"), self.value.format()])
+                    group(&format_args![token("**"), self.value.format()])
                 ]
             )
         }

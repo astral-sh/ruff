@@ -1,8 +1,9 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Operator, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for string literals that are explicitly concatenated (using the

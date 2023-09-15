@@ -1,19 +1,21 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged};
-use ruff_text_size::TextRange;
 
+use crate::autofix::edits::pad;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
+use ruff_text_size::{Ranged, TextRange};
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flynt::helpers;
 
 /// ## What it does
-/// Checks for `str#join` calls that can be replaced with f-strings.
+/// Checks for `str.join` calls that can be replaced with f-strings.
 ///
 /// ## Why is this bad?
-/// f-strings are more readable and generally preferred over `str#join` calls.
+/// f-strings are more readable and generally preferred over `str.join` calls.
 ///
 /// ## Example
 /// ```python
@@ -29,19 +31,27 @@ use crate::rules::flynt::helpers;
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[violation]
 pub struct StaticJoinToFString {
-    expr: String,
+    expression: SourceCodeSnippet,
 }
 
 impl AlwaysAutofixableViolation for StaticJoinToFString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StaticJoinToFString { expr } = self;
-        format!("Consider `{expr}` instead of string join")
+        let StaticJoinToFString { expression } = self;
+        if let Some(expression) = expression.full_display() {
+            format!("Consider `{expression}` instead of string join")
+        } else {
+            format!("Consider f-string instead of string join")
+        }
     }
 
     fn autofix_title(&self) -> String {
-        let StaticJoinToFString { expr } = self;
-        format!("Replace with `{expr}`")
+        let StaticJoinToFString { expression } = self;
+        if let Some(expression) = expression.full_display() {
+            format!("Replace with `{expression}`")
+        } else {
+            format!("Replace with f-string")
+        }
     }
 }
 
@@ -77,7 +87,6 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
                 .join(joiner)
                 .into(),
             range: TextRange::default(),
-            kind: None,
         };
         return Some(node.into());
     }
@@ -105,6 +114,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     Some(node.into())
 }
 
+/// FLY002
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
     let Expr::Call(ast::ExprCall {
         arguments: Arguments { args, keywords, .. },
@@ -114,14 +124,17 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         return;
     };
 
-    if !keywords.is_empty() || args.len() != 1 {
-        // If there are kwargs or more than one argument, this is some non-standard
-        // string join call.
+    // If there are kwargs or more than one argument, this is some non-standard
+    // string join call.
+    if !keywords.is_empty() {
         return;
     }
+    let [arg] = args.as_slice() else {
+        return;
+    };
 
     // Get the elements to join; skip (e.g.) generators, sets, etc.
-    let joinees = match &args[0] {
+    let joinees = match &arg {
         Expr::List(ast::ExprList { elts, .. }) if is_static_length(elts) => elts,
         Expr::Tuple(ast::ExprTuple { elts, .. }) if is_static_length(elts) => elts,
         _ => return,
@@ -137,13 +150,13 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
 
     let mut diagnostic = Diagnostic::new(
         StaticJoinToFString {
-            expr: contents.clone(),
+            expression: SourceCodeSnippet::new(contents.clone()),
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            contents,
+            pad(contents, expr.range(), checker.locator()),
             expr.range(),
         )));
     }

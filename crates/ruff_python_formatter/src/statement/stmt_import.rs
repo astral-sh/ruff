@@ -1,9 +1,8 @@
-use crate::prelude::*;
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtImport;
 
 use crate::comments::{SourceComment, SuppressionKind};
-use crate::FormatNodeRule;
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatStmtImport;
@@ -12,11 +11,11 @@ impl FormatNodeRule<StmtImport> for FormatStmtImport {
     fn fmt_fields(&self, item: &StmtImport, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtImport { names, range: _ } = item;
         let names = format_with(|f| {
-            f.join_with(&format_args![text(","), space()])
+            f.join_with(&format_args![token(","), space()])
                 .entries(names.iter().formatted())
                 .finish()
         });
-        write!(f, [text("import"), space(), names])
+        write!(f, [token("import"), space(), names])
     }
 
     fn is_suppressed(

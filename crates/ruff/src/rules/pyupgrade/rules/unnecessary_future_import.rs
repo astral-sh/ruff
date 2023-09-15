@@ -1,8 +1,9 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, Ranged, Stmt};
+use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -124,7 +125,9 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
                 checker.stylist(),
                 checker.indexer(),
             )?;
-            Ok(Fix::suggested(edit).isolate(checker.parent_isolation()))
+            Ok(Fix::suggested(edit).isolate(Checker::isolation(
+                checker.semantic().current_statement_parent_id(),
+            )))
         });
     }
     checker.diagnostics.push(diagnostic);

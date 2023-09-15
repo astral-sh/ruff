@@ -1,10 +1,11 @@
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
+use ruff_text_size::Ranged;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -50,28 +51,28 @@ impl AlwaysAutofixableViolation for UnnecessaryPass {
 
 /// PIE790
 pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
-    if body.len() > 1 {
-        // This only catches the case in which a docstring makes a `pass` statement
-        // redundant. Consider removing all `pass` statements instead.
-        if !is_docstring_stmt(&body[0]) {
-            return;
-        }
-
-        // The second statement must be a `pass` statement.
-        let stmt = &body[1];
-        if !stmt.is_pass_stmt() {
-            return;
-        }
-
-        let mut diagnostic = Diagnostic::new(UnnecessaryPass, stmt.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.locator()) {
-                Edit::range_deletion(stmt.range().add_end(index))
-            } else {
-                autofix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer())
-            };
-            diagnostic.set_fix(Fix::automatic(edit));
-        }
-        checker.diagnostics.push(diagnostic);
+    let [first, second, ..] = body else {
+        return;
+    };
+    // This only catches the case in which a docstring makes a `pass` statement
+    // redundant. Consider removing all `pass` statements instead.
+    if !is_docstring_stmt(first) {
+        return;
     }
+
+    // The second statement must be a `pass` statement.
+    if !second.is_pass_stmt() {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(UnnecessaryPass, second.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        let edit = if let Some(index) = trailing_comment_start_offset(second, checker.locator()) {
+            Edit::range_deletion(second.range().add_end(index))
+        } else {
+            autofix::edits::delete_stmt(second, None, checker.locator(), checker.indexer())
+        };
+        diagnostic.set_fix(Fix::automatic(edit));
+    }
+    checker.diagnostics.push(diagnostic);
 }

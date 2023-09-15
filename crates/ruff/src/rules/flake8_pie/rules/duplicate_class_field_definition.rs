@@ -3,7 +3,8 @@ use rustc_hash::FxHashSet;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_text_size::Ranged;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -85,7 +86,9 @@ pub(crate) fn duplicate_class_field_definition(checker: &mut Checker, body: &[St
                     checker.locator(),
                     checker.indexer(),
                 );
-                diagnostic.set_fix(Fix::suggested(edit).isolate(checker.statement_isolation()));
+                diagnostic.set_fix(Fix::suggested(edit).isolate(Checker::isolation(Some(
+                    checker.semantic().current_statement_id(),
+                ))));
             }
             checker.diagnostics.push(diagnostic);
         }

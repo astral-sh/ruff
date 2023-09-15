@@ -1,6 +1,8 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Comprehension, Expr, Ranged};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::{self as ast, Comprehension, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -63,9 +65,9 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.try_set_fix_from_edit(|| {
-            fixes::fix_unnecessary_comprehension(checker.locator(), checker.stylist(), expr)
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
+                .map(Fix::suggested)
         });
     }
     checker.diagnostics.push(diagnostic);
@@ -85,28 +87,16 @@ pub(crate) fn unnecessary_dict_comprehension(
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
-    let Some(key) = key.as_name_expr() else {
-        return;
-    };
-    let Some(value) = value.as_name_expr() else {
-        return;
-    };
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
         return;
     };
     let [target_key, target_value] = elts.as_slice() else {
         return;
     };
-    let Some(target_key) = target_key.as_name_expr() else {
-        return;
-    };
-    let Some(target_value) = target_value.as_name_expr() else {
-        return;
-    };
-    if target_key.id != key.id {
+    if ComparableExpr::from(key) != ComparableExpr::from(target_key) {
         return;
     }
-    if target_value.id != value.id {
+    if ComparableExpr::from(value) != ComparableExpr::from(target_value) {
         return;
     }
     add_diagnostic(checker, expr);
@@ -125,13 +115,7 @@ pub(crate) fn unnecessary_list_set_comprehension(
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
-    let Some(elt) = elt.as_name_expr() else {
-        return;
-    };
-    let Some(target) = generator.target.as_name_expr() else {
-        return;
-    };
-    if elt.id != target.id {
+    if ComparableExpr::from(elt) != ComparableExpr::from(&generator.target) {
         return;
     }
     add_diagnostic(checker, expr);

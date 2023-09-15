@@ -4,8 +4,8 @@ use anyhow::{anyhow, Result};
 use itertools::Itertools;
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::Ranged;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
+use ruff_text_size::Ranged;
 
 pub(crate) struct Renamer;
 

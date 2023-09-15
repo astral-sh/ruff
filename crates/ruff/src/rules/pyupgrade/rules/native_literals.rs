@@ -5,7 +5,8 @@ use num_bigint::BigInt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -39,6 +40,7 @@ impl From<LiteralType> for Constant {
         match value {
             LiteralType::Str => Constant::Str(ast::StringConstant {
                 value: String::new(),
+                unicode: false,
                 implicit_concatenated: false,
             }),
             LiteralType::Bytes => Constant::Bytes(ast::BytesConstant {
@@ -129,12 +131,21 @@ impl AlwaysAutofixableViolation for NativeLiterals {
 /// UP018
 pub(crate) fn native_literals(
     checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    call: &ast::ExprCall,
+    parent_expr: Option<&ast::Expr>,
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
+    let ast::ExprCall {
+        func,
+        arguments:
+            ast::Arguments {
+                args,
+                keywords,
+                range: _,
+            },
+        range: _,
+    } = call;
+
+    let Expr::Name(ast::ExprName { ref id, .. }) = func.as_ref() else {
         return;
     };
 
@@ -165,13 +176,20 @@ pub(crate) fn native_literals(
 
     match args.get(0) {
         None => {
-            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, expr.range());
+            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
+
+            // Do not suggest fix for attribute access on an int like `int().attribute`
+            // Ex) `int().denominator` is valid but `0.denominator` is not
+            if literal_type == LiteralType::Int && matches!(parent_expr, Some(Expr::Attribute(_))) {
+                return;
+            }
+
             if checker.patch(diagnostic.kind.rule()) {
                 let constant = Constant::from(literal_type);
                 let content = checker.generator().constant(&constant);
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     content,
-                    expr.range(),
+                    call.range(),
                 )));
             }
             checker.diagnostics.push(diagnostic);
@@ -194,13 +212,22 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            let arg_code = checker.locator().slice(arg.range());
+            let arg_code = checker.locator().slice(arg);
 
-            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, expr.range());
+            // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
+            // Ex) `(7).denominator` is valid but `7.denominator` is not
+            // Note that floats do not have this problem
+            // Ex) `(1.0).real` is valid and `1.0.real` is too
+            let content = match (parent_expr, value) {
+                (Some(Expr::Attribute(_)), Constant::Int(_)) => format!("({arg_code})"),
+                _ => arg_code.to_string(),
+            };
+
+            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    arg_code.to_string(),
-                    expr.range(),
+                    content,
+                    call.range(),
                 )));
             }
             checker.diagnostics.push(diagnostic);

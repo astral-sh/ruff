@@ -974,8 +974,14 @@ impl Violation for OsPathSamefile {
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
 /// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.suffix` can improve readability over the `os`
-/// module's counterparts (e.g., `os.path.splitext()`).
+/// methods such as `Path.suffix` and `Path.stem` can improve readability over
+/// the `os` module's counterparts (e.g., `os.path.splitext()`).
+///
+/// `os.path.splitext()` specifically returns a tuple of the file root and
+/// extension (e.g., given `splitext('/foo/bar.py')`, `os.path.splitext()`
+/// returns `("foo/bar", ".py")`. These outputs can be reconstructed through a
+/// combination of `Path.suffix` (`".py"`), `Path.stem` (`"bar"`), and
+/// `Path.parent` (`"foo"`).
 ///
 /// Note that `os` functions may be preferable if performance is a concern,
 /// e.g., in hot loops.
@@ -984,14 +990,16 @@ impl Violation for OsPathSamefile {
 /// ```python
 /// import os
 ///
-/// os.path.splitext("f1.py")
+/// (root, ext) = os.path.splitext("foo/bar.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// from pathlib import Path
 ///
-/// Path("f1.py").suffix
+/// path = Path("foo/bar.py")
+/// root = path.parent / path.stem
+/// ext = path.suffix
 /// ```
 ///
 /// ## References
@@ -1008,7 +1016,7 @@ pub struct OsPathSplitext;
 impl Violation for OsPathSplitext {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.splitext()` should be replaced by `Path.suffix`")
+        format!("`os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`")
     }
 }
 

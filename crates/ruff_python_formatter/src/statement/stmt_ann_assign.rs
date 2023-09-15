@@ -1,10 +1,10 @@
+use ruff_formatter::write;
+use ruff_python_ast::StmtAnnAssign;
+
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::write;
-use ruff_python_ast::StmtAnnAssign;
 
 #[derive(Default)]
 pub struct FormatStmtAnnAssign;
@@ -23,7 +23,7 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
             f,
             [
                 target.format(),
-                text(":"),
+                token(":"),
                 space(),
                 maybe_parenthesize_expression(annotation, item, Parenthesize::IfBreaks)
             ]
@@ -34,7 +34,7 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
                 f,
                 [
                     space(),
-                    text("="),
+                    token("="),
                     space(),
                     maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
                 ]

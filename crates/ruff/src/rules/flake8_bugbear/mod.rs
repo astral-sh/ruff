@@ -33,6 +33,9 @@ mod tests {
     #[test_case(Rule::JumpStatementInFinally, Path::new("B012.py"))]
     #[test_case(Rule::LoopVariableOverridesIterator, Path::new("B020.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_2.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_3.py"))]
     #[test_case(Rule::NoExplicitStacklevel, Path::new("B028.py"))]
     #[test_case(Rule::RaiseLiteral, Path::new("B016.py"))]
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"))]
@@ -71,8 +74,27 @@ mod tests {
     }
 
     #[test]
-    fn extend_immutable_calls() -> Result<()> {
-        let snapshot = "extend_immutable_calls".to_string();
+    fn extend_immutable_calls_arg_annotation() -> Result<()> {
+        let snapshot = "extend_immutable_calls_arg_annotation".to_string();
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear/B006_extended.py"),
+            &Settings {
+                flake8_bugbear: super::settings::Settings {
+                    extend_immutable_calls: vec![
+                        "custom.ImmutableTypeA".to_string(),
+                        "custom.ImmutableTypeB".to_string(),
+                    ],
+                },
+                ..Settings::for_rule(Rule::MutableArgumentDefault)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn extend_immutable_calls_arg_default() -> Result<()> {
+        let snapshot = "extend_immutable_calls_arg_default".to_string();
         let diagnostics = test_path(
             Path::new("flake8_bugbear/B008_extended.py"),
             &Settings {
@@ -80,6 +102,7 @@ mod tests {
                     extend_immutable_calls: vec![
                         "fastapi.Depends".to_string(),
                         "fastapi.Query".to_string(),
+                        "custom.ImmutableTypeA".to_string(),
                     ],
                 },
                 ..Settings::for_rule(Rule::FunctionCallInDefaultArgument)

@@ -1,8 +1,8 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
-use std::fs::write;
+use std::fs::{write, File};
 use std::io;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::ops::AddAssign;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -14,21 +14,21 @@ use filetime::FileTime;
 use log::{debug, error, warn};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
+use thiserror::Error;
 
-use ruff::jupyter::{Cell, Notebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
 use ruff::message::Message;
 use ruff::pyproject_toml::lint_pyproject_toml;
-use ruff::registry::Rule;
+use ruff::registry::AsRule;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff::source_kind::SourceKind;
-use ruff::{fs, IOError};
+use ruff::{fs, IOError, SyntaxError};
 use ruff_diagnostics::Diagnostic;
 use ruff_macros::CacheKey;
+use ruff_notebook::{Cell, Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::PySourceType;
-use ruff_python_stdlib::path::is_project_toml;
+use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -64,40 +64,57 @@ pub(crate) struct Diagnostics {
     pub(crate) messages: Vec<Message>,
     pub(crate) fixed: FxHashMap<String, FixTable>,
     pub(crate) imports: ImportMap,
-    pub(crate) notebooks: FxHashMap<String, Notebook>,
+    pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
 
 impl Diagnostics {
-    pub(crate) fn new(messages: Vec<Message>, imports: ImportMap) -> Self {
+    pub(crate) fn new(
+        messages: Vec<Message>,
+        imports: ImportMap,
+        notebook_indexes: FxHashMap<String, NotebookIndex>,
+    ) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),
             imports,
-            notebooks: FxHashMap::default(),
+            notebook_indexes,
         }
     }
 
-    /// Generate [`Diagnostics`] based on an [`io::Error`].
-    pub(crate) fn from_io_error(err: &io::Error, path: &Path, settings: &Settings) -> Self {
-        if settings.rules.enabled(Rule::IOError) {
-            let io_err = Diagnostic::new(
-                IOError {
-                    message: err.to_string(),
-                },
-                TextRange::default(),
-            );
-            let dummy = SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
+    /// Generate [`Diagnostics`] based on a [`SourceExtractionError`].
+    pub(crate) fn from_source_error(
+        err: &SourceExtractionError,
+        path: Option<&Path>,
+        settings: &Settings,
+    ) -> Self {
+        let diagnostic = Diagnostic::from(err);
+        if settings.rules.enabled(diagnostic.kind.rule()) {
+            let name = path.map_or_else(|| "-".into(), std::path::Path::to_string_lossy);
+            let dummy = SourceFileBuilder::new(name, "").finish();
             Self::new(
-                vec![Message::from_diagnostic(io_err, dummy, TextSize::default())],
+                vec![Message::from_diagnostic(
+                    diagnostic,
+                    dummy,
+                    TextSize::default(),
+                )],
                 ImportMap::default(),
+                FxHashMap::default(),
             )
         } else {
-            warn!(
-                "{}{}{} {err}",
-                "Failed to lint ".bold(),
-                fs::relativize_path(path).bold(),
-                ":".bold()
-            );
+            match path {
+                Some(path) => {
+                    warn!(
+                        "{}{}{} {err}",
+                        "Failed to lint ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    );
+                }
+                None => {
+                    warn!("{}{} {err}", "Failed to lint".bold(), ":".bold());
+                }
+            }
+
             Self::default()
         }
     }
@@ -118,78 +135,8 @@ impl AddAssign for Diagnostics {
                 }
             }
         }
-        self.notebooks.extend(other.notebooks);
+        self.notebook_indexes.extend(other.notebook_indexes);
     }
-}
-
-/// Read a Jupyter Notebook from disk.
-///
-/// Returns either an indexed Python Jupyter Notebook or a diagnostic (which is empty if we skip).
-fn notebook_from_path(path: &Path) -> Result<Notebook, Box<Diagnostics>> {
-    let notebook = match Notebook::from_path(path) {
-        Ok(notebook) => {
-            if !notebook.is_python_notebook() {
-                // Not a python notebook, this could e.g. be an R notebook which we want to just skip.
-                debug!(
-                    "Skipping {} because it's not a Python notebook",
-                    path.display()
-                );
-                return Err(Box::default());
-            }
-            notebook
-        }
-        Err(diagnostic) => {
-            // Failed to read the jupyter notebook
-            return Err(Box::new(Diagnostics {
-                messages: vec![Message::from_diagnostic(
-                    *diagnostic,
-                    SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish(),
-                    TextSize::default(),
-                )],
-                ..Diagnostics::default()
-            }));
-        }
-    };
-
-    Ok(notebook)
-}
-
-/// Parse a Jupyter Notebook from a JSON string.
-///
-/// Returns either an indexed Python Jupyter Notebook or a diagnostic (which is empty if we skip).
-fn notebook_from_source_code(
-    source_code: &str,
-    path: Option<&Path>,
-) -> Result<Notebook, Box<Diagnostics>> {
-    let notebook = match Notebook::from_source_code(source_code) {
-        Ok(notebook) => {
-            if !notebook.is_python_notebook() {
-                // Not a python notebook, this could e.g. be an R notebook which we want to just skip.
-                if let Some(path) = path {
-                    debug!(
-                        "Skipping {} because it's not a Python notebook",
-                        path.display()
-                    );
-                }
-                return Err(Box::default());
-            }
-            notebook
-        }
-        Err(diagnostic) => {
-            // Failed to read the jupyter notebook
-            return Err(Box::new(Diagnostics {
-                messages: vec![Message::from_diagnostic(
-                    *diagnostic,
-                    SourceFileBuilder::new(path.map(Path::to_string_lossy).unwrap_or_default(), "")
-                        .finish(),
-                    TextSize::default(),
-                )],
-                ..Diagnostics::default()
-            }));
-        }
-    };
-
-    Ok(notebook)
 }
 
 /// Lint the source code at the given `Path`.
@@ -228,42 +175,49 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    // We have to special case this here since the Python tokenizer doesn't work with TOML.
-    if is_project_toml(path) {
-        let messages = if settings
-            .lib
-            .rules
-            .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
-        {
-            let contents = match std::fs::read_to_string(path) {
-                Ok(contents) => contents,
-                Err(err) => {
-                    return Ok(Diagnostics::from_io_error(&err, path, &settings.lib));
-                }
+    let source_type = match SourceType::from(path) {
+        SourceType::Toml(TomlSourceType::Pyproject) => {
+            let messages = if settings
+                .lib
+                .rules
+                .iter_enabled()
+                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+            {
+                let contents =
+                    match std::fs::read_to_string(path).map_err(SourceExtractionError::Io) {
+                        Ok(contents) => contents,
+                        Err(err) => {
+                            return Ok(Diagnostics::from_source_error(
+                                &err,
+                                Some(path),
+                                &settings.lib,
+                            ));
+                        }
+                    };
+                let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+                lint_pyproject_toml(source_file, &settings.lib)
+            } else {
+                vec![]
             };
-            let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-            lint_pyproject_toml(source_file, &settings.lib)
-        } else {
-            vec![]
-        };
-        return Ok(Diagnostics {
-            messages,
-            ..Diagnostics::default()
-        });
-    }
+            return Ok(Diagnostics {
+                messages,
+                ..Diagnostics::default()
+            });
+        }
+        SourceType::Toml(_) => return Ok(Diagnostics::default()),
+        SourceType::Python(source_type) => source_type,
+    };
 
     // Extract the sources from the file.
-    let LintSources {
-        source_type,
-        source_kind,
-    } = match LintSources::try_from_path(path) {
-        Ok(sources) => sources,
-        Err(SourceExtractionError::Io(err)) => {
-            return Ok(Diagnostics::from_io_error(&err, path, &settings.lib));
-        }
-        Err(SourceExtractionError::Diagnostics(diagnostics)) => {
-            return Ok(*diagnostics);
+    let LintSource(source_kind) = match LintSource::try_from_path(path, source_type) {
+        Ok(Some(sources)) => sources,
+        Ok(None) => return Ok(Diagnostics::default()),
+        Err(err) => {
+            return Ok(Diagnostics::from_source_error(
+                &err,
+                Some(path),
+                &settings.lib,
+            ));
         }
     };
 
@@ -293,8 +247,9 @@ pub(crate) fn lint_path(
                         SourceKind::Python(transformed) => {
                             write(path, transformed.as_bytes())?;
                         }
-                        SourceKind::Jupyter(notebook) => {
-                            notebook.write(path)?;
+                        SourceKind::IpyNotebook(notebook) => {
+                            let mut writer = BufWriter::new(File::create(path)?);
+                            notebook.write(&mut writer)?;
                         }
                     },
                     flags::FixMode::Diff => {
@@ -308,10 +263,10 @@ pub(crate) fn lint_path(
                                 stdout.write_all(b"\n")?;
                                 stdout.flush()?;
                             }
-                            SourceKind::Jupyter(dest_notebook) => {
+                            SourceKind::IpyNotebook(dest_notebook) => {
                                 // We need to load the notebook again, since we might've
                                 // mutated it.
-                                let src_notebook = source_kind.as_jupyter().unwrap();
+                                let src_notebook = source_kind.as_ipy_notebook().unwrap();
                                 let mut stdout = io::stdout().lock();
                                 for ((idx, src_cell), dest_cell) in src_notebook
                                     .cells()
@@ -391,7 +346,13 @@ pub(crate) fn lint_path(
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
         if parse_error.is_none() {
-            cache.update(relative_path.to_owned(), key, &messages, &imports);
+            cache.update(
+                relative_path.to_owned(),
+                key,
+                &messages,
+                &imports,
+                source_kind.as_ipy_notebook().map(Notebook::index),
+            );
         }
     }
 
@@ -404,17 +365,18 @@ pub(crate) fn lint_path(
                     source_kind.source_code(),
                     &LineIndex::from_source_text(source_kind.source_code())
                 ),
-                Some(&source_kind),
+                &source_kind,
             )
         );
     }
 
-    let notebooks = if let SourceKind::Jupyter(notebook) = source_kind {
+    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
         FxHashMap::from_iter([(
             path.to_str()
                 .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
                 .to_string(),
-            notebook,
+            // Index needs to be computed always to store in cache.
+            notebook.index().clone(),
         )])
     } else {
         FxHashMap::default()
@@ -424,7 +386,7 @@ pub(crate) fn lint_path(
         messages,
         fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
         imports,
-        notebooks,
+        notebook_indexes,
     })
 }
 
@@ -438,18 +400,17 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
+    // TODO(charlie): Support `pyproject.toml`.
+    let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
+        return Ok(Diagnostics::default());
+    };
+
     // Extract the sources from the file.
-    let LintSources {
-        source_type,
-        source_kind,
-    } = match LintSources::try_from_source_code(contents, path) {
-        Ok(sources) => sources,
-        Err(SourceExtractionError::Io(err)) => {
-            // SAFETY: An `io::Error` can only occur if we're reading from a path.
-            return Ok(Diagnostics::from_io_error(&err, path.unwrap(), settings));
-        }
-        Err(SourceExtractionError::Diagnostics(diagnostics)) => {
-            return Ok(*diagnostics);
+    let LintSource(source_kind) = match LintSource::try_from_source_code(contents, source_type) {
+        Ok(Some(sources)) => sources,
+        Ok(None) => return Ok(Diagnostics::default()),
+        Err(err) => {
+            return Ok(Diagnostics::from_source_error(&err, path, settings));
         }
     };
 
@@ -549,95 +510,83 @@ pub(crate) fn lint_stdin(
             fixed,
         )]),
         imports,
-        notebooks: FxHashMap::default(),
+        notebook_indexes: FxHashMap::default(),
     })
 }
 
 #[derive(Debug)]
-struct LintSources {
-    /// The "type" of source code, e.g. `.py`, `.pyi`, `.ipynb`, etc.
-    source_type: PySourceType,
-    /// The "kind" of source, e.g. Python file, Jupyter Notebook, etc.
-    source_kind: SourceKind,
-}
+pub(crate) struct LintSource(pub(crate) SourceKind);
 
-impl LintSources {
-    /// Extract the lint [`LintSources`] from the given file path.
-    fn try_from_path(path: &Path) -> Result<LintSources, SourceExtractionError> {
-        let source_type = PySourceType::from(path);
-
-        // Read the file from disk.
-        if source_type.is_jupyter() {
-            let notebook = notebook_from_path(path).map_err(SourceExtractionError::Diagnostics)?;
-            let source_kind = SourceKind::Jupyter(notebook);
-            Ok(LintSources {
-                source_type,
-                source_kind,
-            })
+impl LintSource {
+    /// Extract the lint [`LintSource`] from the given file path.
+    pub(crate) fn try_from_path(
+        path: &Path,
+        source_type: PySourceType,
+    ) -> Result<Option<LintSource>, SourceExtractionError> {
+        if source_type.is_ipynb() {
+            let notebook = Notebook::from_path(path)?;
+            Ok(notebook
+                .is_python_notebook()
+                .then_some(LintSource(SourceKind::IpyNotebook(notebook))))
         } else {
             // This is tested by ruff_cli integration test `unreadable_file`
-            let contents = std::fs::read_to_string(path).map_err(SourceExtractionError::Io)?;
-            Ok(LintSources {
-                source_type,
-                source_kind: SourceKind::Python(contents),
-            })
+            let contents = std::fs::read_to_string(path)?;
+            Ok(Some(LintSource(SourceKind::Python(contents))))
         }
     }
 
-    /// Extract the lint [`LintSources`] from the raw string contents, optionally accompanied by a
+    /// Extract the lint [`LintSource`] from the raw string contents, optionally accompanied by a
     /// file path indicating the path to the file from which the contents were read. If provided,
     /// the file path should be used for diagnostics, but not for reading the file from disk.
-    fn try_from_source_code(
+    pub(crate) fn try_from_source_code(
         source_code: String,
-        path: Option<&Path>,
-    ) -> Result<LintSources, SourceExtractionError> {
-        let source_type = path.map(PySourceType::from).unwrap_or_default();
-
-        if source_type.is_jupyter() {
-            let notebook = notebook_from_source_code(&source_code, path)
-                .map_err(SourceExtractionError::Diagnostics)?;
-            let source_kind = SourceKind::Jupyter(notebook);
-            Ok(LintSources {
-                source_type,
-                source_kind,
-            })
+        source_type: PySourceType,
+    ) -> Result<Option<LintSource>, SourceExtractionError> {
+        if source_type.is_ipynb() {
+            let notebook = Notebook::from_source_code(&source_code)?;
+            Ok(notebook
+                .is_python_notebook()
+                .then_some(LintSource(SourceKind::IpyNotebook(notebook))))
         } else {
-            Ok(LintSources {
-                source_type,
-                source_kind: SourceKind::Python(source_code),
-            })
+            Ok(Some(LintSource(SourceKind::Python(source_code))))
         }
     }
 }
 
-#[derive(Debug)]
-enum SourceExtractionError {
+#[derive(Error, Debug)]
+pub(crate) enum SourceExtractionError {
     /// The extraction failed due to an [`io::Error`].
-    Io(io::Error),
-    /// The extraction failed, and generated [`Diagnostics`] to report.
-    Diagnostics(Box<Diagnostics>),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    /// The extraction failed due to a [`NotebookError`].
+    #[error(transparent)]
+    Notebook(#[from] NotebookError),
 }
 
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use crate::diagnostics::{notebook_from_path, notebook_from_source_code, Diagnostics};
-
-    #[test]
-    fn test_r() {
-        let path = Path::new("../ruff/resources/test/fixtures/jupyter/R.ipynb");
-        // No diagnostics is used as skip signal.
-        assert_eq!(
-            notebook_from_path(path).unwrap_err(),
-            Box::<Diagnostics>::default()
-        );
-
-        let contents = std::fs::read_to_string(path).unwrap();
-        // No diagnostics is used as skip signal.
-        assert_eq!(
-            notebook_from_source_code(&contents, Some(path)).unwrap_err(),
-            Box::<Diagnostics>::default()
-        );
+impl From<&SourceExtractionError> for Diagnostic {
+    fn from(err: &SourceExtractionError) -> Self {
+        match err {
+            // IO errors.
+            SourceExtractionError::Io(_)
+            | SourceExtractionError::Notebook(NotebookError::Io(_) | NotebookError::Json(_)) => {
+                Diagnostic::new(
+                    IOError {
+                        message: err.to_string(),
+                    },
+                    TextRange::default(),
+                )
+            }
+            // Syntax errors.
+            SourceExtractionError::Notebook(
+                NotebookError::InvalidJson(_)
+                | NotebookError::InvalidSchema(_)
+                | NotebookError::InvalidFormat(_),
+            ) => Diagnostic::new(
+                SyntaxError {
+                    message: err.to_string(),
+                },
+                TextRange::default(),
+            ),
+        }
     }
 }

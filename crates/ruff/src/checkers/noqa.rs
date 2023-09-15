@@ -3,8 +3,7 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_source_file::Locator;
@@ -110,8 +109,8 @@ pub(crate) fn check_noqa(
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
                         if settings.rules.should_fix(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix_from_edit(delete_noqa(directive.range(), locator));
+                            diagnostic
+                                .set_fix(Fix::suggested(delete_noqa(directive.range(), locator)));
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -175,12 +174,12 @@ pub(crate) fn check_noqa(
                         );
                         if settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
-                                #[allow(deprecated)]
-                                diagnostic
-                                    .set_fix_from_edit(delete_noqa(directive.range(), locator));
+                                diagnostic.set_fix(Fix::suggested(delete_noqa(
+                                    directive.range(),
+                                    locator,
+                                )));
                             } else {
-                                #[allow(deprecated)]
-                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
                                     directive.range(),
                                 )));

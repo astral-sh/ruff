@@ -32,10 +32,10 @@ use itertools::Itertools;
 use log::error;
 use ruff_python_ast::{
     self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged,
-    Stmt, Suite, UnaryOp,
+    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
+    Suite, UnaryOp,
 };
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
@@ -52,7 +52,8 @@ use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_semantic::analyze::{typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
+    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport,
+    SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_source_file::Locator;
@@ -193,24 +194,6 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Returns the [`IsolationLevel`] to isolate fixes for the current statement.
-    ///
-    /// The primary use-case for fix isolation is to ensure that we don't delete all statements
-    /// in a given indented block, which would cause a syntax error. We therefore need to ensure
-    /// that we delete at most one statement per indented block per fixer pass. Fix isolation should
-    /// thus be applied whenever we delete a statement, but can otherwise be omitted.
-    pub(crate) fn statement_isolation(&self) -> IsolationLevel {
-        IsolationLevel::Group(self.semantic.current_statement_id().into())
-    }
-
-    /// Returns the [`IsolationLevel`] to isolate fixes in the current statement's parent.
-    pub(crate) fn parent_isolation(&self) -> IsolationLevel {
-        self.semantic
-            .current_statement_parent_id()
-            .map(|node_id| IsolationLevel::Group(node_id.into()))
-            .unwrap_or_default()
-    }
-
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
     /// offsets.
     pub(crate) const fn locator(&self) -> &'a Locator<'a> {
@@ -259,6 +242,18 @@ impl<'a> Checker<'a> {
     pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
         self.settings.rules.any_enabled(rules)
     }
+
+    /// Returns the [`IsolationLevel`] to isolate fixes for a given node.
+    ///
+    /// The primary use-case for fix isolation is to ensure that we don't delete all statements
+    /// in a given indented block, which would cause a syntax error. We therefore need to ensure
+    /// that we delete at most one statement per indented block per fixer pass. Fix isolation should
+    /// thus be applied whenever we delete a statement, but can otherwise be omitted.
+    pub(crate) fn isolation(node_id: Option<NodeId>) -> IsolationLevel {
+        node_id
+            .map(|node_id| IsolationLevel::Group(node_id.into()))
+            .unwrap_or_default()
+    }
 }
 
 impl<'a, 'b> Visitor<'b> for Checker<'a>
@@ -267,7 +262,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Step 0: Pre-processing
-        self.semantic.push_statement(stmt);
+        self.semantic.push_node(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
@@ -533,11 +528,7 @@ where
                     &self.semantic.definitions,
                 );
                 self.semantic.push_definition(definition);
-
-                self.semantic.push_scope(match &stmt {
-                    Stmt::FunctionDef(stmt) => ScopeKind::Function(stmt),
-                    _ => unreachable!("Expected Stmt::FunctionDef"),
-                });
+                self.semantic.push_scope(ScopeKind::Function(function_def));
 
                 self.deferred.functions.push(self.semantic.snapshot());
 
@@ -779,7 +770,7 @@ where
         analyze::statement(stmt, self);
 
         self.semantic.flags = flags_snapshot;
-        self.semantic.pop_statement();
+        self.semantic.pop_node();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -815,7 +806,7 @@ where
             return;
         }
 
-        self.semantic.push_expression(expr);
+        self.semantic.push_node(expr);
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
@@ -1197,7 +1188,6 @@ where
             }
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
-                kind: _,
                 range: _,
             }) => {
                 if self.semantic.in_type_definition()
@@ -1235,7 +1225,7 @@ where
         analyze::expression(expr, self);
 
         self.semantic.flags = flags_snapshot;
-        self.semantic.pop_expression();
+        self.semantic.pop_node();
     }
 
     fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
@@ -1900,6 +1890,8 @@ impl<'a> Checker<'a> {
         for (name, range) in exports {
             if let Some(binding_id) = self.semantic.global_scope().get(name) {
                 // Mark anything referenced in `__all__` as used.
+                // TODO(charlie): `range` here should be the range of the name in `__all__`, not
+                // the range of `__all__` itself.
                 self.semantic.add_global_reference(binding_id, range);
             } else {
                 if self.semantic.global_scope().uses_star_imports() {

@@ -2,16 +2,15 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt, Suite};
-
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers::to_module_path;
 use ruff_python_ast::imports::{ImportMap, ModuleImport};
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::directives::IsortDirectives;
 use crate::registry::Rule;
@@ -86,7 +85,7 @@ pub(crate) fn check_imports(
     stylist: &Stylist,
     path: &Path,
     package: Option<&Path>,
-    source_kind: Option<&SourceKind>,
+    source_kind: &SourceKind,
     source_type: PySourceType,
 ) -> (Vec<Diagnostic>, Option<ImportMap>) {
     // Extract all import blocks from the AST.

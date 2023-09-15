@@ -137,13 +137,13 @@ fn is_standard_library_override(
         return false;
     };
     match name {
-        // Ex) `Event#set`
+        // Ex) `Event.set`
         "set" => bases.iter().any(|base| {
             semantic
                 .resolve_call_path(base)
                 .is_some_and(|call_path| matches!(call_path.as_slice(), ["threading", "Event"]))
         }),
-        // Ex) `Filter#filter`
+        // Ex) `Filter.filter`
         "filter" => bases.iter().any(|base| {
             semantic
                 .resolve_call_path(base)

@@ -1,0 +1,193 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/ellipsis.pyi
+---
+## Input
+```py
+"""Compound statements with no body should be written on one line."""
+
+if True:
+    ...
+elif True:
+    ...
+else:
+    ...
+
+if True:
+    # comment
+    ...
+elif True:
+    # comment
+    ...
+else:
+    # comment
+    ...
+
+if True:
+    ... # comment
+elif True:
+    ... # comment
+else:
+    ... # comment
+
+for i in []:
+    ...
+else:
+    ...
+
+for i in []:
+    # comment
+    ...
+else:
+    # comment
+    ...
+
+for i in []:
+    ... # comment
+else:
+    ... # comment
+
+while True:
+    ...
+else:
+    ...
+
+while True:
+    # comment
+    ...
+else:
+    # comment
+    ...
+
+while True:
+    ... # comment
+else:
+    ... # comment
+
+with True:
+    ...
+
+with True:
+    # comment
+    ...
+
+with True:
+    ... # comment
+
+match x:
+    case 1:
+        ...
+    case 2:
+        # comment
+        ...
+    case 3:
+        ... # comment
+
+try:
+    ...
+except:
+    ...
+finally:
+    ...
+
+try:
+    # comment
+    ...
+except:
+    # comment
+    ...
+finally:
+    # comment
+    ...
+
+try:
+    ...  # comment
+except:
+    ...  # comment
+finally:
+    ...  # comment```
+
+## Output
+```py
+"""Compound statements with no body should be written on one line."""
+
+if True: ...
+elif True: ...
+else: ...
+
+if True:
+    # comment
+    ...
+elif True:
+    # comment
+    ...
+else:
+    # comment
+    ...
+
+if True: ...  # comment
+elif True: ...  # comment
+else: ...  # comment
+
+for i in []: ...
+else: ...
+
+for i in []:
+    # comment
+    ...
+else:
+    # comment
+    ...
+
+for i in []: ...  # comment
+else: ...  # comment
+
+while True: ...
+else: ...
+
+while True:
+    # comment
+    ...
+else:
+    # comment
+    ...
+
+while True: ...  # comment
+else: ...  # comment
+
+with True: ...
+
+with True:
+    # comment
+    ...
+
+with True: ...  # comment
+
+match x:
+    case 1: ...
+    case 2:
+        # comment
+        ...
+    case 3: ...  # comment
+
+try: ...
+except: ...
+finally: ...
+
+try:
+    # comment
+    ...
+except:
+    # comment
+    ...
+finally:
+    # comment
+    ...
+
+try: ...  # comment
+except: ...  # comment
+finally: ...  # comment
+```
+
+
+

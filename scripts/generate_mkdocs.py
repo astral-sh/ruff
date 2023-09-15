@@ -25,6 +25,7 @@ SECTIONS: list[Section] = [
     Section("Installation", "installation.md", generated=False),
     Section("Usage", "usage.md", generated=False),
     Section("Configuration", "configuration.md", generated=False),
+    Section("Preview", "preview.md", generated=False),
     Section("Rules", "rules.md", generated=True),
     Section("Settings", "settings.md", generated=True),
     Section("Editor Integrations", "editor-integrations.md", generated=False),

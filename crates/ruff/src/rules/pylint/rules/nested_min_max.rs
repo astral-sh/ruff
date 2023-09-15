@@ -1,5 +1,5 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -46,8 +46,10 @@ impl Violation for NestedMinMax {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
+
     fn message(&self) -> String {
-        format!("Nested `{}` calls can be flattened", self.func)
+        let NestedMinMax { func } = self;
+        format!("Nested `{func}` calls can be flattened")
     }
 
     fn autofix_title(&self) -> Option<String> {
@@ -104,14 +106,16 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                 range: _,
             }) = arg
             {
-                if args.len() == 1 {
-                    let new_arg = Expr::Starred(ast::ExprStarred {
-                        value: Box::new(args[0].clone()),
-                        ctx: ast::ExprContext::Load,
-                        range: TextRange::default(),
-                    });
-                    new_args.push(new_arg);
-                    continue;
+                if let [arg] = args.as_slice() {
+                    if arg.as_starred_expr().is_none() {
+                        let new_arg = Expr::Starred(ast::ExprStarred {
+                            value: Box::new(arg.clone()),
+                            ctx: ast::ExprContext::Load,
+                            range: TextRange::default(),
+                        });
+                        new_args.push(new_arg);
+                        continue;
+                    }
                 }
                 if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
                     inner(min_max, args, semantic, new_args);
@@ -127,7 +131,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
     new_args
 }
 
-/// W3301
+/// PLW3301
 pub(crate) fn nested_min_max(
     checker: &mut Checker,
     expr: &Expr,

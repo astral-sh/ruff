@@ -1,17 +1,16 @@
 //! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
 
-use anyhow::{bail, Result};
+use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::{
-    self as ast, Arguments, ExceptHandler, Expr, Keyword, PySourceType, Ranged, Stmt,
-};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{lexer, AsMode};
-use ruff_python_trivia::{has_leading_content, is_python_whitespace, PythonWhitespace};
+use ruff_python_trivia::{
+    has_leading_content, is_python_whitespace, PythonWhitespace, SimpleTokenKind, SimpleTokenizer,
+};
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::autofix::codemods;
 
@@ -48,7 +47,7 @@ pub(crate) fn delete_stmt(
         } else if has_leading_content(stmt.start(), locator) {
             Edit::range_deletion(stmt.range())
         } else if let Some(start) = indexer.preceded_by_continuations(stmt.start(), locator) {
-            Edit::range_deletion(TextRange::new(start, stmt.end()))
+            Edit::deletion(start, stmt.end())
         } else {
             let range = locator.full_lines_range(stmt.range());
             Edit::range_deletion(range)
@@ -89,83 +88,50 @@ pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,
     parentheses: Parentheses,
-    locator: &Locator,
-    source_type: PySourceType,
+    source: &str,
 ) -> Result<Edit> {
-    // TODO(sbrugman): Preserve trailing comments.
-    if arguments.keywords.len() + arguments.args.len() > 1 {
-        let mut fix_start = None;
-        let mut fix_end = None;
+    // Partition into arguments before and after the argument to remove.
+    let (before, after): (Vec<_>, Vec<_>) = arguments
+        .arguments_source_order()
+        .map(|arg| arg.range())
+        .filter(|range| argument.range() != *range)
+        .partition(|range| range.start() < argument.start());
 
-        if arguments
-            .args
-            .iter()
-            .map(Expr::start)
-            .chain(arguments.keywords.iter().map(Keyword::start))
-            .any(|location| location > argument.start())
-        {
-            // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
-            // argument to the end of the subsequent comma.
-            let mut seen_comma = false;
-            for (tok, range) in lexer::lex_starts_at(
-                locator.slice(arguments.range()),
-                source_type.as_mode(),
-                arguments.start(),
-            )
-            .flatten()
-            {
-                if seen_comma {
-                    if tok.is_non_logical_newline() {
-                        // Also delete any non-logical newlines after the comma.
-                        continue;
-                    }
-                    fix_end = Some(if tok.is_newline() {
-                        range.end()
-                    } else {
-                        range.start()
-                    });
-                    break;
-                }
-                if range.start() == argument.start() {
-                    fix_start = Some(range.start());
-                }
-                if fix_start.is_some() && tok.is_comma() {
-                    seen_comma = true;
-                }
-            }
-        } else {
-            // Case 2: argument or keyword is the last node, so delete from the start of the
-            // previous comma to the end of the argument.
-            for (tok, range) in lexer::lex_starts_at(
-                locator.slice(arguments.range()),
-                source_type.as_mode(),
-                arguments.start(),
-            )
-            .flatten()
-            {
-                if range.start() == argument.start() {
-                    fix_end = Some(argument.end());
-                    break;
-                }
-                if tok.is_comma() {
-                    fix_start = Some(range.start());
-                }
-            }
-        }
+    if !after.is_empty() {
+        // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
+        // argument to the end of the subsequent comma.
+        let mut tokenizer = SimpleTokenizer::starts_at(argument.end(), source);
 
-        match (fix_start, fix_end) {
-            (Some(start), Some(end)) => Ok(Edit::deletion(start, end)),
-            _ => {
-                bail!("No fix could be constructed")
-            }
-        }
+        // Find the trailing comma.
+        tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+
+        // Find the next non-whitespace token.
+        let next = tokenizer
+            .find(|token| {
+                token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
+            })
+            .context("Unable to find next token")?;
+
+        Ok(Edit::deletion(argument.start(), next.start()))
+    } else if let Some(previous) = before.iter().map(Ranged::end).max() {
+        // Case 2: argument or keyword is the last node, so delete from the start of the
+        // previous comma to the end of the argument.
+        let mut tokenizer = SimpleTokenizer::starts_at(previous, source);
+
+        // Find the trailing comma.
+        let comma = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+
+        Ok(Edit::deletion(comma.start(), argument.end()))
     } else {
-        // Only one argument; remove it (but preserve parentheses, if needed).
+        // Case 3: argument or keyword is the only node, so delete the arguments (but preserve
+        // parentheses, if needed).
         Ok(match parentheses {
-            Parentheses::Remove => Edit::deletion(arguments.start(), arguments.end()),
-            Parentheses::Preserve => {
-                Edit::replacement("()".to_string(), arguments.start(), arguments.end())
-            }
+            Parentheses::Remove => Edit::range_deletion(arguments.range()),
+            Parentheses::Preserve => Edit::range_replacement("()".to_string(), arguments.range()),
         })
     }
 }
@@ -257,38 +223,75 @@ fn trailing_semicolon(offset: TextSize, locator: &Locator) -> Option<TextSize> {
 fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
     let start_location = semicolon + TextSize::from(1);
 
-    let contents = &locator.contents()[usize::from(start_location)..];
-    for line in NewlineWithTrailingNewline::from(contents) {
+    for line in
+        NewlineWithTrailingNewline::with_offset(locator.after(start_location), start_location)
+    {
         let trimmed = line.trim_whitespace();
         // Skip past any continuations.
         if trimmed.starts_with('\\') {
             continue;
         }
 
-        return start_location
-            + if trimmed.is_empty() {
-                // If the line is empty, then despite the previous statement ending in a
-                // semicolon, we know that it's not a multi-statement line.
-                line.start()
-            } else {
-                // Otherwise, find the start of the next statement. (Or, anything that isn't
-                // whitespace.)
-                let relative_offset = line.find(|c: char| !is_python_whitespace(c)).unwrap();
-                line.start() + TextSize::try_from(relative_offset).unwrap()
-            };
+        return if trimmed.is_empty() {
+            // If the line is empty, then despite the previous statement ending in a
+            // semicolon, we know that it's not a multi-statement line.
+            line.start()
+        } else {
+            // Otherwise, find the start of the next statement. (Or, anything that isn't
+            // whitespace.)
+            let relative_offset = line.find(|c: char| !is_python_whitespace(c)).unwrap();
+            line.start() + TextSize::try_from(relative_offset).unwrap()
+        };
     }
 
     locator.line_end(start_location)
+}
+
+/// Add leading whitespace to a snippet, if it's immediately preceded an identifier or keyword.
+pub(crate) fn pad_start(mut content: String, start: TextSize, locator: &Locator) -> String {
+    // Ex) When converting `except(ValueError,)` from a tuple to a single argument, we need to
+    // insert a space before the fix, to achieve `except ValueError`.
+    if locator
+        .up_to(start)
+        .chars()
+        .last()
+        .is_some_and(|char| char.is_ascii_alphabetic())
+    {
+        content.insert(0, ' ');
+    }
+    content
+}
+
+/// Add trailing whitespace to a snippet, if it's immediately followed by an identifier or keyword.
+pub(crate) fn pad_end(mut content: String, end: TextSize, locator: &Locator) -> String {
+    if locator
+        .after(end)
+        .chars()
+        .next()
+        .is_some_and(|char| char.is_ascii_alphabetic())
+    {
+        content.push(' ');
+    }
+    content
+}
+
+/// Add leading or trailing whitespace to a snippet, if it's immediately preceded or followed by
+/// an identifier or keyword.
+pub(crate) fn pad(content: String, range: TextRange, locator: &Locator) -> String {
+    pad_start(
+        pad_end(content, range.end(), locator),
+        range.start(),
+        locator,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
 
-    use ruff_python_ast::Ranged;
     use ruff_python_parser::parse_suite;
     use ruff_source_file::Locator;
-    use ruff_text_size::TextSize;
+    use ruff_text_size::{Ranged, TextSize};
 
     use crate::autofix::edits::{next_stmt_break, trailing_semicolon};
 

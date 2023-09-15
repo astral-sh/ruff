@@ -98,5 +98,7 @@ E23.py:29:20: E231 [*] Missing whitespace after ':'
 29    |-    'tag_smalldata':[('byte_count_mdtype', 'u4'), ('data', 'S4')],
    29 |+    'tag_smalldata': [('byte_count_mdtype', 'u4'), ('data', 'S4')],
 30 30 | }
+31 31 | 
+32 32 | #: Okay
 
 

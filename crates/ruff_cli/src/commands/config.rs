@@ -1,20 +1,19 @@
-use ruff::settings::options::Options;
+use anyhow::{anyhow, Result};
 
-use crate::ExitStatus;
+use ruff_workspace::options::Options;
 
 #[allow(clippy::print_stdout)]
-pub(crate) fn config(key: Option<&str>) -> ExitStatus {
+pub(crate) fn config(key: Option<&str>) -> Result<()> {
     match key {
         None => print!("{}", Options::metadata()),
         Some(key) => match Options::metadata().get(key) {
             None => {
-                println!("Unknown option");
-                return ExitStatus::Error;
+                return Err(anyhow!("Unknown option: {key}"));
             }
             Some(entry) => {
                 print!("{entry}");
             }
         },
     }
-    ExitStatus::Success
+    Ok(())
 }

@@ -7,8 +7,8 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt, Suite};
-use ruff_text_size::TextSize;
+use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
@@ -171,10 +171,8 @@ impl<'a> Importer<'a> {
         at: TextSize,
         semantic: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
-        match self.get_symbol(symbol, at, semantic) {
-            Some(result) => result,
-            None => self.import_symbol(symbol, at, semantic),
-        }
+        self.get_symbol(symbol, at, semantic)?
+            .map_or_else(|| self.import_symbol(symbol, at, semantic), Ok)
     }
 
     /// Return an [`Edit`] to reference an existing symbol, if it's present in the given [`SemanticModel`].
@@ -183,9 +181,13 @@ impl<'a> Importer<'a> {
         symbol: &ImportRequest,
         at: TextSize,
         semantic: &SemanticModel,
-    ) -> Option<Result<(Edit, String), ResolutionError>> {
+    ) -> Result<Option<(Edit, String)>, ResolutionError> {
         // If the symbol is already available in the current scope, use it.
-        let imported_name = semantic.resolve_qualified_import_name(symbol.module, symbol.member)?;
+        let Some(imported_name) =
+            semantic.resolve_qualified_import_name(symbol.module, symbol.member)
+        else {
+            return Ok(None);
+        };
 
         // If the symbol source (i.e., the import statement) comes after the current location,
         // abort. For example, we could be generating an edit within a function, and the import
@@ -195,13 +197,13 @@ impl<'a> Importer<'a> {
         // unclear whether should add an import statement at the start of the file, since it could
         // be shadowed between the import and the current location.
         if imported_name.start() > at {
-            return Some(Err(ResolutionError::ImportAfterUsage));
+            return Err(ResolutionError::ImportAfterUsage);
         }
 
         // If the symbol source (i.e., the import statement) is in a typing-only context, but we're
         // in a runtime context, abort.
         if imported_name.context().is_typing() && semantic.execution_context().is_runtime() {
-            return Some(Err(ResolutionError::IncompatibleContext));
+            return Err(ResolutionError::IncompatibleContext);
         }
 
         // We also add a no-op edit to force conflicts with any other fixes that might try to
@@ -224,7 +226,7 @@ impl<'a> Importer<'a> {
             self.locator.slice(imported_name.range()).to_string(),
             imported_name.range(),
         );
-        Some(Ok((import_edit, imported_name.into_name())))
+        Ok(Some((import_edit, imported_name.into_name())))
     }
 
     /// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make
@@ -301,12 +303,14 @@ impl<'a> Importer<'a> {
             }
             if let Stmt::ImportFrom(ast::StmtImportFrom {
                 module: name,
+                names,
                 level,
-                ..
+                range: _,
             }) = stmt
             {
                 if level.map_or(true, |level| level.to_u32() == 0)
                     && name.as_ref().is_some_and(|name| name == module)
+                    && names.iter().all(|alias| alias.name.as_str() != "*")
                 {
                     import_from = Some(*stmt);
                 }
@@ -317,7 +321,7 @@ impl<'a> Importer<'a> {
 
     /// Add the given member to an existing `Stmt::ImportFrom` statement.
     fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
-        let mut statement = match_statement(self.locator.slice(stmt.range()))?;
+        let mut statement = match_statement(self.locator.slice(stmt))?;
         let import_from = match_import_from(&mut statement)?;
         let aliases = match_aliases(import_from)?;
         aliases.push(ImportAlias {

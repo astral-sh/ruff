@@ -1,12 +1,11 @@
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::json;
-
-use ruff_source_file::SourceLocation;
 
 use crate::fs::{relativize_path, relativize_path_to};
 use crate::message::{Emitter, EmitterContext, Message};
@@ -58,6 +57,7 @@ impl Serialize for SerializedMessages<'_> {
         S: Serializer,
     {
         let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
+        let mut fingerprints = HashSet::<u64>::with_capacity(self.messages.len());
 
         for message in self.messages {
             let start_location = message.compute_start_location();
@@ -82,10 +82,19 @@ impl Serialize for SerializedMessages<'_> {
                 |project_dir| relativize_path_to(message.filename(), project_dir),
             );
 
+            let mut message_fingerprint = fingerprint(message, 0);
+
+            // Make sure that we do not get a fingerprint that is already in use
+            // by adding in the previously generated one.
+            while fingerprints.contains(&message_fingerprint) {
+                message_fingerprint = fingerprint(message, message_fingerprint);
+            }
+            fingerprints.insert(message_fingerprint);
+
             let value = json!({
                 "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body),
                 "severity": "major",
-                "fingerprint": fingerprint(message, &start_location, &end_location),
+                "fingerprint": format!("{:x}", message_fingerprint),
                 "location": {
                     "path": path,
                     "lines": lines
@@ -100,11 +109,7 @@ impl Serialize for SerializedMessages<'_> {
 }
 
 /// Generate a unique fingerprint to identify a violation.
-fn fingerprint(
-    message: &Message,
-    start_location: &SourceLocation,
-    end_location: &SourceLocation,
-) -> String {
+fn fingerprint(message: &Message, salt: u64) -> u64 {
     let Message {
         kind,
         range: _,
@@ -115,12 +120,11 @@ fn fingerprint(
 
     let mut hasher = DefaultHasher::new();
 
-    kind.rule().hash(&mut hasher);
-    start_location.hash(&mut hasher);
-    end_location.hash(&mut hasher);
+    salt.hash(&mut hasher);
+    kind.name.hash(&mut hasher);
     file.name().hash(&mut hasher);
 
-    format!("{:x}", hasher.finish())
+    hasher.finish()
 }
 
 #[cfg(test)]

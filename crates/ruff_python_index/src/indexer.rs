@@ -1,14 +1,14 @@
 //! Struct used to index source code, to enable efficient lookup of tokens that
 //! are omitted from the AST (e.g., commented lines).
 
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::{StringKind, Tok};
 use ruff_python_trivia::{has_leading_content, has_trailing_content, is_python_whitespace};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::comment_ranges::{CommentRanges, CommentRangesBuilder};
-use ruff_source_file::Locator;
 
 pub struct Indexer {
     comment_ranges: CommentRanges,
@@ -39,7 +39,7 @@ impl Indexer {
         let mut line_start = TextSize::default();
 
         for (tok, range) in tokens.iter().flatten() {
-            let trivia = &locator.contents()[TextRange::new(prev_end, range.start())];
+            let trivia = locator.slice(TextRange::new(prev_end, range.start()));
 
             // Get the trivia between the previous and the current token and detect any newlines.
             // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
@@ -97,18 +97,6 @@ impl Indexer {
     /// Returns the byte offset ranges of comments
     pub const fn comment_ranges(&self) -> &CommentRanges {
         &self.comment_ranges
-    }
-
-    /// Returns the comments in the given range as source code slices
-    pub fn comments_in_range<'a>(
-        &'a self,
-        range: TextRange,
-        locator: &'a Locator,
-    ) -> impl Iterator<Item = &'a str> {
-        self.comment_ranges
-            .comments_in_range(range)
-            .iter()
-            .map(move |comment_range| locator.slice(*comment_range))
     }
 
     /// Returns the line start positions of continuations (backslash).
@@ -262,13 +250,25 @@ impl Indexer {
         Some(continuation)
     }
 
-    /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
-    /// other statements preceding it.
+    /// Return `true` if a [`Stmt`] appears to be preceded by other statements in a multi-statement
+    /// line.
     pub fn preceded_by_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
         has_leading_content(stmt.start(), locator)
             || self
                 .preceded_by_continuations(stmt.start(), locator)
                 .is_some()
+    }
+
+    /// Return `true` if a [`Stmt`] appears to be followed by other statements in a multi-statement
+    /// line.
+    pub fn followed_by_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
+        has_trailing_content(stmt.end(), locator)
+    }
+
+    /// Return `true` if a [`Stmt`] appears to be part of a multi-statement line.
+    pub fn in_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
+        self.followed_by_multi_statement_line(stmt, locator)
+            || self.preceded_by_multi_statement_line(stmt, locator)
     }
 }
 
@@ -276,10 +276,10 @@ impl Indexer {
 mod tests {
     use ruff_python_parser::lexer::LexResult;
     use ruff_python_parser::{lexer, Mode};
+    use ruff_source_file::Locator;
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::Indexer;
-    use ruff_source_file::Locator;
 
     #[test]
     fn continuation() {

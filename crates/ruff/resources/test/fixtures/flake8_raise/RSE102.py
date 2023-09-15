@@ -20,7 +20,16 @@ raise TypeError \
     ()
 
 # RSE102
+raise TypeError \
+    ();
+
+# RSE102
 raise TypeError(
+
+)
+
+# RSE102
+raise (TypeError) (
 
 )
 
@@ -52,3 +61,21 @@ class Class:
 
 # OK
 raise Class.error()
+
+
+import ctypes
+
+
+# OK
+raise ctypes.WinError(1)
+
+
+# RSE102
+raise IndexError()from ZeroDivisionError
+
+raise IndexError()\
+from ZeroDivisionError
+
+raise IndexError() from ZeroDivisionError
+
+raise IndexError();

@@ -8,9 +8,10 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::Decorator;
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Stmt};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::autofix::edits;
@@ -732,8 +733,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                                     keyword,
                                     arguments,
                                     edits::Parentheses::Preserve,
-                                    checker.locator(),
-                                    checker.source_type,
+                                    checker.locator().contents(),
                                 )
                                 .map(Fix::suggested)
                             });

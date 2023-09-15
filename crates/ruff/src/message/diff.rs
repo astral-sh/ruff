@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 
 use colored::{Color, ColoredString, Colorize, Styles};
 
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 
 use ruff_diagnostics::{Applicability, Fix};

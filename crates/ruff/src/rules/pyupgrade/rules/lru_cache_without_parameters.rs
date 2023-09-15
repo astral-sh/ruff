@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Decorator, Expr, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Decorator, Expr};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -78,10 +78,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
                 TextRange::new(func.end(), decorator.end()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::deletion(
-                    arguments.start(),
-                    arguments.end(),
-                )));
+                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(arguments.range())));
             }
             checker.diagnostics.push(diagnostic);
         }

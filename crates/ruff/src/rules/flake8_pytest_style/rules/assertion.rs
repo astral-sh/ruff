@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
-use anyhow::bail;
 use anyhow::Result;
+use anyhow::{bail, Context};
 use libcst_native::{
-    self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace,
-    ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
-    TrailingWhitespace, UnaryOperation,
+    self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizedNode, SimpleStatementLine,
+    SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -13,14 +12,16 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp,
+    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
 };
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
+use crate::cst::helpers::negate;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::importer::ImportRequest;
@@ -410,7 +411,7 @@ fn to_pytest_raises_args<'a>(
         "assertRaises" | "failUnlessRaises" => {
             match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
                 // Ex) `assertRaises(Exception)`
-                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg.range())),
+                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg)),
                 // Ex) `assertRaises(expected_exception=Exception)`
                 ([], [kwarg])
                     if kwarg
@@ -428,8 +429,8 @@ fn to_pytest_raises_args<'a>(
                 // Ex) `assertRaisesRegex(Exception, regex)`
                 ([arg1, arg2], []) => Cow::Owned(format!(
                     "{}, match={}",
-                    checker.locator().slice(arg1.range()),
-                    checker.locator().slice(arg2.range())
+                    checker.locator().slice(arg1),
+                    checker.locator().slice(arg2)
                 )),
                 // Ex) `assertRaisesRegex(Exception, expected_regex=regex)`
                 ([arg], [kwarg])
@@ -440,7 +441,7 @@ fn to_pytest_raises_args<'a>(
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
-                        checker.locator().slice(arg.range()),
+                        checker.locator().slice(arg),
                         checker.locator().slice(kwarg.value.range())
                     ))
                 }
@@ -566,23 +567,6 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
     CompositionKind::None
 }
 
-/// Negate a condition, i.e., `a` => `not a` and `not a` => `a`.
-fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
-    if let Expression::UnaryOperation(ref expression) = expression {
-        if matches!(expression.operator, libcst_native::UnaryOp::Not { .. }) {
-            return *expression.expression.clone();
-        }
-    }
-    Expression::UnaryOperation(Box::new(UnaryOperation {
-        operator: libcst_native::UnaryOp::Not {
-            whitespace_after: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
-        },
-        expression: Box::new(expression.clone()),
-        lpar: vec![],
-        rpar: vec![],
-    }))
-}
-
 /// Propagate parentheses from a parent to a child expression, if necessary.
 ///
 /// For example, when splitting:
@@ -597,7 +581,7 @@ fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
 /// assert (b ==
 ///     "")
 /// ```
-fn parenthesize<'a>(expression: Expression<'a>, parent: &Expression<'a>) -> Expression<'a> {
+fn parenthesize<'a>(expression: &Expression<'a>, parent: &Expression<'a>) -> Expression<'a> {
     if matches!(
         expression,
         Expression::Comparison(_)
@@ -625,19 +609,18 @@ fn parenthesize<'a>(expression: Expression<'a>, parent: &Expression<'a>) -> Expr
             | Expression::NamedExpr(_)
     ) {
         if let (Some(left), Some(right)) = (parent.lpar().first(), parent.rpar().first()) {
-            return expression.with_parens(left.clone(), right.clone());
+            return expression.clone().with_parens(left.clone(), right.clone());
         }
     }
-    expression
+    expression.clone()
 }
 
 /// Replace composite condition `assert a == "hello" and b == "world"` with two statements
 /// `assert a == "hello"` and `assert b == "world"`.
 fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, stmt) else {
-        bail!("Unable to fix multiline statement");
-    };
+    let outer_indent =
+        whitespace::indentation(locator, stmt).context("Unable to fix multiline statement")?;
 
     // Extract the module text.
     let contents = locator.lines(stmt.range());
@@ -672,11 +655,11 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         &mut indented_block.body
     };
 
-    let [Statement::Simple(simple_statement_line)] = &statements[..] else {
+    let [Statement::Simple(simple_statement_line)] = statements.as_slice() else {
         bail!("Expected one simple statement")
     };
 
-    let [SmallStatement::Assert(assert_statement)] = &simple_statement_line.body[..] else {
+    let [SmallStatement::Assert(assert_statement)] = simple_statement_line.body.as_slice() else {
         bail!("Expected simple statement to be an assert")
     };
 
@@ -685,10 +668,16 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     match &assert_statement.test {
         Expression::UnaryOperation(op) => {
             if matches!(op.operator, libcst_native::UnaryOp::Not { .. }) {
-                if let Expression::BooleanOperation(op) = &*op.expression {
-                    if matches!(op.operator, BooleanOp::Or { .. }) {
-                        conditions.push(parenthesize(negate(&op.left), &assert_statement.test));
-                        conditions.push(parenthesize(negate(&op.right), &assert_statement.test));
+                if let Expression::BooleanOperation(boolean_operation) = &*op.expression {
+                    if matches!(boolean_operation.operator, BooleanOp::Or { .. }) {
+                        conditions.push(negate(&parenthesize(
+                            &boolean_operation.left,
+                            &op.expression,
+                        )));
+                        conditions.push(negate(&parenthesize(
+                            &boolean_operation.right,
+                            &op.expression,
+                        )));
                     } else {
                         bail!("Expected assert statement to be a composite condition");
                     }
@@ -699,8 +688,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         }
         Expression::BooleanOperation(op) => {
             if matches!(op.operator, BooleanOp::And { .. }) {
-                conditions.push(parenthesize(*op.left.clone(), &assert_statement.test));
-                conditions.push(parenthesize(*op.right.clone(), &assert_statement.test));
+                conditions.push(parenthesize(&op.left, &assert_statement.test));
+                conditions.push(parenthesize(&op.right, &assert_statement.test));
             } else {
                 bail!("Expected assert statement to be a composite condition");
             }
@@ -754,10 +743,13 @@ pub(crate) fn composite_condition(
             if matches!(composite, CompositionKind::Simple)
                 && msg.is_none()
                 && !checker.indexer().comment_ranges().intersects(stmt.range())
+                && !checker
+                    .indexer()
+                    .in_multi_statement_line(stmt, checker.locator())
             {
-                #[allow(deprecated)]
-                diagnostic.try_set_fix_from_edit(|| {
+                diagnostic.try_set_fix(|| {
                     fix_composite_condition(stmt, checker.locator(), checker.stylist())
+                        .map(Fix::suggested)
                 });
             }
         }

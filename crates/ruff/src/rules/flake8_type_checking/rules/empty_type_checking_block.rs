@@ -1,8 +1,8 @@
 use ruff_python_ast as ast;
-use ruff_python_ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -61,7 +61,9 @@ pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtI
         let stmt = checker.semantic().current_statement();
         let parent = checker.semantic().current_statement_parent();
         let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.parent_isolation()));
+        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(
+            checker.semantic().current_statement_parent_id(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

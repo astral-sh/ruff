@@ -1,11 +1,10 @@
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::WithItem;
 
 use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{parenthesized, Parentheses, Parenthesize};
 use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatWithItem;
@@ -31,7 +30,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         )?;
 
         if let Some(optional_vars) = optional_vars {
-            write!(f, [space(), text("as"), space()])?;
+            write!(f, [space(), token("as"), space()])?;
 
             if trailing_as_comments.is_empty() {
                 write!(f, [optional_vars.format()])?;

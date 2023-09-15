@@ -96,3 +96,11 @@ try:
     pass
 except (OSError, KeyError):
     pass
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7101
+def get_owner_id_from_mac_address():
+    try:
+        mac_address = get_primary_mac_address()
+    except(IOError, OSError) as ex:
+        msg = 'Unable to query URL to get Owner ID: {u}\n{e}'.format(u=owner_id_url, e=ex)

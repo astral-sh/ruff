@@ -12,10 +12,10 @@ use ruff_python_parser::{ParseError, ParseErrorType};
 use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
 
 use crate::fs;
-use crate::jupyter::Notebook;
 use crate::source_kind::SourceKind;
+use ruff_notebook::Notebook;
 
-pub(crate) static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
+pub static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
 
 /// Warn a user once, with uniqueness determined by the given ID.
 #[macro_export]
@@ -139,14 +139,14 @@ pub fn set_up_logging(level: &LogLevel) -> Result<()> {
 pub struct DisplayParseError<'a> {
     error: ParseError,
     source_code: SourceCode<'a, 'a>,
-    source_kind: Option<&'a SourceKind>,
+    source_kind: &'a SourceKind,
 }
 
 impl<'a> DisplayParseError<'a> {
     pub fn new(
         error: ParseError,
         source_code: SourceCode<'a, 'a>,
-        source_kind: Option<&'a SourceKind>,
+        source_kind: &'a SourceKind,
     ) -> Self {
         Self {
             error,
@@ -171,32 +171,29 @@ impl Display for DisplayParseError<'_> {
         // If we're working on a Jupyter notebook, translate the positions
         // with respect to the cell and row in the cell. This is the same
         // format as the `TextEmitter`.
-        let error_location = if let Some(jupyter_index) = self
-            .source_kind
-            .and_then(SourceKind::notebook)
-            .map(Notebook::index)
-        {
-            write!(
-                f,
-                "cell {cell}{colon}",
-                cell = jupyter_index
-                    .cell(source_location.row.get())
-                    .unwrap_or_default(),
-                colon = ":".cyan(),
-            )?;
+        let error_location =
+            if let Some(jupyter_index) = self.source_kind.as_ipy_notebook().map(Notebook::index) {
+                write!(
+                    f,
+                    "cell {cell}{colon}",
+                    cell = jupyter_index
+                        .cell(source_location.row.get())
+                        .unwrap_or_default(),
+                    colon = ":".cyan(),
+                )?;
 
-            SourceLocation {
-                row: OneIndexed::new(
-                    jupyter_index
-                        .cell_row(source_location.row.get())
-                        .unwrap_or(1) as usize,
-                )
-                .unwrap(),
-                column: source_location.column,
-            }
-        } else {
-            source_location
-        };
+                SourceLocation {
+                    row: OneIndexed::new(
+                        jupyter_index
+                            .cell_row(source_location.row.get())
+                            .unwrap_or(1) as usize,
+                    )
+                    .unwrap(),
+                    column: source_location.column,
+                }
+            } else {
+                source_location
+            };
 
         write!(
             f,

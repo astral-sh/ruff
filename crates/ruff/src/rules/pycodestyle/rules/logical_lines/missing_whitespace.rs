@@ -1,9 +1,8 @@
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Ranged;
 use ruff_python_parser::TokenKind;
-use ruff_text_size::TextSize;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 
@@ -81,10 +80,10 @@ pub(crate) fn missing_whitespace(
             TokenKind::Comma | TokenKind::Semi | TokenKind::Colon => {
                 let after = line.text_after(token);
 
-                if !after
+                if after
                     .chars()
                     .next()
-                    .is_some_and(|c| char::is_whitespace(c) || c == '\\')
+                    .is_some_and(|c| !(char::is_whitespace(c) || c == '\\'))
                 {
                     if let Some(next_token) = iter.peek() {
                         match (kind, next_token.kind()) {

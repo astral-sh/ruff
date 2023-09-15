@@ -39,6 +39,30 @@ result_f = (
     # comment
     ''
 )
+
+(
+    f'{1}'  # comment
+    f'{2}'
+)
+
+(
+    f'{1}'
+    f'{2}'  # comment
+)
+
+(
+    1, (  # comment
+        f'{2}'
+    )
+)
+
+(
+    (
+        f'{1}'
+        # comment
+    ),
+    2
+)
 ```
 
 ## Output
@@ -46,7 +70,7 @@ result_f = (
 (f"{one}" f"{two}")
 
 
-rf'Not-so-tricky "quote'
+rf"Not-so-tricky \"quote"
 
 # Regression test for fstrings dropping comments
 result_f = (
@@ -75,6 +99,30 @@ result_f = (
     f"{1}"
     # comment
     ""
+)
+
+(
+    f"{1}"  # comment
+    f"{2}"
+)
+
+(
+    f"{1}" f"{2}"  # comment
+)
+
+(
+    1,
+    (  # comment
+        f"{2}"
+    ),
+)
+
+(
+    (
+        f"{1}"
+        # comment
+    ),
+    2,
 )
 ```
 

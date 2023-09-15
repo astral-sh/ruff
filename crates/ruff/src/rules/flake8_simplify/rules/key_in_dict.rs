@@ -1,16 +1,13 @@
-use anyhow::Result;
-use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, Ranged};
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_attribute, match_call_mut, match_expression};
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -35,29 +32,19 @@ use crate::registry::AsRule;
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[violation]
 pub struct InDictKeys {
-    key: String,
-    dict: String,
     operator: String,
 }
 
 impl AlwaysAutofixableViolation for InDictKeys {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InDictKeys {
-            key,
-            dict,
-            operator,
-        } = self;
-        format!("Use `{key} {operator} {dict}` instead of `{key} {operator} {dict}.keys()`")
+        let InDictKeys { operator } = self;
+        format!("Use `key {operator} dict` instead of `key {operator} dict.keys()`")
     }
 
     fn autofix_title(&self) -> String {
-        let InDictKeys {
-            key,
-            dict,
-            operator,
-        } = self;
-        format!("Convert to `{key} {operator} {dict}`")
+        let InDictKeys { operator: _ } = self;
+        format!("Remove `.keys()`")
     }
 }
 
@@ -67,7 +54,7 @@ fn key_in_dict(
     left: &Expr,
     right: &Expr,
     operator: CmpOp,
-    range: TextRange,
+    parent: AnyNodeRef,
 ) {
     let Expr::Call(ast::ExprCall {
         func,
@@ -100,51 +87,74 @@ fn key_in_dict(
         return;
     }
 
-    // Slice exact content to preserve formatting.
-    let left_content = checker.locator().slice(left.range());
-    let Ok(value_content) =
-        value_content_for_key_in_dict(checker.locator(), checker.stylist(), right)
-    else {
-        return;
-    };
+    // Extract the exact range of the left and right expressions.
+    let left_range = parenthesized_range(left.into(), parent, checker.locator().contents())
+        .unwrap_or(left.range());
+    let right_range = parenthesized_range(right.into(), parent, checker.locator().contents())
+        .unwrap_or(right.range());
 
     let mut diagnostic = Diagnostic::new(
         InDictKeys {
-            key: left_content.to_string(),
-            dict: value_content.to_string(),
             operator: operator.as_str().to_string(),
         },
-        range,
+        TextRange::new(left_range.start(), right_range.end()),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            value_content,
-            right.range(),
-        )));
+        // Delete from the start of the dot to the end of the expression.
+        if let Some(dot) = SimpleTokenizer::starts_at(value.end(), checker.locator().contents())
+            .skip_trivia()
+            .find(|token| token.kind == SimpleTokenKind::Dot)
+        {
+            // If the `.keys()` is followed by (e.g.) a keyword, we need to insert a space,
+            // since we're removing parentheses, which could lead to invalid syntax, as in:
+            // ```python
+            // if key in foo.keys()and bar:
+            // ```
+            let range = TextRange::new(dot.start(), right.end());
+            if checker
+                .locator()
+                .after(range.end())
+                .chars()
+                .next()
+                .is_some_and(|char| char.is_ascii_alphabetic())
+            {
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    " ".to_string(),
+                    range,
+                )));
+            } else {
+                diagnostic.set_fix(Fix::suggested(Edit::range_deletion(range)));
+            }
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
 
-/// SIM118 in a for loop
-pub(crate) fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr) {
+/// SIM118 in a `for` loop.
+pub(crate) fn key_in_dict_for(checker: &mut Checker, for_stmt: &ast::StmtFor) {
     key_in_dict(
         checker,
-        target,
-        iter,
+        &for_stmt.target,
+        &for_stmt.iter,
         CmpOp::In,
-        TextRange::new(target.start(), iter.end()),
+        for_stmt.into(),
     );
 }
 
-/// SIM118 in a comparison
-pub(crate) fn key_in_dict_compare(
-    checker: &mut Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    let [op] = ops else {
+/// SIM118 in a comprehension.
+pub(crate) fn key_in_dict_comprehension(checker: &mut Checker, comprehension: &Comprehension) {
+    key_in_dict(
+        checker,
+        &comprehension.target,
+        &comprehension.iter,
+        CmpOp::In,
+        comprehension.into(),
+    );
+}
+
+/// SIM118 in a comparison.
+pub(crate) fn key_in_dict_compare(checker: &mut Checker, compare: &ast::ExprCompare) {
+    let [op] = compare.ops.as_slice() else {
         return;
     };
 
@@ -152,21 +162,9 @@ pub(crate) fn key_in_dict_compare(
         return;
     }
 
-    let [right] = comparators else {
+    let [right] = compare.comparators.as_slice() else {
         return;
     };
 
-    key_in_dict(checker, left, right, *op, expr.range());
-}
-
-fn value_content_for_key_in_dict(
-    locator: &Locator,
-    stylist: &Stylist,
-    expr: &Expr,
-) -> Result<String> {
-    let content = locator.slice(expr.range());
-    let mut expression = match_expression(content)?;
-    let call = match_call_mut(&mut expression)?;
-    let attribute = match_attribute(&mut call.func)?;
-    Ok(attribute.value.codegen_stylist(stylist))
+    key_in_dict(checker, &compare.left, right, *op, compare.into());
 }

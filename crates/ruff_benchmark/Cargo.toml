@@ -19,6 +19,10 @@ name = "linter"
 harness = false
 
 [[bench]]
+name = "lexer"
+harness = false
+
+[[bench]]
 name = "parser"
 harness = false
 
@@ -32,6 +36,8 @@ serde.workspace = true
 serde_json.workspace = true
 url = "2.3.1"
 ureq = "2.6.2"
+criterion = { version = "0.5.1", default-features = false }
+codspeed-criterion-compat = { version="2.2.0", default-features = false, optional = true}
 
 [dev-dependencies]
 ruff.path = "../ruff"
@@ -39,7 +45,9 @@ ruff_python_ast.path = "../ruff_python_ast"
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_python_index = { path = "../ruff_python_index" }
 ruff_python_parser = { path = "../ruff_python_parser" }
-criterion = { version = "0.5.1"}
+
+[features]
+codspeed = ["codspeed-criterion-compat"]
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 mimalloc = "0.1.34"

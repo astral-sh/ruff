@@ -1,24 +1,20 @@
 use thiserror::Error;
+use tracing::Level;
 
-use ruff_formatter::format_element::tag;
-use ruff_formatter::prelude::{source_position, text, Formatter, Tag};
-use ruff_formatter::{
-    format, write, Buffer, Format, FormatElement, FormatError, FormatResult, PrintError,
-};
-use ruff_formatter::{Formatted, Printed, SourceCode};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_formatter::prelude::*;
+use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
+use ruff_python_ast::node::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::{CommentRanges, CommentRangesBuilder};
 use ruff_python_parser::lexer::{lex, LexicalError};
 use ruff_python_parser::{parse_tokens, Mode, ParseError};
 use ruff_source_file::Locator;
-use ruff_text_size::TextLen;
 
 use crate::comments::{
     dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
-use crate::context::PyFormatContext;
-pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
+pub use crate::context::PyFormatContext;
+pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
 use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
@@ -55,16 +51,21 @@ where
             suppressed_node(node.as_any_node_ref()).fmt(f)
         } else {
             leading_comments(node_comments.leading).fmt(f)?;
+
+            let is_source_map_enabled = f.options().source_map_generation().is_enabled();
+
+            if is_source_map_enabled {
+                source_position(node.start()).fmt(f)?;
+            }
+
             self.fmt_fields(node, f)?;
             self.fmt_dangling_comments(node_comments.dangling, f)?;
 
-            write!(
-                f,
-                [
-                    source_position(node.end()),
-                    trailing_comments(node_comments.trailing)
-                ]
-            )
+            if is_source_map_enabled {
+                source_position(node.end()).fmt(f)?;
+            }
+
+            trailing_comments(node_comments.trailing).fmt(f)
         }
     }
 
@@ -97,9 +98,9 @@ where
 
 #[derive(Error, Debug)]
 pub enum FormatModuleError {
-    #[error("source contains syntax errors (lexer error): {0:?}")]
+    #[error("source contains syntax errors: {0:?}")]
     LexError(LexicalError),
-    #[error("source contains syntax errors (parser error): {0:?}")]
+    #[error("source contains syntax errors: {0:?}")]
     ParseError(ParseError),
     #[error(transparent)]
     FormatError(#[from] FormatError),
@@ -119,6 +120,7 @@ impl From<ParseError> for FormatModuleError {
     }
 }
 
+#[tracing::instrument(level=Level::TRACE, skip_all)]
 pub fn format_module(
     contents: &str,
     options: PyFormatOptions,
@@ -165,43 +167,14 @@ pub fn format_node<'a>(
     Ok(formatted)
 }
 
-pub(crate) struct NotYetImplementedCustomText<'a> {
-    text: &'static str,
-    node: AnyNodeRef<'a>,
-}
+/// Public function for generating a printable string of the debug comments.
+pub fn pretty_comments(root: &Mod, comment_ranges: &CommentRanges, source: &str) -> String {
+    let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
 
-/// Formats a placeholder for nodes that have not yet been implemented
-pub(crate) fn not_yet_implemented_custom_text<'a, T>(
-    text: &'static str,
-    node: T,
-) -> NotYetImplementedCustomText<'a>
-where
-    T: Into<AnyNodeRef<'a>>,
-{
-    NotYetImplementedCustomText {
-        text,
-        node: node.into(),
-    }
-}
-
-impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            tag::VerbatimKind::Verbatim {
-                length: self.text.text_len(),
-            },
-        )));
-
-        text(self.text).fmt(f)?;
-
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim));
-
-        f.context()
-            .comments()
-            .mark_verbatim_node_comments_formatted(self.node);
-
-        Ok(())
-    }
+    std::format!(
+        "{comments:#?}",
+        comments = comments.debug(SourceCode::new(source))
+    )
 }
 
 #[cfg(test)]
@@ -243,12 +216,12 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-@MyDecorator(list = a) # fmt: skip
-# trailing comment
-class Test:
-    pass
-
-
+(header.timecnt * 5  # Transition times and types
+  + header.typecnt * 6  # Local time type records
+  + header.charcnt  # Time zone designations
+  + header.leapcnt * 8  # Leap second records
+  + header.isstdcnt  # Standard/wall indicators
+  + header.isutcnt)  # UT/local indicators
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
@@ -272,9 +245,9 @@ class Test:
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
         // use ruff_formatter::FormatContext;
-        // formatted
+        // dbg!(formatted
         //     .document()
-        //     .display(formatted.context().source_code());
+        //     .display(formatted.context().source_code()));
         //
         // dbg!(formatted
         //     .context()
@@ -285,9 +258,10 @@ class Test:
 
         assert_eq!(
             printed.as_code(),
-            r#"while True:
-    if something.changed:
-        do.stuff()  # trailing comment
+            r#"for converter in connection.ops.get_db_converters(
+    expression
+) + expression.get_db_converters(connection):
+    ...
 "#
         );
     }
@@ -300,21 +274,18 @@ class Test:
         struct FormatString<'a>(&'a str);
 
         impl Format<SimpleFormatContext> for FormatString<'_> {
-            fn fmt(
-                &self,
-                f: &mut ruff_formatter::formatter::Formatter<SimpleFormatContext>,
-            ) -> FormatResult<()> {
+            fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
                 let format_str = format_with(|f| {
-                    write!(f, [text("\"")])?;
+                    write!(f, [token("\"")])?;
 
                     let mut words = self.0.split_whitespace().peekable();
                     let mut fill = f.fill();
 
                     let separator = format_with(|f| {
                         group(&format_args![
-                            if_group_breaks(&text("\"")),
+                            if_group_breaks(&token("\"")),
                             soft_line_break_or_space(),
-                            if_group_breaks(&text("\" "))
+                            if_group_breaks(&token("\" "))
                         ])
                         .fmt(f)
                     });
@@ -322,10 +293,10 @@ class Test:
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [dynamic_text(word, None)])?;
+                            write!(f, [text(word, None)])?;
 
                             if is_last {
-                                write!(f, [text("\"")])?;
+                                write!(f, [token("\"")])?;
                             }
 
                             Ok(())
@@ -340,9 +311,9 @@ class Test:
                 write!(
                     f,
                     [group(&format_args![
-                        if_group_breaks(&text("(")),
+                        if_group_breaks(&token("(")),
                         soft_block_indent(&format_str),
-                        if_group_breaks(&text(")"))
+                        if_group_breaks(&token(")"))
                     ])]
                 )
             }

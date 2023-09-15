@@ -5,7 +5,8 @@ use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Stmt};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -88,7 +89,7 @@ pub(crate) fn unnecessary_map(
         ObjectType::Generator => {
             // Exclude the parent if already matched by other arms.
             if parent
-                .and_then(ruff_python_ast::Expr::as_call_expr)
+                .and_then(Expr::as_call_expr)
                 .and_then(|call| call.func.as_name_expr())
                 .is_some_and(|name| matches!(name.id.as_str(), "list" | "set" | "dict"))
             {
@@ -103,10 +104,17 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if parameters
-                .as_ref()
-                .is_some_and(|parameters| late_binding(parameters, body))
-            {
+            if parameters.as_ref().is_some_and(|parameters| {
+                late_binding(parameters, body)
+                    || parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                        .any(|param| param.default.is_some())
+                    || parameters.vararg.is_some()
+                    || parameters.kwarg.is_some()
+            }) {
                 return;
             }
         }
@@ -114,7 +122,7 @@ pub(crate) fn unnecessary_map(
             // Only flag, e.g., `list(map(lambda x: x + 1, iterable))`.
             let [Expr::Call(ast::ExprCall {
                 func,
-                arguments: Arguments { args, .. },
+                arguments: Arguments { args, keywords, .. },
                 ..
             })] = args
             else {
@@ -122,6 +130,10 @@ pub(crate) fn unnecessary_map(
             };
 
             if args.len() != 2 {
+                return;
+            }
+
+            if !keywords.is_empty() {
                 return;
             }
 
@@ -137,10 +149,17 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if parameters
-                .as_ref()
-                .is_some_and(|parameters| late_binding(parameters, body))
-            {
+            if parameters.as_ref().is_some_and(|parameters| {
+                late_binding(parameters, body)
+                    || parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                        .any(|param| param.default.is_some())
+                    || parameters.vararg.is_some()
+                    || parameters.kwarg.is_some()
+            }) {
                 return;
             }
         }
@@ -148,12 +167,20 @@ pub(crate) fn unnecessary_map(
             // Only flag, e.g., `dict(map(lambda v: (v, v ** 2), values))`.
             let [Expr::Call(ast::ExprCall {
                 func,
-                arguments: Arguments { args, .. },
+                arguments: Arguments { args, keywords, .. },
                 ..
             })] = args
             else {
                 return;
             };
+
+            if args.len() != 2 {
+                return;
+            }
+
+            if !keywords.is_empty() {
+                return;
+            }
 
             let Some(argument) = helpers::first_argument_with_matching_function("map", func, args)
             else {
@@ -177,24 +204,31 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if parameters
-                .as_ref()
-                .is_some_and(|parameters| late_binding(parameters, body))
-            {
+            if parameters.as_ref().is_some_and(|parameters| {
+                late_binding(parameters, body)
+                    || parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                        .any(|param| param.default.is_some())
+                    || parameters.vararg.is_some()
+                    || parameters.kwarg.is_some()
+            }) {
                 return;
             }
         }
-    }
+    };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_map(
-                checker.locator(),
-                checker.stylist(),
                 expr,
                 parent,
                 object_type,
+                checker.locator(),
+                checker.stylist(),
             )
             .map(Fix::suggested)
         });

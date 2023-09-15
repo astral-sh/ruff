@@ -1,9 +1,8 @@
 use log::error;
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged,
-    Stmt,
+    self as ast, Arguments, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -11,12 +10,12 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
-use ruff_python_parser::first_colon_range;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::{Locator, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
-use crate::line_width::LineWidth;
+use crate::line_width::LineWidthBuilder;
 use crate::registry::AsRule;
 use crate::rules::flake8_simplify::rules::fix_if;
 
@@ -369,15 +368,9 @@ pub(crate) fn nested_if_statements(
     };
 
     // Find the deepest nested if-statement, to inform the range.
-    let Some((test, first_stmt)) = find_last_nested_if(body) else {
+    let Some((test, _first_stmt)) = find_last_nested_if(body) else {
         return;
     };
-
-    let colon = first_colon_range(
-        TextRange::new(test.end(), first_stmt.start()),
-        checker.locator().contents(),
-        checker.source_type.is_jupyter(),
-    );
 
     // Check if the parent is already emitting a larger diagnostic including this if statement
     if let Some(Stmt::If(stmt_if)) = parent {
@@ -392,10 +385,14 @@ pub(crate) fn nested_if_statements(
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
-        CollapsibleIf,
-        colon.map_or(range, |colon| TextRange::new(range.start(), colon.end())),
-    );
+    let Some(colon) = SimpleTokenizer::starts_at(test.end(), checker.locator().contents())
+        .skip_trivia()
+        .find(|token| token.kind == SimpleTokenKind::Colon)
+    else {
+        return;
+    };
+
+    let mut diagnostic = Diagnostic::new(CollapsibleIf, TextRange::new(range.start(), colon.end()));
     if checker.patch(diagnostic.kind.rule()) {
         // The fixer preserves comments in the nested body, but removes comments between
         // the outer and inner if statements.
@@ -417,7 +414,7 @@ pub(crate) fn nested_if_statements(
                         .unwrap_or_default()
                         .universal_newlines()
                         .all(|line| {
-                            LineWidth::new(checker.settings.tab_size).add_str(&line)
+                            LineWidthBuilder::new(checker.settings.tab_size).add_str(&line)
                                 <= checker.settings.line_length
                         })
                     {
@@ -663,7 +660,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator().line_start(stmt.start());
-    if LineWidth::new(checker.settings.tab_size)
+    if LineWidthBuilder::new(checker.settings.tab_size)
         .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt.start())])
         .add_str(&contents)
         > checker.settings.line_length
@@ -721,10 +718,16 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
         // ...and the same comments
         let first_comments = checker
             .indexer()
-            .comments_in_range(body_range(&current_branch, locator), locator);
+            .comment_ranges()
+            .comments_in_range(body_range(&current_branch, locator))
+            .iter()
+            .map(|range| locator.slice(*range));
         let second_comments = checker
             .indexer()
-            .comments_in_range(body_range(following_branch, locator), locator);
+            .comment_ranges()
+            .comments_in_range(body_range(following_branch, locator))
+            .iter()
+            .map(|range| locator.slice(*range));
         if !first_comments.eq(second_comments) {
             continue;
         }
@@ -878,7 +881,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     else {
         return;
     };
-    if body_var.len() != 1 {
+    let [body_var] = body_var.as_slice() else {
         return;
     };
     let Stmt::Assign(ast::StmtAssign {
@@ -889,7 +892,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     else {
         return;
     };
-    if orelse_var.len() != 1 {
+    let [orelse_var] = orelse_var.as_slice() else {
         return;
     };
     let Expr::Compare(ast::ExprCompare {
@@ -901,27 +904,16 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     else {
         return;
     };
-    if test_dict.len() != 1 {
+    let [test_dict] = test_dict.as_slice() else {
         return;
-    }
+    };
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [CmpOp::In] => (
-            &body_var[0],
-            body_value,
-            &orelse_var[0],
-            orelse_value.as_ref(),
-        ),
-        [CmpOp::NotIn] => (
-            &orelse_var[0],
-            orelse_value,
-            &body_var[0],
-            body_value.as_ref(),
-        ),
+        [CmpOp::In] => (body_var, body_value, orelse_var, orelse_value.as_ref()),
+        [CmpOp::NotIn] => (orelse_var, orelse_value, body_var, body_value.as_ref()),
         _ => {
             return;
         }
     };
-    let test_dict = &test_dict[0];
     let Expr::Subscript(ast::ExprSubscript {
         value: expected_subscript,
         slice: expected_slice,
@@ -972,7 +964,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator().line_start(stmt_if.start());
-    if LineWidth::new(checker.settings.tab_size)
+    if LineWidthBuilder::new(checker.settings.tab_size)
         .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt_if.start())])
         .add_str(&contents)
         > checker.settings.line_length

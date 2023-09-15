@@ -1,7 +1,7 @@
 use memchr::{memchr2, memchr3, memrchr3_iter};
-use unic_ucd_ident::{is_xid_continue, is_xid_start};
+use unicode_ident::{is_xid_continue, is_xid_start};
 
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::{is_python_whitespace, Cursor};
 
@@ -17,6 +17,24 @@ pub fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<SimpleToke
     SimpleTokenizer::starts_at(offset, code)
         .skip_trivia()
         .next()
+}
+
+/// Returns the only non-trivia, non-closing parenthesis token in `range`.
+///
+/// Includes debug assertions that the range only contains that single token.
+pub fn find_only_token_in_range(
+    range: TextRange,
+    token_kind: SimpleTokenKind,
+    code: &str,
+) -> SimpleToken {
+    let mut tokens = SimpleTokenizer::new(code, range)
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+    let token = tokens.next().expect("Expected a token");
+    debug_assert_eq!(token.kind(), token_kind);
+    let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
+    debug_assert_eq!(tokens.next(), None);
+    token
 }
 
 /// Returns the number of newlines between `offset` and the first non whitespace character in the source code.
@@ -113,18 +131,11 @@ impl SimpleToken {
     pub const fn kind(&self) -> SimpleTokenKind {
         self.kind
     }
+}
 
-    #[allow(unused)]
-    pub const fn range(&self) -> TextRange {
+impl Ranged for SimpleToken {
+    fn range(&self) -> TextRange {
         self.range
-    }
-
-    pub const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    pub const fn end(&self) -> TextSize {
-        self.range.end()
     }
 }
 

@@ -1,15 +1,15 @@
 #![cfg(not(target_family = "wasm"))]
 
-use std::io::{ErrorKind, Read};
+use std::io::{ErrorKind, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::process::{Command, Stdio};
 use std::thread::sleep;
 use std::time::Duration;
 use std::{fs, process, str};
 
-use anyhow::{anyhow, Context, Result};
-use assert_cmd::Command;
+use anyhow::{anyhow, bail, Context, Result};
+use insta_cmd::get_cargo_bin;
 use log::info;
 use walkdir::WalkDir;
 
@@ -29,13 +29,14 @@ impl Blackd {
         // Get free TCP port to run on
         let address = TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0))?.local_addr()?;
 
-        let server = process::Command::new("blackd")
-            .args([
-                "--bind-host",
-                &address.ip().to_string(),
-                "--bind-port",
-                &address.port().to_string(),
-            ])
+        let args = [
+            "--bind-host",
+            &address.ip().to_string(),
+            "--bind-port",
+            &address.port().to_string(),
+        ];
+        let server = Command::new("blackd")
+            .args(args)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -51,16 +52,16 @@ impl Blackd {
                 Err(e) => return Err(e.into()),
                 Ok(_) => {
                     info!("`blackd` ready");
-                    break;
+                    return Ok(Self {
+                        address,
+                        server,
+                        client: ureq::agent(),
+                    });
                 }
             }
         }
 
-        Ok(Self {
-            address,
-            server,
-            client: ureq::agent(),
-        })
+        bail!("blackd {:?} failed to start", args)
     }
 
     /// Format given code with blackd.
@@ -104,34 +105,42 @@ fn run_test(path: &Path, blackd: &Blackd, ruff_args: &[&str]) -> Result<()> {
     let input = fs::read(path)?;
 
     // Step 1: Run `ruff` on the input.
-    let step_1 = &Command::cargo_bin(BIN_NAME)?
+    let mut step_1 = Command::new(get_cargo_bin(BIN_NAME))
         .args(ruff_args)
-        .write_stdin(input)
-        .assert()
-        .append_context("step", "running input through ruff");
-    if !step_1.get_output().status.success() {
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+    if let Some(mut stdin) = step_1.stdin.take() {
+        stdin.write_all(input.as_ref())?;
+    }
+    let step_1_output = step_1.wait_with_output()?;
+    if !step_1_output.status.success() {
         return Err(anyhow!(
             "Running input through ruff failed:\n{}",
-            str::from_utf8(&step_1.get_output().stderr)?
+            str::from_utf8(&step_1_output.stderr)?
         ));
     }
-    let step_1_output = step_1.get_output().stdout.clone();
 
     // Step 2: Run `blackd` on the input.
-    let step_2_output = blackd.check(&step_1_output)?;
+    let step_2_output = blackd.check(&step_1_output.stdout.clone())?;
 
     // Step 3: Re-run `ruff` on the input.
-    let step_3 = &Command::cargo_bin(BIN_NAME)?
+    let mut step_3 = Command::new(get_cargo_bin(BIN_NAME))
         .args(ruff_args)
-        .write_stdin(step_2_output.clone())
-        .assert();
-    if !step_3.get_output().status.success() {
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+    if let Some(mut stdin) = step_3.stdin.take() {
+        stdin.write_all(step_2_output.as_ref())?;
+    }
+    let step_3_output = step_3.wait_with_output()?;
+    if !step_3_output.status.success() {
         return Err(anyhow!(
             "Running input through ruff after black failed:\n{}",
-            str::from_utf8(&step_3.get_output().stderr)?
+            str::from_utf8(&step_3_output.stderr)?
         ));
     }
-    let step_3_output = step_3.get_output().stdout.clone();
+    let step_3_output = step_3_output.stdout.clone();
 
     assert_eq!(
         str::from_utf8(&step_2_output),
@@ -177,11 +186,13 @@ fn test_ruff_black_compatibility() -> Result<()> {
         "--fix",
         "--line-length",
         "88",
-        "--select ALL",
+        "--select",
+        "ALL",
         // Exclude ruff codes, specifically RUF100, because it causes differences that are not a
         // problem. Ruff would add a `# noqa: W292`  after the first run, black introduces a
         // newline, and ruff removes the `# noqa: W292` again.
-        "--ignore RUF",
+        "--ignore",
+        "RUF",
     ];
 
     for entry in paths {

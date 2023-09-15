@@ -50,6 +50,7 @@ mod tests {
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_8.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_9.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_10.py"))]
+    #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_11.py"))]
     #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"))]
     #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"))]
     #[test_case(
@@ -118,8 +119,8 @@ mod tests {
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"))]
     #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"))]
     #[test_case(
-        Rule::RepeatedEqualityComparisonTarget,
-        Path::new("repeated_equality_comparison_target.py")
+        Rule::RepeatedEqualityComparison,
+        Path::new("repeated_equality_comparison.py")
     )]
     #[test_case(Rule::SelfAssigningVariable, Path::new("self_assigning_variable.py"))]
     #[test_case(
@@ -131,6 +132,7 @@ mod tests {
         Path::new("subprocess_run_without_check.py")
     )]
     #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
+    #[test_case(Rule::NoSelfUse, Path::new("no_self_use.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -249,6 +251,22 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..Settings::for_rule(Rule::TooManyReturnStatements)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn too_many_public_methods() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_public_methods.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    max_public_methods: 7,
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyPublicMethods])
             },
         )?;
         assert_messages!(diagnostics);

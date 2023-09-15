@@ -1,12 +1,11 @@
-use crate::context::PyFormatContext;
+use ruff_formatter::write;
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom};
+use ruff_text_size::{Ranged, TextRange};
+
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parenthesize};
 use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::write;
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom, Ranged};
-use ruff_text_size::TextRange;
 
 pub(super) enum AnyExpressionYield<'a> {
     Yield(&'a ExprYield),
@@ -88,14 +87,14 @@ impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
             write!(
                 f,
                 [
-                    text(keyword),
+                    token(keyword),
                     space(),
-                    maybe_parenthesize_expression(val, self, Parenthesize::IfRequired)
+                    maybe_parenthesize_expression(val, self, Parenthesize::Optional)
                 ]
             )?;
         } else {
             // ExprYieldFrom always has Some(value) so we should never get a bare `yield from`
-            write!(f, [&text(keyword)])?;
+            write!(f, [&token(keyword)])?;
         }
         Ok(())
     }

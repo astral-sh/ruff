@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_python_parser::lexer::LexResult;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -126,8 +126,8 @@ pub(crate) fn implicit(
 }
 
 fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator) -> Option<Fix> {
-    let a_text = &locator.contents()[a_range];
-    let b_text = &locator.contents()[b_range];
+    let a_text = locator.slice(a_range);
+    let b_text = locator.slice(b_range);
 
     let a_leading_quote = leading_quote(a_text)?;
     let b_leading_quote = leading_quote(b_text)?;

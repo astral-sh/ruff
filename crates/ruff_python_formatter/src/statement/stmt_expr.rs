@@ -1,11 +1,10 @@
-use crate::comments::{SourceComment, SuppressionKind};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator, StmtExpr};
 
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtExpr;

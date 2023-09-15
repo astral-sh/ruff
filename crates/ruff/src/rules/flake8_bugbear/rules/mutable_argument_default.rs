@@ -1,12 +1,14 @@
+use ast::call_path::{from_qualified_name, CallPath};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Ranged};
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -24,6 +26,10 @@ use crate::registry::AsRule;
 /// Instead, prefer to use immutable data structures, or take `None` as a
 /// default, and initialize a new mutable object inside the function body
 /// for each call.
+///
+/// Arguments with immutable type annotations will be ignored by this rule.
+/// Types outside of the standard library can be marked as immutable with the
+/// [`flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// ## Example
 /// ```python
@@ -48,6 +54,9 @@ use crate::registry::AsRule;
 /// l1 = add_to_list(0)  # [0]
 /// l2 = add_to_list(1)  # [1]
 /// ```
+///
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
 ///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
@@ -84,11 +93,18 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             continue;
         };
 
+        let extend_immutable_calls: Vec<CallPath> = checker
+            .settings
+            .flake8_bugbear
+            .extend_immutable_calls
+            .iter()
+            .map(|target| from_qualified_name(target))
+            .collect();
+
         if is_mutable_expr(default, checker.semantic())
-            && !parameter
-                .annotation
-                .as_ref()
-                .is_some_and(|expr| is_immutable_annotation(expr, checker.semantic()))
+            && !parameter.annotation.as_ref().is_some_and(|expr| {
+                is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
+            })
         {
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 
@@ -125,7 +141,7 @@ fn move_initialization(
     let mut body = function_def.body.iter();
 
     let statement = body.next()?;
-    if indexer.preceded_by_multi_statement_line(statement, locator) {
+    if indexer.in_multi_statement_line(statement, locator) {
         return None;
     }
 
@@ -155,12 +171,19 @@ fn move_initialization(
         if let Some(statement) = body.next() {
             // If there's a second statement, insert _before_ it, but ensure this isn't a
             // multi-statement line.
-            if indexer.preceded_by_multi_statement_line(statement, locator) {
+            if indexer.in_multi_statement_line(statement, locator) {
                 return None;
             }
             Edit::insertion(content, locator.line_start(statement.start()))
+        } else if locator.full_line_end(statement.end()) == locator.text_len() {
+            // If the statement is at the end of the file, without a trailing newline, insert
+            // _after_ it with an extra newline.
+            Edit::insertion(
+                format!("{}{}", stylist.line_ending().as_str(), content),
+                locator.full_line_end(statement.end()),
+            )
         } else {
-            // If the docstring is the only statement, insert _before_ it.
+            // If the docstring is the only statement, insert _after_ it.
             Edit::insertion(content, locator.full_line_end(statement.end()))
         }
     } else {
