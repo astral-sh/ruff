@@ -2430,7 +2430,6 @@ name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
  "insta",
- "memchr",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_source_file",
