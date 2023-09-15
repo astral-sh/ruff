@@ -5,7 +5,9 @@ use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, Stmt, Suite};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{leading_comments, trailing_comments, Comments};
+use crate::comments::{
+    leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
+};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::string::StringLayout;
@@ -69,7 +71,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         // Format the first statement in the body, which often has special formatting rules.
         let first = match self.kind {
             SuiteKind::Other => {
-                if is_class_or_function_definition(first) && !comments.has_leading(first) {
+                if is_class_or_function_definition(first)
+                    && !comments.has_leading(first)
+                    && !source_type.is_stub()
+                {
                     // Add an empty line for any nested functions or classes defined within
                     // non-function or class compound statements, e.g., this is stable formatting:
                     // ```python
@@ -94,7 +99,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
             SuiteKind::Class => {
                 if let Some(docstring) = DocstringStmt::try_from_statement(first) {
-                    if !comments.has_leading(first) && lines_before(first.start(), source) > 1 {
+                    if !comments.has_leading(first)
+                        && lines_before(first.start(), source) > 1
+                        && !source_type.is_stub()
+                    {
                         // Allow up to one empty line before a class docstring, e.g., this is
                         // stable formatting:
                         // ```python
@@ -154,49 +162,23 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 && !preceding_comments.has_trailing_own_line())
                 || is_class_or_function_definition(following)
             {
-                match self.kind {
-                    SuiteKind::TopLevel if source_type.is_stub() => {
-                        // Preserve the empty line if the definitions are separated by a comment
-                        if preceding_comments.has_trailing() || following_comments.has_leading() {
-                            empty_line().fmt(f)?;
-                        } else {
-                            // Two subsequent classes that both have an ellipsis only body
-                            // ```python
-                            // class A: ...
-                            // class B: ...
-                            // ```
-                            let class_sequences_with_ellipsis_only =
-                                preceding.as_class_def_stmt().is_some_and(|class| {
-                                    contains_only_an_ellipsis(&class.body, f.context().comments())
-                                }) && following.as_class_def_stmt().is_some_and(|class| {
-                                    contains_only_an_ellipsis(&class.body, f.context().comments())
-                                });
-
-                            // Two subsequent functions where the preceding has an ellipsis only body
-                            // ```python
-                            // def test(): ...
-                            // def b(): a
-                            // ```
-                            let function_with_ellipsis =
-                                preceding.as_function_def_stmt().is_some_and(|function| {
-                                    contains_only_an_ellipsis(
-                                        &function.body,
-                                        f.context().comments(),
-                                    )
-                                }) && following.is_function_def_stmt();
-
-                            // Don't add an empty line between two classes that have an `...` body only or after
-                            // a function with an `...` body. Otherwise add an empty line.
-                            if !class_sequences_with_ellipsis_only && !function_with_ellipsis {
-                                empty_line().fmt(f)?;
-                            }
+                if source_type.is_stub() {
+                    stub_file_empty_lines(
+                        self.kind,
+                        preceding,
+                        following,
+                        &preceding_comments,
+                        &following_comments,
+                        f,
+                    )?;
+                } else {
+                    match self.kind {
+                        SuiteKind::TopLevel => {
+                            write!(f, [empty_line(), empty_line()])?;
                         }
-                    }
-                    SuiteKind::TopLevel => {
-                        write!(f, [empty_line(), empty_line()])?;
-                    }
-                    SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
-                        empty_line().fmt(f)?;
+                        SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                            empty_line().fmt(f)?;
+                        }
                     }
                 }
             } else if is_import_definition(preceding)
@@ -343,6 +325,89 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         Ok(())
     }
+}
+
+/// Stub files have bespoke rules for empty lines.
+///
+/// These rules are ported from black (preview mode at time of writing) using the stubs test case:
+/// <https://github.com/psf/black/blob/c160e4b7ce30c661ac4f2dfa5038becf1b8c5c33/src/black/lines.py#L576-L744>
+fn stub_file_empty_lines(
+    kind: SuiteKind,
+    preceding: &Stmt,
+    following: &Stmt,
+    preceding_comments: &LeadingDanglingTrailingComments,
+    following_comments: &LeadingDanglingTrailingComments,
+    f: &mut PyFormatter,
+) -> FormatResult<()> {
+    let source = f.context().source();
+    // Preserve the empty line if the definitions are separated by a comment
+    let empty_line_condition = preceding_comments.has_trailing()
+        || following_comments.has_leading()
+        || !stub_suite_can_omit_empty_line(preceding, following, f);
+    match kind {
+        SuiteKind::TopLevel => {
+            if empty_line_condition {
+                empty_line().fmt(f)
+            } else {
+                hard_line_break().fmt(f)
+            }
+        }
+        SuiteKind::Class | SuiteKind::Other | SuiteKind::Function => {
+            if empty_line_condition && lines_after_ignoring_trivia(preceding.end(), source) > 1 {
+                empty_line().fmt(f)
+            } else {
+                hard_line_break().fmt(f)
+            }
+        }
+    }
+}
+
+/// Only a function to compute it lazily
+fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyFormatter) -> bool {
+    // Two subsequent class definitions that both have an ellipsis only body
+    // ```python
+    // class A: ...
+    // class B: ...
+    //
+    // @decorator
+    // class C: ...
+    // ```
+    let class_sequences_with_ellipsis_only = preceding
+        .as_class_def_stmt()
+        .is_some_and(|class| contains_only_an_ellipsis(&class.body, f.context().comments()))
+        && following.as_class_def_stmt().is_some_and(|class| {
+            contains_only_an_ellipsis(&class.body, f.context().comments())
+                && class.decorator_list.is_empty()
+        });
+
+    // Black for some reasons accepts decorators in place of empty lines
+    // ```python
+    // def _count1(): ...
+    // @final
+    // class LockType1: ...
+    //
+    // def _count2(): ...
+    //
+    // class LockType2: ...
+    // ```
+    let class_decorator_instead_of_empty_line = preceding.is_function_def_stmt()
+        && following
+            .as_class_def_stmt()
+            .is_some_and(|class| !class.decorator_list.is_empty());
+
+    // A function definition following a stub function definition
+    // ```python
+    // def test(): ...
+    // def b(): a
+    // ```
+    let function_with_ellipsis = preceding
+        .as_function_def_stmt()
+        .is_some_and(|function| contains_only_an_ellipsis(&function.body, f.context().comments()))
+        && following.is_function_def_stmt();
+
+    class_sequences_with_ellipsis_only
+        || class_decorator_instead_of_empty_line
+        || function_with_ellipsis
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.

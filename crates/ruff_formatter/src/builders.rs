@@ -361,7 +361,7 @@ where
 
         f.write_element(FormatElement::Text {
             text: self.text.to_string().into_boxed_str(),
-            text_width: TextWidth::from_text(self.text, f.options().tab_width()),
+            text_width: TextWidth::from_text(self.text, f.options().indent_width()),
         });
 
         Ok(())
@@ -393,8 +393,10 @@ where
         let slice = source_code.slice(self.range);
         debug_assert_no_newlines(slice.text(source_code));
 
-        let text_width =
-            TextWidth::from_text(slice.text(source_code), f.context().options().tab_width());
+        let text_width = TextWidth::from_text(
+            slice.text(source_code),
+            f.context().options().indent_width(),
+        );
 
         f.write_element(FormatElement::SourceCodeSlice { slice, text_width });
 
@@ -917,8 +919,10 @@ where
 /// use ruff_formatter::prelude::*;
 ///
 /// # fn main() -> FormatResult<()> {
+/// use ruff_formatter::IndentWidth;
 /// let context = SimpleFormatContext::new(SimpleFormatOptions {
-///     indent_style: IndentStyle::Space(4),
+///     indent_style: IndentStyle::Space,
+///     indent_width: IndentWidth::try_from(4).unwrap(),
 ///     ..SimpleFormatOptions::default()
 /// });
 ///

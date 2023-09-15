@@ -13,18 +13,19 @@ x: typing.TypeAlias = list[T]
 T = typing.TypeVar("T")
 x: typing.TypeAlias = list[T]
 
-# UP040 bounded generic (todo)
+# UP040 bounded generic
 T = typing.TypeVar("T", bound=int)
 x: typing.TypeAlias = list[T]
 
+# UP040 constrained generic
 T = typing.TypeVar("T", int, str)
 x: typing.TypeAlias = list[T]
 
-# UP040 contravariant generic (todo)
+# UP040 contravariant generic
 T = typing.TypeVar("T", contravariant=True)
 x: typing.TypeAlias = list[T]
 
-# UP040 covariant generic (todo)
+# UP040 covariant generic
 T = typing.TypeVar("T", covariant=True)
 x: typing.TypeAlias = list[T]
 

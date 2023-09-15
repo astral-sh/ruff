@@ -1,8 +1,11 @@
 use std::io::{stdout, Write};
+use std::num::NonZeroU16;
 use std::path::Path;
 
 use anyhow::Result;
 use log::warn;
+use ruff::settings::types::PreviewMode;
+use ruff_formatter::LineWidth;
 
 use ruff_python_formatter::{format_module, PyFormatOptions};
 use ruff_workspace::resolver::python_file_at_path;
@@ -35,9 +38,19 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &Overrides) -> Resu
 
     // Format the file.
     let path = cli.stdin_filename.as_deref();
+
+    let preview = match pyproject_config.settings.lib.preview {
+        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+    };
+    let line_length = pyproject_config.settings.lib.line_length;
+
     let options = path
         .map(PyFormatOptions::from_extension)
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .with_line_width(LineWidth::from(NonZeroU16::from(line_length)))
+        .with_preview(preview);
+
     match format_source(path, options, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),

@@ -1,0 +1,32 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: comment_until_eol(UNIX_EOL)
+---
+[
+    (
+        Int {
+            value: 123,
+        },
+        0..3,
+    ),
+    (
+        Comment(
+            "# Foo",
+        ),
+        5..10,
+    ),
+    (
+        Newline,
+        10..11,
+    ),
+    (
+        Int {
+            value: 456,
+        },
+        11..14,
+    ),
+    (
+        Newline,
+        14..14,
+    ),
+]

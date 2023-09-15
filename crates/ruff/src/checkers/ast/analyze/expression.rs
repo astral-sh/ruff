@@ -16,7 +16,7 @@ use crate::rules::{
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
     flake8_simplify, flake8_tidy_imports, flake8_use_pathlib, flynt, numpy, pandas_vet,
-    pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff,
+    pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -113,9 +113,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryIterableAllocationForFirstElement) {
                 ruff::rules::unnecessary_iterable_allocation_for_first_element(checker, subscript);
             }
-
             if checker.enabled(Rule::InvalidIndexType) {
                 ruff::rules::invalid_index_type(checker, subscript);
+            }
+            if checker.settings.rules.enabled(Rule::SliceCopy) {
+                refurb::rules::slice_copy(checker, subscript);
             }
 
             pandas_vet::rules::subscript(checker, value, expr);

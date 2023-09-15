@@ -10,7 +10,7 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::format_element::tag::{GroupMode, LabelId, Tag};
 use crate::source_code::SourceCodeSlice;
-use crate::{TabWidth, TagKind};
+use crate::{IndentWidth, TagKind};
 use ruff_text_size::TextSize;
 
 /// Language agnostic IR for formatting source code.
@@ -432,12 +432,12 @@ pub enum TextWidth {
 }
 
 impl TextWidth {
-    pub fn from_text(text: &str, tab_width: TabWidth) -> TextWidth {
+    pub fn from_text(text: &str, indent_width: IndentWidth) -> TextWidth {
         let mut width = 0u32;
 
         for c in text.chars() {
             let char_width = match c {
-                '\t' => tab_width.value(),
+                '\t' => indent_width.value(),
                 '\n' => return TextWidth::Multiline,
                 #[allow(clippy::cast_possible_truncation)]
                 c => c.width().unwrap_or(0) as u32,

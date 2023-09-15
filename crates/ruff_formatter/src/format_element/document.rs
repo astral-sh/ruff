@@ -9,7 +9,7 @@ use crate::prelude::*;
 use crate::source_code::SourceCode;
 use crate::{
     format, write, BufferExtensions, Format, FormatContext, FormatElement, FormatOptions,
-    FormatResult, Formatter, IndentStyle, LineWidth, PrinterOptions, TabWidth,
+    FormatResult, Formatter, IndentStyle, IndentWidth, LineWidth, PrinterOptions,
 };
 
 use super::tag::Tag;
@@ -213,11 +213,11 @@ struct IrFormatOptions;
 
 impl FormatOptions for IrFormatOptions {
     fn indent_style(&self) -> IndentStyle {
-        IndentStyle::Space(2)
+        IndentStyle::Space
     }
 
-    fn tab_width(&self) -> TabWidth {
-        TabWidth::default()
+    fn indent_width(&self) -> IndentWidth {
+        IndentWidth::default()
     }
 
     fn line_width(&self) -> LineWidth {
@@ -227,7 +227,7 @@ impl FormatOptions for IrFormatOptions {
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
             line_width: self.line_width(),
-            indent_style: IndentStyle::Space(2),
+            indent_style: IndentStyle::Space,
             ..PrinterOptions::default()
         }
     }

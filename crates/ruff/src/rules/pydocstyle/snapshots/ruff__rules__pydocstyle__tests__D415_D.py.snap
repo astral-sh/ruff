@@ -292,4 +292,21 @@ D.py:641:18: D415 [*] First line should end with a period, question mark, or exc
 643 643 | 
 644 644 | def single_line_docstring_with_an_escaped_backslash():
 
+D.py:664:5: D415 [*] First line should end with a period, question mark, or exclamation point
+    |
+663 |   def newline_after_closing_quote(self):
+664 |       "We enforce a newline after the closing quote for a multi-line docstring \
+    |  _____^
+665 | |     but continuations shouldn't be considered multi-line"
+    | |_________________________________________________________^ D415
+    |
+    = help: Add closing punctuation
+
+ℹ Suggested fix
+662 662 | 
+663 663 | def newline_after_closing_quote(self):
+664 664 |     "We enforce a newline after the closing quote for a multi-line docstring \
+665     |-    but continuations shouldn't be considered multi-line"
+    665 |+    but continuations shouldn't be considered multi-line."
+
 

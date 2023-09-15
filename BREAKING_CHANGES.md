@@ -1,5 +1,20 @@
 # Breaking Changes
 
+## 0.0.288
+
+### Remove support for emoji identifiers ([#7212](https://github.com/astral-sh/ruff/pull/7212))
+
+Previously, Ruff supported the non-standard compliant emoji identifiers e.g. `📦 = 1`.
+We decided to remove this non-standard language extension, and Ruff now reports syntax errors for emoji identifiers in your code, the same as CPython.
+
+### Improved GitLab fingerprints ([#7203](https://github.com/astral-sh/ruff/pull/7203))
+
+GitLab uses fingerprints to identify new, existing, or fixed violations. Previously, Ruff included the violation's position in the fingerprint. Using the location has the downside that changing any code before the violation causes the fingerprint to change, resulting in GitLab reporting one fixed and one new violation even though it is a pre-existing violation.
+
+Ruff now uses a more stable location-agnostic fingerprint to minimize that existing violations incorrectly get marked as fixed and re-reported as new violations.
+
+Expect GitLab to report each pre-existing violation in your project as fixed and a new violation in your Ruff upgrade PR.
+
 ## 0.0.283 / 0.284
 
 ### The target Python version now defaults to 3.8 instead of 3.10 ([#6397](https://github.com/astral-sh/ruff/pull/6397))

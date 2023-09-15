@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 /// Jupyter Notebook indexing table
 ///
 /// When we lint a jupyter notebook, we have to translate the row/column based on
 /// [`ruff_text_size::TextSize`] to jupyter notebook cell/row/column.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NotebookIndex {
     /// Enter a row (1-based), get back the cell (1-based)
     pub(super) row_to_cell: Vec<u32>,

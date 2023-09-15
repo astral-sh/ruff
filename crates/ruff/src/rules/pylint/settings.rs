@@ -42,6 +42,7 @@ pub struct Settings {
     pub max_returns: usize,
     pub max_branches: usize,
     pub max_statements: usize,
+    pub max_public_methods: usize,
 }
 
 impl Default for Settings {
@@ -52,6 +53,7 @@ impl Default for Settings {
             max_returns: 6,
             max_branches: 12,
             max_statements: 50,
+            max_public_methods: 20,
         }
     }
 }

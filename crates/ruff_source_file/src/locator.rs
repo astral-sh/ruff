@@ -391,7 +391,7 @@ impl<'a> Locator<'a> {
     /// Finds the closest [`TextSize`] not exceeding the offset for which `is_char_boundary` is
     /// `true`.
     ///
-    /// Can be replaced with `str#floor_char_boundary` once it's stable.
+    /// Can be replaced with `str::floor_char_boundary` once it's stable.
     ///
     /// ## Examples
     ///

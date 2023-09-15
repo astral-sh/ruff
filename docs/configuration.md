@@ -212,6 +212,8 @@ Options:
           Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
+      --preview
+          Enable preview mode; checks will include unstable rules and fixes
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
       --statistics
@@ -392,8 +394,9 @@ i = 1  # noqa: E741, F841
 x = 1  # noqa
 ```
 
-Note that, for multi-line strings, the `noqa` directive should come at the end of the string, and
-will apply to the entire string, like so:
+For multi-line strings (like docstrings),
+the `noqa` directive should come at the end of the string (after the closing triple quote),
+and will apply to the entire string, like so:
 
 ```python
 """Lorem ipsum dolor sit amet.
@@ -473,7 +476,7 @@ Ruff supports two command-line flags that alter its exit code behavior:
     `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
     autofixing.
 
-## Autocompletion
+## Shell autocompletion
 
 Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
 by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
