@@ -9,7 +9,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
-use ruff_python_index::CommentRanges;
+use ruff_python_trivia::CommentRanges;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::leading_comments;

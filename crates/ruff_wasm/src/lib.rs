@@ -16,10 +16,10 @@ use ruff_formatter::{FormatResult, Formatted, LineWidth};
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_node, pretty_comments, PyFormatContext, PyFormatOptions};
-use ruff_python_index::{CommentRanges, CommentRangesBuilder, Indexer};
+use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::AsMode;
-use ruff_python_parser::{parse_tokens, Mode};
+use ruff_python_parser::{parse_tokens, AsMode, Mode};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
@@ -116,7 +116,7 @@ impl Workspace {
         Ok(Workspace { settings })
     }
 
-    #[wasm_bindgen(js_name=defaultSettings)]
+    #[wasm_bindgen(js_name = defaultSettings)]
     pub fn default_settings() -> Result<JsValue, Error> {
         serde_wasm_bindgen::to_value(&Options {
             // Propagate defaults.

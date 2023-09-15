@@ -8,8 +8,7 @@ use ruff_python_ast::{Mod, Stmt};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
-use ruff_python_index::CommentRanges;
-use ruff_python_trivia::is_python_whitespace;
+use ruff_python_trivia::{is_python_whitespace, CommentRanges};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 

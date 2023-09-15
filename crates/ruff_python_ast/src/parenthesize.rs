@@ -1,4 +1,4 @@
-use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{BackwardsTokenizer, CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::node::AnyNodeRef;
@@ -9,7 +9,7 @@ use crate::ExpressionRef;
 pub fn parenthesized_range(
     expr: ExpressionRef,
     parent: AnyNodeRef,
-    comment_ranges: &[TextRange],
+    comment_ranges: &CommentRanges,
     source: &str,
 ) -> Option<TextRange> {
     // If the parent is a node that brings its own parentheses, exclude the closing parenthesis

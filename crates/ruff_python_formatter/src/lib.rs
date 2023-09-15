@@ -5,9 +5,10 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::Mod;
-use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+use ruff_python_index::CommentRangesBuilder;
 use ruff_python_parser::lexer::{lex, LexicalError};
 use ruff_python_parser::{parse_tokens, Mode, ParseError};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::comments::{
@@ -120,7 +121,7 @@ impl From<ParseError> for FormatModuleError {
     }
 }
 
-#[tracing::instrument(level=Level::TRACE, skip_all)]
+#[tracing::instrument(level = Level::TRACE, skip_all)]
 pub fn format_module(
     contents: &str,
     options: PyFormatOptions,

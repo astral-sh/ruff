@@ -8,7 +8,7 @@ use ruff_python_ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprConstant, ExprUnaryOp,
     UnaryOp,
 };
-use ruff_python_index::CommentRanges;
+use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 

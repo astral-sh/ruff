@@ -3,10 +3,9 @@ use std::cmp::Ordering;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters};
-use ruff_python_index::CommentRanges;
 use ruff_python_trivia::{
-    find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, SimpleToken,
-    SimpleTokenKind, SimpleTokenizer,
+    find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, CommentRanges,
+    SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange};
@@ -963,7 +962,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
 fn handle_slice_comments<'a>(
     comment: DecoratedComment<'a>,
     expr_slice: &'a ast::ExprSlice,
-    comment_ranges: &[TextRange],
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     let ast::ExprSlice {

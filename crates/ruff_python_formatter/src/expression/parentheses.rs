@@ -2,7 +2,7 @@ use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments, FormatContext, FormatOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExpressionRef;
-use ruff_python_index::CommentRanges;
+use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
     first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
 };
@@ -423,8 +423,8 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::ExpressionRef;
-    use ruff_python_index::CommentRanges;
     use ruff_python_parser::parse_expression;
+    use ruff_python_trivia::CommentRanges;
 
     use crate::expression::parentheses::is_expression_parenthesized;
 

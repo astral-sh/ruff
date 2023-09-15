@@ -11,7 +11,7 @@ use log::warn;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_trivia::indentation_at_offset;
+use ruff_python_trivia::{indentation_at_offset, CommentRanges};
 use ruff_source_file::{LineEnding, Locator};
 
 use crate::codes::NoqaCode;
@@ -234,7 +234,7 @@ impl FileExemption {
     /// globally ignored within the file.
     pub(crate) fn try_extract(
         contents: &str,
-        comment_ranges: &[TextRange],
+        comment_ranges: &CommentRanges,
         path: &Path,
         locator: &Locator,
     ) -> Option<Self> {
@@ -457,7 +457,7 @@ pub(crate) fn add_noqa(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
-    commented_lines: &[TextRange],
+    comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> Result<usize> {
@@ -465,7 +465,7 @@ pub(crate) fn add_noqa(
         path,
         diagnostics,
         locator,
-        commented_lines,
+        comment_ranges,
         noqa_line_for,
         line_ending,
     );
@@ -477,7 +477,7 @@ fn add_noqa_inner(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
-    commented_ranges: &[TextRange],
+    comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> (usize, String) {
@@ -487,8 +487,8 @@ fn add_noqa_inner(
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), commented_ranges, path, locator);
-    let directives = NoqaDirectives::from_commented_ranges(commented_ranges, path, locator);
+    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
@@ -658,7 +658,7 @@ pub(crate) struct NoqaDirectives<'a> {
 
 impl<'a> NoqaDirectives<'a> {
     pub(crate) fn from_commented_ranges(
-        comment_ranges: &[TextRange],
+        comment_ranges: &CommentRanges,
         path: &Path,
         locator: &'a Locator<'a>,
     ) -> Self {
@@ -800,6 +800,7 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
 
     use ruff_diagnostics::Diagnostic;
+    use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, Locator};
 
     use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
@@ -997,7 +998,7 @@ mod tests {
             path,
             &[],
             &Locator::new(contents),
-            &[],
+            &CommentRanges::default(),
             &noqa_line_for,
             LineEnding::Lf,
         );
@@ -1017,7 +1018,7 @@ mod tests {
             path,
             &diagnostics,
             &Locator::new(contents),
-            &[],
+            &CommentRanges::default(),
             &noqa_line_for,
             LineEnding::Lf,
         );
@@ -1038,11 +1039,13 @@ mod tests {
         ];
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = NoqaMapping::default();
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(19))]);
         let (count, output) = add_noqa_inner(
             path,
             &diagnostics,
             &Locator::new(contents),
-            &[TextRange::new(TextSize::from(7), TextSize::from(19))],
+            &comment_ranges,
             &noqa_line_for,
             LineEnding::Lf,
         );
@@ -1063,11 +1066,13 @@ mod tests {
         ];
         let contents = "x = 1  # noqa";
         let noqa_line_for = NoqaMapping::default();
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(13))]);
         let (count, output) = add_noqa_inner(
             path,
             &diagnostics,
             &Locator::new(contents),
-            &[TextRange::new(TextSize::from(7), TextSize::from(13))],
+            &comment_ranges,
             &noqa_line_for,
             LineEnding::Lf,
         );

@@ -99,8 +99,7 @@ use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_ast::Mod;
-use ruff_python_index::CommentRanges;
-use ruff_python_trivia::PythonWhitespace;
+use ruff_python_trivia::{CommentRanges, PythonWhitespace};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -545,9 +544,10 @@ mod tests {
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::Mod;
-    use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+    use ruff_python_index::CommentRangesBuilder;
     use ruff_python_parser::lexer::lex;
     use ruff_python_parser::{parse_tokens, Mode};
+    use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
 

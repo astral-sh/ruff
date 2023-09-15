@@ -560,8 +560,8 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
 #[cfg(test)]
 mod tests {
     use ruff_formatter::format;
-    use ruff_python_index::CommentRanges;
     use ruff_python_parser::parse_suite;
+    use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
     use crate::prelude::*;
