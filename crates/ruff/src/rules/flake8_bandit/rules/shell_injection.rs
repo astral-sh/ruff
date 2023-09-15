@@ -148,7 +148,7 @@ impl Violation for StartProcessWithNoShell {
 ///
 /// ## References
 /// - [Python documentation: `subprocess.Popen()`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
-/// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+/// - [Common Weakness Enumeration: CWE-426](https://cwe.mitre.org/data/definitions/426.html)
 #[violation]
 pub struct StartProcessWithPartialPath;
 
