@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, PySourceType};
+use ruff_python_ast::{self as ast, Expr, PySourceType};
 use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -47,30 +47,35 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
     }
 }
 
-/// Return an iterator containing a two-element tuple for each f-string in the
-/// given [`ExprFString`] expression. The first element of the tuple is the
-/// f-string prefix range, and the second element is the entire f-string range.
+/// Return an iterator containing a two-element tuple for each f-string part
+/// in the given [`ExprFString`] expression.
+///
+/// The first element of the tuple is the f-string prefix range, and the second
+/// element is the entire f-string range. It returns an iterator because of the
+/// possibility of multiple f-strings implicitly concatenated together.
 ///
 /// For example,
 ///
 /// ```python
-/// f"example"
+///   f"first" rf"second"
+/// # ^         ^            (prefix range)
+/// # ^^^^^^^^ ^^^^^^^^^^    (token range)
 /// ```
 ///
-/// would return `[(0..1, 0..10)]`.
+/// would return `[(0..1, 0..8), (10..11, 9..19)]`.
 ///
-/// This function assumes that the given expression is an [`ExprFString`]
-/// without any placeholder expressions.
+/// This function assumes that the given f-string expression is without any
+/// placeholder expressions.
 ///
 /// [`ExprFString`]: `ruff_python_ast::ExprFString`
-fn find_useless_f_strings<'a>(
-    expr: &'a Expr,
+fn fstring_prefix_and_tok_range<'a>(
+    fstring: &'a ast::ExprFString,
     locator: &'a Locator,
     source_type: PySourceType,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
-    let contents = locator.slice(expr);
-    let mut current_f_string_start = TextSize::default();
-    lexer::lex_starts_at(contents, source_type.as_mode(), expr.start())
+    let contents = locator.slice(fstring);
+    let mut current_f_string_start = fstring.start();
+    lexer::lex_starts_at(contents, source_type.as_mode(), fstring.start())
         .flatten()
         .filter_map(move |(tok, range)| match tok {
             Tok::FStringStart => {
@@ -97,13 +102,14 @@ fn find_useless_f_strings<'a>(
 }
 
 /// F541
-pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
-    if !values
+pub(crate) fn f_string_missing_placeholders(fstring: &ast::ExprFString, checker: &mut Checker) {
+    if !fstring
+        .values
         .iter()
         .any(|value| matches!(value, Expr::FormattedValue(_)))
     {
         for (prefix_range, tok_range) in
-            find_useless_f_strings(expr, checker.locator(), checker.source_type)
+            fstring_prefix_and_tok_range(fstring, checker.locator(), checker.source_type)
         {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
