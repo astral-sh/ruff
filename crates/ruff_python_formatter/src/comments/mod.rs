@@ -327,7 +327,7 @@ impl<'a> Comments<'a> {
         }
     }
 
-    pub(crate) fn ranges(&self) -> &CommentRanges {
+    pub(crate) fn ranges(&self) -> &'a CommentRanges {
         self.comment_ranges
     }
 
