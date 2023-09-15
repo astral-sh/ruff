@@ -376,7 +376,7 @@
       ]
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`). Must be greater than `0`.",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`). Must be greater than `0` and less than or equal to `320`.",
       "anyOf": [
         {
           "$ref": "#/definitions/LineLength"
