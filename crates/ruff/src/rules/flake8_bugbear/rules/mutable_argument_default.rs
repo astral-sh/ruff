@@ -70,6 +70,7 @@ impl Violation for MutableArgumentDefault {
     fn message(&self) -> String {
         format!("Do not use mutable data structures for argument defaults")
     }
+
     fn autofix_title(&self) -> Option<String> {
         Some(format!("Replace with `None`; initialize within function"))
     }

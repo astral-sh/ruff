@@ -59,7 +59,7 @@ pub(crate) fn undocumented_warn(checker: &mut Checker, expr: &Expr) {
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import("logging", "WARNING"),
-                    expr.range().start(),
+                    expr.start(),
                     checker.semantic(),
                 )?;
                 let reference_edit = Edit::range_replacement(binding, expr.range());
