@@ -13,6 +13,7 @@ use ruff_macros::CacheKey;
 /// The allowed range of values is 1..=320
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[schemars(range(min = 1, max = 320))]
 pub struct LineLength(NonZeroU16);
 
 impl LineLength {
