@@ -374,6 +374,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: 0c030b5bf31e425cb6070db7386243eca6dbd8f1
+          depth: 0
       - name: Check main branch
         run: |
           # Fetch the main branch since a shallow checkout is used by default
