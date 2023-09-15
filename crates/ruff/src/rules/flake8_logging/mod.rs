@@ -14,6 +14,7 @@ mod tests {
     use crate::test::test_path;
 
     #[test_case(Rule::DirectLoggerInstantiation, Path::new("LOG001.py"))]
+    #[test_case(Rule::InvalidGetLoggerArgument, Path::new("LOG002.py"))]
     #[test_case(Rule::UndocumentedWarn, Path::new("LOG009.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

@@ -859,6 +859,7 @@ mod tests {
         Rule::TooManyPublicMethods,
         Rule::TooManyPublicMethods,
         Rule::UndocumentedWarn,
+        Rule::InvalidGetLoggerArgument,
     ];
 
     #[allow(clippy::needless_pass_by_value)]
