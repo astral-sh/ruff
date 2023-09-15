@@ -1,10 +1,10 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_python_semantic::Binding;
-use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 /// Checks for `for` loops that can be replaced by a dictionary comprehension.
 ///
 /// ## Why is this bad?
-/// When creating a dictionary in a for-loop, prefer a dictionary
+/// When creating or extending a dictionary in a for-loop, prefer a dictionary
 /// comprehension. Comprehensions are more readable and more performant.
 ///
 /// Using the below as an example, the dictionary comprehension is ~10% faster
@@ -47,26 +47,8 @@ impl Violation for ManualDictComprehension {
 }
 
 /// PERF403
-pub(crate) fn manual_dict_comprehension(
-    checker: &mut Checker,
-    target: &Expr,
-    body: &[Stmt],
-    range: TextRange,
-) {
-    // For a dictionary comprehension to be appropriate, the loop needs both an index
-    // and a value, so the target must be a tuple.
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
-        return;
-    };
-
-    let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
-        id: target_value, ..
-    })] = elts.as_slice()
-    else {
-        return;
-    };
-
-    let stmt = match body {
+pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+    let (stmt, if_test) = match body {
         // ```python
         // for idx, name in enumerate(names):
         //     if idx % 2 == 0:
@@ -75,6 +57,7 @@ pub(crate) fn manual_dict_comprehension(
         [Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
+            test,
             ..
         })] => {
             // TODO(charlie): If there's an `else` clause, verify that the `else` has the
@@ -85,20 +68,20 @@ pub(crate) fn manual_dict_comprehension(
             let [stmt] = body.as_slice() else {
                 return;
             };
-            stmt
+            (stmt, Some(test))
         }
         // ```python
         // for idx, name in enumerate(names):
         //     result[name] = idx
         // ```
-        [stmt] => stmt,
+        [stmt] => (stmt, None),
         _ => return,
     };
 
     let Stmt::Assign(ast::StmtAssign {
         targets,
         value,
-        range: loop_assign_range,
+        range,
     }) = stmt
     else {
         return;
@@ -113,16 +96,30 @@ pub(crate) fn manual_dict_comprehension(
         return;
     };
 
-    let Expr::Name(ast::ExprName { id: key, .. }) = slice.as_ref() else {
-        return;
-    };
-
-    let Expr::Name(ast::ExprName { id: value, .. }) = value.as_ref() else {
-        return;
-    };
-
-    if key != target_key || value != target_value {
-        return;
+    match target {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            if !elts
+                .iter()
+                .any(|elt| ComparableExpr::from(slice) == ComparableExpr::from(elt))
+            {
+                return;
+            }
+            if !elts
+                .iter()
+                .any(|elt| ComparableExpr::from(value) == ComparableExpr::from(elt))
+            {
+                return;
+            }
+        }
+        Expr::Name(_) => {
+            if ComparableExpr::from(slice) != ComparableExpr::from(target) {
+                return;
+            }
+            if ComparableExpr::from(value) != ComparableExpr::from(target) {
+                return;
+            }
+        }
+        _ => return,
     }
 
     // Exclude non-dictionary value.
@@ -146,42 +143,30 @@ pub(crate) fn manual_dict_comprehension(
         return;
     }
 
-    // Only push diagnostic if Dict is created empty in the stmt right before the for loop
-    if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
-        if let Some(parent_id) = binding.source {
-            let parent = checker.semantic().statement(parent_id);
-            if let Stmt::Assign(ast::StmtAssign {
-                range: creation_range,
-                value,
-                ..
-            })
-            | Stmt::AnnAssign(ast::StmtAnnAssign {
-                range: creation_range,
-                value: Some(value),
-                ..
-            })
-            | Stmt::AugAssign(ast::StmtAugAssign {
-                range: creation_range,
-                value,
-                ..
-            }) = parent
-            {
-                let Expr::Dict(ast::ExprDict { keys, values, .. }) = value.as_ref() else {
-                    return;
-                };
-
-                if !keys.is_empty() || !values.is_empty() {
-                    return;
-                }
-
-                if checker.locator().full_line_end(creation_range.end())
-                    == checker.locator().line_start(range.start())
-                {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(ManualDictComprehension, *loop_assign_range));
-                }
-            }
-        }
+    // Avoid if the value is used in the conditional test, e.g.,
+    //
+    // ```python
+    // for x in y:
+    //    if x in filtered:
+    //        filtered[x] = y
+    // ```
+    //
+    // Converting this to a dictionary comprehension would raise a `NameError` as
+    // `filtered` is not defined yet:
+    //
+    // ```python
+    // filtered = {x: y for x in y if x in filtered}
+    // ```
+    if if_test.is_some_and(|test| {
+        any_over_expr(test, &|expr| {
+            expr.as_name_expr()
+                .is_some_and(|expr| expr.id == *subscript_name)
+        })
+    }) {
+        return;
     }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(ManualDictComprehension, *range));
 }

@@ -18,7 +18,7 @@ def foo():
     result = {}
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # Ok (false negative: edge case where `else` is same as `if`
+            result[idx] = name  # Ok (false negative: edge case where `else` is same as `if`)
         else:
             result[idx] = name
 
@@ -28,7 +28,7 @@ def foo():
     fruit = ["apple", "pear", "orange"]
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # OK (false negative due to placement of `result = {}`)
+            result[idx] = name  # PERF403
 
 
 def foo():
@@ -36,7 +36,7 @@ def foo():
     result = []
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # OK because result is not a dictionary
+            result[idx] = name  # OK (result is not a dictionary)
         else:
             result[idx] = name
 
@@ -58,4 +58,26 @@ def foo():
     fruit = ["apple", "pear", "orange"]
     for idx, name in enumerate(fruit):
         if idx % 2:
-            result[idx] = name  # Ok
+            result[idx] = name  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result = {}
+    for idx, name in enumerate(fruit):
+        if idx in result:
+            result[idx] = name  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result = {}
+    for name in fruit:
+        result[name] = name  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result = {}
+    for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403
