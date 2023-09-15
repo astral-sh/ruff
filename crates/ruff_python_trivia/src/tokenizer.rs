@@ -470,7 +470,6 @@ impl SimpleTokenKind {
 pub struct SimpleTokenizer<'a> {
     offset: TextSize,
     /// `true` when it is known that the current `back` line has no comment for sure.
-    back_line_has_no_comment: bool,
     bogus: bool,
     source: &'a str,
     cursor: Cursor<'a>,
@@ -480,7 +479,6 @@ impl<'a> SimpleTokenizer<'a> {
     pub fn new(source: &'a str, range: TextRange) -> Self {
         Self {
             offset: range.start(),
-            back_line_has_no_comment: false,
             bogus: false,
             source,
             cursor: Cursor::new(&source[range]),
@@ -490,22 +488,6 @@ impl<'a> SimpleTokenizer<'a> {
     pub fn starts_at(offset: TextSize, source: &'a str) -> Self {
         let range = TextRange::new(offset, source.text_len());
         Self::new(source, range)
-    }
-
-    /// Creates a tokenizer that lexes tokens from the start of `source` up to `offset`.
-    ///
-    /// Consider using [`SimpleTokenizer::up_to_without_back_comment`] if intend to lex backwards.
-    pub fn up_to(offset: TextSize, source: &'a str) -> Self {
-        Self::new(source, TextRange::up_to(offset))
-    }
-
-    /// Creates a tokenizer that lexes tokens from the start of `source` up to `offset`, and informs
-    /// the lexer that the line at `offset` contains no comments. This can significantly speed up backwards lexing
-    /// because the lexer doesn't need to scan for comments.
-    pub fn up_to_without_back_comment(offset: TextSize, source: &'a str) -> Self {
-        let mut tokenizer = Self::up_to(offset, source);
-        tokenizer.back_line_has_no_comment = true;
-        tokenizer
     }
 
     fn next_token(&mut self) -> SimpleToken {
@@ -861,7 +843,6 @@ impl<'a> BackwardsTokenizer<'a> {
                 self.after_newline = true;
                 SimpleTokenKind::Newline
             }
-            '#' => unreachable!(),
             _ => self.next_token_inner(last),
         };
 
@@ -1020,14 +1001,16 @@ mod tests {
         }
 
         fn tokenize_reverse(&self) -> Vec<SimpleToken> {
-            let comment_ranges: Vec<_> = lex(self.source, Mode::Module).filter_map(|result| {
-	             let (token, range) = result.expect("Input to be a valid python program.");
-                if matches!(token, Tok::Comment(_)) {
-                    Some(range)
-                } else {
-                	None
-              	}
-            }).collect()
+            let comment_ranges: Vec<_> = lex(self.source, Mode::Module)
+                .filter_map(|result| {
+                    let (token, range) = result.expect("Input to be a valid python program.");
+                    if matches!(token, Tok::Comment(_)) {
+                        Some(range)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             BackwardsTokenizer::new(self.source, self.range, &comment_ranges).collect()
         }
 
