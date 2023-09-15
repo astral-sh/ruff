@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -43,41 +43,50 @@ use crate::registry::AsRule;
 #[violation]
 pub struct InvalidGetLoggerArgument;
 
-impl AlwaysAutofixableViolation for InvalidGetLoggerArgument {
+impl Violation for InvalidGetLoggerArgument {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `__name__` with `logging.getLogger()`")
     }
 
-    fn autofix_title(&self) -> String {
-        format!("Replace with `__name__`")
+    fn autofix_title(&self) -> Option<String> {
+        Some(format!("Replace with `__name__`"))
     }
 }
 
 /// LOG002
 pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::ExprCall) {
-    if checker
+    let Some(Expr::Name(expr @ ast::ExprName { id, .. })) = call.arguments.find_argument("name", 0)
+    else {
+        return;
+    };
+
+    if !matches!(id.as_ref(), "__file__" | "__cached__") {
+        return;
+    }
+
+    if !checker.semantic().is_builtin(id) {
+        return;
+    }
+
+    if !checker
         .semantic()
         .resolve_call_path(call.func.as_ref())
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "getLogger"]))
     {
-        let Some(Expr::Name(expr @ ast::ExprName { id, .. })) =
-            call.arguments.find_argument("name", 0)
-        else {
-            return;
-        };
+        return;
+    }
 
-        if !matches!(id.as_ref(), "__file__" | "__cached__") {
-            return;
-        }
-
-        let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
+    let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        if checker.semantic().is_builtin("__name__") {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 "__name__".to_string(),
                 expr.range(),
             )));
         }
-        checker.diagnostics.push(diagnostic);
     }
+    checker.diagnostics.push(diagnostic);
 }
