@@ -74,8 +74,10 @@ impl NeedsParentheses for ExprUnaryOp {
         // We preserve the parentheses of the operand. It should not be necessary to break this expression.
         if is_expression_parenthesized(self.operand.as_ref().into(), context.source()) {
             OptionalParentheses::Never
+        } else if context.comments().has(self.operand.as_ref()) {
+            OptionalParentheses::Always
         } else {
-            OptionalParentheses::Multiline
+            self.operand.needs_parentheses(self.into(), context)
         }
     }
 }
