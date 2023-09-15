@@ -13,4 +13,16 @@ ISC.py:5:5: ISC002 Implicitly concatenated string literals over multiple lines
 8 |   _ = (
   |
 
+ISC.py:74:10: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+72 |   _ = "a" f"b {f"c" f"d"} e" "f"
+73 |   _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+74 |   _ = f"b {f"abc" \
+   |  __________^
+75 | |     f"def"} g"
+   | |__________^ ISC002
+76 |   
+77 |   # Explicitly concatenated nested f-strings
+   |
+
 

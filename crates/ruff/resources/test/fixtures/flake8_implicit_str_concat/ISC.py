@@ -59,3 +59,23 @@ _ = "abc" + "def" + foo
 _ = foo + bar + "abc"
 _ = "abc" + foo + bar
 _ = foo + "abc" + bar
+
+# Multiple strings nested inside a f-string
+_ = f"a {'b' 'c' 'd'} e"
+_ = f"""abc {"def" "ghi"} jkl"""
+_ = f"""abc {
+    "def"
+    "ghi"
+} jkl"""
+
+# Nested f-strings
+_ = "a" f"b {f"c" f"d"} e" "f"
+_ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+_ = f"b {f"abc" \
+    f"def"} g"
+
+# Explicitly concatenated nested f-strings
+_ = f"a {f"first"
+    + f"second"} d"
+_ = f"a {f"first {f"middle"}"
+    + f"second"} d"
