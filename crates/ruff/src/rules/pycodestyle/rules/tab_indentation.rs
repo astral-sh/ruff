@@ -1,10 +1,11 @@
-use ruff_text_size::{TextLen, TextRange, TextSize};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 use ruff_python_trivia::leading_indentation;
-use ruff_source_file::Line;
+use ruff_source_file::Locator;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 /// ## What it does
 /// Checks for indentation that uses tabs.
@@ -37,17 +38,39 @@ impl Violation for TabIndentation {
 }
 
 /// W191
-pub(crate) fn tab_indentation(line: &Line, indexer: &Indexer) -> Option<Diagnostic> {
-    let indent = leading_indentation(line);
-    if let Some(tab_index) = indent.find('\t') {
-        // If the tab character is within a multi-line string, abort.
-        let tab_offset = line.start() + TextSize::try_from(tab_index).unwrap();
-        if indexer.triple_quoted_string_range(tab_offset).is_none() {
-            return Some(Diagnostic::new(
-                TabIndentation,
-                TextRange::at(line.start(), indent.text_len()),
-            ));
+pub(crate) fn tab_indentation(
+    diagnostics: &mut Vec<Diagnostic>,
+    tokens: &[LexResult],
+    locator: &Locator,
+    indexer: &Indexer,
+) {
+    for (tok, range) in tokens.iter().flatten() {
+        if matches!(tok, Tok::Newline | Tok::NonLogicalNewline) {
+            tab_indentation_at_line_start(diagnostics, locator, range.end());
         }
     }
-    None
+
+    for continuation_line in indexer.continuation_line_starts() {
+        tab_indentation_at_line_start(
+            diagnostics,
+            locator,
+            locator.full_line_end(*continuation_line),
+        );
+    }
+}
+
+/// Checks for indentation that uses tabs for a line starting at
+/// the given [`TextSize`].
+fn tab_indentation_at_line_start(
+    diagnostics: &mut Vec<Diagnostic>,
+    locator: &Locator,
+    line_start: TextSize,
+) {
+    let indent = leading_indentation(locator.after(line_start));
+    if indent.find('\t').is_some() {
+        diagnostics.push(Diagnostic::new(
+            TabIndentation,
+            TextRange::at(line_start, indent.text_len()),
+        ));
+    }
 }
