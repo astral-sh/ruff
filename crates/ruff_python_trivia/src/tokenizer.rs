@@ -504,10 +504,12 @@ impl<'a> SimpleTokenizer<'a> {
             // Emit a single final bogus token
             let token = SimpleToken {
                 kind: SimpleTokenKind::Bogus,
-                range: TextRange::at(self.offset, first.text_len()),
+                range: TextRange::new(self.offset, self.source.text_len()),
             };
 
-            self.offset += first.text_len();
+            // Set the cursor to EOF
+            self.cursor = Cursor::new("");
+            self.offset = self.source.text_len();
             return token;
         }
 
@@ -786,10 +788,12 @@ impl<'a> BackwardsTokenizer<'a> {
         if self.bogus {
             let token = SimpleToken {
                 kind: SimpleTokenKind::Bogus,
-                range: TextRange::at(self.back_offset - last.text_len(), last.text_len()),
+                range: TextRange::up_to(self.back_offset),
             };
 
-            self.back_offset -= last.text_len();
+            // Set the cursor to EOF
+            self.cursor = Cursor::new("");
+            self.back_offset = TextSize::new(0);
             return token;
         }
 
