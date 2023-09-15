@@ -9,6 +9,10 @@ expression: test_case.tokens()
     },
     SimpleToken {
         kind: Bogus,
-        range: 1..3,
+        range: 1..2,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 2..3,
     },
 ]

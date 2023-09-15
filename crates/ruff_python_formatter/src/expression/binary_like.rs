@@ -449,7 +449,7 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                         if (right_operand_has_leading_comments
                             && !is_expression_parenthesized(
                                 right_operand.expression().into(),
-                                f.context().comments().clone().ranges(),
+                                f.context().comments().ranges(),
                                 f.context().source(),
                             ))
                             || right_operator.has_trailing_comments()
@@ -881,7 +881,7 @@ impl Format<PyFormatContext<'_>> for Operand<'_> {
 
         return if is_expression_parenthesized(
             expression.into(),
-            f.context().comments().clone().ranges(),
+            f.context().comments().ranges(),
             f.context().source(),
         ) {
             let comments = f.context().comments().clone();
