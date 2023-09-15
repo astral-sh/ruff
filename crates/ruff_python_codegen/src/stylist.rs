@@ -55,6 +55,9 @@ fn detect_quote(tokens: &[LexResult], locator: &Locator) -> Quote {
             triple_quoted: false,
             ..
         } => Some(*range),
+        // No need to check if it's triple-quoted as f-strings cannot be used
+        // as docstrings.
+        Tok::FStringStart => Some(*range),
         _ => None,
     });
 
@@ -275,7 +278,23 @@ class FormFeedIndent:
             Quote::Single
         );
 
+        let contents = r#"x = f'1'"#;
+        let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Single
+        );
+
         let contents = r#"x = "1""#;
+        let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Double
+        );
+
+        let contents = r#"x = f"1""#;
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -327,6 +346,41 @@ a = "v"
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Double
+        );
+
+        // Detect from f-string appearing after docstring
+        let contents = r#"
+"""Module docstring."""
+
+a = f'v'
+"#;
+        let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Single
+        );
+
+        let contents = r#"
+'''Module docstring.'''
+
+a = f"v"
+"#;
+        let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Double
+        );
+
+        let contents = r#"
+f'''Module docstring.'''
+"#;
+        let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Single
         );
     }
 
