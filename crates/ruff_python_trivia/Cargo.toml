@@ -16,7 +16,6 @@ license = { workspace = true }
 ruff_text_size = { path = "../ruff_text_size" }
 ruff_source_file = { path = "../ruff_source_file" }
 
-memchr = { workspace = true }
 smallvec = { workspace = true }
 unicode-ident = { workspace = true }
 
