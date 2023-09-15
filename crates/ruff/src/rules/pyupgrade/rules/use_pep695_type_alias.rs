@@ -1,4 +1,6 @@
 use ast::{Constant, ExprCall, ExprConstant};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
@@ -6,13 +8,10 @@ use ruff_python_ast::{
     TypeParam, TypeParamTypeVar,
 };
 use ruff_python_semantic::SemanticModel;
-
-use crate::{registry::AsRule, settings::types::PythonVersion};
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{registry::AsRule, settings::types::PythonVersion};
 
 /// ## What it does
 /// Checks for use of `TypeAlias` annotation for declaring type aliases.
@@ -101,11 +100,13 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
                             range: TextRange::default(),
                             name: Identifier::new(name.id.clone(), TextRange::default()),
                             bound: match restriction {
-                                Some(TypeVarRestriction::Bound(ty)) => Some(Box::new(ty.clone())),
-                                Some(TypeVarRestriction::Constraint(tys)) => {
+                                Some(TypeVarRestriction::Bound(bound)) => {
+                                    Some(Box::new(bound.clone()))
+                                }
+                                Some(TypeVarRestriction::Constraint(constraints)) => {
                                     Some(Box::new(Expr::Tuple(ast::ExprTuple {
                                         range: TextRange::default(),
-                                        elts: tys.into_iter().cloned().collect(),
+                                        elts: constraints.into_iter().cloned().collect(),
                                         ctx: ast::ExprContext::Load,
                                     })))
                                 }
@@ -130,11 +131,15 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     checker.diagnostics.push(diagnostic);
 }
 
+#[derive(Debug)]
 enum TypeVarRestriction<'a> {
-    Constraint(Vec<&'a Expr>),
+    /// A type variable with a bound, e.g., `TypeVar("T", bound=int)`.
     Bound(&'a Expr),
+    /// A type variable with constraints, e.g., `TypeVar("T", int, str)`.
+    Constraint(Vec<&'a Expr>),
 }
 
+#[derive(Debug)]
 struct TypeVar<'a> {
     name: &'a ExprName,
     restriction: Option<TypeVarRestriction<'a>>,
@@ -179,7 +184,6 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                         func, arguments, ..
                     }) => {
                         if self.semantic.match_typing_expr(func, "TypeVar")
-                            && !arguments.args.is_empty()
                             && arguments.args.first().is_some_and(|arg| {
                                 matches!(
                                     arg,
