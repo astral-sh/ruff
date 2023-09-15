@@ -378,8 +378,8 @@ jobs:
         run: |
           # Fetch the main branch since a shallow checkout is used by default
           git fetch origin main
-          git branch --contains 0c030b5bf31e425cb6070db7386243eca6dbd8f1
-          if ! git branch --contains 0c030b5bf31e425cb6070db7386243eca6dbd8f1 | grep -E '(^|\s)main$'; then
+          git branch --contains f936d319ccf50b8af873e2dbe0cea7232d34efac
+          if ! git branch --contains f936d319ccf50b8af873e2dbe0cea7232d34efac | grep -E '(^|\s)main$'; then
             echo "The specified sha is not on the main branch" >&2
             exit 1
           fi
