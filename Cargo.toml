@@ -46,7 +46,7 @@ strum_macros = { version = "0.25.2" }
 syn = { version = "2.0.33" }
 test-case = { version = "3.0.0" }
 thiserror = { version = "1.0.48" }
-toml = { version = "0.7.2" }
+toml = { version = "0.7.8" }
 tracing = "0.1.37"
 tracing-indicatif = "0.3.4"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
