@@ -853,9 +853,11 @@ mod tests {
     ];
 
     const PREVIEW_RULES: &[Rule] = &[
+        Rule::DirectLoggerInstantiation,
         Rule::ManualDictComprehension,
-        Rule::TooManyPublicMethods,
         Rule::SliceCopy,
+        Rule::TooManyPublicMethods,
+        Rule::TooManyPublicMethods,
         Rule::UndocumentedWarn,
     ];
 
