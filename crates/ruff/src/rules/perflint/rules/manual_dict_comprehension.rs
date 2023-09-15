@@ -15,8 +15,8 @@ use crate::checkers::ast::Checker;
 /// When creating or extending a dictionary in a for-loop, prefer a dictionary
 /// comprehension. Comprehensions are more readable and more performant.
 ///
-/// Using the below as an example, the dictionary comprehension is ~10% faster
-/// on Python 3.11, and ~25% faster on Python 3.10.
+/// Using the below as an example, the list comprehension is ~5% faster on
+/// Python 3.10.
 ///
 /// Note that, as with all `perflint` rules, this is only intended as a
 /// micro-optimization, and will have a negligible impact on performance in
@@ -35,6 +35,12 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// pairs = (("a", 1), ("b", 2))
 /// result = {x: y for x, y in pairs if y % 2}
+/// ```
+///
+/// If you're appending to an existing dictionary, use the `update` method instead:
+/// ```python
+/// pairs = (("a", 1), ("b", 2))
+/// result.update({x: y for x, y in pairs if y % 2})
 /// ```
 #[violation]
 pub struct ManualDictComprehension;
