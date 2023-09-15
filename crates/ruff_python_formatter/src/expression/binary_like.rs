@@ -8,6 +8,7 @@ use ruff_python_ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprConstant, ExprUnaryOp,
     UnaryOp,
 };
+use ruff_python_index::CommentRanges;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -485,11 +486,16 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
     }
 }
 
-fn is_simple_power_expression(left: &Expr, right: &Expr, source: &str) -> bool {
+fn is_simple_power_expression(
+    left: &Expr,
+    right: &Expr,
+    comment_range: &CommentRanges,
+    source: &str,
+) -> bool {
     is_simple_power_operand(left)
         && is_simple_power_operand(right)
-        && !is_expression_parenthesized(left.into(), source)
-        && !is_expression_parenthesized(right.into(), source)
+        && !is_expression_parenthesized(left.into(), comment_range, source)
+        && !is_expression_parenthesized(right.into(), comment_range, source)
 }
 
 /// Return `true` if an [`Expr`] adheres to [Black's definition](https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators)
@@ -683,6 +689,7 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                     && is_simple_power_expression(
                         left.last_operand().expression(),
                         right.first_operand().expression(),
+                        f.context().comments().ranges(),
                         f.context().source(),
                     );
 

@@ -964,7 +964,7 @@ impl<'a> BackwardsTokenizer<'a> {
                 if let Some(token) = forward_lexer.last() {
                     // If the token spans multiple characters, bump the cursor. Note,
                     // though, that we already bumped the cursor to past the last character
-                    // in the token at the very start of `next_token_back`.
+                    // in the token at the very start of `next_token_back`.y
                     for _ in self.source[token.range].chars().rev().skip(1) {
                         self.cursor.bump_back().unwrap();
                     }
