@@ -377,7 +377,7 @@ jobs:
       - name: Check main branch
         run: |
           # Fetch the main branch since a shallow checkout is used by default
-          git fetch origin main
+          git fetch origin main --unshallow
           git branch --contains f936d319ccf50b8af873e2dbe0cea7232d34efac
           if ! git branch --contains f936d319ccf50b8af873e2dbe0cea7232d34efac | grep -E '(^|\s)main$'; then
             echo "The specified sha is not on the main branch" >&2
