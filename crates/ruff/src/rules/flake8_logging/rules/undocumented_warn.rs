@@ -12,16 +12,24 @@ use crate::registry::AsRule;
 /// Checks for uses of `logging.WARN`.
 ///
 /// ## Why is this bad?
-/// The WARN constant is an undocumented alias for WARNING. Whilst it’s not deprecated, it’s not
-/// mentioned at all in the documentation, so the documented WARNING should always be used instead.
+/// The `logging.WARN` constant is an undocumented alias for `logging.WARNING`.
+///
+/// Although it’s not explicitly deprecated, `logging.WARN` is not mentioned
+/// in the `logging` documentation. Prefer `logging.WARNING` instead.
 ///
 /// ## Example
 /// ```python
+/// import logging
+///
+///
 /// logging.basicConfig(level=logging.WARN)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import logging
+///
+///
 /// logging.basicConfig(level=logging.WARNING)
 /// ```
 #[violation]

@@ -871,7 +871,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "132") => (RuleGroup::Nursery, rules::refurb::rules::CheckAndRemoveFromSet),
 
         // flake8-logging
-        (Flake8Logging, "009") => (RuleGroup::Nursery, rules::flake8_logging::rules::UndocumentedWarn),
+        (Flake8Logging, "009") => (RuleGroup::Preview, rules::flake8_logging::rules::UndocumentedWarn),
 
         _ => return None,
     })

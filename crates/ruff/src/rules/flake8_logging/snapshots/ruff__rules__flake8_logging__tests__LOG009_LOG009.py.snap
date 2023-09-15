@@ -1,86 +1,41 @@
 ---
 source: crates/ruff/src/rules/flake8_logging/mod.rs
 ---
-LOG009.py:5:1: LOG009 [*] Use of undocumented `logging.WARN` constant
+LOG009.py:3:1: LOG009 [*] Use of undocumented `logging.WARN` constant
   |
-5 | logging.WARN  # LOG009
+1 | import logging
+2 | 
+3 | logging.WARN  # LOG009
   | ^^^^^^^^^^^^ LOG009
+4 | logging.WARNING  # OK
   |
   = help: Replace `logging.WARN` with `logging.WARNING`
 
 ℹ Suggested fix
-2 2 | from logging import WARN, WARNING
-3 3 | 
-4 4 | 
-5   |-logging.WARN  # LOG009
-  5 |+logging.WARNING  # LOG009
-6 6 | 
+1 1 | import logging
+2 2 | 
+3   |-logging.WARN  # LOG009
+  3 |+logging.WARNING  # LOG009
+4 4 | logging.WARNING  # OK
+5 5 | 
+6 6 | from logging import WARN, WARNING
+
+LOG009.py:8:1: LOG009 [*] Use of undocumented `logging.WARN` constant
+  |
+6 | from logging import WARN, WARNING
+7 | 
+8 | WARN  # LOG009
+  | ^^^^ LOG009
+9 | WARNING  # OK
+  |
+  = help: Replace `logging.WARN` with `logging.WARNING`
+
+ℹ Suggested fix
+5 5 | 
+6 6 | from logging import WARN, WARNING
 7 7 | 
-8 8 | logging.WARNING  # OK
-
-LOG009.py:11:1: LOG009 [*] Use of undocumented `logging.WARN` constant
-   |
-11 | WARN  # LOG009
-   | ^^^^ LOG009
-   |
-   = help: Replace `logging.WARN` with `logging.WARNING`
-
-ℹ Suggested fix
-8  8  | logging.WARNING  # OK
-9  9  | 
-10 10 | 
-11    |-WARN  # LOG009
-   11 |+logging.WARNING  # LOG009
-12 12 | 
-13 13 | 
-14 14 | WARNING  # OK
-
-LOG009.py:17:27: LOG009 [*] Use of undocumented `logging.WARN` constant
-   |
-17 | logging.basicConfig(level=logging.WARN)  # LOG009
-   |                           ^^^^^^^^^^^^ LOG009
-   |
-   = help: Replace `logging.WARN` with `logging.WARNING`
-
-ℹ Suggested fix
-14 14 | WARNING  # OK
-15 15 | 
-16 16 | 
-17    |-logging.basicConfig(level=logging.WARN)  # LOG009
-   17 |+logging.basicConfig(level=logging.WARNING)  # LOG009
-18 18 | 
-19 19 | 
-20 20 | logging.basicConfig(level=logging.WARNING)  # OK
-
-LOG009.py:23:5: LOG009 [*] Use of undocumented `logging.WARN` constant
-   |
-23 | x = logging.WARN  # LOG009
-   |     ^^^^^^^^^^^^ LOG009
-   |
-   = help: Replace `logging.WARN` with `logging.WARNING`
-
-ℹ Suggested fix
-20 20 | logging.basicConfig(level=logging.WARNING)  # OK
-21 21 | 
-22 22 | 
-23    |-x = logging.WARN  # LOG009
-   23 |+x = logging.WARNING  # LOG009
-24 24 | 
-25 25 | 
-26 26 | y = WARN  # LOG009
-
-LOG009.py:26:5: LOG009 [*] Use of undocumented `logging.WARN` constant
-   |
-26 | y = WARN  # LOG009
-   |     ^^^^ LOG009
-   |
-   = help: Replace `logging.WARN` with `logging.WARNING`
-
-ℹ Suggested fix
-23 23 | x = logging.WARN  # LOG009
-24 24 | 
-25 25 | 
-26    |-y = WARN  # LOG009
-   26 |+y = logging.WARNING  # LOG009
+8   |-WARN  # LOG009
+  8 |+logging.WARNING  # LOG009
+9 9 | WARNING  # OK
 
 
