@@ -895,6 +895,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::DirectLoggerInstantiation) {
                 flake8_logging::rules::direct_logger_instantiation(checker, call);
             }
+            if checker.enabled(Rule::InvalidGetLoggerArgument) {
+                flake8_logging::rules::invalid_get_logger_argument(checker, call);
+            }
         }
         Expr::Dict(ast::ExprDict {
             keys,
