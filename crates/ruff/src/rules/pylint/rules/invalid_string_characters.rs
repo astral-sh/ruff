@@ -4,6 +4,7 @@ use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
 
 /// ## What it does
@@ -173,10 +174,15 @@ impl AlwaysAutofixableViolation for InvalidCharacterZeroWidthSpace {
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
     diagnostics: &mut Vec<Diagnostic>,
+    tok: &Tok,
     range: TextRange,
     locator: &Locator,
 ) {
-    let text = locator.slice(range);
+    let text = match tok {
+        Tok::String { .. } => locator.slice(range),
+        Tok::FStringMiddle { value, .. } => value.as_str(),
+        _ => return,
+    };
 
     for (column, match_) in text.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}']) {
         let c = match_.chars().next().unwrap();
