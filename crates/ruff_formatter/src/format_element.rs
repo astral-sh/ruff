@@ -1,18 +1,19 @@
-pub mod document;
-pub mod tag;
-
 use std::borrow::Cow;
-use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
 use std::num::NonZeroU32;
 use std::ops::Deref;
-use std::rc::Rc;
+
 use unicode_width::UnicodeWidthChar;
 
+use ruff_text_size::TextSize;
+
 use crate::format_element::tag::{GroupMode, LabelId, Tag};
+use crate::interned_id::InternedId;
 use crate::source_code::SourceCodeSlice;
 use crate::{IndentWidth, TagKind};
-use ruff_text_size::TextSize;
+
+pub mod document;
+pub mod tag;
 
 /// Language agnostic IR for formatting source code.
 ///
@@ -34,7 +35,9 @@ pub enum FormatElement {
     SourcePosition(TextSize),
 
     /// A ASCII only Token that contains no line breaks or tab characters.
-    Token { text: &'static str },
+    Token {
+        text: &'static str,
+    },
 
     /// An arbitrary text that can contain tabs, newlines, and unicode characters.
     Text {
@@ -53,9 +56,7 @@ pub enum FormatElement {
     /// line suffixes, potentially by inserting a hard line break.
     LineSuffixBoundary,
 
-    /// An interned format element. Useful when the same content must be emitted multiple times to avoid
-    /// deep cloning the IR when using the `best_fitting!` macro or `if_group_fits_on_line` and `if_group_breaks`.
-    Interned(Interned),
+    Reference(InternedId),
 
     /// A list of different variants representing the same content. The printer picks the best fitting content.
     /// Line breaks inside of a best fitting don't propagate to parent groups.
@@ -66,16 +67,6 @@ pub enum FormatElement {
 
     /// A [Tag] that marks the start/end of some content to which some special formatting is applied.
     Tag(Tag),
-}
-
-impl FormatElement {
-    pub fn tag_kind(&self) -> Option<TagKind> {
-        if let FormatElement::Tag(tag) = self {
-            Some(tag.kind())
-        } else {
-            None
-        }
-    }
 }
 
 impl std::fmt::Debug for FormatElement {
@@ -97,7 +88,8 @@ impl std::fmt::Debug for FormatElement {
                 .field("variants", variants)
                 .field("mode", &mode)
                 .finish(),
-            FormatElement::Interned(interned) => fmt.debug_list().entries(&**interned).finish(),
+            FormatElement::Reference(id) => fmt.debug_tuple("Reference").field(id).finish(),
+
             FormatElement::Tag(tag) => fmt.debug_tuple("Tag").field(tag).finish(),
             FormatElement::SourcePosition(position) => {
                 fmt.debug_tuple("SourcePosition").field(position).finish()
@@ -148,46 +140,6 @@ impl From<GroupMode> for PrintMode {
             GroupMode::Flat => PrintMode::Flat,
             GroupMode::Expand | GroupMode::Propagated => PrintMode::Expanded,
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct Interned(Rc<[FormatElement]>);
-
-impl Interned {
-    pub(super) fn new(content: Vec<FormatElement>) -> Self {
-        Self(content.into())
-    }
-}
-
-impl PartialEq for Interned {
-    fn eq(&self, other: &Interned) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-impl Eq for Interned {}
-
-impl Hash for Interned {
-    fn hash<H>(&self, hasher: &mut H)
-    where
-        H: Hasher,
-    {
-        Rc::as_ptr(&self.0).hash(hasher);
-    }
-}
-
-impl std::fmt::Debug for Interned {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl Deref for Interned {
-    type Target = [FormatElement];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
@@ -257,18 +209,22 @@ impl FormatElement {
     pub const fn is_space(&self) -> bool {
         matches!(self, FormatElement::Space)
     }
-}
 
-impl FormatElements for FormatElement {
-    fn will_break(&self) -> bool {
+    pub const fn tag_kind(&self) -> Option<TagKind> {
+        if let FormatElement::Tag(tag) = self {
+            Some(tag.kind())
+        } else {
+            None
+        }
+    }
+
+    pub fn will_break(&self) -> bool {
         match self {
             FormatElement::ExpandParent => true,
             FormatElement::Tag(Tag::StartGroup(group)) => !group.mode().is_flat(),
             FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
             FormatElement::Text { text_width, .. } => text_width.is_multiline(),
             FormatElement::SourceCodeSlice { text_width, .. } => text_width.is_multiline(),
-            FormatElement::Interned(interned) => interned.will_break(),
-            // Traverse into the most flat version because the content is guaranteed to expand when even
             // the most flat version contains some content that forces a break.
             FormatElement::BestFitting {
                 variants: best_fitting,
@@ -278,23 +234,19 @@ impl FormatElements for FormatElement {
             | FormatElement::Space
             | FormatElement::Tag(_)
             | FormatElement::Token { .. }
+            | FormatElement::Reference(..)
             | FormatElement::SourcePosition(_) => false,
         }
     }
 
-    fn has_label(&self, label_id: LabelId) -> bool {
+    pub fn has_label(&self, label_id: LabelId) -> bool {
         match self {
             FormatElement::Tag(Tag::StartLabelled(actual)) => *actual == label_id,
-            FormatElement::Interned(interned) => interned.deref().has_label(label_id),
             _ => false,
         }
     }
 
-    fn start_tag(&self, _: TagKind) -> Option<&Tag> {
-        None
-    }
-
-    fn end_tag(&self, kind: TagKind) -> Option<&Tag> {
+    pub fn end_tag(&self, kind: TagKind) -> Option<&Tag> {
         match self {
             FormatElement::Tag(tag) if tag.kind() == kind && tag.is_end() => Some(tag),
             _ => None,
@@ -522,7 +474,6 @@ impl TextWidth {
 
 #[cfg(test)]
 mod tests {
-
     use crate::format_element::{normalize_newlines, LINE_TERMINATORS};
 
     #[test]
@@ -547,13 +498,13 @@ mod sizes {
     // be recomputed at a later point in time?
     // You reduced the size of a format element? Excellent work!
 
-    use super::{BestFittingVariants, Interned, TextWidth};
     use static_assertions::assert_eq_size;
+
+    use super::{BestFittingVariants, TextWidth};
 
     assert_eq_size!(ruff_text_size::TextRange, [u8; 8]);
     assert_eq_size!(TextWidth, [u8; 4]);
     assert_eq_size!(super::tag::VerbatimKind, [u8; 8]);
-    assert_eq_size!(Interned, [u8; 16]);
     assert_eq_size!(BestFittingVariants, [u8; 16]);
 
     #[cfg(not(debug_assertions))]

@@ -247,13 +247,17 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 Parenthesize::IfBreaks => {
                     let group_id = f.group_id("optional_parentheses");
                     let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
-                    let mut format_expression = expression
-                        .format()
-                        .with_options(Parentheses::Never)
-                        .memoized();
+
+                    let interned = f.intern_inspect(
+                        &expression.format().with_options(Parentheses::Never),
+                        "expression",
+                    )?;
+
+                    let breaks = interned.will_break();
+                    let format_expression = interned.into_interned();
 
                     // Don't use best fitting if it is known that the expression can never fit
-                    if format_expression.inspect(f)?.will_break() {
+                    if breaks {
                         // The group here is necessary because `format_expression` may contain IR elements
                         // that refer to the group id
                         group(&format_args![

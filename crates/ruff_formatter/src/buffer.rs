@@ -1,11 +1,11 @@
-use super::{write, Arguments, FormatElement};
-use crate::format_element::Interned;
-use crate::prelude::LineMode;
-use crate::{FormatResult, FormatState};
-use rustc_hash::FxHashMap;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
+
+use crate::prelude::LineMode;
+use crate::{FormatResult, FormatState};
+
+use super::{write, Arguments, FormatElement};
 
 /// A trait for writing or formatting into [`FormatElement`]-accepting buffers or streams.
 pub trait Buffer {
@@ -341,89 +341,12 @@ where
 /// ```
 pub struct RemoveSoftLinesBuffer<'a, Context> {
     inner: &'a mut dyn Buffer<Context = Context>,
-
-    /// Caches the interned elements after the soft line breaks have been removed.
-    ///
-    /// The `key` is the [Interned] element as it has been passed to [Self::write_element] or the child of another
-    /// [Interned] element. The `value` is the matching document of the key where all soft line breaks have been removed.
-    ///
-    /// It's fine to not snapshot the cache. The worst that can happen is that it holds on interned elements
-    /// that are now unused. But there's little harm in that and the cache is cleaned when dropping the buffer.
-    interned_cache: FxHashMap<Interned, Interned>,
 }
 
 impl<'a, Context> RemoveSoftLinesBuffer<'a, Context> {
     /// Creates a new buffer that removes the soft line breaks before writing them into `buffer`.
     pub fn new(inner: &'a mut dyn Buffer<Context = Context>) -> Self {
-        Self {
-            inner,
-            interned_cache: FxHashMap::default(),
-        }
-    }
-
-    /// Removes the soft line breaks from an interned element.
-    fn clean_interned(&mut self, interned: &Interned) -> Interned {
-        clean_interned(interned, &mut self.interned_cache)
-    }
-}
-
-// Extracted to function to avoid monomorphization
-fn clean_interned(
-    interned: &Interned,
-    interned_cache: &mut FxHashMap<Interned, Interned>,
-) -> Interned {
-    if let Some(cleaned) = interned_cache.get(interned) {
-        cleaned.clone()
-    } else {
-        // Find the first soft line break element or interned element that must be changed
-        let result = interned
-            .iter()
-            .enumerate()
-            .find_map(|(index, element)| match element {
-                FormatElement::Line(LineMode::Soft | LineMode::SoftOrSpace) => {
-                    let mut cleaned = Vec::new();
-                    cleaned.extend_from_slice(&interned[..index]);
-                    Some((cleaned, &interned[index..]))
-                }
-                FormatElement::Interned(inner) => {
-                    let cleaned_inner = clean_interned(inner, interned_cache);
-
-                    if &cleaned_inner == inner {
-                        None
-                    } else {
-                        let mut cleaned = Vec::with_capacity(interned.len());
-                        cleaned.extend_from_slice(&interned[..index]);
-                        cleaned.push(FormatElement::Interned(cleaned_inner));
-                        Some((cleaned, &interned[index + 1..]))
-                    }
-                }
-
-                _ => None,
-            });
-
-        let result = match result {
-            // Copy the whole interned buffer so that becomes possible to change the necessary elements.
-            Some((mut cleaned, rest)) => {
-                for element in rest {
-                    let element = match element {
-                        FormatElement::Line(LineMode::Soft) => continue,
-                        FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
-                        FormatElement::Interned(interned) => {
-                            FormatElement::Interned(clean_interned(interned, interned_cache))
-                        }
-                        element => element.clone(),
-                    };
-                    cleaned.push(element);
-                }
-
-                Interned::new(cleaned)
-            }
-            // No change necessary, return existing interned element
-            None => interned.clone(),
-        };
-
-        interned_cache.insert(interned.clone(), result.clone());
-        result
+        Self { inner }
     }
 }
 
@@ -434,9 +357,6 @@ impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
         let element = match element {
             FormatElement::Line(LineMode::Soft) => return,
             FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
-            FormatElement::Interned(interned) => {
-                FormatElement::Interned(self.clean_interned(&interned))
-            }
             element => element,
         };
 
@@ -574,10 +494,16 @@ where
 #[derive(Debug, Copy, Clone)]
 pub struct Recorded<'a>(&'a [FormatElement]);
 
+impl<'a> Recorded<'a> {
+    pub fn as_slice(self) -> &'a [FormatElement] {
+        self.0
+    }
+}
+
 impl Deref for Recorded<'_> {
     type Target = [FormatElement];
 
     fn deref(&self) -> &Self::Target {
-        self.0
+        self.as_slice()
     }
 }

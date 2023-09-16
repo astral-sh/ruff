@@ -19,14 +19,16 @@
 //! * [`format_args!`]: Concatenates a sequence of Format objects.
 //! * [`write!`]: Writes a sequence of formatable objects into an output buffer.
 
+extern crate core;
+
 mod arguments;
 mod buffer;
 mod builders;
 pub mod diagnostics;
 pub mod format_element;
-mod format_extensions;
 pub mod formatter;
 pub mod group_id;
+pub mod interned_id;
 pub mod macros;
 pub mod prelude;
 pub mod printer;
@@ -49,6 +51,7 @@ pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
+use crate::interned_id::{InternedId, UniqueInternedIdBuilder};
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
 pub use group_id::GroupId;
 use ruff_text_size::{TextRange, TextSize};
@@ -779,6 +782,7 @@ pub struct FormatState<Context> {
     context: Context,
 
     group_id_builder: UniqueGroupIdBuilder,
+    interned_id_builder: UniqueInternedIdBuilder,
 }
 
 #[allow(clippy::missing_fields_in_debug)]
@@ -799,6 +803,7 @@ impl<Context> FormatState<Context> {
         Self {
             context,
             group_id_builder: UniqueGroupIdBuilder::default(),
+            interned_id_builder: UniqueInternedIdBuilder::default(),
         }
     }
 
@@ -816,10 +821,17 @@ impl<Context> FormatState<Context> {
         &mut self.context
     }
 
-    /// Creates a new group id that is unique to this document. The passed debug name is used in the
+    /// Creates a [`GroupId`] that is unique to this document. The passed debug name is used in the
     /// [`std::fmt::Debug`] of the document if this is a debug build.
-    /// The name is unused for production builds and has no meaning on the equality of two group ids.
+    /// The name is unused for production builds and has no meaning on the equality of two [`GroupId`]s.
     pub fn group_id(&self, debug_name: &'static str) -> GroupId {
-        self.group_id_builder.group_id(debug_name)
+        self.group_id_builder.new_id(debug_name)
+    }
+
+    /// Creates a new [`InternedId`] that is unique to this document. The passed debug name is used in the
+    /// [`std::fmt::Debug`] of the document if this is a debug build.
+    /// The name is unused for production builds and has no meaning on the equality of [`InternedId`]s.
+    pub fn interned_id(&self, debug_name: &'static str) -> InternedId {
+        self.interned_id_builder.new_id(debug_name)
     }
 }

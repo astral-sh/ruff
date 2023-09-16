@@ -2235,7 +2235,6 @@ dependencies = [
  "drop_bomb",
  "insta",
  "ruff_text_size",
- "rustc-hash",
  "schemars",
  "serde",
  "static_assertions",

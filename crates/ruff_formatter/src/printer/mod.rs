@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextSize};
 use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
 use crate::format_element::{BestFittingMode, BestFittingVariants, LineMode, PrintMode};
+use crate::interned_id::{InternedId, InternedIndex};
 use crate::prelude::tag::{DedentMode, Tag, TagKind, VerbatimKind};
 use crate::prelude::{tag, TextWidth};
 use crate::printer::call_stack::{
@@ -155,9 +156,7 @@ impl<'a> Printer<'a> {
                 self.print_best_fitting(variants, *mode, queue, stack)?;
             }
 
-            FormatElement::Interned(content) => {
-                queue.extend_back(content);
-            }
+            FormatElement::Reference(id) => queue.extend_back(self.state.interned.get(*id)?),
 
             FormatElement::Tag(StartGroup(group)) => {
                 let print_mode = match group.mode() {
@@ -286,6 +285,17 @@ impl<'a> Printer<'a> {
                 }
 
                 stack.push(TagKind::FitsExpanded, args);
+            }
+
+            FormatElement::Tag(Tag::StartInterned { id }) => {
+                let slice = queue.top_slice().unwrap();
+                let length = queue.iter_content(TagKind::Interned).count();
+
+                self.state.interned.insert(*id, &slice[..length]);
+            }
+
+            FormatElement::Tag(EndInterned) => {
+                // Handled in `StartInterned`
             }
 
             FormatElement::Tag(
@@ -825,6 +835,7 @@ struct PrinterState<'a> {
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
+    interned: Interned<'a>,
     // Re-used queue to measure if a group fits. Optimisation to avoid re-allocating a new
     // vec every time a group gets measured
     fits_stack: Vec<StackFrame>,
@@ -856,18 +867,32 @@ impl GroupModes {
         self.0[index] = Some(mode);
     }
 
-    fn get_print_mode(&self, group_id: GroupId) -> PrintResult<PrintMode> {
-        let index = u32::from(group_id) as usize;
+    fn get_print_mode(&self, id: GroupId) -> PrintResult<PrintMode> {
+        let index = u32::from(id) as usize;
 
         match self.0.get(index) {
             Some(Some(print_mode)) => Ok(*print_mode),
             None | Some(None) => Err(PrintError::InvalidDocument(
-                InvalidDocumentError::UnknownGroupId { group_id },
+                InvalidDocumentError::UnknownGroupId { id },
             )),
         }
     }
 }
 
+#[derive(Debug, Default)]
+struct Interned<'a>(InternedIndex<&'a [FormatElement]>);
+
+impl<'a> Interned<'a> {
+    fn insert(&mut self, id: InternedId, slice: &'a [FormatElement]) {
+        self.0.insert(id, slice);
+    }
+
+    fn get(&self, id: InternedId) -> PrintResult<&'a [FormatElement]> {
+        self.0.get(id).copied().ok_or(PrintError::InvalidDocument(
+            InvalidDocumentError::UnknownInternedId { id },
+        ))
+    }
+}
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum Indention {
     /// Indent the content by `count` levels by using the indention sequence specified by the printer options.
@@ -1178,7 +1203,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 self.queue.extend_back(&slice[1..]);
             }
 
-            FormatElement::Interned(content) => self.queue.extend_back(content),
+            FormatElement::Reference(id) => self
+                .queue
+                .extend_back(self.printer.state.interned.get(*id)?),
 
             FormatElement::Tag(StartIndent) => {
                 self.stack.push(
@@ -1296,6 +1323,17 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     // As usual
                     self.stack.push(TagKind::FitsExpanded, args);
                 }
+            }
+
+            FormatElement::Tag(StartInterned { id }) => {
+                let slice = self.queue.top_slice().unwrap();
+                let length = self.queue.iter_content(TagKind::Interned).count();
+
+                self.printer.state.interned.insert(*id, &slice[..length]);
+            }
+
+            FormatElement::Tag(EndInterned) => {
+                // Handled in `StartInternd`
             }
 
             FormatElement::Tag(

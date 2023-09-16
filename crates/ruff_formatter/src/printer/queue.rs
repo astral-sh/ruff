@@ -11,24 +11,15 @@ pub(super) trait Queue<'a> {
     /// Pops the element at the end of the queue.
     fn pop(&mut self) -> Option<&'a FormatElement>;
 
-    /// Returns the next element, not traversing into [`FormatElement::Interned`].
-    fn top_with_interned(&self) -> Option<&'a FormatElement>;
-
-    /// Returns the next element, recursively resolving the first element of [`FormatElement::Interned`].
-    fn top(&self) -> Option<&'a FormatElement> {
-        let mut top = self.top_with_interned();
-
-        while let Some(FormatElement::Interned(interned)) = top {
-            top = interned.first();
-        }
-
-        top
-    }
+    /// Returns the next element, not traversing into [`FormatElement::Reference`].
+    fn top(&self) -> Option<&'a FormatElement>;
 
     /// Queues a single element to process before the other elements in this queue.
     fn push(&mut self, element: &'a FormatElement) {
         self.extend_back(std::slice::from_ref(element));
     }
+
+    fn top_slice(&self) -> Option<&'a [FormatElement]>;
 
     /// Queues a slice of elements to process before the other elements in this queue.
     fn extend_back(&mut self, elements: &'a [FormatElement]);
@@ -85,7 +76,7 @@ impl<'a> Queue<'a> for PrintQueue<'a> {
         })
     }
 
-    fn top_with_interned(&self) -> Option<&'a FormatElement> {
+    fn top(&self) -> Option<&'a FormatElement> {
         let mut slices = self.element_slices.iter().rev();
         let slice = slices.next()?;
 
@@ -99,6 +90,11 @@ impl<'a> Queue<'a> for PrintQueue<'a> {
                 }
             }
         }
+    }
+
+    fn top_slice(&self) -> Option<&'a [FormatElement]> {
+        let mut slice_iters = self.element_slices.iter().rev();
+        Some(slice_iters.next()?.as_slice())
     }
 
     fn extend_back(&mut self, elements: &'a [FormatElement]) {
@@ -156,13 +152,22 @@ impl<'a, 'print> Queue<'a> for FitsQueue<'a, 'print> {
         })
     }
 
-    fn top_with_interned(&self) -> Option<&'a FormatElement> {
-        self.queue.top_with_interned().or_else(|| {
+    fn top(&self) -> Option<&'a FormatElement> {
+        self.queue.top().or_else(|| {
             if let Some(next_elements) = self.rest_elements.as_slice().last() {
                 next_elements.as_slice().first()
             } else {
                 None
             }
+        })
+    }
+
+    fn top_slice(&self) -> Option<&'a [FormatElement]> {
+        self.queue.top_slice().or_else(|| {
+            self.rest_elements
+                .as_slice()
+                .last()
+                .map(std::slice::Iter::as_slice)
         })
     }
 
@@ -184,7 +189,7 @@ impl<'a, 'print> Queue<'a> for FitsQueue<'a, 'print> {
 
 /// Iterator that calls [`Queue::pop`] until it reaches the end of the document.
 ///
-/// The iterator traverses into the content of any [`FormatElement::Interned`].
+/// The iterator traverses into the content of any [`FormatElement::Reference`].
 pub(super) struct QueueIterator<'a, 'q, Q: Queue<'a>> {
     queue: &'q mut Q,
     lifetime: PhantomData<&'a ()>,
@@ -234,12 +239,7 @@ where
         if self.depth == 0 {
             None
         } else {
-            let mut top = self.queue.pop();
-
-            while let Some(FormatElement::Interned(interned)) = top {
-                self.queue.extend_back(interned);
-                top = self.queue.pop();
-            }
+            let top = self.queue.pop();
 
             match top.expect("Missing end signal.") {
                 element @ FormatElement::Tag(tag) if tag.kind() == self.kind => {
@@ -325,7 +325,7 @@ impl FitsEndPredicate for SingleEntryPredicate {
 
                     is_end
                 }
-                FormatElement::Interned(_) => false,
+                FormatElement::Reference(_) => false,
                 element if *depth == 0 => {
                     return invalid_start_tag(TagKind::Entry, Some(element));
                 }

@@ -1,7 +1,9 @@
 use crate::buffer::BufferSnapshot;
 use crate::builders::{FillBuilder, JoinBuilder};
+use crate::interned_id::InternedId;
 use crate::prelude::*;
-use crate::{Arguments, Buffer, FormatContext, FormatState, GroupId, VecBuffer};
+use crate::{Arguments, Buffer, FormatContext, FormatState, GroupId};
+use std::ops::Deref;
 
 /// Handles the formatting of a CST and stores the context how the CST should be formatted (user preferences).
 /// The formatter is passed to the [Format] implementation of every node in the CST so that they
@@ -164,22 +166,34 @@ impl<'buf, Context> Formatter<'buf, Context> {
     }
 
     /// Formats `content` into an interned element without writing it to the formatter's buffer.
-    pub fn intern(&mut self, content: &dyn Format<Context>) -> FormatResult<Option<FormatElement>> {
-        let mut buffer = VecBuffer::new(self.state_mut());
-        crate::write!(&mut buffer, [content])?;
-        let elements = buffer.into_vec();
-
-        Ok(self.intern_vec(elements))
+    pub fn intern(
+        &mut self,
+        content: &dyn Format<Context>,
+        debug_name: &'static str,
+    ) -> FormatResult<Interned> {
+        Ok(self.intern_inspect(content, debug_name)?.into_interned())
     }
 
-    pub fn intern_vec(&mut self, mut elements: Vec<FormatElement>) -> Option<FormatElement> {
-        match elements.len() {
-            0 => None,
-            // Doesn't get cheaper than calling clone, use the element directly
-            // SAFETY: Safe because of the `len == 1` check in the match arm.
-            1 => Some(elements.pop().unwrap()),
-            _ => Some(FormatElement::Interned(Interned::new(elements))),
-        }
+    /// Formats `content` into an interned element without writing it to the formatter's buffer.
+    pub fn intern_inspect(
+        &mut self,
+        content: &dyn Format<Context>,
+        debug_name: &'static str,
+    ) -> FormatResult<InternedInspect> {
+        let id = self.state_mut().interned_id(debug_name);
+
+        let recorded = {
+            let mut f = self.start_recording();
+            f.write_element(FormatElement::Tag(tag::Tag::StartInterned { id }));
+            crate::write!(f, [content])?;
+            f.write_element(FormatElement::Tag(tag::Tag::EndInterned));
+            f.stop()
+        };
+
+        Ok(InternedInspect {
+            id,
+            elements: recorded.as_slice(),
+        })
     }
 }
 
@@ -247,4 +261,34 @@ impl<Context> Buffer for Formatter<'_, Context> {
 /// mode and compiled to nothing in release mode
 pub struct FormatterSnapshot {
     buffer: BufferSnapshot,
+}
+
+pub struct Interned {
+    id: InternedId,
+}
+
+impl<Context> Format<Context> for Interned {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        f.write_element(FormatElement::Reference(self.id));
+        Ok(())
+    }
+}
+
+pub struct InternedInspect<'buf> {
+    id: InternedId,
+    elements: &'buf [FormatElement],
+}
+
+impl InternedInspect<'_> {
+    pub fn into_interned(self) -> Interned {
+        Interned { id: self.id }
+    }
+}
+
+impl Deref for InternedInspect<'_> {
+    type Target = [FormatElement];
+
+    fn deref(&self) -> &Self::Target {
+        self.elements
+    }
 }

@@ -1,7 +1,9 @@
-use crate::format_element::PrintMode;
-use crate::{GroupId, TextSize};
 use std::cell::Cell;
 use std::num::NonZeroU8;
+
+use crate::format_element::PrintMode;
+use crate::interned_id::InternedId;
+use crate::{GroupId, TextSize};
 
 /// A Tag marking the start and end of some content to which some special formatting should be applied.
 ///
@@ -86,6 +88,11 @@ pub enum Tag {
 
     StartBestFittingEntry,
     EndBestFittingEntry,
+
+    StartInterned {
+        id: InternedId,
+    },
+    EndInterned,
 }
 
 impl Tag {
@@ -106,7 +113,8 @@ impl Tag {
                 | Tag::StartVerbatim(_)
                 | Tag::StartLabelled(_)
                 | Tag::StartFitsExpanded(_)
-                | Tag::StartBestFittingEntry,
+                | Tag::StartBestFittingEntry
+                | Tag::StartInterned { .. }
         )
     }
 
@@ -133,6 +141,7 @@ impl Tag {
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
             StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,
+            StartInterned { .. } | EndInterned { .. } => TagKind::Interned,
             StartBestFittingEntry { .. } | EndBestFittingEntry => TagKind::BestFittingEntry,
         }
     }
@@ -158,6 +167,7 @@ pub enum TagKind {
     Labelled,
     FitsExpanded,
     BestFittingEntry,
+    Interned,
 }
 
 #[derive(Debug, Copy, Default, Clone, Eq, PartialEq)]

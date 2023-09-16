@@ -1,3 +1,4 @@
+use crate::interned_id::InternedId;
 use crate::prelude::TagKind;
 use crate::GroupId;
 use ruff_text_size::TextRange;
@@ -101,7 +102,11 @@ pub enum InvalidDocumentError {
     },
 
     UnknownGroupId {
-        group_id: GroupId,
+        id: GroupId,
+    },
+
+    UnknownInternedId {
+        id: InternedId,
     },
 }
 
@@ -155,8 +160,11 @@ impl std::fmt::Display for InvalidDocumentError {
                     }
                 }
             }
-            InvalidDocumentError::UnknownGroupId { group_id } => {
-                std::write!(f, "Encountered unknown group id {group_id:?}. Ensure that the group with the id {group_id:?} exists and that the group is a parent of or comes before the element referring to it.")
+            InvalidDocumentError::UnknownGroupId { id } => {
+                std::write!(f, "Encountered unknown group id {id:?}. Ensure that the group with the id {id:?} exists and that the group is a parent of or comes before the element referring to it.")
+            }
+            InvalidDocumentError::UnknownInternedId { id } => {
+                std::write!(f, "Encountered unknown interned id {id:?}. Ensure that the interned element with the id {id:?} exists and that appears before the element referring to it and isn't recursive.")
             }
         }
     }

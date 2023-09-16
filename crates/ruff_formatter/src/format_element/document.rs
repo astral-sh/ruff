@@ -1,9 +1,7 @@
-use std::collections::HashMap;
 use std::ops::Deref;
 
-use rustc_hash::FxHashMap;
-
 use crate::format_element::tag::{Condition, DedentMode};
+use crate::interned_id::{InternedId, InternedIndex};
 use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
 use crate::source_code::SourceCode;
@@ -39,6 +37,10 @@ impl Document {
                 tag: &'a tag::FitsExpanded,
                 expands_before: bool,
             },
+            Interned {
+                id: InternedId,
+                prev_expanded: bool,
+            },
             BestFitting,
         }
 
@@ -54,7 +56,7 @@ impl Document {
         fn propagate_expands<'a>(
             elements: &'a [FormatElement],
             enclosing: &mut Vec<Enclosing<'a>>,
-            checked_interned: &mut FxHashMap<&'a Interned, bool>,
+            interned: &mut InternedIndex<bool>,
         ) -> bool {
             let mut expands = false;
             for element in elements {
@@ -75,20 +77,11 @@ impl Document {
                         Some(Enclosing::ConditionalGroup(group)) => !group.mode().is_flat(),
                         _ => false,
                     },
-                    FormatElement::Interned(interned) => {
-                        if let Some(interned_expands) = checked_interned.get(interned) {
-                            *interned_expands
-                        } else {
-                            let interned_expands =
-                                propagate_expands(interned, enclosing, checked_interned);
-                            checked_interned.insert(interned, interned_expands);
-                            interned_expands
-                        }
-                    }
+                    FormatElement::Reference(id) => interned.get(*id).copied().unwrap_or_default(),
                     FormatElement::BestFitting { variants, mode: _ } => {
                         enclosing.push(Enclosing::BestFitting);
 
-                        propagate_expands(variants, enclosing, checked_interned);
+                        propagate_expands(variants, enclosing, interned);
                         enclosing.pop();
                         continue;
                     }
@@ -108,6 +101,23 @@ impl Document {
 
                         continue;
                     }
+                    FormatElement::Tag(Tag::StartInterned { id }) => {
+                        enclosing.push(Enclosing::Interned {
+                            id: *id,
+                            prev_expanded: expands,
+                        });
+                        expands = false;
+                        continue;
+                    }
+
+                    FormatElement::Tag(Tag::EndInterned) => {
+                        if let Some(Enclosing::Interned { id, prev_expanded }) = enclosing.pop() {
+                            interned.insert(id, expands);
+                            expands = prev_expanded;
+                        }
+
+                        continue;
+                    }
                     FormatElement::Text {
                         text: _,
                         text_width,
@@ -115,6 +125,7 @@ impl Document {
                     FormatElement::SourceCodeSlice { text_width, .. } => text_width.is_multiline(),
                     FormatElement::ExpandParent
                     | FormatElement::Line(LineMode::Hard | LineMode::Empty) => true,
+
                     _ => false,
                 };
 
@@ -132,7 +143,7 @@ impl Document {
         } else {
             self.len().ilog2() as usize
         });
-        let mut interned = FxHashMap::default();
+        let mut interned = InternedIndex::new();
         propagate_expands(self, &mut enclosing, &mut interned);
     }
 
@@ -185,18 +196,12 @@ impl std::fmt::Debug for DisplayDocument<'_> {
 
 #[derive(Clone, Debug)]
 struct IrFormatContext<'a> {
-    /// The interned elements that have been printed to this point
-    printed_interned_elements: HashMap<Interned, usize>,
-
     source_code: SourceCode<'a>,
 }
 
 impl<'a> IrFormatContext<'a> {
     fn new(source_code: SourceCode<'a>) -> Self {
-        Self {
-            source_code,
-            printed_interned_elements: HashMap::new(),
-        }
+        Self { source_code }
     }
 }
 
@@ -366,30 +371,8 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     write!(f, [token("])")])?;
                 }
 
-                FormatElement::Interned(interned) => {
-                    let interned_elements = &mut f.context_mut().printed_interned_elements;
-
-                    match interned_elements.get(interned).copied() {
-                        None => {
-                            let index = interned_elements.len();
-                            interned_elements.insert(interned.clone(), index);
-
-                            write!(
-                                f,
-                                [
-                                    text(&std::format!("<interned {index}>"), None),
-                                    space(),
-                                    &&**interned,
-                                ]
-                            )?;
-                        }
-                        Some(reference) => {
-                            write!(
-                                f,
-                                [text(&std::format!("<ref interned *{reference}>"), None)]
-                            )?;
-                        }
-                    }
+                FormatElement::Reference(id) => {
+                    write!(f, [text(&std::format!("<ref *{id:?}>"), None)])?;
                 }
 
                 FormatElement::Tag(tag) => {
@@ -597,6 +580,9 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                 )?;
                             }
                         }
+                        StartInterned { id } => {
+                            write!(f, [text(&std::format!("<interned {id:?}>"), None), space()])?;
+                        }
 
                         StartEntry | StartBestFittingEntry { .. } => {
                             // handled after the match for all start tags
@@ -614,6 +600,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         | EndLineSuffix
                         | EndDedent
                         | EndFitsExpanded
+                        | EndInterned { .. }
                         | EndVerbatim => {
                             write!(f, [ContentArrayEnd, token(")")])?;
                         }
@@ -691,11 +678,6 @@ impl FormatElements for [FormatElement] {
                 FormatElement::Tag(Tag::EndLineSuffix | Tag::EndFitsExpanded) => {
                     ignore_depth = ignore_depth.saturating_sub(1);
                 }
-                FormatElement::Interned(interned) if ignore_depth == 0 => {
-                    if interned.will_break() {
-                        return true;
-                    }
-                }
 
                 element if ignore_depth == 0 && element.will_break() => {
                     return true;
@@ -735,20 +717,7 @@ impl FormatElements for [FormatElement] {
                             *depth += 1;
                         }
                     }
-                    FormatElement::Interned(interned) => {
-                        match traverse_slice(interned, kind, depth) {
-                            Some(start) => {
-                                return Some(start);
-                            }
-                            // Reached end or invalid document
-                            None if *depth == 0 => {
-                                return None;
-                            }
-                            _ => {
-                                // continue with other elements
-                            }
-                        }
-                    }
+
                     _ => {}
                 }
             }
