@@ -110,6 +110,23 @@ yield (
 yield "#   * Make sure each ForeignKey and OneToOneField has `on_delete` set "    "to the desired behavior"
 yield "#   * Remove `managed = False` lines if you wish to allow " "Django to create, modify, and delete the table"
 yield "# Feel free to rename the models, but don't rename db_table values or "    "field names."
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7420
+result = yield self.request(
+    f"/applications/{int(application_id)}/guilds/{int(scope)}/commands/{int(command_id)}/permissions"
+)
+
+result = yield (self.request(
+    f"/applications/{int(application_id)}/guilds/{int(scope)}/commands/{int(command_id)}/permissions"
+))
+
+result = yield
+
+result = yield (1 + f(1, 2, 3,))
+
+result = (yield (1 + f(1, 2, 3,)))
+
+print((yield x))
 ```
 
 ## Output
@@ -230,6 +247,39 @@ yield (
     "# Feel free to rename the models, but don't rename db_table values or "
     "field names."
 )
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7420
+result = yield self.request(
+    f"/applications/{int(application_id)}/guilds/{int(scope)}/commands/{int(command_id)}/permissions"
+)
+
+result = yield (
+    self.request(
+        f"/applications/{int(application_id)}/guilds/{int(scope)}/commands/{int(command_id)}/permissions"
+    )
+)
+
+result = yield
+
+result = yield (
+    1
+    + f(
+        1,
+        2,
+        3,
+    )
+)
+
+result = yield (
+    1
+    + f(
+        1,
+        2,
+        3,
+    )
+)
+
+print((yield x))
 ```
 
 
