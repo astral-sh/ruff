@@ -1,12 +1,10 @@
-use itertools::Either::{Left, Right};
-use itertools::Itertools;
-use ruff_python_ast::{self as ast, Expr, Ranged};
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Constant, Expr, ExprContext, Operator};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
-use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
+use crate::autofix::edits::pad;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -76,10 +74,21 @@ pub(crate) fn use_pep604_annotation(
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    optional(slice, checker.locator()),
-                    expr.range(),
-                )));
+                match slice {
+                    Expr::Tuple(_) => {
+                        // Invalid type annotation.
+                    }
+                    _ => {
+                        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            pad(
+                                checker.generator().expr(&optional(slice)),
+                                expr.range(),
+                                checker.locator(),
+                            ),
+                            expr.range(),
+                        )));
+                    }
+                }
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -92,14 +101,22 @@ pub(crate) fn use_pep604_annotation(
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                            union(elts, checker.locator()),
+                            pad(
+                                checker.generator().expr(&union(elts)),
+                                expr.range(),
+                                checker.locator(),
+                            ),
                             expr.range(),
                         )));
                     }
                     _ => {
                         // Single argument.
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                            checker.locator().slice(slice.range()).to_string(),
+                            pad(
+                                checker.locator().slice(slice).to_string(),
+                                expr.range(),
+                                checker.locator(),
+                            ),
                             expr.range(),
                         )));
                     }
@@ -111,23 +128,35 @@ pub(crate) fn use_pep604_annotation(
 }
 
 /// Format the expression as a PEP 604-style optional.
-fn optional(expr: &Expr, locator: &Locator) -> String {
-    format!("{} | None", locator.slice(expr.range()))
+fn optional(expr: &Expr) -> Expr {
+    ast::ExprBinOp {
+        left: Box::new(expr.clone()),
+        op: Operator::BitOr,
+        right: Box::new(Expr::Constant(ast::ExprConstant {
+            value: Constant::None,
+            range: TextRange::default(),
+        })),
+        range: TextRange::default(),
+    }
+    .into()
 }
 
 /// Format the expressions as a PEP 604-style union.
-fn union(elts: &[Expr], locator: &Locator) -> String {
-    let mut elts = elts
-        .iter()
-        .flat_map(|expr| match expr {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => Left(elts.iter()),
-            _ => Right(std::iter::once(expr)),
-        })
-        .peekable();
-    if elts.peek().is_none() {
-        "()".to_string()
-    } else {
-        elts.map(|expr| locator.slice(expr.range())).join(" | ")
+fn union(elts: &[Expr]) -> Expr {
+    match elts {
+        [] => Expr::Tuple(ast::ExprTuple {
+            elts: vec![],
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
+        }),
+        [Expr::Tuple(ast::ExprTuple { elts, .. })] => union(elts),
+        [elt] => elt.clone(),
+        [elt, rest @ ..] => Expr::BinOp(ast::ExprBinOp {
+            left: Box::new(union(&[elt.clone()])),
+            op: Operator::BitOr,
+            right: Box::new(union(rest)),
+            range: TextRange::default(),
+        }),
     }
 }
 

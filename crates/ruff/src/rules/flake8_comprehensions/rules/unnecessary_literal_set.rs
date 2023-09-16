@@ -1,7 +1,8 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
+use ruff_python_ast::{Expr, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -76,7 +77,7 @@ pub(crate) fn unnecessary_literal_set(
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic
-            .try_set_fix(|| fixes::fix_unnecessary_literal_set(checker, expr).map(Fix::suggested));
+            .try_set_fix(|| fixes::fix_unnecessary_literal_set(expr, checker).map(Fix::suggested));
     }
     checker.diagnostics.push(diagnostic);
 }

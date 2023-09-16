@@ -57,10 +57,10 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                         write!(
                             f,
                             [
-                                text("except"),
+                                token("except"),
                                 match self.except_handler_kind {
                                     ExceptHandlerKind::Regular => None,
-                                    ExceptHandlerKind::Starred => Some(text("*")),
+                                    ExceptHandlerKind::Starred => Some(token("*")),
                                 }
                             ]
                         )?;
@@ -78,7 +78,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                                 ]
                             )?;
                             if let Some(name) = name {
-                                write!(f, [space(), text("as"), space(), name.format()])?;
+                                write!(f, [space(), token("as"), space(), name.format()])?;
                             }
                         }
 

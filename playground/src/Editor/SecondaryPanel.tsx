@@ -6,6 +6,7 @@ export enum SecondaryTool {
   "AST" = "AST",
   "Tokens" = "Tokens",
   "FIR" = "FIR",
+  "Comments" = "Comments",
 }
 
 export type SecondaryPanelResult =
@@ -63,6 +64,10 @@ function Content({
 
           case "FIR":
             language = "fir";
+            break;
+
+          case "Comments":
+            language = "Comments";
             break;
         }
 

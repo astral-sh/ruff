@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::Ranged;
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Debug)]
 pub(crate) struct Comment<'a> {

@@ -42,3 +42,17 @@ class Foo:
 
     def __contains__(self, key: object) -> bool:
         return key in self.keys()  # OK
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7124
+key in obj.keys()and foo
+(key in obj.keys())and foo
+key in (obj.keys())and foo
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7200
+for key in (
+    self.experiment.surveys[0]
+        .stations[0]
+        .keys()
+):
+    continue

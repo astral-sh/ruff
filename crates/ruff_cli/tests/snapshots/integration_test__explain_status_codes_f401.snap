@@ -1,0 +1,61 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "--explain"
+    - F401
+---
+success: true
+exit_code: 0
+----- stdout -----
+# unused-import (F401)
+
+Derived from the **Pyflakes** linter.
+
+Autofix is sometimes available.
+
+## What it does
+Checks for unused imports.
+
+## Why is this bad?
+Unused imports add a performance overhead at runtime, and risk creating
+import cycles. They also increase the cognitive load of reading the code.
+
+If an import statement is used to check for the availability or existence
+of a module, consider using `importlib.util.find_spec` instead.
+
+## Example
+```python
+import numpy as np  # unused import
+
+
+def area(radius):
+    return 3.14 * radius**2
+```
+
+Use instead:
+```python
+def area(radius):
+    return 3.14 * radius**2
+```
+
+To check the availability of a module, use `importlib.util.find_spec`:
+```python
+from importlib.util import find_spec
+
+if find_spec("numpy") is not None:
+    print("numpy is installed")
+else:
+    print("numpy is not installed")
+```
+
+## Options
+- `pyflakes.extend-generics`
+
+## References
+- [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
+- [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
+
+----- stderr -----
+

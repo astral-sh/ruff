@@ -1,5 +1,6 @@
-use ruff_text_size::{TextRange, TextSize};
 use std::fmt::{Debug, Formatter};
+
+use ruff_text_size::{Ranged, TextRange};
 
 /// The source code of a document that gets formatted
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
@@ -67,17 +68,11 @@ impl SourceCodeSlice {
         assert!(usize::from(self.range.end()) <= code.text.len(), "The range of this slice is out of bounds. Did you provide the correct source code for this slice?");
         &code.text[self.range]
     }
+}
 
-    pub const fn range(&self) -> TextRange {
+impl Ranged for SourceCodeSlice {
+    fn range(&self) -> TextRange {
         self.range
-    }
-
-    pub const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    pub const fn end(&self) -> TextSize {
-        self.range.end()
     }
 }
 

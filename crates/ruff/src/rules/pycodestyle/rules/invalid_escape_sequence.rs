@@ -1,10 +1,12 @@
 use memchr::memchr_iter;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+
+use crate::autofix::edits::pad_start;
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -138,18 +140,8 @@ pub(crate) fn invalid_escape_sequence(
                 // If necessary, add a space between any leading keyword (`return`, `yield`,
                 // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
                 // `returnr"foo"` is not.
-                let requires_space = locator
-                    .slice(TextRange::up_to(range.start()))
-                    .chars()
-                    .last()
-                    .is_some_and(|char| char.is_ascii_alphabetic());
-
                 diagnostic.set_fix(Fix::automatic(Edit::insertion(
-                    if requires_space {
-                        " r".to_string()
-                    } else {
-                        "r".to_string()
-                    },
+                    pad_start("r".to_string(), range.start(), locator),
                     range.start(),
                 )));
             }

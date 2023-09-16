@@ -1,5 +1,6 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::{ExceptHandler, Ranged, StmtTry};
+use ruff_python_ast::{ExceptHandler, StmtTry};
+use ruff_text_size::Ranged;
 
 use crate::comments;
 use crate::comments::leading_alternate_branch_comments;
@@ -118,7 +119,7 @@ fn format_case<'a>(
 
     Ok(if let Some(last) = body.last() {
         let case_comments_start =
-            dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
+            dangling_comments.partition_point(|comment| comment.end() <= last.end());
         let (case_comments, rest) = dangling_comments.split_at(case_comments_start);
         let partition_point =
             case_comments.partition_point(|comment| comment.line_position().is_own_line());
@@ -135,7 +136,7 @@ fn format_case<'a>(
         write!(
             f,
             [
-                clause_header(header, trailing_case_comments, &text(kind.keyword()))
+                clause_header(header, trailing_case_comments, &token(kind.keyword()))
                     .with_leading_comments(leading_case_comments, previous_node),
                 clause_body(body, trailing_case_comments),
             ]

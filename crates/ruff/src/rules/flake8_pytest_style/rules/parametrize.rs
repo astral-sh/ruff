@@ -7,10 +7,10 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -278,8 +278,6 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
                 acc
             })
             .into(),
-
-        kind: None,
         range: TextRange::default(),
     });
     Some(generator.expr(&node))
@@ -340,7 +338,6 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                     .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
                                             value: (*name).to_string().into(),
-                                            kind: None,
                                             range: TextRange::default(),
                                         })
                                     })
@@ -375,7 +372,6 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                     .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
                                             value: (*name).to_string().into(),
-                                            kind: None,
                                             range: TextRange::default(),
                                         })
                                     })

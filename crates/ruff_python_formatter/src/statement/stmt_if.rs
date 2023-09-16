@@ -30,7 +30,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                     ClauseHeader::If(item),
                     trailing_colon_comment,
                     &format_args![
-                        text("if"),
+                        token("if"),
                         space(),
                         maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
                     ],
@@ -86,13 +86,13 @@ pub(crate) fn format_elif_else_clause(
                         write!(
                             f,
                             [
-                                text("elif"),
+                                token("elif"),
                                 space(),
                                 maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
                             ]
                         )
                     } else {
-                        text("else").fmt(f)
+                        token("else").fmt(f)
                     }
                 }),
             )

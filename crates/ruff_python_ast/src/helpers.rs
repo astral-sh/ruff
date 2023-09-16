@@ -4,13 +4,12 @@ use std::path::Path;
 use num_traits::Zero;
 use smallvec::SmallVec;
 
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::call_path::CallPath;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Ranged, Stmt,
-    TypeParam,
+    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -114,10 +113,7 @@ where
 
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression
 /// returns `true`..
-pub fn any_over_expr<F>(expr: &Expr, func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
     if func(expr) {
         return true;
     }
@@ -211,6 +207,8 @@ where
             range: _,
         }) => {
             any_over_expr(call_func, func)
+                // Note that this is the evaluation order but not necessarily the declaration order
+                // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
                 || args.iter().any(|expr| any_over_expr(expr, func))
                 || keywords
                     .iter()
@@ -248,10 +246,7 @@ where
     }
 }
 
-pub fn any_over_type_param<F>(type_param: &TypeParam, func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
     match type_param {
         TypeParam::TypeVar(ast::TypeParamTypeVar { bound, .. }) => bound
             .as_ref()
@@ -261,10 +256,7 @@ where
     }
 }
 
-pub fn any_over_pattern<F>(pattern: &Pattern, func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool {
     match pattern {
         Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
             any_over_expr(value, func)
@@ -300,10 +292,7 @@ where
     }
 }
 
-pub fn any_over_stmt<F>(stmt: &Stmt, func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             parameters,
@@ -360,6 +349,8 @@ where
             decorator_list,
             ..
         }) => {
+            // Note that e.g. `class A(*args, a=2, *args2, **kwargs): pass` is a valid class
+            // definition
             arguments
                 .as_deref()
                 .is_some_and(|Arguments { args, keywords, .. }| {
@@ -526,10 +517,7 @@ where
     }
 }
 
-pub fn any_over_body<F>(body: &[Stmt], func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_body(body: &[Stmt], func: &dyn Fn(&Expr) -> bool) -> bool {
     body.iter().any(|stmt| any_over_stmt(stmt, func))
 }
 
@@ -592,7 +580,6 @@ pub const fn is_const_none(expr: &Expr) -> bool {
         expr,
         Expr::Constant(ast::ExprConstant {
             value: Constant::None,
-            kind: None,
             ..
         }),
     )
@@ -604,7 +591,6 @@ pub const fn is_const_true(expr: &Expr) -> bool {
         expr,
         Expr::Constant(ast::ExprConstant {
             value: Constant::Bool(true),
-            kind: None,
             ..
         }),
     )
@@ -616,7 +602,6 @@ pub const fn is_const_false(expr: &Expr) -> bool {
         expr,
         Expr::Constant(ast::ExprConstant {
             value: Constant::Bool(false),
-            kind: None,
             ..
         }),
     )
@@ -665,6 +650,17 @@ pub fn map_subscript(expr: &Expr) -> &Expr {
         value
     } else {
         // Ex) `Iterable`
+        expr
+    }
+}
+
+/// Given an [`Expr`] that can be starred, return the underlying starred expression.
+pub fn map_starred(expr: &Expr) -> &Expr {
+    if let Expr::Starred(ast::ExprStarred { value, .. }) = expr {
+        // Ex) `*args`
+        value
+    } else {
+        // Ex) `args`
         expr
     }
 }
@@ -1195,17 +1191,14 @@ mod tests {
         });
         let constant_one = Expr::Constant(ExprConstant {
             value: Constant::Int(1.into()),
-            kind: Some("x".to_string()),
             range: TextRange::default(),
         });
         let constant_two = Expr::Constant(ExprConstant {
             value: Constant::Int(2.into()),
-            kind: Some("y".to_string()),
             range: TextRange::default(),
         });
         let constant_three = Expr::Constant(ExprConstant {
             value: Constant::Int(3.into()),
-            kind: Some("z".to_string()),
             range: TextRange::default(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
@@ -1248,7 +1241,6 @@ mod tests {
 
         let bound = Expr::Constant(ExprConstant {
             value: Constant::Int(1.into()),
-            kind: Some("x".to_string()),
             range: TextRange::default(),
         });
 

@@ -14,6 +14,6 @@ def function(a:int=42):
        a
        b
     """
-    #    There's a NBSP + 3 spaces before
+    #      There's a NBSP + 3 spaces before
     #    And 4 spaces on the next line
     pass

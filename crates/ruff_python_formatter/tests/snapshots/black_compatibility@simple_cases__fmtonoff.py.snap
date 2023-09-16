@@ -198,7 +198,15 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -63,15 +63,15 @@
+@@ -5,6 +5,7 @@
+ from third_party import X, Y, Z
+ 
+ from library import some_connection, some_decorator
++
+ # fmt: off
+ from third_party import (X,
+                          Y, Z)
+@@ -63,15 +64,15 @@
  
  something = {
      # fmt: off
@@ -217,7 +225,7 @@ d={'a':1,
          # fmt: on
          goes + here,
          andhere,
-@@ -122,8 +122,10 @@
+@@ -122,8 +123,10 @@
      """
      # fmt: off
  
@@ -229,7 +237,7 @@ d={'a':1,
      # fmt: on
      pass
  
-@@ -138,7 +140,7 @@
+@@ -138,7 +141,7 @@
      now . considers . multiple . fmt . directives . within . one . prefix
      # fmt: on
      # fmt: off
@@ -238,7 +246,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -178,14 +180,18 @@
+@@ -178,14 +181,18 @@
          $
          """,
          # fmt: off
@@ -271,6 +279,7 @@ import sys
 from third_party import X, Y, Z
 
 from library import some_connection, some_decorator
+
 # fmt: off
 from third_party import (X,
                          Y, Z)

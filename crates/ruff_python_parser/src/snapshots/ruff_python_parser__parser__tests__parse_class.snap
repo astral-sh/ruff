@@ -119,10 +119,10 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 value: Str(
                                                     StringConstant {
                                                         value: "default",
+                                                        unicode: false,
                                                         implicit_concatenated: false,
                                                     },
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     ),

@@ -119,8 +119,8 @@ mod tests {
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"))]
     #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"))]
     #[test_case(
-        Rule::RepeatedEqualityComparisonTarget,
-        Path::new("repeated_equality_comparison_target.py")
+        Rule::RepeatedEqualityComparison,
+        Path::new("repeated_equality_comparison.py")
     )]
     #[test_case(Rule::SelfAssigningVariable, Path::new("self_assigning_variable.py"))]
     #[test_case(
@@ -251,6 +251,22 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..Settings::for_rule(Rule::TooManyReturnStatements)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn too_many_public_methods() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_public_methods.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    max_public_methods: 7,
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyPublicMethods])
             },
         )?;
         assert_messages!(diagnostics);

@@ -18,10 +18,12 @@ ruff_formatter = { path = "../ruff_formatter" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_notebook = { path = "../ruff_notebook" }
 ruff_python_literal = { path = "../ruff_python_literal" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
+ruff_workspace = { path = "../ruff_workspace", features = ["schemars"]}
 
 anyhow = { workspace = true }
 clap = { workspace = true }

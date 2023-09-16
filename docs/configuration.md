@@ -57,23 +57,20 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py38"
 ```
 
-As an example, the following would configure Ruff to: (1) enforce flake8-bugbear rules, in addition
-to the defaults; (2) avoid enforcing line-length violations (`E501`); (3) avoid attempting to fix
-flake8-bugbear (`B`) violations; and (3) ignore import-at-top-of-file violations (`E402`) in
-`__init__.py` files:
+As an example, the following would configure Ruff to:
 
 ```toml
 [tool.ruff]
-# Enable flake8-bugbear (`B`) rules.
+# 1. Enable flake8-bugbear (`B`) rules, in addition to the defaults.
 select = ["E", "F", "B"]
 
-# Never enforce `E501` (line length violations).
+# 2. Avoid enforcing line-length violations (`E501`)
 ignore = ["E501"]
 
-# Avoid trying to fix flake8-bugbear (`B`) violations.
+# 3. Avoid trying to fix flake8-bugbear (`B`) violations.
 unfixable = ["B"]
 
-# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+# 4. Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["E402"]
 "path/to/file.py" = ["E402"]
@@ -174,8 +171,8 @@ Options:
 
 Log levels:
   -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
+  -q, --quiet    Print diagnostics, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -215,6 +212,8 @@ Options:
           Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
+      --preview
+          Enable preview mode; checks will include unstable rules and fixes
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
       --statistics
@@ -268,8 +267,8 @@ Miscellaneous:
 
 Log levels:
   -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
+  -q, --quiet    Print diagnostics, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
 ```
 
 <!-- End auto-generated subcommand help. -->
@@ -395,8 +394,9 @@ i = 1  # noqa: E741, F841
 x = 1  # noqa
 ```
 
-Note that, for multi-line strings, the `noqa` directive should come at the end of the string, and
-will apply to the entire string, like so:
+For multi-line strings (like docstrings),
+the `noqa` directive should come at the end of the string (after the closing triple quote),
+and will apply to the entire string, like so:
 
 ```python
 """Lorem ipsum dolor sit amet.
@@ -476,7 +476,7 @@ Ruff supports two command-line flags that alter its exit code behavior:
     `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
     autofixing.
 
-## Autocompletion
+## Shell autocompletion
 
 Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
 by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,

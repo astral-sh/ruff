@@ -370,7 +370,6 @@ impl UnittestAssert {
                 };
                 let node = Expr::Constant(ast::ExprConstant {
                     value: Constant::None,
-                    kind: None,
                     range: TextRange::default(),
                 });
                 let expr = compare(expr, cmp_op, &node);

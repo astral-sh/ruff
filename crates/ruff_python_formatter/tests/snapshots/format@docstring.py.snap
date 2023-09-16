@@ -111,9 +111,9 @@ class TabbedIndent:
 ## Outputs
 ### Output 1
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
-tab-width               = 8
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -224,9 +224,9 @@ class TabbedIndent:
 
 ### Output 2
 ```
-indent-style            = Spaces, size: 2
+indent-style            = space
 line-width              = 88
-tab-width               = 8
+indent-width            = 2
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -337,9 +337,9 @@ class TabbedIndent:
 
 ### Output 3
 ```
-indent-style            = Tab
+indent-style            = tab
 line-width              = 88
-tab-width               = 8
+indent-width            = 8
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -450,9 +450,9 @@ class TabbedIndent:
 
 ### Output 4
 ```
-indent-style            = Tab
+indent-style            = tab
 line-width              = 88
-tab-width               = 4
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -556,7 +556,7 @@ class TabbedIndent:
 		"""check for correct tabbed formatting
 		                            ^^^^^^^^^^
 		Normal indented line
-		    - autor
+		        - autor
 		"""
 ```
 

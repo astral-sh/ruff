@@ -3,11 +3,12 @@ use itertools::Itertools;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{self as ast, PySourceType, Stmt};
 use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_python_semantic::{Binding, Scope};
 use ruff_source_file::Locator;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -220,12 +221,20 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
-                    let start = target.start();
-                    let end =
-                        match_token_after(start, checker.locator(), checker.source_type, |tok| {
-                            tok == Tok::Equal
-                        })?
-                        .start();
+                    let start = parenthesized_range(
+                        target.into(),
+                        statement.into(),
+                        checker.locator().contents(),
+                    )
+                    .unwrap_or(target.range())
+                    .start();
+                    let end = match_token_after(
+                        target.end(),
+                        checker.locator(),
+                        checker.source_type,
+                        |tok| tok == Tok::Equal,
+                    )?
+                    .start();
                     let edit = Edit::deletion(start, end);
                     Some(Fix::suggested(edit))
                 } else {

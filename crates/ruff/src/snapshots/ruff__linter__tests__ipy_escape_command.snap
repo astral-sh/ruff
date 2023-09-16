@@ -1,0 +1,23 @@
+---
+source: crates/ruff/src/linter.rs
+---
+ipy_escape_command.ipynb:cell 1:5:8: F401 [*] `os` imported but unused
+  |
+3 | %matplotlib inline
+4 | 
+5 | import os
+  |        ^^ F401
+6 | 
+7 | _ = math.pi
+  |
+  = help: Remove unused import: `os`
+
+ℹ Fix
+2 2 | 
+3 3 | %matplotlib inline
+4 4 | 
+5   |-import os
+6 5 | 
+7 6 | _ = math.pi
+
+

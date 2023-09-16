@@ -82,10 +82,11 @@ impl PythonWhitespace for str {
 
 #[cfg(test)]
 mod tests {
-    use crate::has_trailing_content;
-    use ruff_python_ast::Ranged;
     use ruff_python_parser::{parse_suite, ParseError};
     use ruff_source_file::Locator;
+    use ruff_text_size::Ranged;
+
+    use crate::has_trailing_content;
 
     #[test]
     fn trailing_content() -> Result<(), ParseError> {

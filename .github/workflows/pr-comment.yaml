@@ -47,19 +47,30 @@ jobs:
         id: generate-comment
         if: steps.download-ecosystem-result.outputs.found_artifact == 'true'
         run: |
+          echo '## PR Check Results' >> comment.txt
+
+          echo "### Ecosystem" >> comment.txt
+          cat pr/ecosystem/ecosystem-result >> comment.txt
+          echo "" >> comment.txt
+
           echo 'comment<<EOF' >> $GITHUB_OUTPUT
-          echo '## PR Check Results' >> $GITHUB_OUTPUT
-
-          echo "### Ecosystem" >> $GITHUB_OUTPUT
-          cat pr/ecosystem/ecosystem-result >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-
+          cat comment.txt >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
-      - name: Create or update comment
-        if: steps.generate-comment.outputs.comment
-        uses: thollander/actions-comment-pull-request@v2
+      - name: Find Comment
+        uses: peter-evans/find-comment@v2
+        if: steps.generate-comment.outcome == 'success'
+        id: find-comment
         with:
-          pr_number: ${{ steps.pr-number.outputs.pr-number }}
-          message: ${{ steps.generate-comment.outputs.comment }}
-          comment_tag: PR Check Results
+          issue-number: ${{ steps.pr-number.outputs.pr-number }}
+          comment-author: "github-actions[bot]"
+          body-includes: PR Check Results
+
+      - name: Create or update comment
+        if: steps.find-comment.outcome == 'success'
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ steps.pr-number.outputs.pr-number }}
+          body-path: comment.txt
+          edit-mode: replace

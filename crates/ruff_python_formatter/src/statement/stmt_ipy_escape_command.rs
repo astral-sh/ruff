@@ -1,4 +1,5 @@
-use ruff_python_ast::{Ranged, StmtIpyEscapeCommand};
+use ruff_python_ast::StmtIpyEscapeCommand;
+use ruff_text_size::Ranged;
 
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::prelude::*;
@@ -8,7 +9,7 @@ pub struct FormatStmtIpyEscapeCommand;
 
 impl FormatNodeRule<StmtIpyEscapeCommand> for FormatStmtIpyEscapeCommand {
     fn fmt_fields(&self, item: &StmtIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
-        source_text_slice(item.range(), ContainsNewlines::No).fmt(f)
+        source_text_slice(item.range()).fmt(f)
     }
 
     fn is_suppressed(

@@ -12,3 +12,10 @@ sum([[1, 2, 3], [4, 5, 6]],
 # OK
 sum([x, y])
 sum([[1, 2, 3], [4, 5, 6]])
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7059
+def func():
+    import functools, operator
+
+    sum([x, y], [])

@@ -1,11 +1,12 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, Ranged, Stmt};
+use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -137,16 +138,52 @@ const PIPES_TO_SHLEX: &[&str] = &["quote"];
 
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
+    "AbstractSet",
+    "AnyStr",
     "AsyncIterable",
     "AsyncIterator",
     "Awaitable",
+    "BinaryIO",
+    "Callable",
     "ClassVar",
+    "Collection",
+    "Container",
     "ContextManager",
     "Coroutine",
     "DefaultDict",
+    "Dict",
+    "FrozenSet",
+    "Generator",
+    "Generic",
+    "Hashable",
+    "IO",
+    "ItemsView",
+    "Iterable",
+    "Iterator",
+    "KeysView",
+    "List",
+    "Mapping",
+    "MappingView",
+    "Match",
+    "MutableMapping",
+    "MutableSequence",
+    "MutableSet",
+    "Optional",
+    "Pattern",
+    "Reversible",
+    "Sequence",
+    "Set",
+    "Sized",
     "TYPE_CHECKING",
     "Text",
+    "TextIO",
+    "Tuple",
     "Type",
+    "Union",
+    "ValuesView",
+    "cast",
+    "no_type_check",
+    "no_type_check_decorator",
     // Introduced in Python 3.5.2, but `typing_extensions` contains backported bugfixes and
     // optimizations,
     // "NewType",
@@ -164,6 +201,7 @@ const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
     "ChainMap",
     "Counter",
     "Deque",
+    "ForwardRef",
     "NoReturn",
 ];
 
@@ -286,6 +324,18 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
 
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
+    "NamedTuple",
+    // Introduced in Python 3.8, but `typing_extensions` backports a ton of optimizations that were
+    // added in Python 3.12.
+    "Protocol",
+    "SupportsAbs",
+    "SupportsBytes",
+    "SupportsComplex",
+    "SupportsFloat",
+    "SupportsInt",
+    "SupportsRound",
+    "TypedDict",
+    "Unpack",
     // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument,
     // which was introduced in Python 3.12.
     "dataclass_transform",

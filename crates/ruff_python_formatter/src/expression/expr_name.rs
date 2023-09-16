@@ -21,7 +21,7 @@ impl FormatNodeRule<ExprName> for FormatExprName {
                 .text(f.context().source_code())
         );
 
-        write!(f, [source_text_slice(*range, ContainsNewlines::No)])
+        write!(f, [source_text_slice(*range)])
     }
 
     fn fmt_dangling_comments(
@@ -50,9 +50,8 @@ impl NeedsParentheses for ExprName {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::Ranged;
     use ruff_python_parser::parse_program;
-    use ruff_text_size::{TextRange, TextSize};
+    use ruff_text_size::{Ranged, TextRange, TextSize};
 
     #[test]
     fn name_range_with_comments() {

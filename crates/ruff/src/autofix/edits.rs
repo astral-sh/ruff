@@ -3,15 +3,14 @@
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, Keyword, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-
 use ruff_python_trivia::{
     has_leading_content, is_python_whitespace, PythonWhitespace, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
-use ruff_text_size::{TextLen, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::autofix::codemods;
 
@@ -93,10 +92,8 @@ pub(crate) fn remove_argument<T: Ranged>(
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
-        .args
-        .iter()
-        .map(Expr::range)
-        .chain(arguments.keywords.iter().map(Keyword::range))
+        .arguments_source_order()
+        .map(|arg| arg.range())
         .filter(|range| argument.range() != *range)
         .partition(|range| range.start() < argument.start());
 
@@ -250,14 +247,51 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
     locator.line_end(start_location)
 }
 
+/// Add leading whitespace to a snippet, if it's immediately preceded an identifier or keyword.
+pub(crate) fn pad_start(mut content: String, start: TextSize, locator: &Locator) -> String {
+    // Ex) When converting `except(ValueError,)` from a tuple to a single argument, we need to
+    // insert a space before the fix, to achieve `except ValueError`.
+    if locator
+        .up_to(start)
+        .chars()
+        .last()
+        .is_some_and(|char| char.is_ascii_alphabetic())
+    {
+        content.insert(0, ' ');
+    }
+    content
+}
+
+/// Add trailing whitespace to a snippet, if it's immediately followed by an identifier or keyword.
+pub(crate) fn pad_end(mut content: String, end: TextSize, locator: &Locator) -> String {
+    if locator
+        .after(end)
+        .chars()
+        .next()
+        .is_some_and(|char| char.is_ascii_alphabetic())
+    {
+        content.push(' ');
+    }
+    content
+}
+
+/// Add leading or trailing whitespace to a snippet, if it's immediately preceded or followed by
+/// an identifier or keyword.
+pub(crate) fn pad(content: String, range: TextRange, locator: &Locator) -> String {
+    pad_start(
+        pad_end(content, range.end(), locator),
+        range.start(),
+        locator,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
 
-    use ruff_python_ast::Ranged;
     use ruff_python_parser::parse_suite;
     use ruff_source_file::Locator;
-    use ruff_text_size::TextSize;
+    use ruff_text_size::{Ranged, TextSize};
 
     use crate::autofix::edits::{next_stmt_break, trailing_semicolon};
 

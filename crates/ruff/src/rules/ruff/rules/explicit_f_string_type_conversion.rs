@@ -5,9 +5,10 @@ use libcst_native::{
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call_mut, match_name, transform_expression};
@@ -138,7 +139,7 @@ fn convert_call_to_conversion_flag(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let source_code = locator.slice(expr.range());
+    let source_code = locator.slice(expr);
     transform_expression(source_code, stylist, |mut expression| {
         // Replace the formatted call expression at `index` with a conversion flag.
         let formatted_string_expression = match_part(index, &mut expression)?;

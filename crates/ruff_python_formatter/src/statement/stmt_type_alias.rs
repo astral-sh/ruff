@@ -18,7 +18,7 @@ impl FormatNodeRule<StmtTypeAlias> for FormatStmtTypeAlias {
             range: _,
         } = item;
 
-        write!(f, [text("type"), space(), name.as_ref().format()])?;
+        write!(f, [token("type"), space(), name.as_ref().format()])?;
 
         if let Some(type_params) = type_params {
             write!(f, [type_params.format()])?;
@@ -28,7 +28,7 @@ impl FormatNodeRule<StmtTypeAlias> for FormatStmtTypeAlias {
             f,
             [
                 space(),
-                text("="),
+                token("="),
                 space(),
                 maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
             ]

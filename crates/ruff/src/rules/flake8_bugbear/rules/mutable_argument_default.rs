@@ -2,12 +2,13 @@ use ast::call_path::{from_qualified_name, CallPath};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Ranged};
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -69,6 +70,7 @@ impl Violation for MutableArgumentDefault {
     fn message(&self) -> String {
         format!("Do not use mutable data structures for argument defaults")
     }
+
     fn autofix_title(&self) -> Option<String> {
         Some(format!("Replace with `None`; initialize within function"))
     }

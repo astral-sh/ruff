@@ -29,7 +29,7 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
                     write!(f, [space()])?;
                 }
 
-                write!(f, [text("as")])?;
+                write!(f, [token("as")])?;
 
                 let trailing_as_comments = comments.dangling(item);
                 if trailing_as_comments.is_empty() {
@@ -45,7 +45,7 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
             name.format().fmt(f)
         } else {
             debug_assert!(pattern.is_none());
-            text("_").fmt(f)
+            token("_").fmt(f)
         }
     }
 

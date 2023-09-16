@@ -86,7 +86,6 @@ Ok(
                                         value: Int(
                                             20,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ),
@@ -108,7 +107,6 @@ Ok(
                                         value: Int(
                                             30,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ),

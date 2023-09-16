@@ -2,11 +2,11 @@ use unicode_width::UnicodeWidthStr;
 
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{CmpOp, Expr, Ranged};
+use ruff_python_ast::{CmpOp, Expr};
 use ruff_source_file::{Line, Locator};
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
-use crate::line_width::{LineLength, LineWidth, TabSize};
+use crate::line_width::{LineLength, LineWidthBuilder, TabSize};
 
 pub(super) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -66,11 +66,11 @@ pub(super) fn is_overlong(
     // worst-case scenario is that the line is all tabs). If the maximum width is less than the
     // limit, then the line is not overlong.
     let max_width = line.len() * tab_size.as_usize();
-    if max_width < limit.get() {
+    if max_width < limit.value() as usize {
         return None;
     }
 
-    let mut width = LineWidth::new(tab_size);
+    let mut width = LineWidthBuilder::new(tab_size);
     width = width.add_str(line.as_str());
     if width <= limit {
         return None;
@@ -95,14 +95,14 @@ pub(super) fn is_overlong(
     // begins before the limit.
     let last_chunk = chunks.last().unwrap_or(second_chunk);
     if last_chunk.contains("://") {
-        if width.get() - last_chunk.width() <= limit.get() {
+        if width.get() - last_chunk.width() <= limit.value() as usize {
             return None;
         }
     }
 
     // Obtain the start offset of the part of the line that exceeds the limit
     let mut start_offset = line.start();
-    let mut start_width = LineWidth::new(tab_size);
+    let mut start_width = LineWidthBuilder::new(tab_size);
     for c in line.chars() {
         if start_width < limit {
             start_offset += c.text_len();

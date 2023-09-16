@@ -5,9 +5,9 @@ use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::call_path::format_call_path;
-use ruff_python_ast::Ranged;
+use ruff_python_ast::Stmt;
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
@@ -182,17 +182,21 @@ impl<'a> Binding<'a> {
         locator.slice(self.range)
     }
 
+    /// Returns the statement in which the binding was defined.
+    pub fn statement<'b>(&self, semantic: &'b SemanticModel) -> Option<&'b Stmt> {
+        self.source
+            .map(|statement_id| semantic.statement(statement_id))
+    }
+
     /// Returns the range of the binding's parent.
     pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
-        self.source
-            .map(|id| semantic.statement(id))
-            .and_then(|parent| {
-                if parent.is_import_from_stmt() {
-                    Some(parent.range())
-                } else {
-                    None
-                }
-            })
+        self.statement(semantic).and_then(|parent| {
+            if parent.is_import_from_stmt() {
+                Some(parent.range())
+            } else {
+                None
+            }
+        })
     }
 
     pub fn as_any_import(&'a self) -> Option<AnyImport<'a>> {

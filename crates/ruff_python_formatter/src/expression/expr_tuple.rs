@@ -1,9 +1,8 @@
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprTuple;
-use ruff_python_ast::Ranged;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::SourceComment;
@@ -31,6 +30,20 @@ pub enum TupleParentheses {
     /// x[(a, b):]
     /// ```
     Preserve,
+
+    /// The same as [`Self::Default`] except that it uses [`optional_parentheses`] rather than
+    /// [`parenthesize_if_expands`]. This avoids adding parentheses if breaking any containing parenthesized
+    /// expression makes the tuple fit.
+    ///
+    /// Avoids adding parentheses around the tuple because breaking the `sum` call expression is sufficient
+    /// to make it fit.
+    ///
+    /// ```python
+    /// return len(self.nodeseeeeeeeee), sum(
+    //     len(node.parents) for node in self.node_map.values()
+    // )
+    /// ```
+    OptionalParentheses,
 
     /// Handle the special cases where we don't include parentheses at all.
     ///
@@ -127,12 +140,12 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 TupleParentheses::Preserve
                     if !is_tuple_parenthesized(item, f.context().source()) =>
                 {
-                    write!(f, [single.format(), text(",")])
+                    write!(f, [single.format(), token(",")])
                 }
                 _ =>
                 // A single element tuple always needs parentheses and a trailing comma, except when inside of a subscript
                 {
-                    parenthesized("(", &format_args![single.format(), text(",")], ")")
+                    parenthesized("(", &format_args![single.format(), token(",")], ")")
                         .with_dangling_comments(dangling)
                         .fmt(f)
                 }
@@ -153,13 +166,13 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             _ => match self.parentheses {
                 TupleParentheses::Never => {
                     let separator =
-                        format_with(|f| group(&format_args![text(","), space()]).fmt(f));
+                        format_with(|f| group(&format_args![token(","), space()]).fmt(f));
                     f.join_with(separator)
                         .entries(elts.iter().formatted())
                         .finish()
                 }
                 TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
-                TupleParentheses::NeverPreserve => {
+                TupleParentheses::NeverPreserve | TupleParentheses::OptionalParentheses => {
                     optional_parentheses(&ExprSequence::new(item)).fmt(f)
                 }
                 TupleParentheses::Default => {

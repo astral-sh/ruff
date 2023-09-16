@@ -1,7 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Operator, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Operator};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};

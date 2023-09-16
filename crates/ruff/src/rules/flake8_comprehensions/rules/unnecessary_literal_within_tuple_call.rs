@@ -1,7 +1,8 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
+use ruff_python_ast::{Expr, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -97,9 +98,9 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_literal_within_tuple_call(
+                expr,
                 checker.locator(),
                 checker.stylist(),
-                expr,
             )
             .map(Fix::suggested)
         });

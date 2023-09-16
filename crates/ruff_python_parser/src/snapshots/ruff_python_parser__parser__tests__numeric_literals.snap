@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     Assign(
@@ -21,7 +21,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Int(
                         123456789,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -44,7 +43,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Int(
                         123456,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -67,7 +65,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Float(
                         0.1,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -90,7 +87,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Float(
                         1.0,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -113,7 +109,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Float(
                         10.0,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -136,7 +131,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Float(
                         0.1,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -159,7 +153,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Float(
                         1.00000001,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -182,7 +175,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Float(
                         123456789.12345679,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -205,7 +197,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Float(
                         inf,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -228,7 +219,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Float(
                         inf,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -252,7 +242,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                         real: 0.0,
                         imag: 123456789.0,
                     },
-                    kind: None,
                 },
             ),
         },
@@ -276,7 +265,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                         real: 0.0,
                         imag: 123456789.12345679,
                     },
-                    kind: None,
                 },
             ),
         },
@@ -299,7 +287,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Int(
                         727756,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -322,7 +309,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Int(
                         11,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -345,7 +331,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Int(
                         511,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -368,7 +353,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Float(
                         6e-9,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -391,7 +375,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Int(
                         10000,
                     ),
-                    kind: None,
                 },
             ),
         },
@@ -414,7 +397,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     value: Int(
                         133333,
                     ),
-                    kind: None,
                 },
             ),
         },

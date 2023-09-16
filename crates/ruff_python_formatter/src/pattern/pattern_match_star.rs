@@ -16,11 +16,11 @@ impl FormatNodeRule<PatternMatchStar> for FormatPatternMatchStar {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        write!(f, [text("*"), dangling_comments(dangling)])?;
+        write!(f, [token("*"), dangling_comments(dangling)])?;
 
         match name {
             Some(name) => write!(f, [name.format()]),
-            None => write!(f, [text("_")]),
+            None => write!(f, [token("_")]),
         }
     }
 

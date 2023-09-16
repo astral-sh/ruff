@@ -30,7 +30,6 @@ expression: parse_ast
                                                     value: Int(
                                                         1,
                                                     ),
-                                                    kind: None,
                                                 },
                                             ),
                                         ],
@@ -89,10 +88,10 @@ expression: parse_ast
                                                                         value: Str(
                                                                             StringConstant {
                                                                                 value: "caught ",
+                                                                                unicode: false,
                                                                                 implicit_concatenated: false,
                                                                             },
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                                 FormattedValue(
@@ -187,10 +186,10 @@ expression: parse_ast
                                                                         value: Str(
                                                                             StringConstant {
                                                                                 value: "caught ",
+                                                                                unicode: false,
                                                                                 implicit_concatenated: false,
                                                                             },
                                                                         ),
-                                                                        kind: None,
                                                                     },
                                                                 ),
                                                                 FormattedValue(

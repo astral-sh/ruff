@@ -1,9 +1,9 @@
 use std::fmt::{Debug, Formatter, Write};
 
 use itertools::Itertools;
-use ruff_python_ast::Ranged;
 
 use ruff_formatter::SourceCode;
+use ruff_text_size::Ranged;
 
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::{CommentsMap, SourceComment};
@@ -178,11 +178,11 @@ impl Debug for DebugNodeCommentSlice<'_> {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use ruff_python_ast::{StmtBreak, StmtContinue};
-    use ruff_text_size::{TextRange, TextSize};
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::node::AnyNode;
+    use ruff_python_ast::{StmtBreak, StmtContinue};
+    use ruff_text_size::{TextRange, TextSize};
 
     use crate::comments::map::MultiMap;
     use crate::comments::{CommentLinePosition, Comments, CommentsMap, SourceComment};

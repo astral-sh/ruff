@@ -12,7 +12,6 @@ expression: parse_ast
                     value: Int(
                         1,
                     ),
-                    kind: None,
                 },
             ),
             body: [
@@ -25,7 +24,6 @@ expression: parse_ast
                                 value: Int(
                                     10,
                                 ),
-                                kind: None,
                             },
                         ),
                     },
@@ -41,7 +39,6 @@ expression: parse_ast
                                 value: Int(
                                     2,
                                 ),
-                                kind: None,
                             },
                         ),
                     ),
@@ -55,7 +52,6 @@ expression: parse_ast
                                         value: Int(
                                             20,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -75,7 +71,6 @@ expression: parse_ast
                                         value: Int(
                                             30,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },

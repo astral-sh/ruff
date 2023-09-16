@@ -473,6 +473,40 @@ match pattern_match_class:
         # e
     ):
         pass
+
+
+match pattern_match_or:
+    case ( # leading 1
+          a # trailing 1
+          # own line 1
+          | # trailing 2
+          # own line 2
+          b # trailing 3
+          # own line 3
+          | # trailing 4
+          # own line 4
+          c # trailing 5
+            ):
+        ...
+
+    case (
+        (a)
+        | # trailing
+        ( b )
+    ):
+        ...
+
+    case (a|b|c):
+        ...
+
+    case foo | bar | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:
+        ...
+
+    case ( # end of line
+          a | b
+    # own line
+    ):
+        ...
 ```
 
 ## Output
@@ -951,21 +985,59 @@ match pattern_match_class:
         ...
 
     case A(
-        b=# b
+        # b
         # c
-        2  # d
+        b=2  # d
         # e
     ):
         pass
 
     case A(
         # a
-        b=# b
+        # b
         # c
-        2  # d
+        b=2  # d
         # e
     ):
         pass
+
+
+match pattern_match_or:
+    case (  # leading 1
+        a  # trailing 1  # trailing 2
+        # own line 1
+        # own line 2
+        | b  # trailing 3  # trailing 4
+        # own line 3
+        # own line 4
+        | c  # trailing 5
+    ):
+        ...
+
+    case (
+        (
+            a  # trailing
+        )
+        | (b)
+    ):
+        ...
+
+    case a | b | c:
+        ...
+
+    case (
+        foo
+        | bar
+        | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+    ):
+        ...
+
+    case (  # end of line
+        a
+        | b
+        # own line
+    ):
+        ...
 ```
 
 

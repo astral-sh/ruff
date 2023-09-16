@@ -131,4 +131,20 @@ RUF017.py:9:1: RUF017 [*] Avoid quadratic list summation
 12 13 | # OK
 13 14 | sum([x, y])
 
+RUF017.py:21:5: RUF017 [*] Avoid quadratic list summation
+   |
+19 |     import functools, operator
+20 | 
+21 |     sum([x, y], [])
+   |     ^^^^^^^^^^^^^^^ RUF017
+   |
+   = help: Replace with `functools.reduce`
+
+ℹ Suggested fix
+18 18 | def func():
+19 19 |     import functools, operator
+20 20 | 
+21    |-    sum([x, y], [])
+   21 |+    functools.reduce(operator.iadd, [x, y], [])
+
 

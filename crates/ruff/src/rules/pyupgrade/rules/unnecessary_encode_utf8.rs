@@ -1,9 +1,9 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, PySourceType, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, PySourceType};
 use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
@@ -42,13 +42,16 @@ pub struct UnnecessaryEncodeUTF8 {
 impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary call to `encode` as UTF-8")
+        match self.reason {
+            Reason::BytesLiteral => format!("Unnecessary call to `encode` as UTF-8"),
+            Reason::DefaultArgument => format!("Unnecessary UTF-8 `encoding` argument to `encode`"),
+        }
     }
 
     fn autofix_title(&self) -> String {
         match self.reason {
             Reason::BytesLiteral => "Rewrite as bytes literal".to_string(),
-            Reason::DefaultArgument => "Remove unnecessary encoding argument".to_string(),
+            Reason::DefaultArgument => "Remove unnecessary `encoding` argument".to_string(),
         }
     }
 }
@@ -119,17 +122,17 @@ fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
 }
 
 /// Return a [`Fix`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal<T: Ranged>(
+fn replace_with_bytes_literal(
     locator: &Locator,
-    expr: &T,
+    call: &ast::ExprCall,
     source_type: PySourceType,
 ) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
-    let contents = locator.slice(expr.range());
+    let contents = locator.slice(call);
     let mut replacement = String::with_capacity(contents.len() + 1);
-    let mut prev = expr.start();
+    let mut prev = call.start();
     for (tok, range) in
-        lexer::lex_starts_at(contents, source_type.as_mode(), expr.start()).flatten()
+        lexer::lex_starts_at(contents, source_type.as_mode(), call.start()).flatten()
     {
         match tok {
             Tok::Dot => break,
@@ -148,7 +151,7 @@ fn replace_with_bytes_literal<T: Ranged>(
         prev = range.end();
     }
 
-    Fix::automatic(Edit::range_replacement(replacement, expr.range()))
+    Fix::automatic(Edit::range_replacement(replacement, call.range()))
 }
 
 /// UP012

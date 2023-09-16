@@ -1,15 +1,13 @@
 use std::fmt;
 
 use anyhow::Result;
-use ruff_python_ast::{
-    self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged,
-};
-use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::{self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters};
 use ruff_python_parser::typing::parse_type_annotation;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -131,7 +129,6 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 op: Operator::BitOr,
                 right: Box::new(Expr::Constant(ast::ExprConstant {
                     value: Constant::None,
-                    kind: None,
                     range: TextRange::default(),
                 })),
                 range: TextRange::default(),
@@ -190,7 +187,6 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
         if let Expr::Constant(ast::ExprConstant {
             range,
             value: Constant::Str(string),
-            ..
         }) = annotation.as_ref()
         {
             // Quoted annotation.

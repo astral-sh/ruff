@@ -1,6 +1,7 @@
 use ruff_formatter::write;
 use ruff_python_ast::node::AstNode;
-use ruff_python_ast::{Ranged, StmtImportFrom};
+use ruff_python_ast::StmtImportFrom;
+use ruff_text_size::Ranged;
 
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
 use crate::comments::{SourceComment, SuppressionKind};
@@ -26,12 +27,12 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         write!(
             f,
             [
-                text("from"),
+                token("from"),
                 space(),
-                dynamic_text(&level_str, None),
+                text(&level_str, None),
                 module.as_ref().map(AsFormat::format),
                 space(),
-                text("import"),
+                token("import"),
                 space(),
             ]
         )?;
@@ -39,7 +40,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         if let [name] = names.as_slice() {
             // star can't be surrounded by parentheses
             if name.name.as_str() == "*" {
-                return text("*").fmt(f);
+                return token("*").fmt(f);
             }
         }
 

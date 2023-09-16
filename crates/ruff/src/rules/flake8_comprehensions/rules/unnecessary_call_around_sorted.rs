@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -84,9 +85,9 @@ pub(crate) fn unnecessary_call_around_sorted(
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             let edit = fixes::fix_unnecessary_call_around_sorted(
+                expr,
                 checker.locator(),
                 checker.stylist(),
-                expr,
             )?;
             if outer.id == "reversed" {
                 Ok(Fix::suggested(edit))

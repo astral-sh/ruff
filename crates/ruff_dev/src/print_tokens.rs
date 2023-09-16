@@ -20,7 +20,7 @@ pub(crate) struct Args {
 pub(crate) fn main(args: &Args) -> Result<()> {
     let contents = fs::read_to_string(&args.file)?;
     let mode = if args.jupyter {
-        Mode::Jupyter
+        Mode::Ipython
     } else {
         Mode::Module
     };

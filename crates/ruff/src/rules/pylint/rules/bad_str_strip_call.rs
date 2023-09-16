@@ -1,24 +1,25 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks duplicate characters in `str#strip` calls.
+/// Checks duplicate characters in `str.strip` calls.
 ///
 /// ## Why is this bad?
-/// All characters in `str#strip` calls are removed from both the leading and
+/// All characters in `str.strip` calls are removed from both the leading and
 /// trailing ends of the string. Including duplicate characters in the call
 /// is redundant and often indicative of a mistake.
 ///
-/// In Python 3.9 and later, you can use `str#removeprefix` and
-/// `str#removesuffix` to remove an exact prefix or suffix from a string,
+/// In Python 3.9 and later, you can use `str.removeprefix` and
+/// `str.removesuffix` to remove an exact prefix or suffix from a string,
 /// respectively, which should be preferred when possible.
 ///
 /// ## Example
