@@ -7,8 +7,7 @@ invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, u
 14 | #foo = 'hi'
 15 | b = ''
    |       PLE2510
-16 | 
-17 | b_ok = '\\b'
+16 | b = f''
    |
    = help: Replace with escape sequence
 
@@ -18,8 +17,45 @@ invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, u
 14 14 | #foo = 'hi'
 15    |-b = ''
    15 |+b = '\b'
-16 16 | 
-17 17 | b_ok = '\\b'
-18 18 | 
+16 16 | b = f''
+17 17 | 
+18 18 | b_ok = '\\b'
+
+invalid_characters.py:16:7: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+   |
+14 | #foo = 'hi'
+15 | b = ''
+16 | b = f''
+   |        PLE2510
+17 | 
+18 | b_ok = '\\b'
+   |
+   = help: Replace with escape sequence
+
+ℹ Fix
+13 13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
+14 14 | #foo = 'hi'
+15 15 | b = ''
+16    |-b = f''
+   16 |+b = f'\b'
+17 17 | 
+18 18 | b_ok = '\\b'
+19 19 | b_ok = f'\\b'
+
+invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+   |
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+54 | 
+55 | nested_fstrings = f'{f'{f''}'}'
+   |                      PLE2510
+   |
+   = help: Replace with escape sequence
+
+ℹ Fix
+52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+54 54 | 
+55    |-nested_fstrings = f'{f'{f''}'}'
+   55 |+nested_fstrings = f'\b{f'{f''}'}'
 
 
