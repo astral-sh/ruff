@@ -305,15 +305,15 @@ pub(crate) struct Comments<'a> {
     /// }
     /// ```
     data: Rc<CommentsData<'a>>,
-    /// We need those for backwards lexing
-    comment_ranges: &'a CommentRanges,
 }
 
 impl<'a> Comments<'a> {
     fn new(comments: CommentsMap<'a>, comment_ranges: &'a CommentRanges) -> Self {
         Self {
-            data: Rc::new(CommentsData { comments }),
-            comment_ranges,
+            data: Rc::new(CommentsData {
+                comments,
+                comment_ranges,
+            }),
         }
     }
 
@@ -321,13 +321,15 @@ impl<'a> Comments<'a> {
     #[cfg(test)]
     pub(crate) fn from_ranges(comment_ranges: &'a CommentRanges) -> Self {
         Self {
-            data: Rc::new(CommentsData::default()),
-            comment_ranges,
+            data: Rc::new(CommentsData {
+                comments: CommentsMap::default(),
+                comment_ranges,
+            }),
         }
     }
 
     pub(crate) fn ranges(&self) -> &'a CommentRanges {
-        self.comment_ranges
+        self.data.comment_ranges
     }
 
     /// Extracts the comments from the AST.
@@ -521,9 +523,12 @@ impl LeadingDanglingTrailingComments<'_> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
+
+    /// We need those for backwards lexing
+    comment_ranges: &'a CommentRanges,
 }
 
 struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);

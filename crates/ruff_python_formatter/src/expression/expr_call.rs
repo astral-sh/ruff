@@ -38,7 +38,11 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
 
         let fmt_func = format_with(|f: &mut PyFormatter| {
             // Format the function expression.
-            if is_expression_parenthesized(func.into(), f.context().source()) {
+            if is_expression_parenthesized(
+                func.into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            ) {
                 func.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match func.as_ref() {
