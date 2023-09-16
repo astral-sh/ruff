@@ -46,7 +46,11 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         //  a)
         // ```
         if comments.has_leading(operand.as_ref())
-            && !is_expression_parenthesized(operand.as_ref().into(), f.context().source())
+            && !is_expression_parenthesized(
+                operand.as_ref().into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            )
         {
             hard_line_break().fmt(f)?;
         } else if op.is_not() {
@@ -72,7 +76,11 @@ impl NeedsParentheses for ExprUnaryOp {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         // We preserve the parentheses of the operand. It should not be necessary to break this expression.
-        if is_expression_parenthesized(self.operand.as_ref().into(), context.source()) {
+        if is_expression_parenthesized(
+            self.operand.as_ref().into(),
+            context.comments().ranges(),
+            context.source(),
+        ) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::Multiline
