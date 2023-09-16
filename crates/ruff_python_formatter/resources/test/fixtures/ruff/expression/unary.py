@@ -151,3 +151,13 @@ if (
   not  # comment
   a):
     ...
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7423
+if True:
+    if True:
+        if True:
+            if not yn_question(
+                Fore.RED
+                + "WARNING: Removing listed files. Do you really want to continue. yes/n)? "
+            ):
+                pass

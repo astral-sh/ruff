@@ -82,8 +82,10 @@ impl NeedsParentheses for ExprUnaryOp {
             context.source(),
         ) {
             OptionalParentheses::Never
+        } else if context.comments().has(self.operand.as_ref()) {
+            OptionalParentheses::Always
         } else {
-            OptionalParentheses::Multiline
+            self.operand.needs_parentheses(self.into(), context)
         }
     }
 }
