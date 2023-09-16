@@ -1,5 +1,5 @@
 mod comment_ranges;
 mod indexer;
 
-pub use comment_ranges::{CommentRanges, CommentRangesBuilder};
+pub use comment_ranges::CommentRangesBuilder;
 pub use indexer::Indexer;

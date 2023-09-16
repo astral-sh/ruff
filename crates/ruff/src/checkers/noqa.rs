@@ -6,6 +6,7 @@ use itertools::Itertools;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::noqa;
@@ -19,7 +20,7 @@ pub(crate) fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     path: &Path,
     locator: &Locator,
-    comment_ranges: &[TextRange],
+    comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
     settings: &Settings,

@@ -8,6 +8,7 @@ use ruff_python_ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprConstant, ExprUnaryOp,
     UnaryOp,
 };
+use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -179,7 +180,13 @@ impl<'a> BinaryLike<'a> {
         ) {
             let expression = operand.expression();
             match expression {
-                Expr::BinOp(binary) if !is_expression_parenthesized(expression.into(), source) => {
+                Expr::BinOp(binary)
+                    if !is_expression_parenthesized(
+                        expression.into(),
+                        comments.ranges(),
+                        source,
+                    ) =>
+                {
                     let leading_comments = operand
                         .leading_binary_comments()
                         .unwrap_or_else(|| comments.leading(binary));
@@ -198,7 +205,11 @@ impl<'a> BinaryLike<'a> {
                     );
                 }
                 Expr::Compare(compare)
-                    if !is_expression_parenthesized(expression.into(), source) =>
+                    if !is_expression_parenthesized(
+                        expression.into(),
+                        comments.ranges(),
+                        source,
+                    ) =>
                 {
                     let leading_comments = operand
                         .leading_binary_comments()
@@ -218,7 +229,11 @@ impl<'a> BinaryLike<'a> {
                     );
                 }
                 Expr::BoolOp(bool_op)
-                    if !is_expression_parenthesized(expression.into(), source) =>
+                    if !is_expression_parenthesized(
+                        expression.into(),
+                        comments.ranges(),
+                        source,
+                    ) =>
                 {
                     let leading_comments = operand
                         .leading_binary_comments()
@@ -282,7 +297,11 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                 AnyString::from_expression(operand.expression())
                     .filter(|string| {
                         string.is_implicit_concatenated()
-                            && !is_expression_parenthesized(string.into(), source)
+                            && !is_expression_parenthesized(
+                                string.into(),
+                                comments.ranges(),
+                                source,
+                            )
                     })
                     .map(|string| (index, string, operand))
             })
@@ -430,6 +449,7 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                         if (right_operand_has_leading_comments
                             && !is_expression_parenthesized(
                                 right_operand.expression().into(),
+                                f.context().comments().ranges(),
                                 f.context().source(),
                             ))
                             || right_operator.has_trailing_comments()
@@ -466,11 +486,16 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
     }
 }
 
-fn is_simple_power_expression(left: &Expr, right: &Expr, source: &str) -> bool {
+fn is_simple_power_expression(
+    left: &Expr,
+    right: &Expr,
+    comment_range: &CommentRanges,
+    source: &str,
+) -> bool {
     is_simple_power_operand(left)
         && is_simple_power_operand(right)
-        && !is_expression_parenthesized(left.into(), source)
-        && !is_expression_parenthesized(right.into(), source)
+        && !is_expression_parenthesized(left.into(), comment_range, source)
+        && !is_expression_parenthesized(right.into(), comment_range, source)
 }
 
 /// Return `true` if an [`Expr`] adheres to [Black's definition](https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators)
@@ -664,6 +689,7 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                     && is_simple_power_expression(
                         left.last_operand().expression(),
                         right.first_operand().expression(),
+                        f.context().comments().ranges(),
                         f.context().source(),
                     );
 
@@ -806,7 +832,7 @@ impl<'a> Operand<'a> {
             } => !leading_comments.is_empty(),
             Operand::Middle { expression } | Operand::Right { expression, .. } => {
                 let leading = comments.leading(*expression);
-                if is_expression_parenthesized((*expression).into(), source) {
+                if is_expression_parenthesized((*expression).into(), comments.ranges(), source) {
                     leading.iter().any(|comment| {
                         !comment.is_formatted()
                             && matches!(
@@ -853,7 +879,11 @@ impl Format<PyFormatContext<'_>> for Operand<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let expression = self.expression();
 
-        return if is_expression_parenthesized(expression.into(), f.context().source()) {
+        return if is_expression_parenthesized(
+            expression.into(),
+            f.context().comments().ranges(),
+            f.context().source(),
+        ) {
             let comments = f.context().comments().clone();
             let expression_comments = comments.leading_dangling_trailing(expression);
 

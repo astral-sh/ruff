@@ -9,6 +9,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
+use ruff_python_trivia::CommentRanges;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::leading_comments;
@@ -103,9 +104,11 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         });
 
         let parenthesize = match parentheses {
-            Parentheses::Preserve => {
-                is_expression_parenthesized(expression.into(), f.context().source())
-            }
+            Parentheses::Preserve => is_expression_parenthesized(
+                expression.into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            ),
             Parentheses::Always => true,
             // Fluent style means we already have parentheses
             Parentheses::Never => false,
@@ -186,7 +189,11 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
 
         let comments = f.context().comments();
         let preserve_parentheses = parenthesize.is_optional()
-            && is_expression_parenthesized((*expression).into(), f.context().source());
+            && is_expression_parenthesized(
+                (*expression).into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            );
 
         let has_comments =
             comments.has_leading(*expression) || comments.has_trailing_own_line(*expression);
@@ -581,7 +588,11 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
         self.last = Some(expr);
 
         // Rule only applies for non-parenthesized expressions.
-        if is_expression_parenthesized(expr.into(), self.context.source()) {
+        if is_expression_parenthesized(
+            expr.into(),
+            self.context.comments().ranges(),
+            self.context.source(),
+        ) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
@@ -635,7 +646,11 @@ pub enum CallChainLayout {
 }
 
 impl CallChainLayout {
-    pub(crate) fn from_expression(mut expr: ExpressionRef, source: &str) -> Self {
+    pub(crate) fn from_expression(
+        mut expr: ExpressionRef,
+        comment_ranges: &CommentRanges,
+        source: &str,
+    ) -> Self {
         let mut attributes_after_parentheses = 0;
         loop {
             match expr {
@@ -646,7 +661,7 @@ impl CallChainLayout {
                     // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
-                    if is_expression_parenthesized(value.into(), source) {
+                    if is_expression_parenthesized(value.into(), comment_ranges, source) {
                         // `(a).b`. We preserve these parentheses so don't recurse
                         attributes_after_parentheses += 1;
                         break;
@@ -674,7 +689,7 @@ impl CallChainLayout {
                     // f2 = (a).w().t(1,)
                     //       ^ expr
                     // ```
-                    if is_expression_parenthesized(expr, source) {
+                    if is_expression_parenthesized(expr, comment_ranges, source) {
                         attributes_after_parentheses += 1;
                     }
 
@@ -683,7 +698,7 @@ impl CallChainLayout {
             }
 
             // We preserve these parentheses so don't recurse
-            if is_expression_parenthesized(expr, source) {
+            if is_expression_parenthesized(expr, comment_ranges, source) {
                 break;
             }
         }
@@ -704,7 +719,11 @@ impl CallChainLayout {
         match self {
             CallChainLayout::Default => {
                 if f.context().node_level().is_parenthesized() {
-                    CallChainLayout::from_expression(item.into(), f.context().source())
+                    CallChainLayout::from_expression(
+                        item.into(),
+                        f.context().comments().ranges(),
+                        f.context().source(),
+                    )
                 } else {
                     CallChainLayout::NonFluent
                 }
@@ -745,7 +764,7 @@ fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<OwnParenthe
 
     // Otherwise, if the node lacks parentheses (e.g., `(1)`) or only contains empty parentheses
     // (e.g., `([])`), we need to check for surrounding parentheses.
-    if is_expression_parenthesized(expr.into(), context.source()) {
+    if is_expression_parenthesized(expr.into(), context.comments().ranges(), context.source()) {
         return Some(OwnParentheses::NonEmpty);
     }
 

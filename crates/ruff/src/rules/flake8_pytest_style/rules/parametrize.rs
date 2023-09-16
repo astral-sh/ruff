@@ -9,6 +9,7 @@ use ruff_python_ast::node::AstNode;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext};
 use ruff_python_codegen::Generator;
+use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -298,12 +299,17 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
 fn get_parametrize_name_range(
     decorator: &Decorator,
     expr: &Expr,
+    comment_ranges: &CommentRanges,
     source: &str,
 ) -> Option<TextRange> {
-    decorator
-        .expression
-        .as_call_expr()
-        .and_then(|call| parenthesized_range(expr.into(), call.arguments.as_any_node_ref(), source))
+    decorator.expression.as_call_expr().and_then(|call| {
+        parenthesized_range(
+            expr.into(),
+            call.arguments.as_any_node_ref(),
+            comment_ranges,
+            source,
+        )
+    })
 }
 
 /// PT006
@@ -322,6 +328,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         let name_range = get_parametrize_name_range(
                             decorator,
                             expr,
+                            checker.indexer().comment_ranges(),
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());
@@ -356,6 +363,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         let name_range = get_parametrize_name_range(
                             decorator,
                             expr,
+                            checker.indexer().comment_ranges(),
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());

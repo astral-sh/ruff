@@ -4,7 +4,7 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Binding;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -91,20 +91,27 @@ pub(crate) fn remove_exception_handler_assignment(
     bound_exception: &Binding,
     locator: &Locator,
 ) -> Result<Edit> {
-    // Lex backwards, to the token just before the `as`.
+    // Find the position just after the exception name. This is a late pass so we only have the
+    // binding and can't look its parent in the AST up anymore.
+    // ```
+    // except ZeroDivisionError as err:
+    //                             ^^^ This is the bound_exception range
+    //                         ^^^^ lex this range
+    //                         ^ preceding_end (we want to remove from here)
+    // ```
+    // There can't be any comments in that range.
     let mut tokenizer =
-        SimpleTokenizer::up_to_without_back_comment(bound_exception.start(), locator.contents())
-            .skip_trivia();
+        BackwardsTokenizer::up_to(bound_exception.start(), locator.contents(), &[]).skip_trivia();
 
     // Eat the `as` token.
     let preceding = tokenizer
-        .next_back()
+        .next()
         .context("expected the exception name to be preceded by `as`")?;
     debug_assert!(matches!(preceding.kind, SimpleTokenKind::As));
 
     // Lex to the end of the preceding token, which should be the exception value.
     let preceding = tokenizer
-        .next_back()
+        .next()
         .context("expected the exception name to be preceded by a token")?;
 
     // Lex forwards, to the `:` token.

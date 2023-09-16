@@ -2430,12 +2430,11 @@ name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
  "insta",
- "memchr",
+ "itertools",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_source_file",
  "ruff_text_size",
- "smallvec",
  "unicode-ident",
 ]
 
@@ -2492,6 +2491,7 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_index",
  "ruff_python_parser",
+ "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",

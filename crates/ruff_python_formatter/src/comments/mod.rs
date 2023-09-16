@@ -99,8 +99,7 @@ use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_ast::Mod;
-use ruff_python_index::CommentRanges;
-use ruff_python_trivia::PythonWhitespace;
+use ruff_python_trivia::{CommentRanges, PythonWhitespace};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -281,7 +280,7 @@ type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 /// The comments of a syntax tree stored by node.
 ///
 /// Cloning `comments` is cheap as it only involves bumping a reference counter.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct Comments<'a> {
     /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [crate::Formatter].
     /// Independent lifetimes are necessary to support the use case where a (formattable object)[crate::Format]
@@ -306,13 +305,29 @@ pub(crate) struct Comments<'a> {
     /// }
     /// ```
     data: Rc<CommentsData<'a>>,
+    /// We need those for backwards lexing
+    comment_ranges: &'a CommentRanges,
 }
 
 impl<'a> Comments<'a> {
-    fn new(comments: CommentsMap<'a>) -> Self {
+    fn new(comments: CommentsMap<'a>, comment_ranges: &'a CommentRanges) -> Self {
         Self {
             data: Rc::new(CommentsData { comments }),
+            comment_ranges,
         }
+    }
+
+    /// Effectively a [`Default`] implementation that works around the lifetimes for tests
+    #[cfg(test)]
+    pub(crate) fn from_ranges(comment_ranges: &'a CommentRanges) -> Self {
+        Self {
+            data: Rc::new(CommentsData::default()),
+            comment_ranges,
+        }
+    }
+
+    pub(crate) fn ranges(&self) -> &'a CommentRanges {
+        self.comment_ranges
     }
 
     /// Extracts the comments from the AST.
@@ -324,12 +339,13 @@ impl<'a> Comments<'a> {
         let map = if comment_ranges.is_empty() {
             CommentsMap::new()
         } else {
-            let mut builder = CommentsMapBuilder::new(Locator::new(source_code.as_str()));
+            let mut builder =
+                CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
             CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
             builder.finish()
         };
 
-        Self::new(map)
+        Self::new(map, comment_ranges)
     }
 
     /// Returns `true` if the given `node` has any comments.
@@ -528,9 +544,10 @@ mod tests {
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::Mod;
-    use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+    use ruff_python_index::CommentRangesBuilder;
     use ruff_python_parser::lexer::lex;
     use ruff_python_parser::{parse_tokens, Mode};
+    use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
 

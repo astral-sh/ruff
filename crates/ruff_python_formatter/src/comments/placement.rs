@@ -4,7 +4,8 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters};
 use ruff_python_trivia::{
-    find_only_token_in_range, indentation_at_offset, SimpleToken, SimpleTokenKind, SimpleTokenizer,
+    find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, CommentRanges,
+    SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange};
@@ -20,12 +21,13 @@ use crate::pattern::pattern_match_sequence::SequenceType;
 /// Manually attach comments to nodes that the default placement gets wrong.
 pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     handle_parenthesized_comment(comment, locator)
         .or_else(|comment| handle_end_of_line_comment_around_body(comment, locator))
         .or_else(|comment| handle_own_line_comment_around_body(comment, locator))
-        .or_else(|comment| handle_enclosed_comment(comment, locator))
+        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, locator))
 }
 
 /// Handle parenthesized comments. A parenthesized comment is a comment that appears within a
@@ -172,6 +174,7 @@ fn handle_parenthesized_comment<'a>(
 /// Handle a comment that is enclosed by a node.
 fn handle_enclosed_comment<'a>(
     comment: DecoratedComment<'a>,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     match comment.enclosing_node() {
@@ -213,13 +216,15 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
-        AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, expr_slice, locator),
+        AnyNodeRef::ExprSlice(expr_slice) => {
+            handle_slice_comments(comment, expr_slice, comment_ranges, locator)
+        }
         AnyNodeRef::ExprStarred(starred) => {
             handle_trailing_expression_starred_star_end_of_line_comment(comment, starred, locator)
         }
         AnyNodeRef::ExprSubscript(expr_subscript) => {
             if let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() {
-                handle_slice_comments(comment, expr_slice, locator)
+                handle_slice_comments(comment, expr_slice, comment_ranges, locator)
             } else {
                 CommentPlacement::Default(comment)
             }
@@ -958,6 +963,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
 fn handle_slice_comments<'a>(
     comment: DecoratedComment<'a>,
     expr_slice: &'a ast::ExprSlice,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     let ast::ExprSlice {
@@ -969,9 +975,9 @@ fn handle_slice_comments<'a>(
 
     // Check for `foo[ # comment`, but only if they are on the same line
     let after_lbracket = matches!(
-        SimpleTokenizer::up_to_without_back_comment(comment.start(), locator.contents())
+        BackwardsTokenizer::up_to(comment.start(), locator.contents(), comment_ranges)
             .skip_trivia()
-            .next_back(),
+            .next(),
         Some(SimpleToken {
             kind: SimpleTokenKind::LBracket,
             ..

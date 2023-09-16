@@ -82,13 +82,20 @@ impl NeedsParentheses for ExprCall {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if CallChainLayout::from_expression(self.into(), context.source())
-            == CallChainLayout::Fluent
+        if CallChainLayout::from_expression(
+            self.into(),
+            context.comments().ranges(),
+            context.source(),
+        ) == CallChainLayout::Fluent
         {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
-        } else if is_expression_parenthesized(self.func.as_ref().into(), context.source()) {
+        } else if is_expression_parenthesized(
+            self.func.as_ref().into(),
+            context.comments().ranges(),
+            context.source(),
+        ) {
             OptionalParentheses::Never
         } else {
             self.func.needs_parentheses(self.into(), context)
