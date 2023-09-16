@@ -50,6 +50,9 @@ pub(crate) fn tab_indentation(
         }
     }
 
+    // The lexer doesn't emit `Newline` / `NonLogicalNewline` for a line
+    // continuation character (`\`), so we need to manually check for tab
+    // indentation for lines that follow a line continuation character.
     for continuation_line in indexer.continuation_line_starts() {
         tab_indentation_at_line_start(
             diagnostics,
