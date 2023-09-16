@@ -39,7 +39,7 @@ use crate::registry::{AsRule, Rule};
 /// ## Options
 /// - `pydocstyle.convention`
 ///
-/// [D211]: https://beta.ruff.rs/docs/rules/blank-line-before-class
+/// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
 #[violation]
 pub struct OneBlankLineBeforeClass;
 
@@ -136,7 +136,7 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 /// ## Options
 /// - `pydocstyle.convention`
 ///
-/// [D203]: https://beta.ruff.rs/docs/rules/one-blank-line-before-class
+/// [D203]: https://docs.astral.sh/ruff/rules/one-blank-line-before-class
 #[violation]
 pub struct BlankLineBeforeClass;
 

@@ -146,3 +146,8 @@ if (
   # comment
   a):
     ...
+
+if (
+  not  # comment
+  a):
+    ...

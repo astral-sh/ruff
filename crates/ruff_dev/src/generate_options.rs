@@ -1,6 +1,6 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
 //!
-//! Used for <https://beta.ruff.rs/docs/settings/>.
+//! Used for <https://docs.astral.sh/ruff/settings/>.
 use itertools::Itertools;
 use ruff_workspace::options::Options;
 use ruff_workspace::options_base::{OptionEntry, OptionField};

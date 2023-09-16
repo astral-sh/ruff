@@ -211,6 +211,7 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::PatternKeyword(pattern_keyword) => {
             handle_pattern_keyword_comment(comment, pattern_keyword, locator)
         }
+        AnyNodeRef::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, locator),
         AnyNodeRef::ExprNamedExpr(_) => handle_named_expr_comment(comment, locator),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
@@ -1587,6 +1588,46 @@ fn handle_named_expr_comment<'a>(
         // Otherwise, treat it as dangling. We effectively treat it as a comment on the `:=` itself.
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     }
+}
+
+/// Attach trailing end-of-line comments on the operator as dangling comments on the enclosing
+/// node.
+///
+/// For example, given:
+/// ```python
+/// (
+///     not  # comment
+///     True
+/// )
+/// ```
+///
+/// The `# comment` will be attached as a dangling comment on the enclosing node, to ensure that
+/// it remains on the same line as the operator.
+fn handle_unary_op_comment<'a>(
+    comment: DecoratedComment<'a>,
+    unary_op: &'a ast::ExprUnaryOp,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    if comment.line_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    if comment.start() > unary_op.operand.start() {
+        return CommentPlacement::Default(comment);
+    }
+
+    let tokenizer = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(comment.start(), unary_op.operand.start()),
+    );
+    if tokenizer
+        .skip_trivia()
+        .any(|token| token.kind == SimpleTokenKind::LParen)
+    {
+        return CommentPlacement::Default(comment);
+    }
+
+    CommentPlacement::dangling(comment.enclosing_node(), comment)
 }
 
 /// Attach an end-of-line comment immediately following an open bracket as a dangling comment on
