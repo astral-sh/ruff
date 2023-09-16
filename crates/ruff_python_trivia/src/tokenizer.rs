@@ -743,12 +743,8 @@ impl Iterator for SimpleTokenizer<'_> {
 pub struct BackwardsTokenizer<'a> {
     offset: TextSize,
     back_offset: TextSize,
-    /// Remember if we have check for comments
-    after_newline: bool,
-    /// Not `&CommentRanges` to avoid a circular dependency
+    /// Not `&CommentRanges` to avoid a circular dependency.
     comment_ranges: &'a [TextRange],
-    /// The index the previously line ending comment
-    previous_comment_idx: Option<usize>,
     bogus: bool,
     source: &'a str,
     cursor: Cursor<'a>,
@@ -759,10 +755,9 @@ impl<'a> BackwardsTokenizer<'a> {
         Self {
             offset: range.start(),
             back_offset: range.end(),
-            // We could start tokenizing at a comment
-            after_newline: true,
-            comment_ranges: comment_range,
-            previous_comment_idx: None,
+            // Throw out any comments that follow the range.
+            comment_ranges: &comment_range
+                [..comment_range.partition_point(|comment| comment.start() <= range.end())],
             bogus: false,
             source,
             cursor: Cursor::new(&source[range]),
@@ -781,33 +776,6 @@ impl<'a> BackwardsTokenizer<'a> {
         self.cursor.start_token();
         self.back_offset = self.cursor.text_len() + self.offset;
 
-        if self.after_newline {
-            // This comment ended a line with a higher line number, not the current one
-            let previous_comment_idx = self.previous_comment_idx.unwrap_or_else(|| {
-                self.comment_ranges
-                    .partition_point(|comment| comment.end() <= self.back_offset)
-            });
-            // If `previous_comment_idx == 0`, we're in a comment free region
-            if previous_comment_idx > 0 {
-                let comment = self.comment_ranges[previous_comment_idx - 1];
-                if comment.end() == self.back_offset {
-                    // Skip the comment without iterating over the chars manually
-                    self.cursor =
-                        Cursor::new(&self.source[TextRange::new(self.offset, comment.start())]);
-                    debug_assert_eq!(self.cursor.text_len() + self.offset, comment.start());
-                    self.after_newline = false;
-                    self.previous_comment_idx = Some(previous_comment_idx - 1);
-                    return SimpleToken {
-                        kind: SimpleTokenKind::Comment,
-                        range: comment.range(),
-                    };
-                }
-                // At least memoize the binary search
-                self.previous_comment_idx = Some(previous_comment_idx);
-            }
-            self.after_newline = false;
-        }
-
         let Some(last) = self.cursor.bump_back() else {
             return SimpleToken {
                 kind: SimpleTokenKind::EndOfFile,
@@ -825,6 +793,22 @@ impl<'a> BackwardsTokenizer<'a> {
             return token;
         }
 
+        if let Some(comment) = self
+            .comment_ranges
+            .last()
+            .filter(|comment| comment.contains_inclusive(self.back_offset))
+        {
+            self.comment_ranges = &self.comment_ranges[..self.comment_ranges.len() - 1];
+
+            // Skip the comment without iterating over the chars manually.
+            self.cursor = Cursor::new(&self.source[TextRange::new(self.offset, comment.start())]);
+            debug_assert_eq!(self.cursor.text_len() + self.offset, comment.start());
+            return SimpleToken {
+                kind: SimpleTokenKind::Comment,
+                range: comment.range(),
+            };
+        }
+
         let kind = match last {
             // This may not be 100% correct because it will lex-out trailing whitespace from a comment
             // as whitespace rather than being part of the token. This shouldn't matter for what we use the lexer for.
@@ -833,14 +817,9 @@ impl<'a> BackwardsTokenizer<'a> {
                 SimpleTokenKind::Whitespace
             }
 
-            '\r' => {
-                self.after_newline = true;
-                SimpleTokenKind::Newline
-            }
-
+            '\r' => SimpleTokenKind::Newline,
             '\n' => {
                 self.cursor.eat_char_back('\r');
-                self.after_newline = true;
                 SimpleTokenKind::Newline
             }
             _ => self.next_token_inner(last),
