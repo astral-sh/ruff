@@ -40,7 +40,7 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/astral-sh/ruff"
-Documentation = "https://beta.ruff.rs/docs/"
+Documentation = "https://docs.astral.sh/ruff/"
 Changelog = "https://github.com/astral-sh/ruff/releases"
 
 [tool.maturin]

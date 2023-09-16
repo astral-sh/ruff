@@ -299,4 +299,4 @@ default.
 `pyproject.toml` files are now resolved hierarchically, such that for each Python file, we find
 the first `pyproject.toml` file in its path, and use that to determine its lint settings.
 
-See the [documentation](https://beta.ruff.rs/docs/configuration/#python-file-discovery) for more.
+See the [documentation](https://docs.astral.sh/ruff/configuration/#python-file-discovery) for more.
