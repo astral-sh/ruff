@@ -165,27 +165,34 @@ fn move_initialization(
     content.push_str(stylist.line_ending().as_str());
 
     // Indent the edit to match the body indentation.
-    let content = textwrap::indent(&content, indentation).to_string();
+    let mut content = textwrap::indent(&content, indentation).to_string();
 
     // Find the position to insert the initialization after docstring and imports
     let mut pos = locator.line_start(statement.start());
     while let Some(statement) = body.next() {
         if is_docstring_stmt(statement) {
-            // // If the statement in the function is a docstring, insert _after_ it.
+            // If the statement in the function is a docstring, insert _after_ it.
             if let Some(statement) = body.peek() {
+                // If there's a second statement, insert _before_ it, but ensure this isn't a
+                // multi-statement line.
                 if indexer.in_multi_statement_line(statement, locator) {
                     return None;
                 }
                 pos = locator.line_start(statement.start());
+            } else if locator.full_line_end(statement.end()) == locator.text_len() {
+                // If the statement is at the end of the file, without a trailing newline, insert
+                // _after_ it with an extra newline.
+                content = format!("{}{}", stylist.line_ending().as_str(), content);
+                pos = locator.full_line_end(statement.end());
+                break;
             } else {
-                // If the docstring is the only statement, insert _before_ it.
+                // If the docstring is the only statement, insert _after_ it.
                 pos = locator.full_line_end(statement.end());
             }
         } else if statement.is_import_stmt() || statement.is_import_from_stmt() {
             // If the statement in the function is an import, insert _after_ it.
             pos = locator.full_line_end(statement.end());
         } else {
-            // Otherwise, insert before the first statement.
             break;
         };
     }
