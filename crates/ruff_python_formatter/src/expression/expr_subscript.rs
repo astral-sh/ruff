@@ -43,7 +43,11 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         );
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            if is_expression_parenthesized(value.into(), f.context().source()) {
+            if is_expression_parenthesized(
+                value.into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            ) {
                 value.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match value.as_ref() {
