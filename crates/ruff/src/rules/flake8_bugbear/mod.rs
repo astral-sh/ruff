@@ -36,6 +36,7 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_2.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_3.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_imports.py"))]
     #[test_case(Rule::NoExplicitStacklevel, Path::new("B028.py"))]
     #[test_case(Rule::RaiseLiteral, Path::new("B016.py"))]
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"))]
