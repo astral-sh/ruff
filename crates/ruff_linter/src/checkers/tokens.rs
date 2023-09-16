@@ -98,9 +98,7 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
         for (tok, range) in tokens.iter().flatten() {
-            if tok.is_string() {
-                pylint::rules::invalid_string_characters(&mut diagnostics, *range, locator);
-            }
+            pylint::rules::invalid_string_characters(&mut diagnostics, tok, *range, locator);
         }
     }
 
