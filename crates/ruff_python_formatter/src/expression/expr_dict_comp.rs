@@ -1,5 +1,5 @@
 use ruff_formatter::prelude::{
-    format_args, format_with, group, soft_line_break_or_space, space, text,
+    format_args, format_with, group, soft_line_break_or_space, space, token,
 };
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
@@ -35,7 +35,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
                 "{",
                 &group(&format_args!(
                     group(&key.format()),
-                    text(":"),
+                    token(":"),
                     space(),
                     value.format(),
                     soft_line_break_or_space(),

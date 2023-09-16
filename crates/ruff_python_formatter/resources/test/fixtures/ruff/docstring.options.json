@@ -1,22 +1,18 @@
 [
   {
-    "indent_style": {
-      "Space": 4
-    },
-    "tab_width": 8
+    "indent_style": "Space",
+    "indent_width": 4
   },
   {
-    "indent_style": {
-      "Space": 2
-    },
-    "tab_width": 8
+    "indent_style": "Space",
+    "indent_width": 2
   },
   {
     "indent_style": "Tab",
-    "tab_width": 8
+    "indent_width": 8
   },
   {
     "indent_style": "Tab",
-    "tab_width": 4
+    "indent_width": 4
   }
 ]

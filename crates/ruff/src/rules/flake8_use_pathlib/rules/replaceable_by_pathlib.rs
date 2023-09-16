@@ -1,6 +1,6 @@
-use ruff_python_ast::{Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_python_ast::Expr;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

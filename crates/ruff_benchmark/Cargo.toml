@@ -19,6 +19,10 @@ name = "linter"
 harness = false
 
 [[bench]]
+name = "lexer"
+harness = false
+
+[[bench]]
 name = "parser"
 harness = false
 
@@ -32,8 +36,8 @@ serde.workspace = true
 serde_json.workspace = true
 url = "2.3.1"
 ureq = "2.6.2"
-criterion = { version = "0.5.1"}
-codspeed-criterion-compat = { version="2.1.0", optional = true}
+criterion = { version = "0.5.1", default-features = false }
+codspeed-criterion-compat = { version="2.2.0", default-features = false, optional = true}
 
 [dev-dependencies]
 ruff.path = "../ruff"
@@ -46,7 +50,7 @@ ruff_python_parser = { path = "../ruff_python_parser" }
 codspeed = ["codspeed-criterion-compat"]
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
-mimalloc = "0.1.34"
+mimalloc = "0.1.39"
 
 [target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dev-dependencies]
 tikv-jemallocator = "0.5.0"

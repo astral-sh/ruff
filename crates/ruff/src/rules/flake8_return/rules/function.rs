@@ -1,7 +1,7 @@
 use std::ops::Add;
 
-use ruff_python_ast::{self as ast, ElifElseClause, Expr, Ranged, Stmt};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -12,6 +12,7 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::is_python_whitespace;
 
 use crate::autofix::edits;
 use crate::checkers::ast::Checker;
@@ -537,7 +538,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
                 // Replace the `x = 1` statement with `return 1`.
-                let content = checker.locator().slice(assign.range());
+                let content = checker.locator().slice(assign);
                 let equals_index = content
                     .find('=')
                     .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;
@@ -549,11 +550,11 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     if content[after_equals..]
                         .chars()
                         .next()
-                        .is_some_and(char::is_alphabetic)
+                        .is_some_and(is_python_whitespace)
                     {
-                        "return ".to_string()
-                    } else {
                         "return".to_string()
+                    } else {
+                        "return ".to_string()
                     },
                     // Replace from the start of the assignment statement to the end of the equals
                     // sign.

@@ -2,9 +2,8 @@
 //!
 //! Used for <https://beta.ruff.rs/docs/settings/>.
 use itertools::Itertools;
-
-use ruff::settings::options::Options;
-use ruff::settings::options_base::{OptionEntry, OptionField};
+use ruff_workspace::options::Options;
+use ruff_workspace::options_base::{OptionEntry, OptionField};
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
     // if there's a group name, we need to add it to the anchor

@@ -1,22 +1,15 @@
-use crate::autofix::source_map::SourceMap;
-use crate::jupyter::Notebook;
+use ruff_diagnostics::SourceMap;
+use ruff_notebook::Notebook;
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum SourceKind {
+    /// The source contains Python source code.
     Python(String),
+    /// The source contains a Jupyter notebook.
     IpyNotebook(Notebook),
 }
 
 impl SourceKind {
-    /// Return the [`Notebook`] if the source kind is [`SourceKind::IpyNotebook`].
-    pub fn notebook(&self) -> Option<&Notebook> {
-        if let Self::IpyNotebook(notebook) = self {
-            Some(notebook)
-        } else {
-            None
-        }
-    }
-
     #[must_use]
     pub(crate) fn updated(&self, new_source: String, source_map: &SourceMap) -> Self {
         match self {

@@ -1,5 +1,5 @@
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};

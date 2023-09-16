@@ -87,28 +87,28 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
-use ruff_text_size::TextRange;
 use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use ruff_python_ast::{Mod, Ranged};
-
 pub(crate) use format::{
     dangling_comments, dangling_node_comments, dangling_open_parenthesis_comments,
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
-    trailing_node_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+use ruff_python_ast::Mod;
 use ruff_python_index::CommentRanges;
 use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
 use crate::comments::node_key::NodeRefEqualityKey;
-use crate::comments::visitor::CommentsVisitor;
+use crate::comments::visitor::{CommentsMapBuilder, CommentsVisitor};
+pub(crate) use visitor::collect_comments;
 
 mod debug;
 pub(crate) mod format;
@@ -324,10 +324,23 @@ impl<'a> Comments<'a> {
         let map = if comment_ranges.is_empty() {
             CommentsMap::new()
         } else {
-            CommentsVisitor::new(source_code, comment_ranges).visit(root)
+            let mut builder = CommentsMapBuilder::new(Locator::new(source_code.as_str()));
+            CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+            builder.finish()
         };
 
         Self::new(map)
+    }
+
+    /// Returns `true` if the given `node` has any comments.
+    #[inline]
+    pub(crate) fn has<T>(&self, node: T) -> bool
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
+        self.data
+            .comments
+            .has(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).
@@ -470,6 +483,28 @@ impl<'a> Comments<'a> {
 
 pub(crate) type LeadingDanglingTrailingComments<'a> = LeadingDanglingTrailing<'a, SourceComment>;
 
+impl LeadingDanglingTrailingComments<'_> {
+    /// Returns `true` if the struct has any [leading comments](self#leading-comments).
+    #[inline]
+    pub(crate) fn has_leading(&self) -> bool {
+        !self.leading.is_empty()
+    }
+
+    /// Returns `true` if the struct has any [trailing comments](self#trailing-comments).
+    #[inline]
+    pub(crate) fn has_trailing(&self) -> bool {
+        !self.trailing.is_empty()
+    }
+
+    /// Returns `true` if the struct has any [trailing own line comments](self#trailing-comments).
+    #[inline]
+    pub(crate) fn has_trailing_own_line(&self) -> bool {
+        self.trailing
+            .iter()
+            .any(|comment| comment.line_position().is_own_line())
+    }
+}
+
 #[derive(Debug, Default)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
@@ -490,12 +525,12 @@ impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use ruff_python_ast::Mod;
-    use ruff_python_parser::lexer::lex;
-    use ruff_python_parser::{parse_tokens, Mode};
 
     use ruff_formatter::SourceCode;
+    use ruff_python_ast::Mod;
     use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+    use ruff_python_parser::lexer::lex;
+    use ruff_python_parser::{parse_tokens, Mode};
 
     use crate::comments::Comments;
 

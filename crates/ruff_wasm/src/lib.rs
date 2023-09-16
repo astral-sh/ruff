@@ -1,9 +1,7 @@
+use std::num::NonZeroU16;
 use std::path::Path;
 
 use js_sys::Error;
-
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{parse_tokens, Mode};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -11,23 +9,21 @@ use ruff::directives;
 use ruff::line_width::{LineLength, TabSize};
 use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
-use ruff::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
-};
-use ruff::settings::configuration::Configuration;
-use ruff::settings::options::Options;
-use ruff::settings::types::PythonVersion;
+use ruff::settings::types::{PreviewMode, PythonVersion};
 use ruff::settings::{defaults, flags, Settings};
-use ruff_python_ast::PySourceType;
+use ruff::source_kind::SourceKind;
+use ruff_formatter::{FormatResult, Formatted, LineWidth};
+use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module, format_node, PyFormatOptions};
-use ruff_python_index::{CommentRangesBuilder, Indexer};
+use ruff_python_formatter::{format_node, pretty_comments, PyFormatContext, PyFormatOptions};
+use ruff_python_index::{CommentRanges, CommentRangesBuilder, Indexer};
+use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
+use ruff_python_parser::{parse_tokens, Mode};
 use ruff_source_file::{Locator, SourceLocation};
+use ruff_text_size::Ranged;
+use ruff_workspace::configuration::Configuration;
+use ruff_workspace::options::Options;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -113,8 +109,9 @@ impl Workspace {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Path::new(".")).map_err(into_error)?;
-        let settings =
-            Settings::from_configuration(configuration, Path::new(".")).map_err(into_error)?;
+        let settings = configuration
+            .into_settings(Path::new("."))
+            .map_err(into_error)?;
 
         Ok(Workspace { settings })
     }
@@ -133,6 +130,7 @@ impl Workspace {
             external: Some(Vec::default()),
             ignore: Some(Vec::default()),
             line_length: Some(LineLength::default()),
+            preview: Some(false),
             select: Some(defaults::PREFIXES.to_vec()),
             tab_size: Some(TabSize::default()),
             target_version: Some(PythonVersion::default()),
@@ -161,45 +159,16 @@ impl Workspace {
             task_tags: None,
             typing_modules: None,
             unfixable: None,
-            // Use default options for all plugins.
-            flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),
-            flake8_bandit: Some(flake8_bandit::settings::Settings::default().into()),
-            flake8_bugbear: Some(flake8_bugbear::settings::Settings::default().into()),
-            flake8_builtins: Some(flake8_builtins::settings::Settings::default().into()),
-            flake8_comprehensions: Some(
-                flake8_comprehensions::settings::Settings::default().into(),
-            ),
-            flake8_copyright: Some(flake8_copyright::settings::Settings::default().into()),
-            flake8_errmsg: Some(flake8_errmsg::settings::Settings::default().into()),
-            flake8_gettext: Some(flake8_gettext::settings::Settings::default().into()),
-            flake8_implicit_str_concat: Some(
-                flake8_implicit_str_concat::settings::Settings::default().into(),
-            ),
-            flake8_import_conventions: Some(
-                flake8_import_conventions::settings::Settings::default().into(),
-            ),
-            flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
-            flake8_quotes: Some(flake8_quotes::settings::Settings::default().into()),
-            flake8_self: Some(flake8_self::settings::Settings::default().into()),
-            flake8_tidy_imports: Some(flake8_tidy_imports::settings::Settings::default().into()),
-            flake8_type_checking: Some(flake8_type_checking::settings::Settings::default().into()),
-            flake8_unused_arguments: Some(
-                flake8_unused_arguments::settings::Settings::default().into(),
-            ),
-            isort: Some(isort::settings::Settings::default().into()),
-            mccabe: Some(mccabe::settings::Settings::default().into()),
-            pep8_naming: Some(pep8_naming::settings::Settings::default().into()),
-            pycodestyle: Some(pycodestyle::settings::Settings::default().into()),
-            pydocstyle: Some(pydocstyle::settings::Settings::default().into()),
-            pyflakes: Some(pyflakes::settings::Settings::default().into()),
-            pylint: Some(pylint::settings::Settings::default().into()),
-            pyupgrade: Some(pyupgrade::settings::Settings::default().into()),
+            ..Options::default()
         })
         .map_err(into_error)
     }
 
     pub fn check(&self, contents: &str) -> Result<JsValue, Error> {
         let source_type = PySourceType::default();
+
+        // TODO(dhruvmanila): Support Jupyter Notebooks
+        let source_kind = SourceKind::Python(contents.to_string());
 
         // Tokenize once.
         let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
@@ -231,7 +200,7 @@ impl Workspace {
             &directives,
             &self.settings,
             flags::Noqa::Enabled,
-            None,
+            &source_kind,
             source_type,
         );
 
@@ -268,30 +237,24 @@ impl Workspace {
     }
 
     pub fn format(&self, contents: &str) -> Result<String, Error> {
-        // TODO(konstin): Add an options for py/pyi to the UI (1/2)
-        let options = PyFormatOptions::from_source_type(PySourceType::default());
-        let printed = format_module(contents, options).map_err(into_error)?;
+        let parsed = ParsedModule::from_source(contents)?;
+        let formatted = parsed.format(&self.settings).map_err(into_error)?;
+        let printed = formatted.print().map_err(into_error)?;
 
         Ok(printed.into_code())
     }
 
     pub fn format_ir(&self, contents: &str) -> Result<String, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
-        let mut comment_ranges = CommentRangesBuilder::default();
-
-        for (token, range) in tokens.iter().flatten() {
-            comment_ranges.visit_token(token, *range);
-        }
-
-        let comment_ranges = comment_ranges.finish();
-        let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
-
-        // TODO(konstin): Add an options for py/pyi to the UI (2/2)
-        let options = PyFormatOptions::from_source_type(PySourceType::default());
-        let formatted =
-            format_node(&module, &comment_ranges, contents, options).map_err(into_error)?;
+        let parsed = ParsedModule::from_source(contents)?;
+        let formatted = parsed.format(&self.settings).map_err(into_error)?;
 
         Ok(format!("{formatted}"))
+    }
+
+    pub fn comments(&self, contents: &str) -> Result<String, Error> {
+        let parsed = ParsedModule::from_source(contents)?;
+        let comments = pretty_comments(&parsed.module, &parsed.comment_ranges, contents);
+        Ok(comments)
     }
 
     /// Parses the content and returns its AST
@@ -310,4 +273,46 @@ impl Workspace {
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
     Error::new(&err.to_string())
+}
+
+struct ParsedModule<'a> {
+    source_code: &'a str,
+    module: Mod,
+    comment_ranges: CommentRanges,
+}
+
+impl<'a> ParsedModule<'a> {
+    fn from_source(source: &'a str) -> Result<Self, Error> {
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source, Mode::Module).collect();
+        let mut comment_ranges = CommentRangesBuilder::default();
+
+        for (token, range) in tokens.iter().flatten() {
+            comment_ranges.visit_token(token, *range);
+        }
+        let comment_ranges = comment_ranges.finish();
+        let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
+
+        Ok(Self {
+            source_code: source,
+            comment_ranges,
+            module,
+        })
+    }
+
+    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext>> {
+        // TODO(konstin): Add an options for py/pyi to the UI (2/2)
+        let options = PyFormatOptions::from_source_type(PySourceType::default())
+            .with_preview(match settings.preview {
+                PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+                PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+            })
+            .with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
+
+        format_node(
+            &self.module,
+            &self.comment_ranges,
+            self.source_code,
+            options,
+        )
+    }
 }

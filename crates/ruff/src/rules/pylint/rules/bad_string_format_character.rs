@@ -3,7 +3,7 @@ use std::str::FromStr;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 use ruff_python_literal::{
     cformat::{CFormatErrorType, CFormatString},
     format::FormatPart,
@@ -11,7 +11,7 @@ use ruff_python_literal::{
     format::{FormatSpec, FormatSpecError, FormatString},
 };
 use ruff_python_parser::{lexer, Mode};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -94,12 +94,8 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
 pub(crate) fn percent(checker: &mut Checker, expr: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<TextRange> = vec![];
-    for (tok, range) in lexer::lex_starts_at(
-        checker.locator().slice(expr.range()),
-        Mode::Module,
-        expr.start(),
-    )
-    .flatten()
+    for (tok, range) in
+        lexer::lex_starts_at(checker.locator().slice(expr), Mode::Module, expr.start()).flatten()
     {
         if tok.is_string() {
             strings.push(range);

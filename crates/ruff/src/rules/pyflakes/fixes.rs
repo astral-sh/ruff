@@ -1,11 +1,12 @@
 use anyhow::{Context, Ok, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::{self as ast, Ranged};
+use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Binding;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::cst::matchers::{match_call_mut, match_dict, transform_expression};
 
@@ -16,7 +17,7 @@ pub(super) fn remove_unused_format_arguments_from_dict(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let source_code = locator.slice(dict.range());
+    let source_code = locator.slice(dict);
     transform_expression(source_code, stylist, |mut expression| {
         let dict = match_dict(&mut expression)?;
 
@@ -40,7 +41,7 @@ pub(super) fn remove_unused_keyword_arguments_from_format_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let source_code = locator.slice(call.range());
+    let source_code = locator.slice(call);
     transform_expression(source_code, stylist, |mut expression| {
         let call = match_call_mut(&mut expression)?;
 
@@ -68,7 +69,7 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let source_code = locator.slice(call.range());
+    let source_code = locator.slice(call);
     transform_expression(source_code, stylist, |mut expression| {
         let call = match_call_mut(&mut expression)?;
 

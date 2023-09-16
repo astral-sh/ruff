@@ -1,8 +1,9 @@
-use ruff_python_ast::{self as ast, Comprehension, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Comprehension, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::{self, Visitor};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 

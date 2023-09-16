@@ -1,5 +1,5 @@
-use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Ranged, Stmt, UnaryOp};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, UnaryOp};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -273,7 +273,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().in_boolean_test() {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.locator().slice(operand.range()).to_string(),
+                checker.locator().slice(operand.as_ref()).to_string(),
                 expr.range(),
             )));
         } else if checker.semantic().is_builtin("bool") {

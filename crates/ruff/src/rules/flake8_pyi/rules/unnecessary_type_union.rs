@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
+use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 
@@ -77,7 +78,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             UnnecessaryTypeUnion {
                 members: type_exprs
                     .into_iter()
-                    .map(|type_expr| checker.locator().slice(type_expr.range()).to_string())
+                    .map(|type_expr| checker.locator().slice(type_expr.as_ref()).to_string())
                     .collect(),
                 is_pep604_union,
             },

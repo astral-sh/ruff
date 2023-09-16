@@ -1,7 +1,7 @@
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Constant, ExprConstant, Ranged};
-use ruff_text_size::{TextLen, TextRange};
+use ruff_python_ast::{Constant, ExprConstant};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::SourceComment;
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
@@ -35,18 +35,14 @@ impl FormatRuleWithOptions<ExprConstant, PyFormatContext<'_>> for FormatExprCons
 
 impl FormatNodeRule<ExprConstant> for FormatExprConstant {
     fn fmt_fields(&self, item: &ExprConstant, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprConstant {
-            range: _,
-            value,
-            kind: _,
-        } = item;
+        let ExprConstant { range: _, value } = item;
 
         match value {
-            Constant::Ellipsis => text("...").fmt(f),
-            Constant::None => text("None").fmt(f),
+            Constant::Ellipsis => token("...").fmt(f),
+            Constant::None => token("None").fmt(f),
             Constant::Bool(value) => match value {
-                true => text("True").fmt(f),
-                false => text("False").fmt(f),
+                true => token("True").fmt(f),
+                false => token("False").fmt(f),
             },
             Constant::Int(_) => FormatInt::new(item).fmt(f),
             Constant::Float(_) => FormatFloat::new(item).fmt(f),

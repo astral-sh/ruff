@@ -275,23 +275,7 @@ last_call()
  flags & ~select.EPOLLIN and waiters.write_task is not None
  lambda arg: None
  lambda a=True: a
-@@ -39,10 +39,11 @@
- lambda a, b, c=True, *, d=(1 << v2), e="str": a
- lambda a, b, c=True, *vararg, d=(v1 << 2), e="str", **kwargs: a + b
- manylambdas = lambda x=lambda y=lambda z=1: z: y(): x()
--foo = lambda port_id, ignore_missing: {
--    "port1": port1_resource,
--    "port2": port2_resource,
--}[port_id]
-+foo = (
-+    lambda port_id, ignore_missing: {"port1": port1_resource, "port2": port2_resource}[
-+        port_id
-+    ]
-+)
- 1 if True else 2
- str or None if True else str or bytes or None
- (str or None) if True else (str or bytes or None)
-@@ -115,7 +116,7 @@
+@@ -115,7 +115,7 @@
      arg,
      another,
      kwarg="hey",
@@ -300,38 +284,6 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
-@@ -328,13 +329,18 @@
- ):
-     return True
- if (
--    ~aaaa.a + aaaa.b - aaaa.c * aaaa.d / aaaa.e
-+    ~aaaa.a
-+    + aaaa.b
-+    - aaaa.c * aaaa.d / aaaa.e
-     | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
- ):
-     return True
- if (
--    ~aaaaaaaa.a + aaaaaaaa.b - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
--    | aaaaaaaa.f & aaaaaaaa.g % aaaaaaaa.h
-+    ~aaaaaaaa.a
-+    + aaaaaaaa.b
-+    - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
-+    | aaaaaaaa.f
-+    & aaaaaaaa.g % aaaaaaaa.h
-     ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
- ):
-     return True
-@@ -342,7 +348,8 @@
-     ~aaaaaaaaaaaaaaaa.a
-     + aaaaaaaaaaaaaaaa.b
-     - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
--    | aaaaaaaaaaaaaaaa.f & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
-+    | aaaaaaaaaaaaaaaa.f
-+    & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
-     ^ aaaaaaaaaaaaaaaa.i
-     << aaaaaaaaaaaaaaaa.k
-     >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
 ```
 
 ## Ruff Output
@@ -378,11 +330,10 @@ lambda a, b, c=True: a
 lambda a, b, c=True, *, d=(1 << v2), e="str": a
 lambda a, b, c=True, *vararg, d=(v1 << 2), e="str", **kwargs: a + b
 manylambdas = lambda x=lambda y=lambda z=1: z: y(): x()
-foo = (
-    lambda port_id, ignore_missing: {"port1": port1_resource, "port2": port2_resource}[
-        port_id
-    ]
-)
+foo = lambda port_id, ignore_missing: {
+    "port1": port1_resource,
+    "port2": port2_resource,
+}[port_id]
 1 if True else 2
 str or None if True else str or bytes or None
 (str or None) if True else (str or bytes or None)
@@ -668,18 +619,13 @@ if (
 ):
     return True
 if (
-    ~aaaa.a
-    + aaaa.b
-    - aaaa.c * aaaa.d / aaaa.e
+    ~aaaa.a + aaaa.b - aaaa.c * aaaa.d / aaaa.e
     | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
 ):
     return True
 if (
-    ~aaaaaaaa.a
-    + aaaaaaaa.b
-    - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
-    | aaaaaaaa.f
-    & aaaaaaaa.g % aaaaaaaa.h
+    ~aaaaaaaa.a + aaaaaaaa.b - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
+    | aaaaaaaa.f & aaaaaaaa.g % aaaaaaaa.h
     ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
 ):
     return True
@@ -687,8 +633,7 @@ if (
     ~aaaaaaaaaaaaaaaa.a
     + aaaaaaaaaaaaaaaa.b
     - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
-    | aaaaaaaaaaaaaaaa.f
-    & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
+    | aaaaaaaaaaaaaaaa.f & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
     ^ aaaaaaaaaaaaaaaa.i
     << aaaaaaaaaaaaaaaa.k
     >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n

@@ -1,0 +1,20 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/module_dangling_comment1.py
+---
+## Input
+```py
+__all__ = ["X", "XK", "Xatom", "Xcursorfont", "Xutil", "display", "error", "rdb"]
+
+# Shared types throughout the stub
+```
+
+## Output
+```py
+__all__ = ["X", "XK", "Xatom", "Xcursorfont", "Xutil", "display", "error", "rdb"]
+
+# Shared types throughout the stub
+```
+
+
+

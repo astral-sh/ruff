@@ -1,6 +1,7 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
+use ruff_text_size::{Ranged, TextRange};
 
+use crate::autofix::edits::pad;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
@@ -122,22 +123,21 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
                 remaining.insert(0, node.into());
             }
 
-            if remaining.len() == 1 {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    "OSError".to_string(),
-                    target.range(),
-                )));
+            let content = if remaining.len() == 1 {
+                "OSError".to_string()
             } else {
                 let node = ast::ExprTuple {
                     elts: remaining,
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    format!("({})", checker.generator().expr(&node.into())),
-                    target.range(),
-                )));
-            }
+                format!("({})", checker.generator().expr(&node.into()))
+            };
+
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                pad(content, target.range(), checker.locator()),
+                target.range(),
+            )));
         }
     }
     checker.diagnostics.push(diagnostic);

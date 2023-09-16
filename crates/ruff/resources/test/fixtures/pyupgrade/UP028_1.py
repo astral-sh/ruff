@@ -1,4 +1,4 @@
-# These should NOT change
+# OK
 def f():
     for x in z:
         yield

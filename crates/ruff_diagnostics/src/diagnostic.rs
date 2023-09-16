@@ -3,7 +3,7 @@ use log::error;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Fix;
 
@@ -71,21 +71,15 @@ impl Diagnostic {
         }
     }
 
-    pub const fn range(&self) -> TextRange {
-        self.range
-    }
-
-    pub const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    pub const fn end(&self) -> TextSize {
-        self.range.end()
-    }
-
     /// Set the location of the diagnostic's parent node.
     #[inline]
     pub fn set_parent(&mut self, parent: TextSize) {
         self.parent = Some(parent);
+    }
+}
+
+impl Ranged for Diagnostic {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }

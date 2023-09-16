@@ -1,11 +1,9 @@
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_semantic::Definition;
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -153,6 +151,15 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
             }
             checker.diagnostics.push(diagnostic);
         }
+    } else if first_line.as_str().ends_with('\\') {
+        // Ignore the edge case whether a single quoted string is multiple lines through an
+        // escape (https://github.com/astral-sh/ruff/issues/7139). Single quote docstrings are
+        // flagged by D300.
+        // ```python
+        // "\
+        // "
+        // ```
+        return;
     } else {
         if checker.enabled(Rule::MultiLineSummarySecondLine) {
             let mut diagnostic = Diagnostic::new(MultiLineSummarySecondLine, docstring.range());

@@ -6,13 +6,14 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use ruff_python_parser::{lexer, Mode, Tok};
+
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineLength;
@@ -21,10 +22,10 @@ use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
 /// ## What it does
-/// Checks for `str#format` calls that can be replaced with f-strings.
+/// Checks for `str.format` calls that can be replaced with f-strings.
 ///
 /// ## Why is this bad?
-/// f-strings are more readable and generally preferred over `str#format`
+/// f-strings are more readable and generally preferred over `str.format`
 /// calls.
 ///
 /// ## Example
@@ -73,7 +74,7 @@ impl<'a> FormatSummaryValues<'a> {
 
         for arg in &call.arguments.args {
             if matches!(arg, Expr::Starred(..))
-                || contains_quotes(locator.slice(arg.range()))
+                || contains_quotes(locator.slice(arg))
                 || locator.contains_line_break(arg.range())
             {
                 return None;
@@ -89,9 +90,7 @@ impl<'a> FormatSummaryValues<'a> {
             let Some(key) = arg else {
                 return None;
             };
-            if contains_quotes(locator.slice(value.range()))
-                || locator.contains_line_break(value.range())
-            {
+            if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
                 return None;
             }
             extracted_kwargs.insert(key, value);
@@ -141,7 +140,7 @@ enum FormatContext {
 
 /// Given an [`Expr`], format it for use in a formatted expression within an f-string.
 fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>) -> Cow<'a, str> {
-    let text = locator.slice(expr.range());
+    let text = locator.slice(expr);
     let parenthesize = match (context, expr) {
         // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
         (
@@ -372,7 +371,7 @@ pub(crate) fn f_strings(
         return;
     }
 
-    let mut contents = String::with_capacity(checker.locator().slice(call.range()).len());
+    let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
     for (range, fstring) in patches {
         contents.push_str(
@@ -396,7 +395,7 @@ pub(crate) fn f_strings(
         // """.format(0, 1) -> offset = 0
         // ```
         let offset = if idx == 0 { col_offset.to_usize() } else { 0 };
-        offset + line.chars().count() > line_length.get()
+        offset + line.chars().count() > line_length.value() as usize
     }) {
         return;
     }

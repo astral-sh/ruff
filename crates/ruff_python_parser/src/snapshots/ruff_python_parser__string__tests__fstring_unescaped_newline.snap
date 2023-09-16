@@ -16,10 +16,10 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "\n",
+                                        unicode: false,
                                         implicit_concatenated: false,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                         FormattedValue(

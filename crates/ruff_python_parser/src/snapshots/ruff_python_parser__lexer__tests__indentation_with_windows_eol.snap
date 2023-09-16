@@ -1,0 +1,58 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: indentation_with_eol(WINDOWS_EOL)
+---
+[
+    (
+        Def,
+        0..3,
+    ),
+    (
+        Name {
+            name: "foo",
+        },
+        4..7,
+    ),
+    (
+        Lpar,
+        7..8,
+    ),
+    (
+        Rpar,
+        8..9,
+    ),
+    (
+        Colon,
+        9..10,
+    ),
+    (
+        Newline,
+        10..12,
+    ),
+    (
+        Indent,
+        12..16,
+    ),
+    (
+        Return,
+        16..22,
+    ),
+    (
+        Int {
+            value: 99,
+        },
+        23..25,
+    ),
+    (
+        Newline,
+        25..27,
+    ),
+    (
+        NonLogicalNewline,
+        27..29,
+    ),
+    (
+        Dedent,
+        29..29,
+    ),
+]

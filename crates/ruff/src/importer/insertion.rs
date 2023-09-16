@@ -1,9 +1,9 @@
 //! Insert statements into Python code.
 use std::ops::Add;
 
-use ruff_python_ast::{PySourceType, Ranged, Stmt};
+use ruff_python_ast::{PySourceType, Stmt};
 use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::TextSize;
+use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::is_docstring_stmt;

@@ -32,10 +32,10 @@ use itertools::Itertools;
 use log::error;
 use ruff_python_ast::{
     self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged,
-    Stmt, Suite, UnaryOp,
+    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
+    Suite, UnaryOp,
 };
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
@@ -528,11 +528,7 @@ where
                     &self.semantic.definitions,
                 );
                 self.semantic.push_definition(definition);
-
-                self.semantic.push_scope(match &stmt {
-                    Stmt::FunctionDef(stmt) => ScopeKind::Function(stmt),
-                    _ => unreachable!("Expected Stmt::FunctionDef"),
-                });
+                self.semantic.push_scope(ScopeKind::Function(function_def));
 
                 self.deferred.functions.push(self.semantic.snapshot());
 
@@ -1192,7 +1188,6 @@ where
             }
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
-                kind: _,
                 range: _,
             }) => {
                 if self.semantic.in_type_definition()
@@ -1895,6 +1890,8 @@ impl<'a> Checker<'a> {
         for (name, range) in exports {
             if let Some(binding_id) = self.semantic.global_scope().get(name) {
                 // Mark anything referenced in `__all__` as used.
+                // TODO(charlie): `range` here should be the range of the name in `__all__`, not
+                // the range of `__all__` itself.
                 self.semantic.add_global_reference(binding_id, range);
             } else {
                 if self.semantic.global_scope().uses_star_imports() {

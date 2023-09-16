@@ -1,9 +1,10 @@
 use itertools::Itertools;
 
+use crate::autofix::edits::pad;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
@@ -11,10 +12,10 @@ use crate::registry::AsRule;
 use crate::rules::flynt::helpers;
 
 /// ## What it does
-/// Checks for `str#join` calls that can be replaced with f-strings.
+/// Checks for `str.join` calls that can be replaced with f-strings.
 ///
 /// ## Why is this bad?
-/// f-strings are more readable and generally preferred over `str#join` calls.
+/// f-strings are more readable and generally preferred over `str.join` calls.
 ///
 /// ## Example
 /// ```python
@@ -86,7 +87,6 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
                 .join(joiner)
                 .into(),
             range: TextRange::default(),
-            kind: None,
         };
         return Some(node.into());
     }
@@ -114,6 +114,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     Some(node.into())
 }
 
+/// FLY002
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
     let Expr::Call(ast::ExprCall {
         arguments: Arguments { args, keywords, .. },
@@ -155,7 +156,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            contents,
+            pad(contents, expr.range(), checker.locator()),
             expr.range(),
         )));
     }

@@ -6,8 +6,6 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
 use log::error;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{AsMode, ParseError};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -15,8 +13,10 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::{AsMode, ParseError};
 use ruff_source_file::{Locator, SourceFileBuilder};
+use ruff_text_size::Ranged;
 
 use crate::autofix::{fix_file, FixResult};
 use crate::checkers::ast::check_ast;
@@ -35,9 +35,6 @@ use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs};
-
-const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
-const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
 /// A [`Result`]-like type that returns both data and an error. Used to return
 /// diagnostics even in the face of parse errors, since many diagnostics can be
@@ -81,7 +78,7 @@ pub fn check_path(
     directives: &Directives,
     settings: &Settings,
     noqa: flags::Noqa,
-    source_kind: Option<&SourceKind>,
+    source_kind: &SourceKind,
     source_type: PySourceType,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
@@ -267,17 +264,20 @@ pub fn check_path(
 const MAX_ITERATIONS: usize = 100;
 
 /// Add any missing `# noqa` pragmas to the source code at the given `Path`.
-pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings) -> Result<usize> {
-    let source_type = PySourceType::from(path);
-
-    // Read the file from disk.
-    let contents = std::fs::read_to_string(path)?;
+pub fn add_noqa_to_path(
+    path: &Path,
+    package: Option<&Path>,
+    source_kind: &SourceKind,
+    source_type: PySourceType,
+    settings: &Settings,
+) -> Result<usize> {
+    let contents = source_kind.source_code();
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
     // Map row and column locations to byte slices (lazily).
-    let locator = Locator::new(&contents);
+    let locator = Locator::new(contents);
 
     // Detect the current code style (lazily).
     let stylist = Stylist::from_tokens(&tokens, &locator);
@@ -307,21 +307,20 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
         &directives,
         settings,
         flags::Noqa::Disabled,
-        None,
+        source_kind,
         source_type,
     );
 
     // Log any parse errors.
     if let Some(err) = error {
-        // TODO(dhruvmanila): This should use `SourceKind`, update when
-        // `--add-noqa` is supported for Jupyter notebooks.
         error!(
             "{}",
-            DisplayParseError::new(err, locator.to_source_code(), None)
+            DisplayParseError::new(err, locator.to_source_code(), source_kind)
         );
     }
 
     // Add any missing `# noqa` pragmas.
+    // TODO(dhruvmanila): Add support for Jupyter Notebooks
     add_noqa(
         path,
         &diagnostics.0,
@@ -374,7 +373,7 @@ pub fn lint_only(
         &directives,
         settings,
         noqa,
-        Some(source_kind),
+        source_kind,
         source_type,
     );
 
@@ -468,7 +467,7 @@ pub fn lint_fix<'a>(
             &directives,
             settings,
             noqa,
-            Some(source_kind),
+            source_kind,
             source_type,
         );
 
@@ -541,8 +540,9 @@ fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: 
     let codes = collect_rule_codes(diagnostics.iter().map(|diagnostic| diagnostic.kind.rule()));
     if cfg!(debug_assertions) {
         eprintln!(
-            "{}: Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
+            "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
             "debug error".red().bold(),
+            ":".bold(),
             MAX_ITERATIONS,
             fs::relativize_path(path),
             codes,
@@ -551,18 +551,17 @@ fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: 
     } else {
         eprintln!(
             r#"
-{}: Failed to converge after {} iterations.
+{}{} Failed to converge after {} iterations.
 
-This indicates a bug in `{}`. If you could open an issue at:
+This indicates a bug in Ruff. If you could open an issue at:
 
-    {}/issues/new?title=%5BInfinite%20loop%5D
+    https://github.com/astral-sh/ruff/issues/new?title=%5BInfinite%20loop%5D
 
 ...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
+            ":".bold(),
             MAX_ITERATIONS,
-            CARGO_PKG_NAME,
-            CARGO_PKG_REPOSITORY,
             fs::relativize_path(path),
             codes
         );
@@ -579,8 +578,9 @@ fn report_autofix_syntax_error(
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {
         eprintln!(
-            "{}: Autofix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
+            "{}{} Autofix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
             "error".red().bold(),
+            ":".bold(),
             fs::relativize_path(path),
             codes,
             error,
@@ -589,19 +589,148 @@ fn report_autofix_syntax_error(
     } else {
         eprintln!(
             r#"
-{}: Autofix introduced a syntax error. Reverting all changes.
+{}{} Autofix introduced a syntax error. Reverting all changes.
 
-This indicates a bug in `{}`. If you could open an issue at:
+This indicates a bug in Ruff. If you could open an issue at:
 
-    {}/issues/new?title=%5BAutofix%20error%5D
+    https://github.com/astral-sh/ruff/issues/new?title=%5BAutofix%20error%5D
 
 ...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
-            CARGO_PKG_NAME,
-            CARGO_PKG_REPOSITORY,
+            ":".bold(),
             fs::relativize_path(path),
             codes,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use anyhow::Result;
+    use test_case::test_case;
+
+    use ruff_notebook::{Notebook, NotebookError};
+
+    use crate::registry::Rule;
+    use crate::source_kind::SourceKind;
+    use crate::test::{test_contents, test_notebook_path, TestedNotebook};
+    use crate::{assert_messages, settings};
+
+    /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
+    fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
+        Path::new("../ruff_notebook/resources/test/fixtures/jupyter").join(path)
+    }
+
+    #[test]
+    fn test_import_sorting() -> Result<(), NotebookError> {
+        let actual = notebook_path("isort.ipynb");
+        let expected = notebook_path("isort_expected.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
+            &actual,
+            expected,
+            &settings::Settings::for_rule(Rule::UnsortedImports),
+        )?;
+        assert_messages!(messages, actual, source_notebook);
+        Ok(())
+    }
+
+    #[test]
+    fn test_ipy_escape_command() -> Result<(), NotebookError> {
+        let actual = notebook_path("ipy_escape_command.ipynb");
+        let expected = notebook_path("ipy_escape_command_expected.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
+            &actual,
+            expected,
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        )?;
+        assert_messages!(messages, actual, source_notebook);
+        Ok(())
+    }
+
+    #[test]
+    fn test_unused_variable() -> Result<(), NotebookError> {
+        let actual = notebook_path("unused_variable.ipynb");
+        let expected = notebook_path("unused_variable_expected.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
+            &actual,
+            expected,
+            &settings::Settings::for_rule(Rule::UnusedVariable),
+        )?;
+        assert_messages!(messages, actual, source_notebook);
+        Ok(())
+    }
+
+    #[test]
+    fn test_json_consistency() -> Result<()> {
+        let actual_path = notebook_path("before_fix.ipynb");
+        let expected_path = notebook_path("after_fix.ipynb");
+
+        let TestedNotebook {
+            linted_notebook: fixed_notebook,
+            ..
+        } = test_notebook_path(
+            actual_path,
+            &expected_path,
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        )?;
+        let mut writer = Vec::new();
+        fixed_notebook.write(&mut writer)?;
+        let actual = String::from_utf8(writer)?;
+        let expected = std::fs::read_to_string(expected_path)?;
+        assert_eq!(actual, expected);
+        Ok(())
+    }
+
+    #[test_case(Path::new("before_fix.ipynb"), true; "trailing_newline")]
+    #[test_case(Path::new("no_trailing_newline.ipynb"), false; "no_trailing_newline")]
+    fn test_trailing_newline(path: &Path, trailing_newline: bool) -> Result<()> {
+        let notebook = Notebook::from_path(&notebook_path(path))?;
+        assert_eq!(notebook.trailing_newline(), trailing_newline);
+
+        let mut writer = Vec::new();
+        notebook.write(&mut writer)?;
+        let string = String::from_utf8(writer)?;
+        assert_eq!(string.ends_with('\n'), trailing_newline);
+
+        Ok(())
+    }
+
+    // Version <4.5, don't emit cell ids
+    #[test_case(Path::new("no_cell_id.ipynb"), false; "no_cell_id")]
+    // Version 4.5, cell ids are missing and need to be added
+    #[test_case(Path::new("add_missing_cell_id.ipynb"), true; "add_missing_cell_id")]
+    fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
+        let source_notebook = Notebook::from_path(&notebook_path(path))?;
+        let source_kind = SourceKind::IpyNotebook(source_notebook);
+        let (_, transformed) = test_contents(
+            &source_kind,
+            path,
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        );
+        let linted_notebook = transformed.into_owned().expect_ipy_notebook();
+        let mut writer = Vec::new();
+        linted_notebook.write(&mut writer)?;
+        let actual = String::from_utf8(writer)?;
+        if has_id {
+            assert!(actual.contains(r#""id": ""#));
+        } else {
+            assert!(!actual.contains(r#""id":"#));
+        }
+        Ok(())
     }
 }

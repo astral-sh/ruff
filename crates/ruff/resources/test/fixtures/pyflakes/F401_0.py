@@ -112,3 +112,11 @@ match *0, 1, *2:
         import b1
 
         import b2
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7244
+from datameta_client_lib.model_utils import (  # noqa: F401
+noqa )
+
+from datameta_client_lib.model_helpers import (
+noqa )

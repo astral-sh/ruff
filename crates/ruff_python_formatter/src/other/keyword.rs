@@ -13,11 +13,11 @@ impl FormatNodeRule<Keyword> for FormatKeyword {
             arg,
             value,
         } = item;
+        // Comments after the `=` or `**` are reassigned as leading comments on the value.
         if let Some(arg) = arg {
-            write!(f, [arg.format(), text("="), value.format()])
+            write!(f, [arg.format(), token("="), value.format()])
         } else {
-            // Comments after the stars are reassigned as trailing value comments
-            write!(f, [text("**"), value.format()])
+            write!(f, [token("**"), value.format()])
         }
     }
 }

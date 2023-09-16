@@ -1,6 +1,5 @@
 use ruff_python_ast::str::raw_contents_range;
-use ruff_python_ast::Ranged;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_python_semantic::{BindingKind, ContextualizedDefinition, Export};
 
@@ -164,9 +163,9 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 continue;
             };
 
-            let contents = checker.locator.slice(expr.range());
+            let contents = checker.locator().slice(expr);
 
-            let indentation = checker.locator.slice(TextRange::new(
+            let indentation = checker.locator().slice(TextRange::new(
                 checker.locator.line_start(expr.start()),
                 expr.start(),
             ));

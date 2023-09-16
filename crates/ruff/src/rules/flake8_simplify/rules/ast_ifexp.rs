@@ -1,9 +1,10 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Ranged, UnaryOp};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, UnaryOp};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
+use ruff_python_ast::parenthesize::parenthesized_range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -30,7 +31,7 @@ use crate::registry::AsRule;
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct IfExprWithTrueFalse {
-    expr: String,
+    is_compare: bool,
 }
 
 impl Violation for IfExprWithTrueFalse {
@@ -38,13 +39,21 @@ impl Violation for IfExprWithTrueFalse {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfExprWithTrueFalse { expr } = self;
-        format!("Use `bool({expr})` instead of `True if {expr} else False`")
+        let IfExprWithTrueFalse { is_compare } = self;
+        if *is_compare {
+            format!("Remove unnecessary `True if ... else False`")
+        } else {
+            format!("Use `bool(...)` instead of `True if ... else False`")
+        }
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let IfExprWithTrueFalse { expr } = self;
-        Some(format!("Replace with `not {expr}"))
+        let IfExprWithTrueFalse { is_compare } = self;
+        if *is_compare {
+            Some(format!("Remove unnecessary `True if ... else False`"))
+        } else {
+            Some(format!("Replace with `bool(...)"))
+        }
     }
 }
 
@@ -70,20 +79,16 @@ impl Violation for IfExprWithTrueFalse {
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
-pub struct IfExprWithFalseTrue {
-    expr: String,
-}
+pub struct IfExprWithFalseTrue;
 
 impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfExprWithFalseTrue { expr } = self;
-        format!("Use `not {expr}` instead of `False if {expr} else True`")
+        format!("Use `not ...` instead of `False if ... else True`")
     }
 
     fn autofix_title(&self) -> String {
-        let IfExprWithFalseTrue { expr } = self;
-        format!("Replace with `bool({expr})")
+        format!("Replace with `not ...`")
     }
 }
 
@@ -135,7 +140,7 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
 }
 
 /// SIM210
-pub(crate) fn explicit_true_false_in_ifexpr(
+pub(crate) fn if_expr_with_true_false(
     checker: &mut Checker,
     expr: &Expr,
     test: &Expr,
@@ -148,33 +153,43 @@ pub(crate) fn explicit_true_false_in_ifexpr(
 
     let mut diagnostic = Diagnostic::new(
         IfExprWithTrueFalse {
-            expr: checker.generator().expr(test),
+            is_compare: test.is_compare_expr(),
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         if test.is_compare_expr() {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.locator().slice(test.range()).to_string(),
+                checker
+                    .locator()
+                    .slice(
+                        parenthesized_range(test.into(), expr.into(), checker.locator().contents())
+                            .unwrap_or(test.range()),
+                    )
+                    .to_string(),
                 expr.range(),
             )));
         } else if checker.semantic().is_builtin("bool") {
-            let node = ast::ExprName {
-                id: "bool".into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-            };
-            let node1 = ast::ExprCall {
-                func: Box::new(node.into()),
-                arguments: Arguments {
-                    args: vec![test.clone()],
-                    keywords: vec![],
-                    range: TextRange::default(),
-                },
-                range: TextRange::default(),
-            };
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.generator().expr(&node1.into()),
+                checker.generator().expr(
+                    &ast::ExprCall {
+                        func: Box::new(
+                            ast::ExprName {
+                                id: "bool".into(),
+                                ctx: ExprContext::Load,
+                                range: TextRange::default(),
+                            }
+                            .into(),
+                        ),
+                        arguments: Arguments {
+                            args: vec![test.clone()],
+                            keywords: vec![],
+                            range: TextRange::default(),
+                        },
+                        range: TextRange::default(),
+                    }
+                    .into(),
+                ),
                 expr.range(),
             )));
         };
@@ -183,7 +198,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
 }
 
 /// SIM211
-pub(crate) fn explicit_false_true_in_ifexpr(
+pub(crate) fn if_expr_with_false_true(
     checker: &mut Checker,
     expr: &Expr,
     test: &Expr,
@@ -194,21 +209,17 @@ pub(crate) fn explicit_false_true_in_ifexpr(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
-        IfExprWithFalseTrue {
-            expr: checker.generator().expr(test),
-        },
-        expr.range(),
-    );
+    let mut diagnostic = Diagnostic::new(IfExprWithFalseTrue, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let node = test.clone();
-        let node1 = ast::ExprUnaryOp {
-            op: UnaryOp::Not,
-            operand: Box::new(node),
-            range: TextRange::default(),
-        };
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            checker.generator().expr(&node1.into()),
+            checker.generator().expr(
+                &ast::ExprUnaryOp {
+                    op: UnaryOp::Not,
+                    operand: Box::new(test.clone()),
+                    range: TextRange::default(),
+                }
+                .into(),
+            ),
             expr.range(),
         )));
     }

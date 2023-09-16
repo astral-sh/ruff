@@ -39,3 +39,72 @@ d1 = [
     ("b") else # 2
     ("c")
 ]
+
+e1 = (
+    a
+    if True # 1
+    else b
+    if False # 2
+    else c
+)
+
+
+# Flattening nested if-expressions.
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        (NamedValuesListIterable
+        if named
+        else FlatValuesListIterable)
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else (FlatValuesListIterable
+        if flat
+        else ValuesListIterable)
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable(1,)
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else (FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable
+        if flat
+        else ValuesListIterable)
+    )

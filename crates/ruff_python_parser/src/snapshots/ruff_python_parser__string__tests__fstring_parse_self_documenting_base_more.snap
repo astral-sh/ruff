@@ -9,10 +9,10 @@ expression: parse_ast
             value: Str(
                 StringConstant {
                     value: "mix ",
+                    unicode: false,
                     implicit_concatenated: false,
                 },
             ),
-            kind: None,
         },
     ),
     FormattedValue(
@@ -41,10 +41,10 @@ expression: parse_ast
             value: Str(
                 StringConstant {
                     value: " with text and ",
+                    unicode: false,
                     implicit_concatenated: false,
                 },
             ),
-            kind: None,
         },
     ),
     FormattedValue(

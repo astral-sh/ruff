@@ -17,7 +17,6 @@ Ok(
                                 value: Int(
                                     1,
                                 ),
-                                kind: None,
                             },
                         ),
                     },

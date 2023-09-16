@@ -1,8 +1,9 @@
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments, FormatContext, FormatOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{ExpressionRef, Ranged};
+use ruff_python_ast::ExpressionRef;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::Ranged;
 
 use crate::comments::{
     dangling_comments, dangling_open_parenthesis_comments, trailing_comments, SourceComment,
@@ -46,7 +47,7 @@ where
     text_len > 5
         && text_len
             <= context.options().line_width().value() as usize
-                - context.options().indent_width() as usize
+                - context.options().indent_width().value() as usize
 }
 
 pub(crate) trait NeedsParentheses {
@@ -171,10 +172,10 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let inner = format_with(|f| {
             group(&format_args![
-                text(self.left),
+                token(self.left),
                 dangling_open_parenthesis_comments(self.comments),
                 soft_block_indent(&Arguments::from(&self.content)),
-                text(self.right)
+                token(self.right)
             ])
             .fmt(f)
         });
@@ -231,13 +232,13 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast>
         write!(
             f,
             [group(&format_args![
-                if_group_breaks(&text("(")),
+                if_group_breaks(&token("(")),
                 indent_if_group_breaks(
                     &format_args![soft_line_break(), Arguments::from(&self.content)],
                     parens_id
                 ),
                 soft_line_break(),
-                if_group_breaks(&text(")"))
+                if_group_breaks(&token(")"))
             ])
             .with_group_id(Some(parens_id))]
         )
@@ -313,23 +314,41 @@ pub(crate) struct FormatInParenthesesOnlyGroup<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        match f.context().node_level() {
-            NodeLevel::Expression(Some(parentheses_id)) => {
-                // If this content is enclosed by a group that adds the optional parentheses, then *disable*
-                // this group *except* if the optional parentheses are shown.
-                conditional_group(
-                    &Arguments::from(&self.content),
-                    Condition::if_group_breaks(parentheses_id),
-                )
-                .fmt(f)
-            }
-            NodeLevel::ParenthesizedExpression => {
-                // Unconditionally group the content if it is not enclosed by an optional parentheses group.
-                group(&Arguments::from(&self.content)).fmt(f)
-            }
-            NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
-                Arguments::from(&self.content).fmt(f)
-            }
+        write_in_parentheses_only_group_start_tag(f);
+        Arguments::from(&self.content).fmt(f)?;
+        write_in_parentheses_only_group_end_tag(f);
+        Ok(())
+    }
+}
+
+pub(super) fn write_in_parentheses_only_group_start_tag(f: &mut PyFormatter) {
+    match f.context().node_level() {
+        NodeLevel::Expression(Some(parentheses_id)) => {
+            f.write_element(FormatElement::Tag(tag::Tag::StartConditionalGroup(
+                tag::ConditionalGroup::new(Condition::if_group_breaks(parentheses_id)),
+            )));
+        }
+        NodeLevel::ParenthesizedExpression => {
+            // Unconditionally group the content if it is not enclosed by an optional parentheses group.
+            f.write_element(FormatElement::Tag(tag::Tag::StartGroup(tag::Group::new())));
+        }
+        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+            // No group
+        }
+    }
+}
+
+pub(super) fn write_in_parentheses_only_group_end_tag(f: &mut PyFormatter) {
+    match f.context().node_level() {
+        NodeLevel::Expression(Some(_)) => {
+            f.write_element(FormatElement::Tag(tag::Tag::EndConditionalGroup));
+        }
+        NodeLevel::ParenthesizedExpression => {
+            // Unconditionally group the content if it is not enclosed by an optional parentheses group.
+            f.write_element(FormatElement::Tag(tag::Tag::EndGroup));
+        }
+        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+            // No group
         }
     }
 }
@@ -374,7 +393,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
         write!(
             f,
             [group(&format_args![
-                text(self.left),
+                token(self.left),
                 // end-of-line comments
                 trailing_comments(&self.comments[..end_of_line_split]),
                 // Avoid unstable formatting with
@@ -389,7 +408,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
                 (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
                 // own line comments, which need to be indented
                 soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
-                text(self.right)
+                token(self.right)
             ])]
         )
     }

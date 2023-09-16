@@ -85,6 +85,17 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    pub(super) fn eat_char2(&mut self, c1: char, c2: char) -> bool {
+        let mut chars = self.chars.clone();
+        if chars.next() == Some(c1) && chars.next() == Some(c2) {
+            self.bump();
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+
     pub(super) fn eat_if<F>(&mut self, mut predicate: F) -> Option<char>
     where
         F: FnMut(char) -> bool,

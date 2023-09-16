@@ -1,8 +1,9 @@
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::str;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
@@ -69,6 +70,7 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &E
     if helpers::is_named_tuple_assignment(parent, checker.semantic())
         || helpers::is_typed_dict_assignment(parent, checker.semantic())
         || helpers::is_type_var_assignment(parent, checker.semantic())
+        || helpers::is_type_alias_assignment(parent, checker.semantic())
     {
         return;
     }

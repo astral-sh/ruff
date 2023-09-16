@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-SIM211.py:1:5: SIM211 [*] Use `not b` instead of `False if b else True`
+SIM211.py:1:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
 1 | a = False if b else True  # SIM211
   |     ^^^^^^^^^^^^^^^^^^^^ SIM211
 2 | 
 3 | a = False if b != c else True  # SIM211
   |
-  = help: Replace with `bool(b)
+  = help: Replace with `not ...`
 
 ℹ Suggested fix
 1   |-a = False if b else True  # SIM211
@@ -17,7 +17,7 @@ SIM211.py:1:5: SIM211 [*] Use `not b` instead of `False if b else True`
 3 3 | a = False if b != c else True  # SIM211
 4 4 | 
 
-SIM211.py:3:5: SIM211 [*] Use `not b != c` instead of `False if b != c else True`
+SIM211.py:3:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
 1 | a = False if b else True  # SIM211
 2 | 
@@ -26,7 +26,7 @@ SIM211.py:3:5: SIM211 [*] Use `not b != c` instead of `False if b != c else True
 4 | 
 5 | a = False if b + c else True  # SIM211
   |
-  = help: Replace with `bool(b != c)
+  = help: Replace with `not ...`
 
 ℹ Suggested fix
 1 1 | a = False if b else True  # SIM211
@@ -37,7 +37,7 @@ SIM211.py:3:5: SIM211 [*] Use `not b != c` instead of `False if b != c else True
 5 5 | a = False if b + c else True  # SIM211
 6 6 | 
 
-SIM211.py:5:5: SIM211 [*] Use `not b + c` instead of `False if b + c else True`
+SIM211.py:5:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
 3 | a = False if b != c else True  # SIM211
 4 | 
@@ -46,7 +46,7 @@ SIM211.py:5:5: SIM211 [*] Use `not b + c` instead of `False if b + c else True`
 6 | 
 7 | a = True if b else False  # OK
   |
-  = help: Replace with `bool(b + c)
+  = help: Replace with `not ...`
 
 ℹ Suggested fix
 2 2 | 

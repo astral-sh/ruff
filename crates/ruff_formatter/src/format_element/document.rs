@@ -7,10 +7,9 @@ use crate::format_element::tag::{Condition, DedentMode};
 use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
 use crate::source_code::SourceCode;
-use crate::{format, write, TabWidth};
 use crate::{
-    BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
-    IndentStyle, LineWidth, PrinterOptions,
+    format, write, BufferExtensions, Format, FormatContext, FormatElement, FormatOptions,
+    FormatResult, Formatter, IndentStyle, IndentWidth, LineWidth, PrinterOptions,
 };
 
 use super::tag::Tag;
@@ -105,11 +104,11 @@ impl Document {
                         expands = false;
                         continue;
                     }
-                    FormatElement::StaticText { text } => text.contains('\n'),
-                    FormatElement::DynamicText { text, .. } => text.contains('\n'),
-                    FormatElement::SourceCodeSlice {
-                        contains_newlines, ..
-                    } => *contains_newlines,
+                    FormatElement::Text {
+                        text: _,
+                        text_width,
+                    } => text_width.is_multiline(),
+                    FormatElement::SourceCodeSlice { text_width, .. } => text_width.is_multiline(),
                     FormatElement::ExpandParent
                     | FormatElement::Line(LineMode::Hard | LineMode::Empty) => true,
                     _ => false,
@@ -214,21 +213,21 @@ struct IrFormatOptions;
 
 impl FormatOptions for IrFormatOptions {
     fn indent_style(&self) -> IndentStyle {
-        IndentStyle::Space(2)
+        IndentStyle::Space
     }
 
-    fn tab_width(&self) -> TabWidth {
-        TabWidth::default()
+    fn indent_width(&self) -> IndentWidth {
+        IndentWidth::default()
     }
 
     fn line_width(&self) -> LineWidth {
-        LineWidth(80)
+        LineWidth::try_from(80).unwrap()
     }
 
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
-            print_width: self.line_width().into(),
-            indent_style: IndentStyle::Space(2),
+            line_width: self.line_width(),
+            indent_style: IndentStyle::Space,
             ..PrinterOptions::default()
         }
     }
@@ -250,29 +249,35 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
         while let Some(element) = iter.next() {
             if !first_element && !in_text && !element.is_end_tag() {
                 // Write a separator between every two elements
-                write!(f, [text(","), soft_line_break_or_space()])?;
+                write!(f, [token(","), soft_line_break_or_space()])?;
             }
 
             first_element = false;
 
             match element {
                 element @ (FormatElement::Space
-                | FormatElement::StaticText { .. }
-                | FormatElement::DynamicText { .. }
+                | FormatElement::Token { .. }
+                | FormatElement::Text { .. }
                 | FormatElement::SourceCodeSlice { .. }) => {
                     fn write_escaped(element: &FormatElement, f: &mut Formatter<IrFormatContext>) {
-                        let text = match element {
-                            FormatElement::StaticText { text } => text,
-                            FormatElement::DynamicText { text } => text.as_ref(),
-                            FormatElement::SourceCodeSlice { slice, .. } => {
-                                slice.text(f.context().source_code())
+                        let (text, text_width) = match element {
+                            #[allow(clippy::cast_possible_truncation)]
+                            FormatElement::Token { text } => {
+                                (*text, TextWidth::Width(Width::new(text.len() as u32)))
+                            }
+                            FormatElement::Text { text, text_width } => {
+                                (text.as_ref(), *text_width)
+                            }
+                            FormatElement::SourceCodeSlice { slice, text_width } => {
+                                (slice.text(f.context().source_code()), *text_width)
                             }
                             _ => unreachable!(),
                         };
 
                         if text.contains('"') {
-                            f.write_element(FormatElement::DynamicText {
+                            f.write_element(FormatElement::Text {
                                 text: text.replace('"', r#"\""#).into(),
+                                text_width,
                             });
                         } else {
                             f.write_element(element.clone());
@@ -280,14 +285,14 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     }
 
                     if !in_text {
-                        write!(f, [text("\"")])?;
+                        write!(f, [token("\"")])?;
                     }
 
                     in_text = true;
 
                     match element {
                         FormatElement::Space => {
-                            write!(f, [text(" ")])?;
+                            write!(f, [token(" ")])?;
                         }
                         element if element.is_text() => {
                             write_escaped(element, f);
@@ -298,45 +303,42 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     let is_next_text = iter.peek().is_some_and(|e| e.is_text() || e.is_space());
 
                     if !is_next_text {
-                        write!(f, [text("\"")])?;
+                        write!(f, [token("\"")])?;
                         in_text = false;
                     }
                 }
 
                 FormatElement::Line(mode) => match mode {
                     LineMode::SoftOrSpace => {
-                        write!(f, [text("soft_line_break_or_space")])?;
+                        write!(f, [token("soft_line_break_or_space")])?;
                     }
                     LineMode::Soft => {
-                        write!(f, [text("soft_line_break")])?;
+                        write!(f, [token("soft_line_break")])?;
                     }
                     LineMode::Hard => {
-                        write!(f, [text("hard_line_break")])?;
+                        write!(f, [token("hard_line_break")])?;
                     }
                     LineMode::Empty => {
-                        write!(f, [text("empty_line")])?;
+                        write!(f, [token("empty_line")])?;
                     }
                 },
                 FormatElement::ExpandParent => {
-                    write!(f, [text("expand_parent")])?;
+                    write!(f, [token("expand_parent")])?;
                 }
 
                 FormatElement::SourcePosition(position) => {
                     write!(
                         f,
-                        [dynamic_text(
-                            &std::format!("source_position({position:?})"),
-                            None
-                        )]
+                        [text(&std::format!("source_position({position:?})"), None)]
                     )?;
                 }
 
                 FormatElement::LineSuffixBoundary => {
-                    write!(f, [text("line_suffix_boundary")])?;
+                    write!(f, [token("line_suffix_boundary")])?;
                 }
 
                 FormatElement::BestFitting { variants, mode } => {
-                    write!(f, [text("best_fitting([")])?;
+                    write!(f, [token("best_fitting([")])?;
                     f.write_elements([
                         FormatElement::Tag(StartIndent),
                         FormatElement::Line(LineMode::Hard),
@@ -351,13 +353,13 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         FormatElement::Line(LineMode::Hard),
                     ]);
 
-                    write!(f, [text("]")])?;
+                    write!(f, [token("]")])?;
 
                     if *mode != BestFittingMode::FirstLine {
-                        write!(f, [dynamic_text(&std::format!(", mode: {mode:?}"), None),])?;
+                        write!(f, [text(&std::format!(", mode: {mode:?}"), None),])?;
                     }
 
-                    write!(f, [text(")")])?;
+                    write!(f, [token(")")])?;
                 }
 
                 FormatElement::Interned(interned) => {
@@ -371,7 +373,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             write!(
                                 f,
                                 [
-                                    dynamic_text(&std::format!("<interned {index}>"), None),
+                                    text(&std::format!("<interned {index}>"), None),
                                     space(),
                                     &&**interned,
                                 ]
@@ -380,10 +382,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         Some(reference) => {
                             write!(
                                 f,
-                                [dynamic_text(
-                                    &std::format!("<ref interned *{reference}>"),
-                                    None
-                                )]
+                                [text(&std::format!("<ref interned *{reference}>"), None)]
                             )?;
                         }
                     }
@@ -402,9 +401,9 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                 write!(
                                     f,
                                     [
-                                        text("<END_TAG_WITHOUT_START<"),
-                                        dynamic_text(&std::format!("{:?}", tag.kind()), None),
-                                        text(">>"),
+                                        token("<END_TAG_WITHOUT_START<"),
+                                        text(&std::format!("{:?}", tag.kind()), None),
+                                        token(">>"),
                                     ]
                                 )?;
                                 first_element = false;
@@ -415,13 +414,13 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                     f,
                                     [
                                         ContentArrayEnd,
-                                        text(")"),
+                                        token(")"),
                                         soft_line_break_or_space(),
-                                        text("ERROR<START_END_TAG_MISMATCH<start: "),
-                                        dynamic_text(&std::format!("{start_kind:?}"), None),
-                                        text(", end: "),
-                                        dynamic_text(&std::format!("{:?}", tag.kind()), None),
-                                        text(">>")
+                                        token("ERROR<START_END_TAG_MISMATCH<start: "),
+                                        text(&std::format!("{start_kind:?}"), None),
+                                        token(", end: "),
+                                        text(&std::format!("{:?}", tag.kind()), None),
+                                        token(">>")
                                     ]
                                 )?;
                                 first_element = false;
@@ -435,7 +434,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
 
                     match tag {
                         StartIndent => {
-                            write!(f, [text("indent(")])?;
+                            write!(f, [token("indent(")])?;
                         }
 
                         StartDedent(mode) => {
@@ -444,38 +443,46 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                 DedentMode::Root => "dedentRoot",
                             };
 
-                            write!(f, [text(label), text("(")])?;
+                            write!(f, [token(label), token("(")])?;
                         }
 
                         StartAlign(tag::Align(count)) => {
                             write!(
                                 f,
                                 [
-                                    text("align("),
-                                    dynamic_text(&count.to_string(), None),
-                                    text(","),
+                                    token("align("),
+                                    text(&count.to_string(), None),
+                                    token(","),
                                     space(),
                                 ]
                             )?;
                         }
 
-                        StartLineSuffix => {
-                            write!(f, [text("line_suffix(")])?;
+                        StartLineSuffix { reserved_width } => {
+                            write!(
+                                f,
+                                [
+                                    token("line_suffix("),
+                                    text(&std::format!("{reserved_width:?}"), None),
+                                    token(","),
+                                    space(),
+                                ]
+                            )?;
                         }
 
                         StartVerbatim(_) => {
-                            write!(f, [text("verbatim(")])?;
+                            write!(f, [token("verbatim(")])?;
                         }
 
                         StartGroup(group) => {
-                            write!(f, [text("group(")])?;
+                            write!(f, [token("group(")])?;
 
                             if let Some(group_id) = group.id() {
                                 write!(
                                     f,
                                     [
-                                        dynamic_text(&std::format!("\"{group_id:?}\""), None),
-                                        text(","),
+                                        text(&std::format!("\"{group_id:?}\""), None),
+                                        token(","),
                                         space(),
                                     ]
                                 )?;
@@ -484,10 +491,10 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             match group.mode() {
                                 GroupMode::Flat => {}
                                 GroupMode::Expand => {
-                                    write!(f, [text("expand: true,"), space()])?;
+                                    write!(f, [token("expand: true,"), space()])?;
                                 }
                                 GroupMode::Propagated => {
-                                    write!(f, [text("expand: propagated,"), space()])?;
+                                    write!(f, [token("expand: propagated,"), space()])?;
                                 }
                             }
                         }
@@ -496,10 +503,10 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             write!(
                                 f,
                                 [
-                                    text("conditional_group(condition:"),
+                                    token("conditional_group(condition:"),
                                     space(),
                                     group.condition(),
-                                    text(","),
+                                    token(","),
                                     space()
                                 ]
                             )?;
@@ -507,10 +514,10 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             match group.mode() {
                                 GroupMode::Flat => {}
                                 GroupMode::Expand => {
-                                    write!(f, [text("expand: true,"), space()])?;
+                                    write!(f, [token("expand: true,"), space()])?;
                                 }
                                 GroupMode::Propagated => {
-                                    write!(f, [text("expand: propagated,"), space()])?;
+                                    write!(f, [token("expand: propagated,"), space()])?;
                                 }
                             }
                         }
@@ -519,9 +526,9 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             write!(
                                 f,
                                 [
-                                    text("indent_if_group_breaks("),
-                                    dynamic_text(&std::format!("\"{id:?}\""), None),
-                                    text(","),
+                                    token("indent_if_group_breaks("),
+                                    text(&std::format!("\"{id:?}\""), None),
+                                    token(","),
                                     space(),
                                 ]
                             )?;
@@ -530,10 +537,10 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         StartConditionalContent(condition) => {
                             match condition.mode {
                                 PrintMode::Flat => {
-                                    write!(f, [text("if_group_fits_on_line(")])?;
+                                    write!(f, [token("if_group_fits_on_line(")])?;
                                 }
                                 PrintMode::Expanded => {
-                                    write!(f, [text("if_group_breaks(")])?;
+                                    write!(f, [token("if_group_breaks(")])?;
                                 }
                             }
 
@@ -541,8 +548,8 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                 write!(
                                     f,
                                     [
-                                        dynamic_text(&std::format!("\"{group_id:?}\""), None),
-                                        text(","),
+                                        text(&std::format!("\"{group_id:?}\""), None),
+                                        token(","),
                                         space(),
                                     ]
                                 )?;
@@ -553,36 +560,36 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             write!(
                                 f,
                                 [
-                                    text("label("),
-                                    dynamic_text(&std::format!("\"{label_id:?}\""), None),
-                                    text(","),
+                                    token("label("),
+                                    text(&std::format!("\"{label_id:?}\""), None),
+                                    token(","),
                                     space(),
                                 ]
                             )?;
                         }
 
                         StartFill => {
-                            write!(f, [text("fill(")])?;
+                            write!(f, [token("fill(")])?;
                         }
 
                         StartFitsExpanded(tag::FitsExpanded {
                             condition,
                             propagate_expand,
                         }) => {
-                            write!(f, [text("fits_expanded(propagate_expand:"), space()])?;
+                            write!(f, [token("fits_expanded(propagate_expand:"), space()])?;
 
                             if propagate_expand.get() {
-                                write!(f, [text("true")])?;
+                                write!(f, [token("true")])?;
                             } else {
-                                write!(f, [text("false")])?;
+                                write!(f, [token("false")])?;
                             }
 
-                            write!(f, [text(","), space()])?;
+                            write!(f, [token(","), space()])?;
 
                             if let Some(condition) = condition {
                                 write!(
                                     f,
-                                    [text("condition:"), space(), condition, text(","), space()]
+                                    [token("condition:"), space(), condition, token(","), space()]
                                 )?;
                             }
                         }
@@ -604,7 +611,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         | EndDedent
                         | EndFitsExpanded
                         | EndVerbatim => {
-                            write!(f, [ContentArrayEnd, text(")")])?;
+                            write!(f, [ContentArrayEnd, token(")")])?;
                         }
                     };
 
@@ -620,9 +627,9 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                 f,
                 [
                     ContentArrayEnd,
-                    text(")"),
+                    token(")"),
                     soft_line_break_or_space(),
-                    dynamic_text(&std::format!("<START_WITHOUT_END<{top:?}>>"), None),
+                    text(&std::format!("<START_WITHOUT_END<{top:?}>>"), None),
                 ]
             )?;
         }
@@ -637,7 +644,7 @@ impl Format<IrFormatContext<'_>> for ContentArrayStart {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
         use Tag::{StartGroup, StartIndent};
 
-        write!(f, [text("[")])?;
+        write!(f, [token("[")])?;
 
         f.write_elements([
             FormatElement::Tag(StartGroup(tag::Group::new())),
@@ -660,7 +667,7 @@ impl Format<IrFormatContext<'_>> for ContentArrayEnd {
             FormatElement::Tag(EndGroup),
         ]);
 
-        write!(f, [text("]")])
+        write!(f, [token("]")])
     }
 }
 
@@ -672,7 +679,9 @@ impl FormatElements for [FormatElement] {
             match element {
                 // Line suffix
                 // Ignore if any of its content breaks
-                FormatElement::Tag(Tag::StartLineSuffix | Tag::StartFitsExpanded(_)) => {
+                FormatElement::Tag(
+                    Tag::StartLineSuffix { reserved_width: _ } | Tag::StartFitsExpanded(_),
+                ) => {
                     ignore_depth += 1;
                 }
                 FormatElement::Tag(Tag::EndLineSuffix | Tag::EndFitsExpanded) => {
@@ -758,22 +767,22 @@ impl FormatElements for [FormatElement] {
 impl Format<IrFormatContext<'_>> for Condition {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
         match (self.mode, self.group_id) {
-            (PrintMode::Flat, None) => write!(f, [text("if_fits_on_line")]),
+            (PrintMode::Flat, None) => write!(f, [token("if_fits_on_line")]),
             (PrintMode::Flat, Some(id)) => write!(
                 f,
                 [
-                    text("if_group_fits_on_line("),
-                    dynamic_text(&std::format!("\"{id:?}\""), None),
-                    text(")")
+                    token("if_group_fits_on_line("),
+                    text(&std::format!("\"{id:?}\""), None),
+                    token(")")
                 ]
             ),
-            (PrintMode::Expanded, None) => write!(f, [text("if_breaks")]),
+            (PrintMode::Expanded, None) => write!(f, [token("if_breaks")]),
             (PrintMode::Expanded, Some(id)) => write!(
                 f,
                 [
-                    text("if_group_breaks("),
-                    dynamic_text(&std::format!("\"{id:?}\""), None),
-                    text(")")
+                    token("if_group_breaks("),
+                    text(&std::format!("\"{id:?}\""), None),
+                    token(")")
                 ]
             ),
         }
@@ -796,11 +805,11 @@ mod tests {
                 write!(
                     f,
                     [group(&format_args![
-                        text("("),
+                        token("("),
                         soft_block_indent(&format_args![
-                            text("Some longer content"),
+                            token("Some longer content"),
                             space(),
-                            text("That should ultimately break"),
+                            token("That should ultimately break"),
                         ])
                     ])]
                 )
@@ -829,7 +838,7 @@ mod tests {
     fn escapes_quotes() {
         let formatted = format!(
             SimpleFormatContext::default(),
-            [text(r#""""Python docstring""""#)]
+            [token(r#""""Python docstring""""#)]
         )
         .unwrap();
 
@@ -850,17 +859,11 @@ mod tests {
                 write!(
                     f,
                     [group(&format_args![
-                        text("("),
+                        token("("),
                         soft_block_indent(&format_args![
-                            source_text_slice(
-                                TextRange::at(TextSize::new(0), TextSize::new(19)),
-                                ContainsNewlines::No
-                            ),
+                            source_text_slice(TextRange::at(TextSize::new(0), TextSize::new(19)),),
                             space(),
-                            source_text_slice(
-                                TextRange::at(TextSize::new(20), TextSize::new(28)),
-                                ContainsNewlines::No
-                            ),
+                            source_text_slice(TextRange::at(TextSize::new(20), TextSize::new(28)),),
                         ])
                     ])]
                 )
@@ -890,16 +893,16 @@ mod tests {
         use Tag::*;
 
         let document = Document::from(vec![
-            FormatElement::StaticText { text: "[" },
+            FormatElement::Token { text: "[" },
             FormatElement::Tag(StartGroup(tag::Group::new())),
             FormatElement::Tag(StartIndent),
             FormatElement::Line(LineMode::Soft),
-            FormatElement::StaticText { text: "a" },
+            FormatElement::Token { text: "a" },
             // Close group instead of indent
             FormatElement::Tag(EndGroup),
             FormatElement::Line(LineMode::Soft),
             FormatElement::Tag(EndIndent),
-            FormatElement::StaticText { text: "]" },
+            FormatElement::Token { text: "]" },
             // End tag without start
             FormatElement::Tag(EndIndent),
             // Start tag without an end

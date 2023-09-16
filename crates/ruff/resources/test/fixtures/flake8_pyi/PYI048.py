@@ -1,19 +1,27 @@
-def bar():    # OK
-    ...
+def bar():
+    ...  # OK
 
 
-def oof():    # OK, docstrings are handled by another rule
+def bar():
+    pass  # OK
+
+
+def bar():
+    """oof"""  # OK
+
+
+def oof():  # ERROR PYI048
     """oof"""
     print("foo")
 
 
-def foo():    # Ok not in Stub file
+def foo():  # ERROR PYI048
     """foo"""
     print("foo")
     print("foo")
 
 
-def buzz():    # Ok not in Stub file
+def buzz():  # ERROR PYI048
     print("fizz")
     print("buzz")
     print("test")

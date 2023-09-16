@@ -270,5 +270,33 @@ UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 73    |-        yield x, y
    72 |+    yield from z()
 74 73 |     x = 1
+75 74 | 
+76 75 | 
+
+UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+77 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7103
+78 |   def _serve_method(fn):
+79 |       for h in (
+   |  _____^
+80 | |         TaggedText.from_file(args.input)
+81 | |             .markup(highlight=args.region)
+82 | |     ):
+83 | |         yield h
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+76 76 | 
+77 77 | # Regression test for: https://github.com/astral-sh/ruff/issues/7103
+78 78 | def _serve_method(fn):
+79    |-    for h in (
+   79 |+    yield from (
+80 80 |         TaggedText.from_file(args.input)
+81 81 |             .markup(highlight=args.region)
+82    |-    ):
+83    |-        yield h
+   82 |+    )
 
 

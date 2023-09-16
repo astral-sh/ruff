@@ -17,10 +17,10 @@ expression: parse_ast
                                     value: Str(
                                         StringConstant {
                                             value: "test",
+                                            unicode: false,
                                             implicit_concatenated: false,
                                         },
                                     ),
-                                    kind: None,
                                 },
                             ),
                         ),
@@ -32,7 +32,6 @@ expression: parse_ast
                                 value: Int(
                                     1,
                                 ),
-                                kind: None,
                             },
                         ),
                     ],
@@ -105,10 +104,10 @@ expression: parse_ast
                                     value: Str(
                                         StringConstant {
                                             value: "label",
+                                            unicode: false,
                                             implicit_concatenated: false,
                                         },
                                     ),
-                                    kind: None,
                                 },
                             ),
                         ),
@@ -120,10 +119,10 @@ expression: parse_ast
                                 value: Str(
                                     StringConstant {
                                         value: "test",
+                                        unicode: false,
                                         implicit_concatenated: false,
                                     },
                                 ),
-                                kind: None,
                             },
                         ),
                     ],
@@ -142,10 +141,10 @@ expression: parse_ast
                                         value: Str(
                                             StringConstant {
                                                 value: "label",
+                                                unicode: false,
                                                 implicit_concatenated: false,
                                             },
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -260,7 +259,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -274,7 +272,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -302,7 +299,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -338,7 +334,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -352,7 +347,6 @@ expression: parse_ast
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -380,7 +374,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -416,7 +409,6 @@ expression: parse_ast
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -444,7 +436,6 @@ expression: parse_ast
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },

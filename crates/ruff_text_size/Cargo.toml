@@ -6,8 +6,8 @@ edition = "2021"
 rust-version = "1.67.1"
 
 [dependencies]
-serde = { version="1.0.152", optional = true, default_features = false }
-schemars = { version = "0.8.12", optional = true }
+serde = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_test = { version = "1.0.152" }

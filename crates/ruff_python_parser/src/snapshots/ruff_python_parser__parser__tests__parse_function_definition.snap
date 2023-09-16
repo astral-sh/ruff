@@ -43,7 +43,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 17..20,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -123,7 +122,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 50..53,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -211,7 +209,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 88..91,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -314,7 +311,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 135..138,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -387,7 +383,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 168..171,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
@@ -491,7 +486,6 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 227..230,
                                 value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },
