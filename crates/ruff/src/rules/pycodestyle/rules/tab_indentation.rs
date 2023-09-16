@@ -44,6 +44,10 @@ pub(crate) fn tab_indentation(
     locator: &Locator,
     indexer: &Indexer,
 ) {
+    // Always check the first line for tab indentation as there's no newline
+    // token before it.
+    tab_indentation_at_line_start(diagnostics, locator, TextSize::default());
+
     for (tok, range) in tokens.iter().flatten() {
         if matches!(tok, Tok::Newline | Tok::NonLogicalNewline) {
             tab_indentation_at_line_start(diagnostics, locator, range.end());
