@@ -913,12 +913,13 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // refurb
         #[allow(deprecated)]
-        (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
         #[allow(deprecated)]
-        (Refurb, "131") => (RuleGroup::Nursery, rules::refurb::rules::DeleteFullSlice),
         #[allow(deprecated)]
-        (Refurb, "132") => (RuleGroup::Nursery, rules::refurb::rules::CheckAndRemoveFromSet),
+        (Refurb, "113") => (RuleGroup::Preview, rules::refurb::rules::RepeatedAppend),
+        (Refurb, "131") => (RuleGroup::Preview, rules::refurb::rules::DeleteFullSlice),
+        (Refurb, "132") => (RuleGroup::Preview, rules::refurb::rules::CheckAndRemoveFromSet),
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
+        (Refurb, "148") => (RuleGroup::Unspecified, rules::refurb::rules::UnnecessaryEnumerate),
 
         // flake8-logging
         (Flake8Logging, "001") => (RuleGroup::Preview, rules::flake8_logging::rules::DirectLoggerInstantiation),
