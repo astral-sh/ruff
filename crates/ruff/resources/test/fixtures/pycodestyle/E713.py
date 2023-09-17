@@ -37,3 +37,4 @@ assert (not foo) in bar
 assert {"x": not foo} in bar
 assert [42, not foo] in bar
 assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
+assert not('name' in request)or not request['name']

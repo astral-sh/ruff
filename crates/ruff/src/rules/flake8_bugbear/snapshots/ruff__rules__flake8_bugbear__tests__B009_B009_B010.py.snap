@@ -316,4 +316,19 @@ B009_B010.py:34:1: B009 [*] Do not call `getattr` with a constant attribute valu
 37 37 | 
 38 38 | # Valid setattr usage
 
+B009_B010.py:58:8: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
+58 | assert getattr(func, '_rpc')is True
+   |        ^^^^^^^^^^^^^^^^^^^^^ B009
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+55 55 | setattr(foo.bar, r"baz", None)
+56 56 | 
+57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
+58    |-assert getattr(func, '_rpc')is True
+   58 |+assert func._rpc is True
+
 
