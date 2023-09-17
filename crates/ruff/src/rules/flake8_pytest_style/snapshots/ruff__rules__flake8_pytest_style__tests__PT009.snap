@@ -637,5 +637,27 @@ PT009.py:94:9: PT009 [*] Use a regular `assert` instead of unittest-style `failI
 93 93 |     def test_fail_if_equal(self):
 94    |-        self.failIfEqual(1, 2)  # Error
    94 |+        assert 1 != 2  # Error
+95 95 | 
+96 96 | 
+97 97 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459517
+
+PT009.py:98:2: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+    |
+ 97 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459517
+ 98 | (self.assertTrue(
+    |  ^^^^^^^^^^^^^^^ PT009
+ 99 |     "piAx_piAy_beta[r][x][y] = {17}".format(
+100 |         self.model.piAx_piAy_beta[r][x][y])))
+    |
+    = help: Replace `assertTrue(...)` with `assert ...`
+
+ℹ Suggested fix
+95 95 | 
+96 96 | 
+97 97 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459517
+98    |-(self.assertTrue(
+99    |-    "piAx_piAy_beta[r][x][y] = {17}".format(
+100    |-        self.model.piAx_piAy_beta[r][x][y])))
+   98 |+assert "piAx_piAy_beta[r][x][y] = {17}".format(self.model.piAx_piAy_beta[r][x][y])
 
 
