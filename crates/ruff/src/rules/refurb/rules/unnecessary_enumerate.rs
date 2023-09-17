@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Constant, Expr};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::helpers::is_unused;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -95,6 +95,7 @@ impl Violation for UnnecessaryEnumerate {
 
 /// FURB148
 pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+    // Check the for statement is of the form `for x, y in func(...)`.
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
         return;
     };
@@ -107,6 +108,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
     else {
         return;
     };
+
     // Check that the function is the `enumerate` builtin.
     let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
         return;
@@ -117,6 +119,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
     if !checker.semantic().is_builtin("enumerate") {
         return;
     };
+
     // Get the `start` argument, if it is a constant integer.
     let start = start(arguments);
 
@@ -125,6 +128,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
         return;
     };
 
+    // Check if the index and value are used.
     match (
         is_unused(index, checker.semantic()),
         is_unused(value, checker.semantic()),
@@ -138,7 +142,8 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
         (true, false) => {
             // The index is unused, so replace with `for value in sequence`.
 
-            // Attempt to create a suggested iterator replacement, it's used in both the message and the autofix.
+            // Attempt to create a suggested iterator replacement, as it's used
+            // in both the message and the autofix.
             let replace_iter = match start {
                 Some(start) if start > 0 => {
                     // If the start argument is a positive integer, there isn't a clear fix.
@@ -167,6 +172,8 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             );
 
             if checker.patch(diagnostic.kind.rule()) {
+                // If we made a suggested iterator replacement, use it and
+                // replace the target to produce a fix.
                 if let Some(replace_iter) = replace_iter {
                     let replace_target = Edit::range_replacement(
                         checker.locator().slice(value).to_string(),
@@ -181,7 +188,8 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
         (false, true) => {
             // The value is unused, so replace with `for index in range(len(sequence))`.
 
-            // Create suggested iterator replacement, it's used in both the message and the autofix.
+            // Create suggested iterator replacement, as it's used in both the
+            // message and the autofix.
             let replace_iter = Edit::range_replacement(
                 generate_range_len_call(sequence, start, checker.generator()),
                 stmt_for.iter.range(),
@@ -198,6 +206,8 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 func.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
+                // Replace the target and combine it with the suggested
+                // iterator replacement to produce a fix.
                 let replace_target = Edit::range_replacement(
                     checker.locator().slice(index).to_string(),
                     stmt_for.target.range(),
@@ -298,38 +308,4 @@ fn generate_range_len_call(name: &str, start: Option<u32>, generator: Generator)
         range: TextRange::default(),
     };
     generator.stmt(&stmt.into())
-}
-
-/// Returns `true` if the given expression is either an unused value or a tuple of unused values.
-/// TODO(tjkuson): Promote to helper function.
-fn is_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().all(|expr| is_unused(expr, semantic))
-        }
-        Expr::Name(ast::ExprName { id, .. }) => {
-            // Treat a variable as used if it has any usages, _or_ it's shadowed by another variable
-            // with usages.
-            //
-            // If we don't respect shadowing, we'll incorrectly flag `bar` as unused in:
-            // ```python
-            // from random import random
-            //
-            // for bar in range(10):
-            //     if random() > 0.5:
-            //         break
-            // else:
-            //     bar = 1
-            //
-            // print(bar)
-            // ```
-            let scope = semantic.current_scope();
-            scope
-                .get_all(id)
-                .map(|binding_id| semantic.binding(binding_id))
-                .filter(|binding| binding.start() >= expr.start())
-                .all(|binding| !binding.is_used())
-        }
-        _ => false,
-    }
 }
