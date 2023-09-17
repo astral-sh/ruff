@@ -1,4 +1,3 @@
-use num_traits::One;
 use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
 
 use ruff_diagnostics::Diagnostic;
@@ -115,7 +114,7 @@ pub(crate) fn nunique_constant_series_check(
 fn is_constant_one(expr: &Expr) -> bool {
     match expr {
         Expr::Constant(constant) => match &constant.value {
-            Constant::Int(int) => int.is_one(),
+            Constant::Int(int) => *int == 1,
             _ => false,
         },
         _ => false,

@@ -1,4 +1,4 @@
-use num_traits::ToPrimitive;
+use malachite::Integer;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -36,7 +36,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[violation]
 pub struct BadFilePermissions {
-    mask: u16,
+    mask: Integer,
 }
 
 impl Violation for BadFilePermissions {
@@ -56,7 +56,9 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
     {
         if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
             if let Some(int_value) = int_value(mode_arg, checker.semantic()) {
-                if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
+                if (int_value.clone() & Integer::from(WRITE_WORLD) > 0)
+                    || (int_value.clone() & Integer::from(EXECUTE_GROUP) > 0)
+                {
                     checker.diagnostics.push(Diagnostic::new(
                         BadFilePermissions { mask: int_value },
                         mode_arg.range(),
@@ -113,13 +115,17 @@ fn py_stat(call_path: &CallPath) -> Option<u16> {
     }
 }
 
-fn int_value(expr: &Expr, semantic: &SemanticModel) -> Option<u16> {
+fn int_value(expr: &Expr, semantic: &SemanticModel) -> Option<Integer> {
     match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..
-        }) => value.to_u16(),
-        Expr::Attribute(_) => semantic.resolve_call_path(expr).as_ref().and_then(py_stat),
+        }) => Some(value.clone()),
+        Expr::Attribute(_) => semantic
+            .resolve_call_path(expr)
+            .as_ref()
+            .and_then(py_stat)
+            .map(Integer::from),
         Expr::BinOp(ast::ExprBinOp {
             left,
             op,

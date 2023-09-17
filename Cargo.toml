@@ -25,8 +25,8 @@ insta = { version = "1.31.0", feature = ["filters", "glob"] }
 is-macro = { version = "0.3.0" }
 itertools = { version = "0.11.0" }
 log = { version = "0.4.17" }
+malachite = { version = "0.4.0", default-features = false, features = ["naturals_and_integers"] }
 memchr = "2.6.3"
-num-bigint = { version = "0.4.3" }
 num-traits = { version = "0.2.15" }
 once_cell = { version = "1.17.1" }
 path-absolutize = { version = "3.1.1" }

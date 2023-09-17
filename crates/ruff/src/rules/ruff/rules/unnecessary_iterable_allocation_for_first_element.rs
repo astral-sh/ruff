@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use num_traits::Zero;
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr};
@@ -115,7 +113,7 @@ fn is_head_slice(expr: &Expr) -> bool {
         ..
     }) = expr
     {
-        value.is_zero()
+        *value == 0
     } else {
         false
     }

@@ -15,9 +15,8 @@
 //! an implicit concatenation of string literals, as these expressions are considered to
 //! have the same shape in that they evaluate to the same value.
 
-use num_bigint::BigInt;
-
 use crate as ast;
+use malachite::Integer;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableBoolOp {
@@ -334,7 +333,7 @@ pub enum ComparableConstant<'a> {
     Bool(&'a bool),
     Str { value: &'a str, unicode: bool },
     Bytes(&'a [u8]),
-    Int(&'a BigInt),
+    Int(&'a Integer),
     Tuple(Vec<ComparableConstant<'a>>),
     Float(u64),
     Complex { real: u64, imag: u64 },

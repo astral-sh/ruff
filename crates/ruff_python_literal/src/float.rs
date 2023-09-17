@@ -1,5 +1,5 @@
 use crate::Case;
-use num_traits::{Float, Zero};
+use num_traits::Float;
 use std::f64;
 
 pub fn parse_str(literal: &str) -> Option<f64> {
@@ -248,7 +248,7 @@ pub fn to_hex(value: f64) -> String {
     let (mantissa, exponent, sign) = value.integer_decode();
     let sign_fmt = if sign < 0 { "-" } else { "" };
     match value {
-        value if value.is_zero() => format!("{sign_fmt}0x0.0p+0"),
+        value if value == 0.0 => format!("{sign_fmt}0x0.0p+0"),
         value if value.is_infinite() => format!("{sign_fmt}inf"),
         value if value.is_nan() => "nan".to_owned(),
         _ => {

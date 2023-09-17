@@ -1,4 +1,3 @@
-use num_bigint::BigInt;
 use ruff_python_ast::{self as ast, Constant, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -184,11 +183,11 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                     ..
                 }) = upper.as_ref()
                 {
-                    if *i == BigInt::from(1) && checker.enabled(Rule::SysVersionSlice1) {
+                    if *i == 1 && checker.enabled(Rule::SysVersionSlice1) {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(SysVersionSlice1, value.range()));
-                    } else if *i == BigInt::from(3) && checker.enabled(Rule::SysVersionSlice3) {
+                    } else if *i == 3 && checker.enabled(Rule::SysVersionSlice3) {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(SysVersionSlice3, value.range()));
@@ -200,11 +199,11 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 value: Constant::Int(i),
                 ..
             }) => {
-                if *i == BigInt::from(2) && checker.enabled(Rule::SysVersion2) {
+                if *i == 2 && checker.enabled(Rule::SysVersion2) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(SysVersion2, value.range()));
-                } else if *i == BigInt::from(0) && checker.enabled(Rule::SysVersion0) {
+                } else if *i == 0 && checker.enabled(Rule::SysVersion0) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(SysVersion0, value.range()));

@@ -1,4 +1,4 @@
-use num_traits::ToPrimitive;
+use malachite::Integer;
 use ruff_python_ast::{self as ast, Constant, Expr, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -46,11 +46,11 @@ impl Violation for PairwiseOverZipped {
 #[derive(Debug)]
 struct SliceInfo {
     arg_name: String,
-    slice_start: Option<i64>,
+    slice_start: Option<Integer>,
 }
 
 impl SliceInfo {
-    pub(crate) fn new(arg_name: String, slice_start: Option<i64>) -> Self {
+    pub(crate) fn new(arg_name: String, slice_start: Option<Integer>) -> Self {
         Self {
             arg_name,
             slice_start,
@@ -89,12 +89,12 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
     ))
 }
 
-fn to_bound(expr: &Expr) -> Option<i64> {
+fn to_bound(expr: &Expr) -> Option<Integer> {
     match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..
-        }) => value.to_i64(),
+        }) => Some(value.clone()),
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: UnaryOp::USub | UnaryOp::Invert,
             operand,
@@ -105,7 +105,7 @@ fn to_bound(expr: &Expr) -> Option<i64> {
                 ..
             }) = operand.as_ref()
             {
-                value.to_i64().map(|v| -v)
+                Some(-value.clone())
             } else {
                 None
             }
@@ -155,7 +155,10 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
     }
 
     // Verify that the arguments are successive.
-    if second_arg_info.slice_start.unwrap_or(0) - first_arg_info.slice_start.unwrap_or(0) != 1 {
+    if second_arg_info.slice_start.unwrap_or(Integer::from(0))
+        - first_arg_info.slice_start.unwrap_or(Integer::from(0))
+        != 1
+    {
         return;
     }
 

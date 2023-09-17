@@ -1,5 +1,3 @@
-use num_bigint::BigInt;
-use num_traits::{One, Zero};
 use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -249,10 +247,10 @@ impl ExpectedComparator {
                     ..
                 }) = upper.as_ref()
                 {
-                    if *upper == BigInt::one() {
+                    if *upper == 1 {
                         return Some(ExpectedComparator::MajorTuple);
                     }
-                    if *upper == BigInt::from(2) {
+                    if *upper == 2 {
                         return Some(ExpectedComparator::MajorMinorTuple);
                     }
                 }
@@ -260,7 +258,7 @@ impl ExpectedComparator {
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(n),
                 ..
-            }) if n.is_zero() => {
+            }) if *n == 0 => {
                 return Some(ExpectedComparator::MajorDigit);
             }
             _ => (),

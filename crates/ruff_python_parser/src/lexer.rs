@@ -28,11 +28,11 @@
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
+use malachite::num::conversion::traits::FromStringBase;
+use malachite::Integer;
 use std::iter::FusedIterator;
 use std::{char, cmp::Ordering, str::FromStr};
 
-use num_bigint::BigInt;
-use num_traits::{Num, Zero};
 use ruff_python_ast::IpyEscapeKind;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use unicode_ident::{is_xid_continue, is_xid_start};
@@ -264,11 +264,16 @@ impl<'source> Lexer<'source> {
 
         let mut number = LexedText::new(self.offset(), self.source);
         self.radix_run(&mut number, radix);
-        let value =
-            BigInt::from_str_radix(number.as_str(), radix.as_u32()).map_err(|e| LexicalError {
-                error: LexicalErrorType::OtherError(format!("{e:?}")),
+
+        let value = Integer::from_string_base(radix.as_u8(), number.as_str()).ok_or_else(|| {
+            LexicalError {
+                error: LexicalErrorType::OtherError(format!(
+                    "'{}' is not a valid integer",
+                    number.as_str()
+                )),
                 location: self.token_range().start(),
-            })?;
+            }
+        })?;
         Ok(Tok::Int { value })
     }
 
@@ -339,8 +344,19 @@ impl<'source> Lexer<'source> {
                 let imag = f64::from_str(number.as_str()).unwrap();
                 Ok(Tok::Complex { real: 0.0, imag })
             } else {
-                let value = number.as_str().parse::<BigInt>().unwrap();
-                if start_is_zero && !value.is_zero() {
+                // Optimization: `Natural` and thereby `Integer` add up digits from bytes to convert
+                // from string. This is much less efficient than the highly optimized std
+                // string-to-number parser and we know that most numbers are small.
+                // i32::MAX is 2147483647 (10 digits), so all 9 digit numbers are representable as
+                // i32. We can't guarantee that `32_bit_limbs` isn't set, so we limit ourselves to
+                // i32 instead of i64.
+                let value = if number.as_str().len() < 10 {
+                    Integer::from(i32::from_str(number.as_str()).unwrap())
+                } else {
+                    Integer::from_str(number.as_str()).unwrap()
+                };
+
+                if start_is_zero && value != 0 {
                     // leading zeros in decimal integer literals are not permitted
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
@@ -1155,7 +1171,7 @@ impl State {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Radix {
     Binary,
     Octal,
@@ -1164,7 +1180,7 @@ enum Radix {
 }
 
 impl Radix {
-    const fn as_u32(self) -> u32 {
+    const fn as_u8(self) -> u8 {
         match self {
             Radix::Binary => 2,
             Radix::Octal => 8,

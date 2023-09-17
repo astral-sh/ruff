@@ -1,6 +1,5 @@
 //! Analysis rules for the `typing` module.
 
-use num_traits::identities::Zero;
 use ruff_python_ast::{
     self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters, Stmt,
 };
@@ -319,7 +318,7 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
         ..
     }) = test.as_ref()
     {
-        if value.is_zero() {
+        if *value == 0 {
             return true;
         }
     }

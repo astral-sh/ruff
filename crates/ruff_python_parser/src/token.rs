@@ -5,7 +5,7 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
 use crate::Mode;
-use num_bigint::BigInt;
+use malachite::Integer;
 use ruff_python_ast::IpyEscapeKind;
 use ruff_text_size::TextSize;
 use std::fmt;
@@ -21,7 +21,7 @@ pub enum Tok {
     /// Token value for an integer.
     Int {
         /// The integer value.
-        value: BigInt,
+        value: Integer,
     },
     /// Token value for a floating point number.
     Float {

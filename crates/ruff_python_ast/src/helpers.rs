@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use num_traits::Zero;
 use smallvec::SmallVec;
 
 use ruff_text_size::{Ranged, TextRange};
@@ -1073,7 +1072,7 @@ impl Truthiness {
                 Constant::None => Some(false),
                 Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
                 Constant::Bytes(bytes) => Some(!bytes.is_empty()),
-                Constant::Int(int) => Some(!int.is_zero()),
+                Constant::Int(int) => Some(*int != 0),
                 Constant::Float(float) => Some(*float != 0.0),
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),

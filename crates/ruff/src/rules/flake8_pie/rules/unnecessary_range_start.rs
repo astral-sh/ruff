@@ -1,5 +1,3 @@
-use num_bigint::BigInt;
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -75,7 +73,7 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     else {
         return;
     };
-    if *value != BigInt::from(0) {
+    if *value != 0 {
         return;
     };
 

@@ -1,5 +1,3 @@
-use num_traits::{One, Zero};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
@@ -57,7 +55,7 @@ pub(crate) fn snmp_insecure_version(checker: &mut Checker, call: &ast::ExprCall)
                 ..
             }) = &keyword.value
             {
-                if value.is_zero() || value.is_one() {
+                if *value == 0 || *value == 1 {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(SnmpInsecureVersion, keyword.range()));
