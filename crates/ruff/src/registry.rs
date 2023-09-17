@@ -251,7 +251,6 @@ impl Rule {
             | Rule::MissingCopyrightNotice
             | Rule::MissingNewlineAtEndOfFile
             | Rule::MixedSpacesAndTabs
-            | Rule::TabIndentation
             | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
@@ -292,6 +291,7 @@ impl Rule {
             | Rule::ShebangNotExecutable
             | Rule::ShebangNotFirstLine
             | Rule::SingleLineImplicitStringConcatenation
+            | Rule::TabIndentation
             | Rule::TrailingCommaOnBareTuple
             | Rule::TypeCommentInStub
             | Rule::UselessSemicolon

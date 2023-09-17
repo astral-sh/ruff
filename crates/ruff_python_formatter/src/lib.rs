@@ -217,12 +217,14 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-(header.timecnt * 5  # Transition times and types
-  + header.typecnt * 6  # Local time type records
-  + header.charcnt  # Time zone designations
-  + header.leapcnt * 8  # Leap second records
-  + header.isstdcnt  # Standard/wall indicators
-  + header.isutcnt)  # UT/local indicators
+def main() -> None:
+    if True:
+        some_very_long_variable_name_abcdefghijk = Foo()
+        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
+            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
+            == "This is a very long string abcdefghijk"
+        ]
+
 "#;
         // Tokenize once
         let mut tokens = Vec::new();

@@ -9,7 +9,7 @@ use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::missing_copyright_notice;
 use crate::rules::pycodestyle::rules::{
     doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
-    tab_indentation, trailing_whitespace,
+    trailing_whitespace,
 };
 use crate::rules::pylint;
 use crate::settings::Settings;
@@ -31,7 +31,6 @@ pub(crate) fn check_physical_lines(
     let enforce_trailing_whitespace = settings.rules.enabled(Rule::TrailingWhitespace);
     let enforce_blank_line_contains_whitespace =
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
-    let enforce_tab_indentation = settings.rules.enabled(Rule::TabIndentation);
     let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
 
     let mut doc_lines_iter = doc_lines.iter().peekable();
@@ -66,12 +65,6 @@ pub(crate) fn check_physical_lines(
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
             if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
-                diagnostics.push(diagnostic);
-            }
-        }
-
-        if enforce_tab_indentation {
-            if let Some(diagnostic) = tab_indentation(&line, indexer) {
                 diagnostics.push(diagnostic);
             }
         }
