@@ -586,6 +586,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::LoggingConfigInsecureListen) {
                 flake8_bandit::rules::logging_config_insecure_listen(checker, call);
             }
+            if checker.enabled(Rule::FlaskDebugTrue) {
+                flake8_bandit::rules::flask_debug_true(checker, call);
+            }
             if checker.any_enabled(&[
                 Rule::SubprocessWithoutShellEqualsTrue,
                 Rule::SubprocessPopenWithShellEqualsTrue,

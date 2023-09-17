@@ -1,6 +1,7 @@
 pub(crate) use assert_used::*;
 pub(crate) use bad_file_permissions::*;
 pub(crate) use exec_used::*;
+pub(crate) use flask_debug_true::*;
 pub(crate) use hardcoded_bind_all_interfaces::*;
 pub(crate) use hardcoded_password_default::*;
 pub(crate) use hardcoded_password_func_arg::*;
@@ -24,6 +25,7 @@ pub(crate) use unsafe_yaml_load::*;
 mod assert_used;
 mod bad_file_permissions;
 mod exec_used;
+mod flask_debug_true;
 mod hardcoded_bind_all_interfaces;
 mod hardcoded_password_default;
 mod hardcoded_password_func_arg;
