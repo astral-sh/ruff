@@ -54,18 +54,23 @@ pub(crate) fn unnecessary_generator_dict(
     else {
         return;
     };
-    if let Expr::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument {
-        match elt.as_ref() {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) if elts.len() == 2 => {
-                let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
-                        fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::suggested)
-                    });
-                }
-                checker.diagnostics.push(diagnostic);
-            }
-            _ => {}
-        }
+    let Expr::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument else {
+        return;
+    };
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = elt.as_ref() else {
+        return;
+    };
+    if elts.len() != 2 {
+        return;
     }
+    if elts.iter().any(Expr::is_starred_expr) {
+        return;
+    }
+    let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::suggested)
+        });
+    }
+    checker.diagnostics.push(diagnostic);
 }
