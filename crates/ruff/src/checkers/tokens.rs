@@ -45,12 +45,15 @@ pub(crate) fn check_tokens(
         let mut state_machine = StateMachine::default();
         for &(ref tok, range) in tokens.iter().flatten() {
             let is_docstring = state_machine.consume(tok);
-            if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
+            if matches!(
+                tok,
+                Tok::String { .. } | Tok::FStringMiddle { .. } | Tok::Comment(_)
+            ) {
                 ruff::rules::ambiguous_unicode_character(
                     &mut diagnostics,
                     locator,
                     range,
-                    if tok.is_string() {
+                    if tok.is_string() || tok.is_f_string_middle() {
                         if is_docstring {
                             Context::Docstring
                         } else {
