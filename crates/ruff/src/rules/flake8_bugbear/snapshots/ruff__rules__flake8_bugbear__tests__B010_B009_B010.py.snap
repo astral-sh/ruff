@@ -82,6 +82,7 @@ B009_B010.py:53:1: B010 [*] Do not call `setattr` with a constant attribute valu
    53 |+foo.abc123 = None
 54 54 | setattr(foo, r"abc123", None)
 55 55 | setattr(foo.bar, r"baz", None)
+56 56 | 
 
 B009_B010.py:54:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -100,6 +101,8 @@ B009_B010.py:54:1: B010 [*] Do not call `setattr` with a constant attribute valu
 54    |-setattr(foo, r"abc123", None)
    54 |+foo.abc123 = None
 55 55 | setattr(foo.bar, r"baz", None)
+56 56 | 
+57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
 
 B009_B010.py:55:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -107,6 +110,8 @@ B009_B010.py:55:1: B010 [*] Do not call `setattr` with a constant attribute valu
 54 | setattr(foo, r"abc123", None)
 55 | setattr(foo.bar, r"baz", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+56 | 
+57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
    |
    = help: Replace `setattr` with assignment
 
@@ -116,5 +121,8 @@ B009_B010.py:55:1: B010 [*] Do not call `setattr` with a constant attribute valu
 54 54 | setattr(foo, r"abc123", None)
 55    |-setattr(foo.bar, r"baz", None)
    55 |+foo.bar.baz = None
+56 56 | 
+57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
+58 58 | assert getattr(func, '_rpc')is True
 
 

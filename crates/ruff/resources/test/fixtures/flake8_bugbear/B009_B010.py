@@ -53,3 +53,6 @@ setattr(foo, "__123abc__", None)
 setattr(foo, "abc123", None)
 setattr(foo, r"abc123", None)
 setattr(foo.bar, r"baz", None)
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
+assert getattr(func, '_rpc')is True

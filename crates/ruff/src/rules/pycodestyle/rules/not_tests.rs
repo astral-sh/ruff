@@ -1,3 +1,4 @@
+use crate::autofix::edits::pad;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
@@ -95,12 +96,16 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
                 let mut diagnostic = Diagnostic::new(NotInTest, unary_op.operand.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        generate_comparison(
-                            left,
-                            &[CmpOp::NotIn],
-                            comparators,
-                            unary_op.into(),
-                            checker.indexer().comment_ranges(),
+                        pad(
+                            generate_comparison(
+                                left,
+                                &[CmpOp::NotIn],
+                                comparators,
+                                unary_op.into(),
+                                checker.indexer().comment_ranges(),
+                                checker.locator(),
+                            ),
+                            unary_op.range(),
                             checker.locator(),
                         ),
                         unary_op.range(),
@@ -114,12 +119,16 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
                 let mut diagnostic = Diagnostic::new(NotIsTest, unary_op.operand.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        generate_comparison(
-                            left,
-                            &[CmpOp::IsNot],
-                            comparators,
-                            unary_op.into(),
-                            checker.indexer().comment_ranges(),
+                        pad(
+                            generate_comparison(
+                                left,
+                                &[CmpOp::IsNot],
+                                comparators,
+                                unary_op.into(),
+                                checker.indexer().comment_ranges(),
+                                checker.locator(),
+                            ),
+                            unary_op.range(),
                             checker.locator(),
                         ),
                         unary_op.range(),
