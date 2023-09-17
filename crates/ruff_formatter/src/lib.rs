@@ -439,7 +439,7 @@ pub type FormatResult<F> = Result<F, FormatError>;
 /// let paragraph = Paragraph(String::from("test"));
 /// let formatted = format!(SimpleFormatContext::default(), [paragraph])?;
 ///
-/// assert_eq!("\ntest\n", formatted.print()?.as_code());
+/// assert_eq!("test\n", formatted.print()?.as_code());
 /// # Ok(())
 /// # }
 /// ```
