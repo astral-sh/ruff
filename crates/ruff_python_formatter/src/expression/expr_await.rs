@@ -1,6 +1,6 @@
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::ExprAwait;
+use ruff_python_ast::{Expr, ExprAwait};
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
@@ -15,12 +15,48 @@ impl FormatNodeRule<ExprAwait> for FormatExprAwait {
     fn fmt_fields(&self, item: &ExprAwait, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprAwait { range: _, value } = item;
 
+        // Drop parentheses around low-precedence operators (constants, names, attributes, and
+        // subscripts). It would also be syntactically valid to drop parentheses around lists,
+        // sets, and dictionaries, but Black doesn't do that.
+        // See: https://docs.python.org/3/reference/expressions.html#operator-precedence
+        let parenthesize = match value.as_ref() {
+            Expr::FString(_)
+            | Expr::Constant(_)
+            | Expr::Attribute(_)
+            | Expr::Subscript(_)
+            | Expr::Call(_)
+            | Expr::Name(_) => Parenthesize::IfBreaks,
+
+            Expr::Dict(_)
+            | Expr::Set(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::DictComp(_)
+            | Expr::BoolOp(_)
+            | Expr::NamedExpr(_)
+            | Expr::BinOp(_)
+            | Expr::UnaryOp(_)
+            | Expr::Lambda(_)
+            | Expr::IfExp(_)
+            | Expr::GeneratorExp(_)
+            | Expr::Await(_)
+            | Expr::Yield(_)
+            | Expr::YieldFrom(_)
+            | Expr::Compare(_)
+            | Expr::FormattedValue(_)
+            | Expr::Starred(_)
+            | Expr::List(_)
+            | Expr::Tuple(_)
+            | Expr::Slice(_)
+            | Expr::IpyEscapeCommand(_) => Parenthesize::Optional,
+        };
+
         write!(
             f,
             [
                 token("await"),
                 space(),
-                maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
+                maybe_parenthesize_expression(value, item, parenthesize)
             ]
         )
     }
