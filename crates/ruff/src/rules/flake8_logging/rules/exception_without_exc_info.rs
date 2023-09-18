@@ -31,9 +31,9 @@ use crate::checkers::ast::Checker;
 /// logging.error("...")
 /// ```
 #[violation]
-pub struct ExcInfoFalseInException;
+pub struct ExceptionWithoutExcInfo;
 
-impl Violation for ExcInfoFalseInException {
+impl Violation for ExceptionWithoutExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use of `logging.exception` with falsy `exc_info`")
@@ -41,7 +41,7 @@ impl Violation for ExcInfoFalseInException {
 }
 
 /// LOG007
-pub(crate) fn exc_info_false_in_exception(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall) {
     if !is_logger_candidate(
         call.func.as_ref(),
         checker.semantic(),
@@ -60,6 +60,6 @@ pub(crate) fn exc_info_false_in_exception(checker: &mut Checker, call: &ExprCall
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(ExcInfoFalseInException, call.range()));
+            .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
     }
 }
