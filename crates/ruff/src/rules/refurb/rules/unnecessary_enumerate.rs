@@ -45,6 +45,8 @@ use crate::registry::AsRule;
 ///
 /// ## References
 /// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
+/// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
+/// - [Python documentation: `len`](https://docs.python.org/3/library/functions.html#len)
 #[violation]
 pub struct UnnecessaryEnumerate {
     subset: EnumerateSubset,
