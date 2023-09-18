@@ -64,9 +64,13 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 impl NeedsParentheses for ExprLambda {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }

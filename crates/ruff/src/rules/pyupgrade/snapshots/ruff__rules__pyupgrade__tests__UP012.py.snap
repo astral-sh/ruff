@@ -510,6 +510,7 @@ UP012.py:75:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    75 |+(f"foo{bar}").encode()
 76 76 | ("unicode text©").encode("utf-8")
 77 77 | ("unicode text©").encode(encoding="utf-8")
+78 78 | 
 
 UP012.py:76:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
@@ -528,6 +529,8 @@ UP012.py:76:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 76    |-("unicode text©").encode("utf-8")
    76 |+("unicode text©").encode()
 77 77 | ("unicode text©").encode(encoding="utf-8")
+78 78 | 
+79 79 | 
 
 UP012.py:77:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
@@ -544,5 +547,24 @@ UP012.py:77:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 76 76 | ("unicode text©").encode("utf-8")
 77    |-("unicode text©").encode(encoding="utf-8")
    77 |+("unicode text©").encode()
+78 78 | 
+79 79 | 
+80 80 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459882
+
+UP012.py:82:17: UP012 [*] Unnecessary call to `encode` as UTF-8
+   |
+80 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459882
+81 | def _match_ignore(line):
+82 |     input=stdin and'\n'.encode()or None
+   |                    ^^^^^^^^^^^^^ UP012
+   |
+   = help: Rewrite as bytes literal
+
+ℹ Fix
+79 79 | 
+80 80 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459882
+81 81 | def _match_ignore(line):
+82    |-	input=stdin and'\n'.encode()or None
+   82 |+	input=stdin and b'\n' or None
 
 

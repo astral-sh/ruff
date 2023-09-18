@@ -91,10 +91,14 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
 impl NeedsParentheses for ExprGeneratorExp {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Never
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Never
+        }
     }
 }
 

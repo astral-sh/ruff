@@ -10,6 +10,5 @@ type(arg)(" ")
 # OK
 y = x.dtype.type(0.0)
 
-# OK
-type = lambda *args, **kwargs: None
-type("")
+# Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459841
+assert isinstance(fullname, type("")is not True)

@@ -60,6 +60,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "one-blank-line-after-class",
     "over-indentation",
     "over-indented",
+    "pass-statement-stub-body",
     "prohibited-trailing-comma",
     "shebang-leading-whitespace",
     "surrounding-whitespace",

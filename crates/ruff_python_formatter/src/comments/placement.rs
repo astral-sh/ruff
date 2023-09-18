@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters};
+use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, ModModule, Parameters};
 use ruff_python_trivia::{
     find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, CommentRanges,
     SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -229,8 +229,12 @@ fn handle_enclosed_comment<'a>(
                 CommentPlacement::Default(comment)
             }
         }
-        AnyNodeRef::ModModule(_) => {
-            handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
+        AnyNodeRef::ModModule(module) => {
+            handle_trailing_module_comment(module, comment).or_else(|comment| {
+                handle_module_level_own_line_comment_before_class_or_function_comment(
+                    comment, locator,
+                )
+            })
         }
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
         AnyNodeRef::PatternMatchSequence(pattern_match_sequence) => {
@@ -877,6 +881,35 @@ fn handle_trailing_binary_like_comment<'a>(
 
     if comment.end() < operator_offset {
         CommentPlacement::trailing(left_operand, comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
+}
+
+/// Handles trailing comments after the last statement in a module.
+/// Ruff's parser sets the module range to exclude trailing comments and the result is that
+/// [`CommentPlacement::Default`] makes these comments dangling comments.
+///
+/// This method overrides the handling to make these comments trailing comments of the last
+/// statement instead.
+///
+/// ```python
+/// a
+///
+/// # trailing comment
+/// ```
+///
+/// Comments of an all empty module are leading module comments
+fn handle_trailing_module_comment<'a>(
+    module: &'a ModModule,
+    comment: DecoratedComment<'a>,
+) -> CommentPlacement<'a> {
+    if comment.preceding_node().is_none() && comment.following_node().is_none() {
+        if let Some(last_statement) = module.body.last() {
+            CommentPlacement::trailing(last_statement, comment)
+        } else {
+            CommentPlacement::leading(comment.enclosing_node(), comment)
+        }
     } else {
         CommentPlacement::Default(comment)
     }

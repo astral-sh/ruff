@@ -17,10 +17,6 @@ pub struct Indexer {
     /// Stores the start offset of continuation lines.
     continuation_lines: Vec<TextSize>,
 
-    /// The range of all triple quoted strings in the source document. The ranges are sorted by their
-    /// [`TextRange::start`] position in increasing order. No two ranges are overlapping.
-    triple_quoted_string_ranges: Vec<TextRange>,
-
     /// The range of all f-string in the source document. The ranges are sorted by their
     /// [`TextRange::start`] position in increasing order. No two ranges are overlapping.
     f_string_ranges: Vec<TextRange>,
@@ -32,7 +28,6 @@ impl Indexer {
 
         let mut comment_ranges_builder = CommentRangesBuilder::default();
         let mut continuation_lines = Vec::new();
-        let mut triple_quoted_string_ranges = Vec::new();
         let mut f_string_ranges = Vec::new();
         // Token, end
         let mut prev_end = TextSize::default();
@@ -70,12 +65,6 @@ impl Indexer {
                     line_start = range.end();
                 }
                 Tok::String {
-                    triple_quoted: true,
-                    ..
-                } => {
-                    triple_quoted_string_ranges.push(*range);
-                }
-                Tok::String {
                     kind: StringKind::FString | StringKind::RawFString,
                     ..
                 } => {
@@ -90,7 +79,6 @@ impl Indexer {
         Self {
             comment_ranges: comment_ranges_builder.finish(),
             continuation_lines,
-            triple_quoted_string_ranges,
             f_string_ranges,
         }
     }
@@ -109,22 +97,6 @@ impl Indexer {
     pub fn is_continuation(&self, offset: TextSize, locator: &Locator) -> bool {
         let line_start = locator.line_start(offset);
         self.continuation_lines.binary_search(&line_start).is_ok()
-    }
-
-    /// Return the [`TextRange`] of the triple-quoted-string containing a given offset.
-    pub fn triple_quoted_string_range(&self, offset: TextSize) -> Option<TextRange> {
-        let Ok(string_range_index) = self.triple_quoted_string_ranges.binary_search_by(|range| {
-            if offset < range.start() {
-                std::cmp::Ordering::Greater
-            } else if range.contains(offset) {
-                std::cmp::Ordering::Equal
-            } else {
-                std::cmp::Ordering::Less
-            }
-        }) else {
-            return None;
-        };
-        Some(self.triple_quoted_string_ranges[string_range_index])
     }
 
     /// Return the [`TextRange`] of the f-string containing a given offset.
@@ -278,7 +250,7 @@ mod tests {
     use ruff_python_parser::lexer::LexResult;
     use ruff_python_parser::{lexer, Mode};
     use ruff_source_file::Locator;
-    use ruff_text_size::{TextRange, TextSize};
+    use ruff_text_size::TextSize;
 
     use crate::Indexer;
 
@@ -359,58 +331,6 @@ import os
                 TextSize::from(84),
                 // row 12
                 TextSize::from(116)
-            ]
-        );
-    }
-
-    #[test]
-    fn string_ranges() {
-        let contents = r#""this is a single-quoted string""#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
-        assert_eq!(indexer.triple_quoted_string_ranges, []);
-
-        let contents = r#"
-            """
-            this is a multiline string
-            """
-            "#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
-        assert_eq!(
-            indexer.triple_quoted_string_ranges,
-            [TextRange::new(TextSize::from(13), TextSize::from(71))]
-        );
-
-        let contents = r#"
-            """
-            '''this is a multiline string with multiple delimiter types'''
-            """
-            "#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
-        assert_eq!(
-            indexer.triple_quoted_string_ranges,
-            [TextRange::new(TextSize::from(13), TextSize::from(107))]
-        );
-
-        let contents = r#"
-            """
-            this is one
-            multiline string
-            """
-            """
-            and this is
-            another
-            """
-            "#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
-        assert_eq!(
-            indexer.triple_quoted_string_ranges,
-            &[
-                TextRange::new(TextSize::from(13), TextSize::from(85)),
-                TextRange::new(TextSize::from(98), TextSize::from(161))
             ]
         );
     }

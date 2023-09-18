@@ -36,3 +36,8 @@ def isinstances():
     result = isinstance(var[6], int) or isinstance(var[7], int)
     result = isinstance(var[6], (float, int)) or False
     return result
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
+if(isinstance(self.k, int)) or (isinstance(self.k, float)):
+    ...
