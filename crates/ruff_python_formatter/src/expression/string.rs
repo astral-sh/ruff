@@ -543,10 +543,17 @@ fn preferred_quotes(
                             // `""` or `''`
                             chars.next();
 
-                            if chars.peek().copied() == Some(configured_quote_char) {
-                                // `"""` or `'''`
-                                chars.next();
-                                uses_triple_quotes = true;
+                            match chars.peek().copied() {
+                                Some(c) if c == configured_quote_char => {
+                                    // `"""` or `'''`
+                                    chars.next();
+                                    uses_triple_quotes = true;
+                                }
+                                Some(_) => {}
+                                None => {
+                                    // Handle `''' ""'''`
+                                    uses_triple_quotes = true;
+                                }
                             }
                         }
                         Some(_) => {
