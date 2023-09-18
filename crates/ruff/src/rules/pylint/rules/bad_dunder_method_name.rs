@@ -123,6 +123,7 @@ fn is_known_dunder_method(method: &str) -> bool {
             | "__getstate__"
             | "__gt__"
             | "__hash__"
+            | "__html__"
             | "__iadd__"
             | "__iand__"
             | "__ifloordiv__"

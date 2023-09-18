@@ -31,10 +31,12 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 impl NeedsParentheses for ExprCompare {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if let Expr::Constant(constant) = self.left.as_ref() {
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else if let Expr::Constant(constant) = self.left.as_ref() {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
             if !constant.value.is_implicit_concatenated()
                 && is_multiline_string(constant, context.source())

@@ -72,11 +72,12 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
 impl NeedsParentheses for ExprUnaryOp {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        // We preserve the parentheses of the operand. It should not be necessary to break this expression.
-        if is_expression_parenthesized(
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else if is_expression_parenthesized(
             self.operand.as_ref().into(),
             context.comments().ranges(),
             context.source(),
