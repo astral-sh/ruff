@@ -12,26 +12,30 @@ license = { workspace = true }
 
 [dependencies]
 ruff_formatter = { path = "../ruff_formatter" }
-ruff_python_whitespace = { path = "../ruff_python_whitespace" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
+ruff_source_file = { path = "../ruff_source_file" }
 ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_text_size = { workspace = true }
+ruff_python_index = { path = "../ruff_python_index" }
+ruff_python_parser = { path = "../ruff_python_parser" }
+ruff_text_size = { path = "../ruff_text_size" }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 clap = { workspace = true }
 countme = "3.0.1"
-is-macro = { workspace = true }
 itertools = { workspace = true }
+memchr = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
-rustpython-parser = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+static_assertions = { workspace = true }
 thiserror = { workspace = true }
-unic-ucd-ident = "0.9.0"
+tracing = { workspace = true }
+unicode-width = { workspace = true }
 
 [dev-dependencies]
-ruff_formatter = { path = "../ruff_formatter", features = ["serde"]}
+ruff_formatter = { path = "../ruff_formatter", features = ["serde"] }
 
 insta = { workspace = true, features = ["glob"] }
 serde = { workspace = true }
@@ -42,8 +46,8 @@ similar = { workspace = true }
 name = "ruff_python_formatter_fixtures"
 path = "tests/fixtures.rs"
 test = true
-required-features = [ "serde" ]
+required-features = ["serde"]
 
 [features]
-serde = ["dep:serde", "ruff_formatter/serde"]
+serde = ["dep:serde", "ruff_formatter/serde", "ruff_source_file/serde", "ruff_python_ast/serde"]
 default = ["serde"]

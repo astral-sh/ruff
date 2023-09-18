@@ -1,8 +1,9 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, UnaryOp};
+use ruff_python_ast::{self as ast, Constant, Expr, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
@@ -79,10 +80,11 @@ fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
         Constant::Bool(_) => false,
         Constant::Ellipsis => false,
         // Otherwise, special-case some common string and integer types.
-        Constant::Str(value) => !matches!(value.as_str(), "" | "__main__"),
+        Constant::Str(ast::StringConstant { value, .. }) => {
+            !matches!(value.as_str(), "" | "__main__")
+        }
         Constant::Int(value) => !matches!(value.try_into(), Ok(0 | 1)),
         Constant::Bytes(_) => true,
-        Constant::Tuple(_) => true,
         Constant::Float(_) => true,
         Constant::Complex { .. } => true,
     }

@@ -36,7 +36,7 @@ pub struct UnusedCodes {
 /// ```
 ///
 /// ## References
-/// - [Automatic `noqa` management](https://beta.ruff.rs/docs/configuration/#automatic-noqa-management)
+/// - [Automatic `noqa` management](https://docs.astral.sh/ruff/configuration/#automatic-noqa-management)
 #[violation]
 pub struct UnusedNOQA {
     pub codes: Option<UnusedCodes>,

@@ -1,38 +1,50 @@
+use std::fmt::Debug;
 use std::iter::Peekable;
-
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{
-    Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
-    MatchCase, Mod, Pattern, Ranged, Stmt, WithItem,
-};
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::source_code::{CommentRanges, Locator};
+use ruff_python_ast::{Mod, Stmt};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
-use ruff_python_whitespace::is_python_whitespace;
+use ruff_python_trivia::{is_python_whitespace, CommentRanges};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
 use crate::comments::{CommentLinePosition, CommentsMap, SourceComment};
 
+/// Collect the preceding, following and enclosing node for each comment without applying
+/// [`place_comment`] for debugging.
+pub(crate) fn collect_comments<'a>(
+    root: &'a Mod,
+    source_code: SourceCode<'a>,
+    comment_ranges: &'a CommentRanges,
+) -> Vec<DecoratedComment<'a>> {
+    let mut collector = CommentsVecBuilder::default();
+    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(root);
+    collector.comments
+}
+
 /// Visitor extracting the comments from an AST.
-#[derive(Debug, Clone)]
-pub(crate) struct CommentsVisitor<'a> {
-    builder: CommentsBuilder<'a>,
+pub(super) struct CommentsVisitor<'a, 'builder> {
+    builder: &'builder mut (dyn PushComment<'a> + 'a),
     source_code: SourceCode<'a>,
     parents: Vec<AnyNodeRef<'a>>,
     preceding_node: Option<AnyNodeRef<'a>>,
     comment_ranges: Peekable<std::slice::Iter<'a, TextRange>>,
 }
 
-impl<'a> CommentsVisitor<'a> {
-    pub(crate) fn new(source_code: SourceCode<'a>, comment_ranges: &'a CommentRanges) -> Self {
+impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
+    pub(super) fn new(
+        source_code: SourceCode<'a>,
+        comment_ranges: &'a CommentRanges,
+        builder: &'builder mut (dyn PushComment<'a> + 'a),
+    ) -> Self {
         Self {
-            builder: CommentsBuilder::default(),
+            builder,
             source_code,
             parents: Vec::new(),
             preceding_node: None,
@@ -40,20 +52,22 @@ impl<'a> CommentsVisitor<'a> {
         }
     }
 
-    pub(super) fn visit(mut self, root: &'a Mod) -> CommentsMap<'a> {
+    pub(super) fn visit(mut self, root: &'a Mod) {
         self.visit_mod(root);
-
-        self.finish()
     }
 
-    fn start_node<N>(&mut self, node: N) -> TraversalSignal
-    where
-        N: Into<AnyNodeRef<'a>>,
-    {
-        self.start_node_impl(node.into())
+    // Try to skip the subtree if
+    // * there are no comments
+    // * if the next comment comes after this node (meaning, this nodes subtree contains no comments)
+    fn can_skip(&mut self, node_end: TextSize) -> bool {
+        self.comment_ranges
+            .peek()
+            .map_or(true, |next_comment| next_comment.start() >= node_end)
     }
+}
 
-    fn start_node_impl(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
+    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         let node_range = node.range();
 
         let enclosing_node = self.parents.last().copied().unwrap_or(node);
@@ -76,10 +90,7 @@ impl<'a> CommentsVisitor<'a> {
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder.add_comment(place_comment(
-                comment,
-                &Locator::new(self.source_code.as_str()),
-            ));
+            self.builder.push_comment(comment);
             self.comment_ranges.next();
         }
 
@@ -94,23 +105,7 @@ impl<'a> CommentsVisitor<'a> {
         }
     }
 
-    // Try to skip the subtree if
-    // * there are no comments
-    // * if the next comment comes after this node (meaning, this nodes subtree contains no comments)
-    fn can_skip(&mut self, node_end: TextSize) -> bool {
-        self.comment_ranges
-            .peek()
-            .map_or(true, |next_comment| next_comment.start() >= node_end)
-    }
-
-    fn finish_node<N>(&mut self, node: N)
-    where
-        N: Into<AnyNodeRef<'a>>,
-    {
-        self.finish_node_impl(node.into());
-    }
-
-    fn finish_node_impl(&mut self, node: AnyNodeRef<'a>) {
+    fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
         // We are leaving this node, pop it from the parent stack.
         self.parents.pop();
 
@@ -128,35 +123,19 @@ impl<'a> CommentsVisitor<'a> {
 
             let comment = DecoratedComment {
                 enclosing: node,
-                preceding: self.preceding_node,
                 parent: self.parents.last().copied(),
+                preceding: self.preceding_node,
                 following: None,
                 line_position: text_position(*comment_range, self.source_code),
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder.add_comment(place_comment(
-                comment,
-                &Locator::new(self.source_code.as_str()),
-            ));
+            self.builder.push_comment(comment);
 
             self.comment_ranges.next();
         }
 
         self.preceding_node = Some(node);
-    }
-
-    fn finish(self) -> CommentsMap<'a> {
-        self.builder.finish()
-    }
-}
-
-impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
-    fn visit_mod(&mut self, module: &'ast Mod) {
-        if self.start_node(module).is_traverse() {
-            walk_module(self, module);
-        }
-        self.finish_node(module);
     }
 
     fn visit_body(&mut self, body: &'ast [Stmt]) {
@@ -177,112 +156,6 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
                 }
             }
         }
-    }
-
-    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
-        if self.start_node(stmt).is_traverse() {
-            walk_stmt(self, stmt);
-        }
-        self.finish_node(stmt);
-    }
-
-    fn visit_annotation(&mut self, expr: &'ast Expr) {
-        if self.start_node(expr).is_traverse() {
-            walk_expr(self, expr);
-        }
-        self.finish_node(expr);
-    }
-
-    fn visit_decorator(&mut self, decorator: &'ast Decorator) {
-        if self.start_node(decorator).is_traverse() {
-            walk_decorator(self, decorator);
-        }
-        self.finish_node(decorator);
-    }
-
-    fn visit_expr(&mut self, expr: &'ast Expr) {
-        if self.start_node(expr).is_traverse() {
-            walk_expr(self, expr);
-        }
-        self.finish_node(expr);
-    }
-
-    fn visit_comprehension(&mut self, comprehension: &'ast Comprehension) {
-        if self.start_node(comprehension).is_traverse() {
-            walk_comprehension(self, comprehension);
-        }
-        self.finish_node(comprehension);
-    }
-
-    fn visit_except_handler(&mut self, except_handler: &'ast ExceptHandler) {
-        if self.start_node(except_handler).is_traverse() {
-            walk_except_handler(self, except_handler);
-        }
-        self.finish_node(except_handler);
-    }
-
-    fn visit_format_spec(&mut self, format_spec: &'ast Expr) {
-        if self.start_node(format_spec).is_traverse() {
-            walk_expr(self, format_spec);
-        }
-        self.finish_node(format_spec);
-    }
-
-    fn visit_arguments(&mut self, arguments: &'ast Arguments) {
-        if self.start_node(arguments).is_traverse() {
-            walk_arguments(self, arguments);
-        }
-        self.finish_node(arguments);
-    }
-
-    fn visit_arg(&mut self, arg: &'ast Arg) {
-        if self.start_node(arg).is_traverse() {
-            walk_arg(self, arg);
-        }
-        self.finish_node(arg);
-    }
-
-    fn visit_arg_with_default(&mut self, arg_with_default: &'ast ArgWithDefault) {
-        if self.start_node(arg_with_default).is_traverse() {
-            walk_arg_with_default(self, arg_with_default);
-        }
-        self.finish_node(arg_with_default);
-    }
-
-    fn visit_keyword(&mut self, keyword: &'ast Keyword) {
-        if self.start_node(keyword).is_traverse() {
-            walk_keyword(self, keyword);
-        }
-        self.finish_node(keyword);
-    }
-
-    fn visit_alias(&mut self, alias: &'ast Alias) {
-        if self.start_node(alias).is_traverse() {
-            walk_alias(self, alias);
-        }
-        self.finish_node(alias);
-    }
-
-    fn visit_with_item(&mut self, with_item: &'ast WithItem) {
-        if self.start_node(with_item).is_traverse() {
-            walk_with_item(self, with_item);
-        }
-
-        self.finish_node(with_item);
-    }
-
-    fn visit_match_case(&mut self, match_case: &'ast MatchCase) {
-        if self.start_node(match_case).is_traverse() {
-            walk_match_case(self, match_case);
-        }
-        self.finish_node(match_case);
-    }
-
-    fn visit_pattern(&mut self, pattern: &'ast Pattern) {
-        if self.start_node(pattern).is_traverse() {
-            walk_pattern(self, pattern);
-        }
-        self.finish_node(pattern);
     }
 }
 
@@ -306,7 +179,7 @@ fn text_position(comment_range: TextRange, source_code: SourceCode) -> CommentLi
 ///
 /// Used by [`CommentStyle::place_comment`] to determine if this should become a [leading](self#leading-comments), [dangling](self#dangling-comments), or [trailing](self#trailing-comments) comment.
 #[derive(Debug, Clone)]
-pub(super) struct DecoratedComment<'a> {
+pub(crate) struct DecoratedComment<'a> {
     enclosing: AnyNodeRef<'a>,
     preceding: Option<AnyNodeRef<'a>>,
     following: Option<AnyNodeRef<'a>>,
@@ -332,18 +205,13 @@ impl<'a> DecoratedComment<'a> {
     ///
     /// The enclosing node is the list expression and not the name `b` because
     /// `a` and `b` are children of the list expression and `comment` is between the two nodes.
-    pub(super) fn enclosing_node(&self) -> AnyNodeRef<'a> {
+    pub(crate) fn enclosing_node(&self) -> AnyNodeRef<'a> {
         self.enclosing
     }
 
     /// Returns the parent of the enclosing node, if any
     pub(super) fn enclosing_parent(&self) -> Option<AnyNodeRef<'a>> {
         self.parent
-    }
-
-    /// Returns the slice into the source code.
-    pub(super) fn slice(&self) -> &SourceCodeSlice {
-        &self.slice
     }
 
     /// Returns the comment's preceding node.
@@ -386,7 +254,7 @@ impl<'a> DecoratedComment<'a> {
     ///
     ///  Returns `Some(a)` because `a` is the preceding node of `comment`. The presence of the `,` token
     /// doesn't change that.
-    pub(super) fn preceding_node(&self) -> Option<AnyNodeRef<'a>> {
+    pub(crate) fn preceding_node(&self) -> Option<AnyNodeRef<'a>> {
         self.preceding
     }
 
@@ -444,13 +312,18 @@ impl<'a> DecoratedComment<'a> {
     ///
     /// Returns `None` because `comment` is enclosed inside the parenthesized expression and it has no children
     /// following `# comment`.
-    pub(super) fn following_node(&self) -> Option<AnyNodeRef<'a>> {
+    pub(crate) fn following_node(&self) -> Option<AnyNodeRef<'a>> {
         self.following
     }
 
     /// The position of the comment in the text.
     pub(super) fn line_position(&self) -> CommentLinePosition {
         self.line_position
+    }
+
+    /// Returns the slice into the source code.
+    pub(crate) fn slice(&self) -> &SourceCodeSlice {
+        &self.slice
     }
 }
 
@@ -605,50 +478,71 @@ pub(super) enum CommentPlacement<'a> {
 impl<'a> CommentPlacement<'a> {
     /// Makes `comment` a [leading comment](self#leading-comments) of `node`.
     #[inline]
-    pub(super) fn leading(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn leading(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Leading {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }
 
     /// Makes `comment` a [dangling comment](self::dangling-comments) of `node`.
-    pub(super) fn dangling(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn dangling(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Dangling {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }
 
     /// Makes `comment` a [trailing comment](self::trailing-comments) of `node`.
     #[inline]
-    pub(super) fn trailing(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn trailing(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Trailing {
-            node,
+            node: node.into(),
             comment: comment.into(),
+        }
+    }
+
+    /// Chains the placement with the given function.
+    ///
+    /// Returns `self` when the placement is non-[`CommentPlacement::Default`]. Otherwise, calls the
+    /// function with the comment and returns the result.
+    pub(super) fn or_else<F: FnOnce(DecoratedComment<'a>) -> Self>(self, f: F) -> Self {
+        match self {
+            Self::Default(comment) => f(comment),
+            _ => self,
         }
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum TraversalSignal {
-    Traverse,
-    Skip,
+pub(super) trait PushComment<'a> {
+    fn push_comment(&mut self, placement: DecoratedComment<'a>);
 }
 
-impl TraversalSignal {
-    const fn is_traverse(self) -> bool {
-        matches!(self, TraversalSignal::Traverse)
+/// A storage for the [`CommentsVisitor`] that just pushes the decorated comments to a [`Vec`] for
+/// debugging purposes.
+#[derive(Debug, Default)]
+struct CommentsVecBuilder<'a> {
+    comments: Vec<DecoratedComment<'a>>,
+}
+
+impl<'a> PushComment<'a> for CommentsVecBuilder<'a> {
+    fn push_comment(&mut self, placement: DecoratedComment<'a>) {
+        self.comments.push(placement);
     }
 }
 
-#[derive(Clone, Debug, Default)]
-struct CommentsBuilder<'a> {
+/// A storage for the [`CommentsVisitor`] that fixes the placement and stores the comments in a
+/// [`CommentsMap`].
+pub(super) struct CommentsMapBuilder<'a> {
     comments: CommentsMap<'a>,
+    /// We need those for backwards lexing
+    comment_ranges: &'a CommentRanges,
+    locator: Locator<'a>,
 }
 
-impl<'a> CommentsBuilder<'a> {
-    fn add_comment(&mut self, placement: CommentPlacement<'a>) {
+impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
+    fn push_comment(&mut self, placement: DecoratedComment<'a>) {
+        let placement = place_comment(placement, self.comment_ranges, &self.locator);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -707,8 +601,18 @@ impl<'a> CommentsBuilder<'a> {
             }
         }
     }
+}
 
-    fn finish(self) -> CommentsMap<'a> {
+impl<'a> CommentsMapBuilder<'a> {
+    pub(crate) fn new(locator: Locator<'a>, comment_ranges: &'a CommentRanges) -> Self {
+        Self {
+            comments: CommentsMap::default(),
+            comment_ranges,
+            locator,
+        }
+    }
+
+    pub(crate) fn finish(self) -> CommentsMap<'a> {
         self.comments
     }
 

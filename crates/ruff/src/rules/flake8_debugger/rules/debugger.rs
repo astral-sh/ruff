@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
+use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{format_call_path, from_unqualified_name, CallPath};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_debugger::types::DebuggerUsingType;

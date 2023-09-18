@@ -1,11 +1,13 @@
 use std::hash::BuildHasherDefault;
 
+use ruff_python_ast::Expr;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{Expr, Ranged};
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -42,7 +44,7 @@ use crate::registry::{AsRule, Rule};
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[violation]
 pub struct MultiValueRepeatedKeyLiteral {
-    name: String,
+    name: SourceCodeSnippet,
 }
 
 impl Violation for MultiValueRepeatedKeyLiteral {
@@ -51,12 +53,20 @@ impl Violation for MultiValueRepeatedKeyLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MultiValueRepeatedKeyLiteral { name } = self;
-        format!("Dictionary key literal `{name}` repeated")
+        if let Some(name) = name.full_display() {
+            format!("Dictionary key literal `{name}` repeated")
+        } else {
+            format!("Dictionary key literal repeated")
+        }
     }
 
     fn autofix_title(&self) -> Option<String> {
         let MultiValueRepeatedKeyLiteral { name } = self;
-        Some(format!("Remove repeated key literal `{name}`"))
+        if let Some(name) = name.full_display() {
+            Some(format!("Remove repeated key literal `{name}`"))
+        } else {
+            Some(format!("Remove repeated key literal"))
+        }
     }
 }
 
@@ -91,7 +101,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[violation]
 pub struct MultiValueRepeatedKeyVariable {
-    name: String,
+    name: SourceCodeSnippet,
 }
 
 impl Violation for MultiValueRepeatedKeyVariable {
@@ -100,12 +110,20 @@ impl Violation for MultiValueRepeatedKeyVariable {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MultiValueRepeatedKeyVariable { name } = self;
-        format!("Dictionary key `{name}` repeated")
+        if let Some(name) = name.full_display() {
+            format!("Dictionary key `{name}` repeated")
+        } else {
+            format!("Dictionary key repeated")
+        }
     }
 
     fn autofix_title(&self) -> Option<String> {
         let MultiValueRepeatedKeyVariable { name } = self;
-        Some(format!("Remove repeated key `{name}`"))
+        if let Some(name) = name.full_display() {
+            Some(format!("Remove repeated key `{name}`"))
+        } else {
+            Some(format!("Remove repeated key"))
+        }
     }
 }
 
@@ -130,11 +148,11 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
         };
 
         match key {
-            Expr::Constant(_) | Expr::Tuple(_) | Expr::JoinedStr(_) => {
+            Expr::Constant(_) | Expr::Tuple(_) | Expr::FString(_) => {
                 if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
                     let mut diagnostic = Diagnostic::new(
                         MultiValueRepeatedKeyLiteral {
-                            name: checker.locator.slice(key.range()).to_string(),
+                            name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                         },
                         key.range(),
                     );
@@ -153,7 +171,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                 if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
                     let mut diagnostic = Diagnostic::new(
                         MultiValueRepeatedKeyVariable {
-                            name: checker.locator.slice(key.range()).to_string(),
+                            name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                         },
                         key.range(),
                     );

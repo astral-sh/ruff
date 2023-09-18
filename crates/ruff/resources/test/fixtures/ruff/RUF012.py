@@ -11,6 +11,8 @@ class A:
     without_annotation = []
     class_variable: ClassVar[list[int]] = []
     final_variable: Final[list[int]] = []
+    class_variable_without_subscript: ClassVar = []
+    final_variable_without_subscript: Final = []
 
 
 from dataclasses import dataclass, field

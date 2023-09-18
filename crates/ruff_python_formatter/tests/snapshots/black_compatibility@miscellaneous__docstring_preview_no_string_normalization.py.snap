@@ -27,7 +27,7 @@ def do_not_touch_this_prefix3():
  
  def do_not_touch_this_prefix2():
 -    FR'There was a bug where docstring prefixes would be normalized even with -S.'
-+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++    Rf"There was a bug where docstring prefixes would be normalized even with -S."
  
  
  def do_not_touch_this_prefix3():
@@ -43,7 +43,7 @@ def do_not_touch_this_prefix():
 
 
 def do_not_touch_this_prefix2():
-    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    Rf"There was a bug where docstring prefixes would be normalized even with -S."
 
 
 def do_not_touch_this_prefix3():

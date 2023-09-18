@@ -1,6 +1,6 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::OneIndexed;
+use ruff_source_file::OneIndexed;
 
 /// ## What it does
 /// Checks for variable definitions that redefine (or "shadow") unused

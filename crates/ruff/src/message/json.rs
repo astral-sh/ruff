@@ -5,7 +5,8 @@ use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::SourceCode;
+use ruff_source_file::SourceCode;
+use ruff_text_size::Ranged;
 
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;

@@ -1,0 +1,461 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: "parse_suite(source, \"<test>\").unwrap()"
+---
+[
+    ClassDef(
+        StmtClassDef {
+            range: 10..29,
+            decorator_list: [],
+            name: Identifier {
+                id: "Foo",
+                range: 16..19,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 19..22,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 20..21,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 20..21,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            arguments: Some(
+                Arguments {
+                    range: 22..24,
+                    args: [],
+                    keywords: [],
+                },
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 26..29,
+                        value: Constant(
+                            ExprConstant {
+                                range: 26..29,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    ClassDef(
+        StmtClassDef {
+            range: 52..76,
+            decorator_list: [],
+            name: Identifier {
+                id: "Foo",
+                range: 58..61,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 61..69,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 62..68,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 62..63,
+                                },
+                                bound: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 65..68,
+                                            id: "str",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            arguments: Some(
+                Arguments {
+                    range: 69..71,
+                    args: [],
+                    keywords: [],
+                },
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 73..76,
+                        value: Constant(
+                            ExprConstant {
+                                range: 73..76,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    ClassDef(
+        StmtClassDef {
+            range: 105..138,
+            decorator_list: [],
+            name: Identifier {
+                id: "Foo",
+                range: 111..114,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 114..131,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 115..130,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 115..116,
+                                },
+                                bound: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 118..130,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 119..122,
+                                                        id: "str",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 124..129,
+                                                        id: "bytes",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            arguments: Some(
+                Arguments {
+                    range: 131..133,
+                    args: [],
+                    keywords: [],
+                },
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 135..138,
+                        value: Constant(
+                            ExprConstant {
+                                range: 135..138,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    ClassDef(
+        StmtClassDef {
+            range: 159..181,
+            decorator_list: [],
+            name: Identifier {
+                id: "Foo",
+                range: 165..168,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 168..174,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 169..170,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 169..170,
+                                },
+                                bound: None,
+                            },
+                        ),
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 172..173,
+                                name: Identifier {
+                                    id: "U",
+                                    range: 172..173,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            arguments: Some(
+                Arguments {
+                    range: 174..176,
+                    args: [],
+                    keywords: [],
+                },
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 178..181,
+                        value: Constant(
+                            ExprConstant {
+                                range: 178..181,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    ClassDef(
+        StmtClassDef {
+            range: 200..223,
+            decorator_list: [],
+            name: Identifier {
+                id: "Foo",
+                range: 206..209,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 209..216,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 210..211,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 210..211,
+                                },
+                                bound: None,
+                            },
+                        ),
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 213..214,
+                                name: Identifier {
+                                    id: "U",
+                                    range: 213..214,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            arguments: Some(
+                Arguments {
+                    range: 216..218,
+                    args: [],
+                    keywords: [],
+                },
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 220..223,
+                        value: Constant(
+                            ExprConstant {
+                                range: 220..223,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    ClassDef(
+        StmtClassDef {
+            range: 240..261,
+            decorator_list: [],
+            name: Identifier {
+                id: "Foo",
+                range: 246..249,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 249..254,
+                    type_params: [
+                        TypeVarTuple(
+                            TypeParamTypeVarTuple {
+                                range: 250..253,
+                                name: Identifier {
+                                    id: "Ts",
+                                    range: 251..253,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
+            arguments: Some(
+                Arguments {
+                    range: 254..256,
+                    args: [],
+                    keywords: [],
+                },
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 258..261,
+                        value: Constant(
+                            ExprConstant {
+                                range: 258..261,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    ClassDef(
+        StmtClassDef {
+            range: 275..296,
+            decorator_list: [],
+            name: Identifier {
+                id: "Foo",
+                range: 281..284,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 284..289,
+                    type_params: [
+                        ParamSpec(
+                            TypeParamParamSpec {
+                                range: 285..288,
+                                name: Identifier {
+                                    id: "P",
+                                    range: 287..288,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
+            arguments: Some(
+                Arguments {
+                    range: 289..291,
+                    args: [],
+                    keywords: [],
+                },
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 293..296,
+                        value: Constant(
+                            ExprConstant {
+                                range: 293..296,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    ClassDef(
+        StmtClassDef {
+            range: 312..351,
+            decorator_list: [],
+            name: Identifier {
+                id: "Foo",
+                range: 318..321,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 321..341,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 322..323,
+                                name: Identifier {
+                                    id: "X",
+                                    range: 322..323,
+                                },
+                                bound: None,
+                            },
+                        ),
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 325..331,
+                                name: Identifier {
+                                    id: "Y",
+                                    range: 325..326,
+                                },
+                                bound: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 328..331,
+                                            id: "str",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                        TypeVarTuple(
+                            TypeParamTypeVarTuple {
+                                range: 333..335,
+                                name: Identifier {
+                                    id: "U",
+                                    range: 334..335,
+                                },
+                            },
+                        ),
+                        ParamSpec(
+                            TypeParamParamSpec {
+                                range: 337..340,
+                                name: Identifier {
+                                    id: "P",
+                                    range: 339..340,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
+            arguments: Some(
+                Arguments {
+                    range: 341..343,
+                    args: [],
+                    keywords: [],
+                },
+            ),
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 347..351,
+                    },
+                ),
+            ],
+        },
+    ),
+]

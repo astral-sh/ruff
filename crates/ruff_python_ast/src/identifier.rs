@@ -10,23 +10,40 @@
 //!
 //! This module can be used to identify the [`TextRange`] of the `except` token.
 
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::{Alias, Arg, ArgWithDefault, Pattern};
-use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
+use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Stmt};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use ruff_python_whitespace::{is_python_whitespace, Cursor};
-
-use crate::source_code::Locator;
+use ruff_python_trivia::{is_python_whitespace, Cursor};
 
 pub trait Identifier {
     /// Return the [`TextRange`] of the identifier in the given AST node.
     fn identifier(&self) -> TextRange;
 }
 
-pub trait TryIdentifier {
-    /// Return the [`TextRange`] of the identifier in the given AST node, or `None` if
-    /// the node does not have an identifier.
-    fn try_identifier(&self) -> Option<TextRange>;
+impl Identifier for ast::StmtFunctionDef {
+    /// Return the [`TextRange`] of the identifier in the given function definition.
+    ///
+    /// For example, return the range of `f` in:
+    /// ```python
+    /// def f():
+    ///     ...
+    /// ```
+    fn identifier(&self) -> TextRange {
+        self.name.range()
+    }
+}
+
+impl Identifier for ast::StmtClassDef {
+    /// Return the [`TextRange`] of the identifier in the given class definition.
+    ///
+    /// For example, return the range of `C` in:
+    /// ```python
+    /// class C():
+    ///     ...
+    /// ```
+    fn identifier(&self) -> TextRange {
+        self.name.range()
+    }
 }
 
 impl Identifier for Stmt {
@@ -39,16 +56,15 @@ impl Identifier for Stmt {
     /// ```
     fn identifier(&self) -> TextRange {
         match self {
-            Stmt::ClassDef(ast::StmtClassDef { name, .. })
-            | Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name.range(),
+            Stmt::ClassDef(class) => class.identifier(),
+            Stmt::FunctionDef(function) => function.identifier(),
             _ => self.range(),
         }
     }
 }
 
-impl Identifier for Arg {
-    /// Return the [`TextRange`] for the identifier defining an [`Arg`].
+impl Identifier for Parameter {
+    /// Return the [`TextRange`] for the identifier defining an [`Parameter`].
     ///
     /// For example, return the range of `x` in:
     /// ```python
@@ -56,12 +72,12 @@ impl Identifier for Arg {
     ///     ...
     /// ```
     fn identifier(&self) -> TextRange {
-        self.arg.range()
+        self.name.range()
     }
 }
 
-impl Identifier for ArgWithDefault {
-    /// Return the [`TextRange`] for the identifier defining an [`ArgWithDefault`].
+impl Identifier for ParameterWithDefault {
+    /// Return the [`TextRange`] for the identifier defining an [`ParameterWithDefault`].
     ///
     /// For example, return the range of `x` in:
     /// ```python
@@ -69,7 +85,7 @@ impl Identifier for ArgWithDefault {
     ///     ...
     /// ```
     fn identifier(&self) -> TextRange {
-        self.def.identifier()
+        self.parameter.identifier()
     }
 }
 
@@ -87,84 +103,16 @@ impl Identifier for Alias {
     }
 }
 
-impl TryIdentifier for Pattern {
-    /// Return the [`TextRange`] of the identifier in the given pattern.
-    ///
-    /// For example, return the range of `z` in:
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchAs
-    ///     case z:
-    ///         ...
-    /// ```
-    ///
-    /// Or:
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchAs
-    ///     case y as z:
-    ///         ...
-    /// ```
-    ///
-    /// Or :
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchMapping
-    ///     case {"a": 1, **z}
-    ///         ...
-    /// ```
-    ///
-    /// Or :
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchStar
-    ///     case *z:
-    ///         ...
-    /// ```
-    fn try_identifier(&self) -> Option<TextRange> {
-        let name = match self {
-            Pattern::MatchAs(ast::PatternMatchAs {
-                name: Some(name), ..
-            }) => Some(name),
-            Pattern::MatchMapping(ast::PatternMatchMapping {
-                rest: Some(rest), ..
-            }) => Some(rest),
-            Pattern::MatchStar(ast::PatternMatchStar {
-                name: Some(name), ..
-            }) => Some(name),
-            _ => None,
-        };
-        name.map(Ranged::range)
-    }
-}
-
-impl TryIdentifier for ExceptHandler {
-    /// Return the [`TextRange`] of a named exception in an [`ExceptHandler`].
-    ///
-    /// For example, return the range of `e` in:
-    /// ```python
-    /// try:
-    ///     ...
-    /// except ValueError as e:
-    ///     ...
-    /// ```
-    fn try_identifier(&self) -> Option<TextRange> {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, .. }) = self;
-        name.as_ref().map(Ranged::range)
-    }
-}
-
 /// Return the [`TextRange`] of the `except` token in an [`ExceptHandler`].
-pub fn except(handler: &ExceptHandler, locator: &Locator) -> TextRange {
-    IdentifierTokenizer::new(locator.contents(), handler.range())
+pub fn except(handler: &ExceptHandler, source: &str) -> TextRange {
+    IdentifierTokenizer::new(source, handler.range())
         .next()
         .expect("Failed to find `except` token in `ExceptHandler`")
 }
 
-/// Return the [`TextRange`] of the `else` token in a `For`, `AsyncFor`, or `While` statement.
-pub fn else_(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
+/// Return the [`TextRange`] of the `else` token in a `For` or `While` statement.
+pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
     let (Stmt::For(ast::StmtFor { body, orelse, .. })
-    | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
     | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
     else {
         return None;
@@ -176,7 +124,7 @@ pub fn else_(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
 
     IdentifierTokenizer::starts_at(
         body.last().expect("Expected body to be non-empty").end(),
-        locator.contents(),
+        source,
     )
     .next()
 }
@@ -276,42 +224,17 @@ impl Iterator for IdentifierTokenizer<'_> {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
-    use ruff_text_size::{TextRange, TextSize};
-    use rustpython_ast::{Ranged, Stmt};
-    use rustpython_parser::Parse;
-
-    use crate::identifier;
-    use crate::identifier::IdentifierTokenizer;
-    use crate::source_code::Locator;
+    use super::IdentifierTokenizer;
+    use ruff_text_size::{TextLen, TextRange, TextSize};
 
     #[test]
-    fn extract_else_range() -> Result<()> {
-        let contents = r#"
-for x in y:
-    pass
-else:
-    pass
-"#
-        .trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        let range = identifier::else_(&stmt, &locator).unwrap();
-        assert_eq!(&contents[range], "else");
-        assert_eq!(
-            range,
-            TextRange::new(TextSize::from(21), TextSize::from(25))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn extract_global_names() -> Result<()> {
+    fn extract_global_names() {
         let contents = r#"global X,Y, Z"#.trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
 
-        let mut names = IdentifierTokenizer::new(locator.contents(), stmt.range());
+        let mut names = IdentifierTokenizer::new(
+            contents,
+            TextRange::new(TextSize::new(0), contents.text_len()),
+        );
 
         let range = names.next_token().unwrap();
         assert_eq!(&contents[range], "global");
@@ -331,6 +254,5 @@ else:
             range,
             TextRange::new(TextSize::from(12), TextSize::from(13))
         );
-        Ok(())
     }
 }

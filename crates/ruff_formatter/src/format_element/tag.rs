@@ -63,8 +63,11 @@ pub enum Tag {
     StartEntry,
     EndEntry,
 
-    /// Delay the printing of its content until the next line break
-    StartLineSuffix,
+    /// Delay the printing of its content until the next line break. Using reserved width will include
+    /// the associated line suffix during measurement.
+    StartLineSuffix {
+        reserved_width: u32,
+    },
     EndLineSuffix,
 
     /// A token that tracks tokens/nodes that are printed as verbatim.
@@ -80,6 +83,9 @@ pub enum Tag {
 
     StartFitsExpanded(FitsExpanded),
     EndFitsExpanded,
+
+    StartBestFittingEntry,
+    EndBestFittingEntry,
 }
 
 impl Tag {
@@ -96,10 +102,11 @@ impl Tag {
                 | Tag::StartIndentIfGroupBreaks(_)
                 | Tag::StartFill
                 | Tag::StartEntry
-                | Tag::StartLineSuffix
+                | Tag::StartLineSuffix { reserved_width: _ }
                 | Tag::StartVerbatim(_)
                 | Tag::StartLabelled(_)
                 | Tag::StartFitsExpanded(_)
+                | Tag::StartBestFittingEntry,
         )
     }
 
@@ -109,6 +116,7 @@ impl Tag {
     }
 
     pub const fn kind(&self) -> TagKind {
+        #[allow(clippy::enum_glob_use)]
         use Tag::*;
 
         match self {
@@ -121,10 +129,11 @@ impl Tag {
             StartIndentIfGroupBreaks(_) | EndIndentIfGroupBreaks => TagKind::IndentIfGroupBreaks,
             StartFill | EndFill => TagKind::Fill,
             StartEntry | EndEntry => TagKind::Entry,
-            StartLineSuffix | EndLineSuffix => TagKind::LineSuffix,
+            StartLineSuffix { reserved_width: _ } | EndLineSuffix => TagKind::LineSuffix,
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
             StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,
+            StartBestFittingEntry { .. } | EndBestFittingEntry => TagKind::BestFittingEntry,
         }
     }
 }
@@ -148,6 +157,7 @@ pub enum TagKind {
     Verbatim,
     Labelled,
     FitsExpanded,
+    BestFittingEntry,
 }
 
 #[derive(Debug, Copy, Default, Clone, Eq, PartialEq)]
@@ -180,13 +190,14 @@ impl FitsExpanded {
         Self::default()
     }
 
+    #[must_use]
     pub fn with_condition(mut self, condition: Option<Condition>) -> Self {
         self.condition = condition;
         self
     }
 
     pub fn propagate_expand(&self) {
-        self.propagate_expand.set(true)
+        self.propagate_expand.set(true);
     }
 }
 
@@ -204,11 +215,13 @@ impl Group {
         }
     }
 
+    #[must_use]
     pub fn with_id(mut self, id: Option<GroupId>) -> Self {
         self.id = id;
         self
     }
 
+    #[must_use]
     pub fn with_mode(mut self, mode: GroupMode) -> Self {
         self.mode = Cell::new(mode);
         self
@@ -220,7 +233,7 @@ impl Group {
 
     pub fn propagate_expand(&self) {
         if self.mode.get() == GroupMode::Flat {
-            self.mode.set(GroupMode::Propagated)
+            self.mode.set(GroupMode::Propagated);
         }
     }
 
@@ -248,7 +261,7 @@ impl ConditionalGroup {
     }
 
     pub fn propagate_expand(&self) {
-        self.mode.set(GroupMode::Propagated)
+        self.mode.set(GroupMode::Propagated);
     }
 
     pub fn mode(&self) -> GroupMode {
@@ -312,6 +325,7 @@ impl Condition {
         }
     }
 
+    #[must_use]
     pub fn with_group_id(mut self, id: Option<GroupId>) -> Self {
         self.group_id = id;
         self
@@ -350,6 +364,7 @@ impl PartialEq for LabelId {
 }
 
 impl LabelId {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn of<T: LabelDefinition>(label: T) -> Self {
         Self {
             value: label.value(),

@@ -1,0 +1,248 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Try(
+        StmtTry {
+            range: 0..134,
+            body: [
+                Raise(
+                    StmtRaise {
+                        range: 9..28,
+                        exc: Some(
+                            Call(
+                                ExprCall {
+                                    range: 15..28,
+                                    func: Name(
+                                        ExprName {
+                                            range: 15..25,
+                                            id: "ValueError",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 25..28,
+                                        args: [
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 26..27,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        ),
+                        cause: None,
+                    },
+                ),
+            ],
+            handlers: [
+                ExceptHandler(
+                    ExceptHandlerExceptHandler {
+                        range: 29..82,
+                        type_: Some(
+                            Name(
+                                ExprName {
+                                    range: 36..45,
+                                    id: "TypeError",
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                        name: Some(
+                            Identifier {
+                                id: "e",
+                                range: 49..50,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 56..82,
+                                    value: Call(
+                                        ExprCall {
+                                            range: 56..82,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 56..61,
+                                                    id: "print",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 61..82,
+                                                args: [
+                                                    FString(
+                                                        ExprFString {
+                                                            range: 62..81,
+                                                            values: [
+                                                                Constant(
+                                                                    ExprConstant {
+                                                                        range: 64..71,
+                                                                        value: Str(
+                                                                            StringConstant {
+                                                                                value: "caught ",
+                                                                                unicode: false,
+                                                                                implicit_concatenated: false,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                                FormattedValue(
+                                                                    ExprFormattedValue {
+                                                                        range: 71..80,
+                                                                        value: Call(
+                                                                            ExprCall {
+                                                                                range: 72..79,
+                                                                                func: Name(
+                                                                                    ExprName {
+                                                                                        range: 72..76,
+                                                                                        id: "type",
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                                arguments: Arguments {
+                                                                                    range: 76..79,
+                                                                                    args: [
+                                                                                        Name(
+                                                                                            ExprName {
+                                                                                                range: 77..78,
+                                                                                                id: "e",
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                    ],
+                                                                                    keywords: [],
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        debug_text: None,
+                                                                        conversion: None,
+                                                                        format_spec: None,
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            implicit_concatenated: false,
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                ExceptHandler(
+                    ExceptHandlerExceptHandler {
+                        range: 83..134,
+                        type_: Some(
+                            Name(
+                                ExprName {
+                                    range: 90..97,
+                                    id: "OSError",
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                        name: Some(
+                            Identifier {
+                                id: "e",
+                                range: 101..102,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 108..134,
+                                    value: Call(
+                                        ExprCall {
+                                            range: 108..134,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 108..113,
+                                                    id: "print",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 113..134,
+                                                args: [
+                                                    FString(
+                                                        ExprFString {
+                                                            range: 114..133,
+                                                            values: [
+                                                                Constant(
+                                                                    ExprConstant {
+                                                                        range: 116..123,
+                                                                        value: Str(
+                                                                            StringConstant {
+                                                                                value: "caught ",
+                                                                                unicode: false,
+                                                                                implicit_concatenated: false,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                                FormattedValue(
+                                                                    ExprFormattedValue {
+                                                                        range: 123..132,
+                                                                        value: Call(
+                                                                            ExprCall {
+                                                                                range: 124..131,
+                                                                                func: Name(
+                                                                                    ExprName {
+                                                                                        range: 124..128,
+                                                                                        id: "type",
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                                arguments: Arguments {
+                                                                                    range: 128..131,
+                                                                                    args: [
+                                                                                        Name(
+                                                                                            ExprName {
+                                                                                                range: 129..130,
+                                                                                                id: "e",
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                    ],
+                                                                                    keywords: [],
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        debug_text: None,
+                                                                        conversion: None,
+                                                                        format_spec: None,
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            implicit_concatenated: false,
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ],
+            orelse: [],
+            finalbody: [],
+            is_star: false,
+        },
+    ),
+]

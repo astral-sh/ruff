@@ -1,10 +1,11 @@
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -106,26 +107,21 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
 
 fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) -> bool {
     keywords.iter().any(|keyword| {
-        keyword.arg.as_ref().map_or(false, |arg| arg == "metaclass")
+        keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
             && semantic
                 .resolve_call_path(&keyword.value)
-                .map_or(false, |call_path| {
-                    matches!(call_path.as_slice(), ["abc", "ABCMeta"])
-                })
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["abc", "ABCMeta"]))
     }) || bases.iter().any(|base| {
-        semantic.resolve_call_path(base).map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["abc", "ABC"])
-        })
+        semantic
+            .resolve_call_path(base)
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["abc", "ABC"]))
     })
 }
 
 fn is_empty_body(body: &[Stmt]) -> bool {
     body.iter().all(|stmt| match stmt {
         Stmt::Pass(_) => true,
-        Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _range,
-        }) => match value.as_ref() {
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => match value.as_ref() {
             Expr::Constant(ast::ExprConstant { value, .. }) => {
                 matches!(value, Constant::Str(..) | Constant::Ellipsis)
             }
@@ -141,14 +137,17 @@ pub(crate) fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
-    bases: &[Expr],
-    keywords: &[Keyword],
+    arguments: Option<&Arguments>,
     body: &[Stmt],
 ) {
-    if bases.len() + keywords.len() != 1 {
+    let Some(Arguments { args, keywords, .. }) = arguments else {
+        return;
+    };
+
+    if args.len() + keywords.len() != 1 {
         return;
     }
-    if !is_abc_class(bases, keywords, checker.semantic()) {
+    if !is_abc_class(args, keywords, checker.semantic()) {
         return;
     }
 
@@ -161,18 +160,12 @@ pub(crate) fn abstract_base_class(
             continue;
         }
 
-        let (Stmt::FunctionDef(ast::StmtFunctionDef {
+        let Stmt::FunctionDef(ast::StmtFunctionDef {
             decorator_list,
             body,
             name: method_name,
             ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            decorator_list,
-            body,
-            name: method_name,
-            ..
-        })) = stmt
+        }) = stmt
         else {
             continue;
         };

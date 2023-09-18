@@ -1,11 +1,12 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{self, Expr, Operator, Ranged};
+use ruff_python_ast::{self as ast, Expr, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -53,7 +54,7 @@ fn matches_sql_statement(string: &str) -> bool {
     SQL_REGEX.is_match(string)
 }
 
-fn matches_string_format_expression(expr: &Expr, model: &SemanticModel) -> bool {
+fn matches_string_format_expression(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         // "select * from table where val = " + "str" + ...
         // "select * from table where val = %s" % ...
@@ -62,8 +63,8 @@ fn matches_string_format_expression(expr: &Expr, model: &SemanticModel) -> bool 
             ..
         }) => {
             // Only evaluate the full BinOp, not the nested components.
-            if model
-                .expr_parent()
+            if semantic
+                .current_expression_parent()
                 .map_or(true, |parent| !parent.is_bin_op_expr())
             {
                 if any_over_expr(expr, &has_string_literal) {
@@ -80,7 +81,7 @@ fn matches_string_format_expression(expr: &Expr, model: &SemanticModel) -> bool 
             attr == "format" && string_literal(value).is_some()
         }
         // f"select * from table where val = {val}"
-        Expr::JoinedStr(_) => true,
+        Expr::FString(_) => true,
         _ => false,
     }
 }

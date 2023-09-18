@@ -1,11 +1,11 @@
 use std::{fmt, iter, usize};
 
 use log::error;
-use rustpython_parser::ast::{
-    Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Ranged, Stmt, StmtAsyncFor,
-    StmtAsyncWith, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtTryStar, StmtWhile, StmtWith,
+use ruff_python_ast::{
+    Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Stmt, StmtFor, StmtMatch, StmtReturn,
+    StmtTry, StmtWhile, StmtWith,
 };
-use rustpython_parser::text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_index::{IndexSlice, IndexVec};
@@ -378,7 +378,7 @@ fn loop_block<'stmt>(
             // For `break` statements we don't want to continue with the
             // loop, but instead with the statement after the loop (i.e.
             // not change anything).
-            !block.stmts.last().map_or(false, Stmt::is_break_stmt)
+            !block.stmts.last().is_some_and(Stmt::is_break_stmt)
         },
     );
     NextBlock::If {
@@ -467,7 +467,6 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
             let next = match stmt {
                 // Statements that continue to the next statement after execution.
                 Stmt::FunctionDef(_)
-                | Stmt::AsyncFunctionDef(_)
                 | Stmt::Import(_)
                 | Stmt::ImportFrom(_)
                 | Stmt::ClassDef(_)
@@ -484,17 +483,44 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     self.unconditional_next_block(after)
                 }
                 // Statements that (can) divert the control flow.
-                Stmt::If(stmt) => {
-                    let next_after_block =
-                        self.maybe_next_block_index(after, || needs_next_block(&stmt.body));
-                    let orelse_after_block =
-                        self.maybe_next_block_index(after, || needs_next_block(&stmt.orelse));
-                    let next = self.append_blocks_if_not_empty(&stmt.body, next_after_block);
-                    let orelse = self.append_blocks_if_not_empty(&stmt.orelse, orelse_after_block);
+                Stmt::If(stmt_if) => {
+                    let after_consequent_block =
+                        self.maybe_next_block_index(after, || needs_next_block(&stmt_if.body));
+                    let after_alternate_block = self.maybe_next_block_index(after, || {
+                        stmt_if
+                            .elif_else_clauses
+                            .last()
+                            .map_or(true, |clause| needs_next_block(&clause.body))
+                    });
+
+                    let consequent =
+                        self.append_blocks_if_not_empty(&stmt_if.body, after_consequent_block);
+
+                    // Block ID of the next elif or else clause.
+                    let mut next_branch = after_alternate_block;
+
+                    for clause in stmt_if.elif_else_clauses.iter().rev() {
+                        let consequent =
+                            self.append_blocks_if_not_empty(&clause.body, after_consequent_block);
+
+                        next_branch = if let Some(test) = &clause.test {
+                            let next = NextBlock::If {
+                                condition: Condition::Test(test),
+                                next: consequent,
+                                orelse: next_branch,
+                            };
+                            let stmts = std::slice::from_ref(stmt);
+                            let block = BasicBlock { stmts, next };
+                            self.blocks.push(block)
+                        } else {
+                            consequent
+                        };
+                    }
+
                     NextBlock::If {
-                        condition: Condition::Test(&stmt.test),
-                        next,
-                        orelse,
+                        condition: Condition::Test(&stmt_if.test),
+                        next: consequent,
+                        orelse: next_branch,
                     }
                 }
                 Stmt::While(StmtWhile {
@@ -508,21 +534,8 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     body,
                     orelse,
                     ..
-                })
-                | Stmt::AsyncFor(StmtAsyncFor {
-                    iter: condition,
-                    body,
-                    orelse,
-                    ..
                 }) => loop_block(self, Condition::Iterator(condition), body, orelse, after),
                 Stmt::Try(StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                })
-                | Stmt::TryStar(StmtTryStar {
                     body,
                     handlers,
                     orelse,
@@ -539,24 +552,13 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     let _ = (body, handlers, orelse, finalbody); // Silence unused code warnings.
                     self.unconditional_next_block(after)
                 }
-                Stmt::With(StmtWith {
-                    items,
-                    body,
-                    type_comment,
-                    ..
-                })
-                | Stmt::AsyncWith(StmtAsyncWith {
-                    items,
-                    body,
-                    type_comment,
-                    ..
-                }) => {
+                Stmt::With(StmtWith { items, body, .. }) => {
                     // TODO: handle `with` statements, see
                     // <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>.
                     // I recommend to `try` statements first as `with` can desugar
                     // to a `try` statement.
                     // For now we'll skip over it.
-                    let _ = (items, body, type_comment); // Silence unused code warnings.
+                    let _ = (items, body); // Silence unused code warnings.
                     self.unconditional_next_block(after)
                 }
                 Stmt::Match(StmtMatch { subject, cases, .. }) => {
@@ -624,7 +626,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Compare(_)
                         | Expr::Call(_)
                         | Expr::FormattedValue(_)
-                        | Expr::JoinedStr(_)
+                        | Expr::FString(_)
                         | Expr::Constant(_)
                         | Expr::Attribute(_)
                         | Expr::Subscript(_)
@@ -644,10 +646,13 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Await(_)
                         | Expr::Yield(_)
                         | Expr::YieldFrom(_) => self.unconditional_next_block(after),
+                        Expr::IpyEscapeCommand(_) => todo!(),
                     }
                 }
                 // The tough branches are done, here is an easy one.
                 Stmt::Return(_) => NextBlock::Terminate,
+                Stmt::TypeAlias(_) => todo!(),
+                Stmt::IpyEscapeCommand(_) => todo!(),
             };
 
             // Include any statements in the block that don't divert the control flow.
@@ -867,9 +872,8 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
 
     match last {
         Stmt::Return(_) | Stmt::Raise(_) => false,
-        Stmt::If(stmt) => needs_next_block(&stmt.body) || needs_next_block(&stmt.orelse),
+        Stmt::If(stmt) => needs_next_block(&stmt.body) || stmt.elif_else_clauses.last().map_or(true, |clause| needs_next_block(&clause.body)),
         Stmt::FunctionDef(_)
-        | Stmt::AsyncFunctionDef(_)
         | Stmt::Import(_)
         | Stmt::ImportFrom(_)
         | Stmt::ClassDef(_)
@@ -885,14 +889,13 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
         | Stmt::Break(_)
         | Stmt::Continue(_)
         | Stmt::For(_)
-        | Stmt::AsyncFor(_)
         | Stmt::While(_)
         | Stmt::With(_)
-        | Stmt::AsyncWith(_)
         | Stmt::Match(_)
         | Stmt::Try(_)
-        | Stmt::TryStar(_)
         | Stmt::Assert(_) => true,
+        Stmt::TypeAlias(_) => todo!(),
+        Stmt::IpyEscapeCommand(_) => todo!(),
     }
 }
 
@@ -901,7 +904,6 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
 fn is_control_flow_stmt(stmt: &Stmt) -> bool {
     match stmt {
         Stmt::FunctionDef(_)
-        | Stmt::AsyncFunctionDef(_)
         | Stmt::Import(_)
         | Stmt::ImportFrom(_)
         | Stmt::ClassDef(_)
@@ -915,18 +917,17 @@ fn is_control_flow_stmt(stmt: &Stmt) -> bool {
         | Stmt::Pass(_) => false,
         Stmt::Return(_)
         | Stmt::For(_)
-        | Stmt::AsyncFor(_)
         | Stmt::While(_)
         | Stmt::If(_)
         | Stmt::With(_)
-        | Stmt::AsyncWith(_)
         | Stmt::Match(_)
         | Stmt::Raise(_)
         | Stmt::Try(_)
-        | Stmt::TryStar(_)
         | Stmt::Assert(_)
         | Stmt::Break(_)
         | Stmt::Continue(_) => true,
+        Stmt::TypeAlias(_) => todo!(),
+        Stmt::IpyEscapeCommand(_) => todo!(),
     }
 }
 
@@ -1019,8 +1020,8 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use rustpython_parser::ast::Ranged;
-    use rustpython_parser::{parse, Mode};
+    use ruff_python_parser::{parse, Mode};
+    use ruff_text_size::Ranged;
     use std::fmt::Write;
     use test_case::test_case;
 
@@ -1063,6 +1064,11 @@ mod tests {
                 "first block should always terminate"
             );
 
+            let got_mermaid = MermaidGraph {
+                graph: &got,
+                source: &source,
+            };
+
             // All block index should be valid.
             let valid = BlockIndex::from_usize(got.blocks.len());
             for block in &got.blocks {
@@ -1075,11 +1081,6 @@ mod tests {
                     NextBlock::Terminate => {}
                 }
             }
-
-            let got_mermaid = MermaidGraph {
-                graph: &got,
-                source: &source,
-            };
 
             writeln!(
                 output,

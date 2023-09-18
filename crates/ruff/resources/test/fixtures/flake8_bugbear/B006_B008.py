@@ -68,6 +68,20 @@ def this_is_also_wrong(value={}):
     ...
 
 
+class Foo:
+    @staticmethod
+    def this_is_also_wrong_and_more_indented(value={}):
+        pass
+
+
+def multiline_arg_wrong(value={
+
+}):
+    ...
+
+def single_line_func_wrong(value = {}): ...
+
+
 def and_this(value=set()):
     ...
 
@@ -177,6 +191,9 @@ def str_okay(value=str("foo")):
 def bool_okay(value=bool("bar")):
     pass
 
+# Allow immutable bytes() value
+def bytes_okay(value=bytes(1)):
+    pass
 
 # Allow immutable int() value
 def int_okay(value=int("12")):
@@ -213,6 +230,10 @@ def timedelta_okay(value=dt.timedelta(hours=1)):
 def path_okay(value=Path(".")):
     pass
 
+# B008 allow arbitrary call with immutable annotation
+def immutable_annotation_call(value: Sequence[int] = foo()):
+    pass
+
 # B006 and B008
 # We should handle arbitrary nesting of these B008.
 def nested_combo(a=[float(3), dt.datetime.now()]):
@@ -237,12 +258,16 @@ def foo(f=lambda x: print(x)):
 
 from collections import abc
 from typing import Annotated, Dict, Optional, Sequence, Union, Set
+import typing_extensions
 
 
 def immutable_annotations(
     a: Sequence[int] | None = [],
     b: Optional[abc.Mapping[int, int]] = {},
     c: Annotated[Union[abc.Set[str], abc.Sized], "annotation"] = set(),
+    d: typing_extensions.Annotated[
+        Union[abc.Set[str], abc.Sized], "annotation"
+    ] = set(),
 ):
     pass
 
@@ -251,5 +276,39 @@ def mutable_annotations(
     a: list[int] | None = [],
     b: Optional[Dict[int, int]] = {},
     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 ):
     pass
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""
+    ...
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""; ...
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""; \
+        ...
+
+
+def single_line_func_wrong(value: dict[str, str] = {
+    # This is a comment
+}):
+    """Docstring"""
+
+
+def single_line_func_wrong(value: dict[str, str] = {}) \
+    : \
+    """Docstring"""
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring without newline"""

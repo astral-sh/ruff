@@ -3,14 +3,16 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{contains_effect, has_comments, Truthiness};
+use ruff_python_ast::helpers::{contains_effect, Truthiness};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_codegen::Generator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -152,7 +154,7 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
 ///
 /// ## Example
 /// ```python
-/// x and not x
+/// x or not x
 /// ```
 ///
 /// ## References
@@ -315,8 +317,12 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         // Verify that this is an `isinstance` call.
         let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) = &call
         else {
@@ -351,7 +357,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
-            let target = if let Expr::Call(ast::ExprCall { args, .. }) = &values[indices[0]] {
+            let target = if let Expr::Call(ast::ExprCall {
+                arguments: Arguments { args, .. },
+                ..
+            }) = &values[indices[0]]
+            {
                 args.get(0).expect("`isinstance` should have two arguments")
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
@@ -374,7 +384,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         .iter()
                         .map(|index| &values[*index])
                         .map(|expr| {
-                            let Expr::Call(ast::ExprCall { args, .. }) = expr else {
+                            let Expr::Call(ast::ExprCall {
+                                arguments: Arguments { args, .. },
+                                ..
+                            }) = expr
+                            else {
                                 unreachable!("Indices should only contain `isinstance` calls")
                             };
                             args.get(1).expect("`isinstance` should have two arguments")
@@ -405,8 +419,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     };
                     let node2 = ast::ExprCall {
                         func: Box::new(node1.into()),
-                        args: vec![target.clone(), node.into()],
-                        keywords: vec![],
+                        arguments: Arguments {
+                            args: vec![target.clone(), node.into()],
+                            keywords: vec![],
+                            range: TextRange::default(),
+                        },
                         range: TextRange::default(),
                     };
                     let call = node2.into();
@@ -450,16 +467,15 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     else {
         return None;
     };
-    if ops.len() != 1 || comparators.len() != 1 {
-        return None;
-    }
-    if !matches!(&ops[0], CmpOp::Eq) {
+    if ops != &[CmpOp::Eq] {
         return None;
     }
     let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
         return None;
     };
-    let comparator = &comparators[0];
+    let [comparator] = comparators.as_slice() else {
+        return None;
+    };
     if !matches!(&comparator, Expr::Name(_)) {
         return None;
     }
@@ -505,7 +521,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
 
         // Avoid removing comments.
-        if has_comments(expr, checker.locator) {
+        if checker.indexer().has_comments(expr, checker.locator()) {
             continue;
         }
 
@@ -678,12 +694,12 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-pub(crate) fn get_short_circuit_edit(
+fn get_short_circuit_edit(
     expr: &Expr,
     range: TextRange,
     truthiness: Truthiness,
     in_boolean_test: bool,
-    checker: &Checker,
+    generator: Generator,
 ) -> Edit {
     let content = if in_boolean_test {
         match truthiness {
@@ -694,9 +710,17 @@ pub(crate) fn get_short_circuit_edit(
             }
         }
     } else {
-        checker.generator().expr(expr)
+        generator.expr(expr)
     };
-    Edit::range_replacement(content, range)
+    Edit::range_replacement(
+        if matches!(expr, Expr::Tuple(ast::ExprTuple { elts, ctx: _, range: _}) if !elts.is_empty())
+        {
+            format!("({content})")
+        } else {
+            content
+        },
+        range,
+    )
 }
 
 fn is_short_circuit(
@@ -720,7 +744,7 @@ fn is_short_circuit(
         BoolOp::Or => Truthiness::Truthy,
     };
 
-    let mut location = expr.start();
+    let mut furthest = expr;
     let mut edit = None;
     let mut remove = None;
 
@@ -735,7 +759,7 @@ fn is_short_circuit(
             && (!checker.semantic().in_boolean_test()
                 || contains_effect(value, |id| checker.semantic().is_builtin(id)))
         {
-            location = next_value.start();
+            furthest = next_value;
             continue;
         }
 
@@ -744,17 +768,24 @@ fn is_short_circuit(
         // short-circuit expression is the first expression in the list; otherwise, we'll see it
         // as `next_value` before we see it as `value`.
         if value_truthiness == short_circuit_truthiness {
-            remove = Some(if location == value.start() {
-                ContentAround::After
-            } else {
-                ContentAround::Both
-            });
+            remove = Some(ContentAround::After);
+
             edit = Some(get_short_circuit_edit(
                 value,
-                TextRange::new(location, expr.end()),
+                TextRange::new(
+                    parenthesized_range(
+                        furthest.into(),
+                        expr.into(),
+                        checker.indexer().comment_ranges(),
+                        checker.locator().contents(),
+                    )
+                    .unwrap_or(furthest.range())
+                    .start(),
+                    expr.end(),
+                ),
                 short_circuit_truthiness,
                 checker.semantic().in_boolean_test(),
-                checker,
+                checker.generator(),
             ));
             break;
         }
@@ -762,17 +793,27 @@ fn is_short_circuit(
         // If the next expression is a constant, and it matches the short-circuit value, then
         // we can return the location of the expression.
         if next_value_truthiness == short_circuit_truthiness {
-            remove = Some(if index == values.len() - 2 {
+            remove = Some(if index + 1 == values.len() - 1 {
                 ContentAround::Before
             } else {
                 ContentAround::Both
             });
             edit = Some(get_short_circuit_edit(
                 next_value,
-                TextRange::new(location, expr.end()),
+                TextRange::new(
+                    parenthesized_range(
+                        furthest.into(),
+                        expr.into(),
+                        checker.indexer().comment_ranges(),
+                        checker.locator().contents(),
+                    )
+                    .unwrap_or(furthest.range())
+                    .start(),
+                    expr.end(),
+                ),
                 short_circuit_truthiness,
                 checker.semantic().in_boolean_test(),
-                checker,
+                checker.generator(),
             ));
             break;
         }

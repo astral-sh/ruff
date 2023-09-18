@@ -24,6 +24,7 @@ mod tests {
     #[test_case(Path::new("EXE004_1.py"))]
     #[test_case(Path::new("EXE004_2.py"))]
     #[test_case(Path::new("EXE004_3.py"))]
+    #[test_case(Path::new("EXE004_4.py"))]
     #[test_case(Path::new("EXE005_1.py"))]
     #[test_case(Path::new("EXE005_2.py"))]
     #[test_case(Path::new("EXE005_3.py"))]

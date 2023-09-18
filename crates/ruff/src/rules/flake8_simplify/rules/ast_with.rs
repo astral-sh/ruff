@@ -1,15 +1,15 @@
 use log::error;
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
-use ruff_python_whitespace::UniversalNewlines;
+use ruff_python_ast::{self as ast, Stmt, WithItem};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::UniversalNewlines;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::line_width::LineWidth;
+use crate::line_width::LineWidthBuilder;
 use crate::registry::AsRule;
 
 use super::fix_with;
@@ -63,18 +63,22 @@ impl Violation for MultipleWithStatements {
 /// Returns a boolean indicating whether it's an async with statement, the items
 /// and body.
 fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
-    match body {
-        [Stmt::With(ast::StmtWith { items, body, .. })] => Some((false, items, body)),
-        [Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. })] => Some((true, items, body)),
-        _ => None,
-    }
+    let [Stmt::With(ast::StmtWith {
+        is_async,
+        items,
+        body,
+        ..
+    })] = body
+    else {
+        return None;
+    };
+    Some((*is_async, items, body))
 }
 
 /// SIM117
 pub(crate) fn multiple_with_statements(
     checker: &mut Checker,
-    with_stmt: &Stmt,
-    with_body: &[Stmt],
+    with_stmt: &ast::StmtWith,
     with_parent: Option<&Stmt>,
 ) {
     // Make sure we fix from top to bottom for nested with statements, e.g. for
@@ -102,40 +106,34 @@ pub(crate) fn multiple_with_statements(
         }
     }
 
-    if let Some((is_async, items, body)) = next_with(with_body) {
-        if is_async != with_stmt.is_async_with_stmt() {
+    if let Some((is_async, items, _body)) = next_with(&with_stmt.body) {
+        if is_async != with_stmt.is_async {
             // One of the statements is an async with, while the other is not,
             // we can't merge those statements.
             return;
         }
 
-        let last_item = items.last().expect("Expected items to be non-empty");
-        let colon = first_colon_range(
-            TextRange::new(
-                last_item
-                    .optional_vars
-                    .as_ref()
-                    .map_or(last_item.context_expr.end(), |v| v.end()),
-                body.first().expect("Expected body to be non-empty").start(),
-            ),
-            checker.locator,
-        );
+        let Some(colon) = items.last().and_then(|item| {
+            SimpleTokenizer::starts_at(item.end(), checker.locator().contents())
+                .skip_trivia()
+                .find(|token| token.kind == SimpleTokenKind::Colon)
+        }) else {
+            return;
+        };
 
         let mut diagnostic = Diagnostic::new(
             MultipleWithStatements,
-            colon.map_or_else(
-                || with_stmt.range(),
-                |colon| TextRange::new(with_stmt.start(), colon.end()),
-            ),
+            TextRange::new(with_stmt.start(), colon.end()),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            if !has_comments_in(
-                TextRange::new(with_stmt.start(), with_body[0].start()),
-                checker.locator,
-            ) {
+            if !checker
+                .indexer()
+                .comment_ranges()
+                .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
+            {
                 match fix_with::fix_multiple_with_statements(
-                    checker.locator,
-                    checker.stylist,
+                    checker.locator(),
+                    checker.stylist(),
                     with_stmt,
                 ) {
                     Ok(edit) => {
@@ -144,7 +142,7 @@ pub(crate) fn multiple_with_statements(
                             .unwrap_or_default()
                             .universal_newlines()
                             .all(|line| {
-                                LineWidth::new(checker.settings.tab_size).add_str(&line)
+                                LineWidthBuilder::new(checker.settings.tab_size).add_str(&line)
                                     <= checker.settings.line_length
                             })
                         {

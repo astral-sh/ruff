@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -69,7 +70,12 @@ pub(crate) fn nullable_model_string_field(checker: &mut Checker, body: &[Stmt]) 
 }
 
 fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
-    let Expr::Call(ast::ExprCall { func, keywords, .. }) = value else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: Arguments { keywords, .. },
+        ..
+    }) = value
+    else {
         return None;
     };
 

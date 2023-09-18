@@ -1,12 +1,8 @@
-use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::types::RefEquality;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{statement_visitor, visitor};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -46,155 +42,111 @@ impl AlwaysAutofixableViolation for YieldInForLoop {
     }
 }
 
-/// Return `true` if the two expressions are equivalent, and consistent solely
+/// UP028
+pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+    // Intentionally omit async contexts.
+    if checker.semantic().in_async_context() {
+        return;
+    }
+
+    let ast::StmtFor {
+        target,
+        iter,
+        body,
+        orelse,
+        is_async: _,
+        range: _,
+    } = stmt_for;
+
+    // If there is an else statement, don't rewrite.
+    if !orelse.is_empty() {
+        return;
+    }
+
+    // If there's any logic besides a yield, don't rewrite.
+    let [body] = body.as_slice() else {
+        return;
+    };
+
+    // If the body is not a yield, don't rewrite.
+    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body else {
+        return;
+    };
+    let Expr::Yield(ast::ExprYield {
+        value: Some(value),
+        range: _,
+    }) = value.as_ref()
+    else {
+        return;
+    };
+
+    // If the target is not the same as the value, don't rewrite. For example, we should rewrite
+    // `for x in y: yield x` to `yield from y`, but not `for x in y: yield x + 1`.
+    if !is_same_expr(target, value) {
+        return;
+    }
+
+    // If any of the bound names are used outside of the yield itself, don't rewrite.
+    if collect_names(value).any(|name| {
+        checker
+            .semantic()
+            .current_scope()
+            .get_all(name.id.as_str())
+            .any(|binding_id| {
+                let binding = checker.semantic().binding(binding_id);
+                binding.references.iter().any(|reference_id| {
+                    checker.semantic().reference(*reference_id).range() != name.range()
+                })
+            })
+    }) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(YieldInForLoop, stmt_for.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        let contents = checker.locator().slice(
+            parenthesized_range(
+                iter.as_ref().into(),
+                stmt_for.into(),
+                checker.indexer().comment_ranges(),
+                checker.locator().contents(),
+            )
+            .unwrap_or(iter.range()),
+        );
+        let contents = format!("yield from {contents}");
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            contents,
+            stmt_for.range(),
+        )));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+/// Return `true` if the two expressions are equivalent, and both consistent solely
 /// of tuples and names.
-fn is_same_expr(a: &Expr, b: &Expr) -> bool {
-    match (&a, &b) {
-        (Expr::Name(ast::ExprName { id: a, .. }), Expr::Name(ast::ExprName { id: b, .. })) => {
-            a == b
+fn is_same_expr(left: &Expr, right: &Expr) -> bool {
+    match (&left, &right) {
+        (Expr::Name(left), Expr::Name(right)) => left.id == right.id,
+        (Expr::Tuple(left), Expr::Tuple(right)) => {
+            left.elts.len() == right.elts.len()
+                && left
+                    .elts
+                    .iter()
+                    .zip(right.elts.iter())
+                    .all(|(left, right)| is_same_expr(left, right))
         }
-        (
-            Expr::Tuple(ast::ExprTuple { elts: a, .. }),
-            Expr::Tuple(ast::ExprTuple { elts: b, .. }),
-        ) => a.len() == b.len() && a.iter().zip(b).all(|(a, b)| is_same_expr(a, b)),
         _ => false,
     }
 }
 
 /// Collect all named variables in an expression consisting solely of tuples and
 /// names.
-fn collect_names(expr: &Expr) -> Vec<&str> {
-    match expr {
-        Expr::Name(ast::ExprName { id, .. }) => vec![id],
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().flat_map(collect_names).collect(),
-        _ => panic!("Expected: Expr::Name | Expr::Tuple"),
-    }
-}
-
-#[derive(Debug)]
-struct YieldFrom<'a> {
-    stmt: &'a Stmt,
-    body: &'a Stmt,
-    iter: &'a Expr,
-    names: Vec<&'a str>,
-}
-
-#[derive(Default)]
-struct YieldFromVisitor<'a> {
-    yields: Vec<YieldFrom<'a>>,
-}
-
-impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::For(ast::StmtFor {
-                target,
-                body,
-                orelse,
-                iter,
-                ..
-            }) => {
-                // If there is an else statement, don't rewrite.
-                if !orelse.is_empty() {
-                    return;
-                }
-                // If there's any logic besides a yield, don't rewrite.
-                let [body] = body.as_slice() else {
-                    return;
-                };
-                // If the body is not a yield, don't rewrite.
-                if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body {
-                    if let Expr::Yield(ast::ExprYield {
-                        value: Some(value),
-                        range: _,
-                    }) = value.as_ref()
-                    {
-                        if is_same_expr(target, value) {
-                            self.yields.push(YieldFrom {
-                                stmt,
-                                body,
-                                iter,
-                                names: collect_names(target),
-                            });
-                        }
-                    }
-                }
-            }
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
-                // Don't recurse into anything that defines a new scope.
-            }
-            _ => statement_visitor::walk_stmt(self, stmt),
-        }
-    }
-}
-
-#[derive(Default)]
-struct ReferenceVisitor<'a> {
-    parent: Option<&'a Stmt>,
-    references: FxHashMap<RefEquality<'a, Stmt>, Vec<&'a str>>,
-}
-
-impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        let prev_parent = self.parent;
-        self.parent = Some(stmt);
-        visitor::walk_stmt(self, stmt);
-        self.parent = prev_parent;
-    }
-
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
-                if matches!(ctx, ExprContext::Load | ExprContext::Del) {
-                    if let Some(parent) = self.parent {
-                        self.references
-                            .entry(RefEquality(parent))
-                            .or_default()
-                            .push(id);
-                    }
-                }
-            }
-            _ => visitor::walk_expr(self, expr),
-        }
-    }
-}
-
-/// UP028
-pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
-    // Intentionally omit async functions.
-    if let Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) = stmt {
-        let yields = {
-            let mut visitor = YieldFromVisitor::default();
-            visitor.visit_body(body);
-            visitor.yields
-        };
-
-        let references = {
-            let mut visitor = ReferenceVisitor::default();
-            visitor.visit_body(body);
-            visitor.references
-        };
-
-        for item in yields {
-            // If any of the bound names are used outside of the loop, don't rewrite.
-            if references.iter().any(|(stmt, names)| {
-                stmt != &RefEquality(item.stmt)
-                    && stmt != &RefEquality(item.body)
-                    && item.names.iter().any(|name| names.contains(name))
-            }) {
-                continue;
-            }
-
-            let mut diagnostic = Diagnostic::new(YieldInForLoop, item.stmt.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                let contents = checker.locator.slice(item.iter.range());
-                let contents = format!("yield from {contents}");
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    contents,
-                    item.stmt.range(),
-                )));
-            }
-            checker.diagnostics.push(diagnostic);
-        }
-    }
+fn collect_names<'a>(expr: &'a Expr) -> Box<dyn Iterator<Item = &ast::ExprName> + 'a> {
+    Box::new(
+        expr.as_name_expr().into_iter().chain(
+            expr.as_tuple_expr()
+                .into_iter()
+                .flat_map(|tuple| tuple.elts.iter().flat_map(collect_names)),
+        ),
+    )
 }

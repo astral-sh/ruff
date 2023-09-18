@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use regex::RegexSet;
-use ruff_python_ast::source_code::{Indexer, Locator};
+use ruff_python_index::Indexer;
+use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};

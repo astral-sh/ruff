@@ -19,13 +19,25 @@ use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
 
 #[derive(
-    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, CacheKey, EnumIter,
+    Clone,
+    Copy,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    CacheKey,
+    EnumIter,
 )]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PythonVersion {
     Py37,
+    #[default]
     Py38,
     Py39,
     Py310,
@@ -41,6 +53,11 @@ impl From<PythonVersion> for Pep440Version {
 }
 
 impl PythonVersion {
+    /// Return the latest supported Python version.
+    pub const fn latest() -> Self {
+        Self::Py312
+    }
+
     pub const fn as_tuple(&self) -> (u32, u32) {
         match self {
             Self::Py37 => (3, 7),
@@ -72,6 +89,23 @@ impl PythonVersion {
             }
         }
         minimum_version
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
+pub enum PreviewMode {
+    #[default]
+    Disabled,
+    Enabled,
+}
+
+impl From<bool> for PreviewMode {
+    fn from(version: bool) -> Self {
+        if version {
+            PreviewMode::Enabled
+        } else {
+            PreviewMode::Disabled
+        }
     }
 }
 
@@ -160,7 +194,8 @@ pub struct PerFileIgnore {
 
 impl PerFileIgnore {
     pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
-        let rules: RuleSet = prefixes.iter().flat_map(IntoIterator::into_iter).collect();
+        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
+        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
         let path = Path::new(&pattern);
         let absolute = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),

@@ -1,9 +1,10 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::analyze::typing::ModuleMember;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -20,8 +21,16 @@ use crate::registry::AsRule;
 ///
 /// When available, the [PEP 585] syntax should be used instead of importing
 /// members from the `typing` module, as it's more concise and readable.
-/// Importing those members from `typing` is considered deprecated as of PEP
-/// 585.
+/// Importing those members from `typing` is considered deprecated as of [PEP
+/// 585].
+///
+/// This rule is enabled when targeting Python 3.9 or later (see:
+/// [`target-version`]). By default, it's _also_ enabled for earlier Python
+/// versions if `from __future__ import annotations` is present, as
+/// `__future__` annotations are not evaluated at runtime. If your code relies
+/// on runtime type annotations (either directly or via a library like
+/// Pydantic), you can disable this behavior for Python versions prior to 3.9
+/// by setting [`pyupgrade.keep-runtime-typing`] to `true`.
 ///
 /// ## Example
 /// ```python
@@ -92,7 +101,7 @@ pub(crate) fn use_pep585_annotation(
                 ModuleMember::Member(module, member) => {
                     // Imported type, like `collections.deque`.
                     diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
                             &ImportRequest::import_from(module, member),
                             expr.start(),
                             checker.semantic(),

@@ -119,4 +119,20 @@ W605_0.py:28:12: W605 [*] Invalid escape sequence: `\.`
 30 30 | #: Okay
 31 31 | regex = r'\.png$'
 
+W605_0.py:45:12: W605 [*] Invalid escape sequence: `\_`
+   |
+43 | '''  # noqa
+44 | 
+45 | regex = '\\\_'
+   |            ^^ W605
+   |
+   = help: Add backslash to escape sequence
+
+ℹ Fix
+42 42 | \w
+43 43 | '''  # noqa
+44 44 | 
+45    |-regex = '\\\_'
+   45 |+regex = '\\\\_'
+
 

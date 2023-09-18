@@ -43,12 +43,14 @@ def import_fixture(fixture: Path, fixture_set: str):
 
 # The name of the folders in the `data` for which the tests should be imported
 FIXTURE_SETS = [
+    "fast",
     "py_36",
     "py_37",
     "py_38",
     "py_39",
     "py_310",
     "py_311",
+    "py_312",
     "simple_cases",
     "miscellaneous",
     ".",
@@ -57,9 +59,6 @@ FIXTURE_SETS = [
 
 # Tests that ruff doesn't fully support yet and, therefore, should not be imported
 IGNORE_LIST = [
-    "pep_572_remove_parens.py", # Reformatting bugs
-    "pep_646.py", # Rust Python parser bug
-
     # Contain syntax errors
     "async_as_identifier.py",
     "invalid_header.py",

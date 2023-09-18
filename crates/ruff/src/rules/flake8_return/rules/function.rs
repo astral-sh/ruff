@@ -1,16 +1,18 @@
 use std::ops::Add;
 
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::helpers::{elif_else_range, is_const_false, is_const_true};
+use ruff_python_ast::helpers::{is_const_false, is_const_true};
+use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::is_python_whitespace;
 
 use crate::autofix::edits;
 use crate::checkers::ast::Checker;
@@ -372,7 +374,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
 
 /// Return `true` if the `func` is a known function that never returns.
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
             call_path.as_slice(),
             ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
@@ -387,23 +389,35 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
 /// RET503
 fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
     match stmt {
-        Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);
             }
-            if let Some(last_stmt) = orelse.last() {
-                implicit_return(checker, last_stmt);
-            } else {
+            for clause in elif_else_clauses {
+                if let Some(last_stmt) = clause.body.last() {
+                    implicit_return(checker, last_stmt);
+                }
+            }
+
+            // Check if we don't have an else clause
+            if matches!(
+                elif_else_clauses.last(),
+                None | Some(ast::ElifElseClause { test: Some(_), .. })
+            ) {
                 let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator, stmt) {
+                    if let Some(indent) = indentation(checker.locator(), stmt) {
                         let mut content = String::new();
-                        content.push_str(checker.stylist.line_ending().as_str());
+                        content.push_str(checker.stylist().line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
                         diagnostic.set_fix(Fix::suggested(Edit::insertion(
                             content,
-                            end_of_last_statement(stmt, checker.locator),
+                            end_of_last_statement(stmt, checker.locator()),
                         )));
                     }
                 }
@@ -412,22 +426,20 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
         }
         Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => {}
         Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => {}
-        Stmt::For(ast::StmtFor { orelse, .. })
-        | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-        | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+        Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
                 let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator, stmt) {
+                    if let Some(indent) = indentation(checker.locator(), stmt) {
                         let mut content = String::new();
-                        content.push_str(checker.stylist.line_ending().as_str());
+                        content.push_str(checker.stylist().line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
                         diagnostic.set_fix(Fix::suggested(Edit::insertion(
                             content,
-                            end_of_last_statement(stmt, checker.locator),
+                            end_of_last_statement(stmt, checker.locator()),
                         )));
                     }
                 }
@@ -441,13 +453,12 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::With(ast::StmtWith { body, .. })
-        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+        Stmt::With(ast::StmtWith { body, .. }) => {
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);
             }
         }
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) | Stmt::TryStar(_) => {}
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => {}
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),
@@ -457,14 +468,14 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(indent) = indentation(checker.locator, stmt) {
+                if let Some(indent) = indentation(checker.locator(), stmt) {
                     let mut content = String::new();
-                    content.push_str(checker.stylist.line_ending().as_str());
+                    content.push_str(checker.stylist().line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
                     diagnostic.set_fix(Fix::suggested(Edit::insertion(
                         content,
-                        end_of_last_statement(stmt, checker.locator),
+                        end_of_last_statement(stmt, checker.locator()),
                     )));
                 }
             }
@@ -524,10 +535,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                 // edit, since we're editing the preceding statement, so no conflicting edit would
                 // be allowed to remove that preceding statement.
                 let delete_return =
-                    edits::delete_stmt(stmt, None, checker.locator, checker.indexer);
+                    edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
                 // Replace the `x = 1` statement with `return 1`.
-                let content = checker.locator.slice(assign.range());
+                let content = checker.locator().slice(assign);
                 let equals_index = content
                     .find('=')
                     .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;
@@ -539,16 +550,16 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     if content[after_equals..]
                         .chars()
                         .next()
-                        .map_or(false, char::is_alphabetic)
+                        .is_some_and(is_python_whitespace)
                     {
-                        "return ".to_string()
-                    } else {
                         "return".to_string()
+                    } else {
+                        "return ".to_string()
                     },
                     // Replace from the start of the assignment statement to the end of the equals
                     // sign.
                     TextRange::new(
-                        assign.range().start(),
+                        assign.start(),
                         assign
                             .range()
                             .start()
@@ -564,13 +575,22 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
 }
 
 /// RET505, RET506, RET507, RET508
-fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Branch) -> bool {
-    let ast::StmtIf { body, .. } = stmt;
-    for child in body {
+fn superfluous_else_node(
+    checker: &mut Checker,
+    if_elif_body: &[Stmt],
+    elif_else: &ElifElseClause,
+) -> bool {
+    let branch = if elif_else.test.is_some() {
+        Branch::Elif
+    } else {
+        Branch::Else
+    };
+    for child in if_elif_body {
         if child.is_return_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
+                elif_else_range(elif_else, checker.locator().contents())
+                    .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -579,7 +599,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Bran
         } else if child.is_break_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
+                elif_else_range(elif_else, checker.locator().contents())
+                    .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -588,7 +609,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Bran
         } else if child.is_raise_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
+                elif_else_range(elif_else, checker.locator().contents())
+                    .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -597,7 +619,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Bran
         } else if child.is_continue_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
+                elif_else_range(elif_else, checker.locator().contents())
+                    .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -609,16 +632,9 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Bran
 }
 
 /// RET505, RET506, RET507, RET508
-fn superfluous_elif(checker: &mut Checker, stack: &Stack) {
-    for stmt in &stack.elifs {
-        superfluous_else_node(checker, stmt, Branch::Elif);
-    }
-}
-
-/// RET505, RET506, RET507, RET508
-fn superfluous_else(checker: &mut Checker, stack: &Stack) {
-    for stmt in &stack.elses {
-        superfluous_else_node(checker, stmt, Branch::Else);
+fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
+    for (if_elif_body, elif_else) in &stack.elifs_elses {
+        superfluous_else_node(checker, if_elif_body, elif_else);
     }
 }
 
@@ -655,8 +671,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
         Rule::SuperfluousElseContinue,
         Rule::SuperfluousElseBreak,
     ]) {
-        superfluous_elif(checker, &stack);
-        superfluous_else(checker, &stack);
+        superfluous_elif_else(checker, &stack);
     }
 
     // Skip any functions without return statements.

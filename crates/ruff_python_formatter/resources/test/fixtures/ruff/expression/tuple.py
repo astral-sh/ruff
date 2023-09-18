@@ -3,6 +3,8 @@ a1 = 1, 2
 a2 = (1, 2)
 a3 = (1, 2), 3
 a4 = ((1, 2), 3)
+a5 = (1), (2)
+a6 = ((1), (2))
 
 # Wrapping parentheses checks
 b1 = (("Michael", "Ende"), ("Der", "satanarchäolügenialkohöllische", "Wunschpunsch"), ("Beelzebub", "Irrwitzer"), ("Tyrannja", "Vamperl"),)
@@ -64,3 +66,6 @@ g2 = ( # a
 h1 = ((((1, 2))))
 h2 = ((((1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"))))
 h3 = 1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"
+
+i1 = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # This should break
+

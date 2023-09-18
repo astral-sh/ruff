@@ -18,8 +18,12 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
+    #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
+    #[test_case(
+        Rule::BadStringFormatCharacter,
+        Path::new("bad_string_format_character.py")
+    )]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"))]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]
@@ -32,6 +36,7 @@ mod tests {
         Path::new("repeated_isinstance_calls.py")
     )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
+    #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
@@ -45,6 +50,7 @@ mod tests {
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_8.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_9.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_10.py"))]
+    #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_11.py"))]
     #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"))]
     #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"))]
     #[test_case(
@@ -113,14 +119,25 @@ mod tests {
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"))]
     #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"))]
     #[test_case(
-        Rule::RepeatedEqualityComparisonTarget,
-        Path::new("repeated_equality_comparison_target.py")
+        Rule::RepeatedEqualityComparison,
+        Path::new("repeated_equality_comparison.py")
     )]
+    #[test_case(Rule::SelfAssigningVariable, Path::new("self_assigning_variable.py"))]
+    #[test_case(
+        Rule::SubprocessPopenPreexecFn,
+        Path::new("subprocess_popen_preexec_fn.py")
+    )]
+    #[test_case(
+        Rule::SubprocessRunWithoutCheck,
+        Path::new("subprocess_run_without_check.py")
+    )]
+    #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
+    #[test_case(Rule::NoSelfUse, Path::new("no_self_use.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
-            &Settings::for_rules(vec![rule_code]),
+            &Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -130,10 +147,8 @@ mod tests {
     fn repeated_isinstance_calls() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/repeated_isinstance_calls.py"),
-            &Settings {
-                target_version: PythonVersion::Py39,
-                ..Settings::for_rules(vec![Rule::RepeatedIsinstanceCalls])
-            },
+            &Settings::for_rule(Rule::RepeatedIsinstanceCalls)
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -143,10 +158,7 @@ mod tests {
     fn continue_in_finally() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/continue_in_finally.py"),
-            &Settings {
-                target_version: PythonVersion::Py37,
-                ..Settings::for_rules(vec![Rule::ContinueInFinally])
-            },
+            &Settings::for_rule(Rule::ContinueInFinally).with_target_version(PythonVersion::Py37),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -161,7 +173,7 @@ mod tests {
                     allow_magic_value_types: vec![pylint::settings::ConstantType::Int],
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::MagicValueComparison])
+                ..Settings::for_rule(Rule::MagicValueComparison)
             },
         )?;
         assert_messages!(diagnostics);
@@ -177,7 +189,7 @@ mod tests {
                     max_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyArguments])
+                ..Settings::for_rule(Rule::TooManyArguments)
             },
         )?;
         assert_messages!(diagnostics);
@@ -190,7 +202,7 @@ mod tests {
             Path::new("pylint/too_many_arguments_params.py"),
             &Settings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap(),
-                ..Settings::for_rules(vec![Rule::TooManyArguments])
+                ..Settings::for_rule(Rule::TooManyArguments)
             },
         )?;
         assert_messages!(diagnostics);
@@ -206,7 +218,7 @@ mod tests {
                     max_branches: 1,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyBranches])
+                ..Settings::for_rule(Rule::TooManyBranches)
             },
         )?;
         assert_messages!(diagnostics);
@@ -222,7 +234,7 @@ mod tests {
                     max_statements: 1,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyStatements])
+                ..Settings::for_rule(Rule::TooManyStatements)
             },
         )?;
         assert_messages!(diagnostics);
@@ -238,7 +250,23 @@ mod tests {
                     max_returns: 1,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyReturnStatements])
+                ..Settings::for_rule(Rule::TooManyReturnStatements)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn too_many_public_methods() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_public_methods.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    max_public_methods: 7,
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyPublicMethods])
             },
         )?;
         assert_messages!(diagnostics);

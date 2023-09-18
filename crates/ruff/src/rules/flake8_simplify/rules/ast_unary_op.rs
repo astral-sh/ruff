@@ -1,5 +1,5 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, CmpOp, Expr, ExprContext, Ranged, Stmt, UnaryOp};
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, UnaryOp};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -127,13 +127,7 @@ fn is_dunder_method(name: &str) -> bool {
 }
 
 fn is_exception_check(stmt: &Stmt) -> bool {
-    let Stmt::If(ast::StmtIf {
-        test: _,
-        body,
-        orelse: _,
-        range: _,
-    }) = stmt
-    else {
+    let Stmt::If(ast::StmtIf { body, .. }) = stmt else {
         return false;
     };
     matches!(body.as_slice(), [Stmt::Raise(_)])
@@ -161,14 +155,13 @@ pub(crate) fn negation_with_equal_op(
     if !matches!(&ops[..], [CmpOp::Eq]) {
         return;
     }
-    if is_exception_check(checker.semantic().stmt()) {
+    if is_exception_check(checker.semantic().current_statement()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. })
-    | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef { name, .. }) =
-        &checker.semantic().scope().kind
+    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
+        &checker.semantic().current_scope().kind
     {
         if is_dunder_method(name) {
             return;
@@ -219,14 +212,13 @@ pub(crate) fn negation_with_not_equal_op(
     if !matches!(&ops[..], [CmpOp::NotEq]) {
         return;
     }
-    if is_exception_check(checker.semantic().stmt()) {
+    if is_exception_check(checker.semantic().current_statement()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. })
-    | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef { name, .. }) =
-        &checker.semantic().scope().kind
+    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
+        &checker.semantic().current_scope().kind
     {
         if is_dunder_method(name) {
             return;
@@ -281,7 +273,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().in_boolean_test() {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.locator.slice(operand.range()).to_string(),
+                checker.locator().slice(operand.as_ref()).to_string(),
                 expr.range(),
             )));
         } else if checker.semantic().is_builtin("bool") {
@@ -292,8 +284,11 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
             };
             let node1 = ast::ExprCall {
                 func: Box::new(node.into()),
-                args: vec![*operand.clone()],
-                keywords: vec![],
+                arguments: Arguments {
+                    args: vec![*operand.clone()],
+                    keywords: vec![],
+                    range: TextRange::default(),
+                },
                 range: TextRange::default(),
             };
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

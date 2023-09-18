@@ -154,8 +154,7 @@ raise (
 )
 
 
-raise (
-    # hey
+raise (  # hey
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     # Holala
     + bbbbbbbbbbbbbbbbbbbbbbbbbb  # stay
@@ -165,8 +164,7 @@ raise (
 )  # whaaaaat
 # the end
 
-raise (
-    # hey 2
+raise (  # hey 2
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     # Holala
     "bbbbbbbbbbbbbbbbbbbbbbbb"  # stay
@@ -201,11 +199,11 @@ raise (  # sould I stay here
     # just a comment here
 )  # trailing comment
 
-raise hello()  # sould I stay here
-# just a comment here  # trailing comment
+raise hello(  # sould I stay here
+    # just a comment here
+)  # trailing comment
 
-raise (
-    # sould I stay here
+raise (  # sould I stay here
     test,
     # just a comment here
 )  # trailing comment

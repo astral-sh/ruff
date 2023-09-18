@@ -1,6 +1,6 @@
 //! Specialized AST visitor trait and walk functions that only visit statements.
 
-use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Stmt};
+use crate::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
 
 /// A trait for AST visitors that only need to visit statements.
 pub trait StatementVisitor<'a> {
@@ -12,6 +12,9 @@ pub trait StatementVisitor<'a> {
     }
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
         walk_except_handler(self, except_handler);
+    }
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+        walk_elif_else_clause(self, elif_else_clause);
     }
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         walk_match_case(self, match_case);
@@ -29,9 +32,6 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
             visitor.visit_body(body);
         }
-        Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
-            visitor.visit_body(body);
-        }
         Stmt::For(ast::StmtFor { body, orelse, .. }) => {
             visitor.visit_body(body);
             visitor.visit_body(orelse);
@@ -39,22 +39,21 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
         Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
             visitor.visit_body(body);
         }
-        Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
-            visitor.visit_body(body);
-            visitor.visit_body(orelse);
-        }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
-        Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            for clause in elif_else_clauses {
+                visitor.visit_elif_else_clause(clause);
+            }
         }
         Stmt::With(ast::StmtWith { body, .. }) => {
-            visitor.visit_body(body);
-        }
-        Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
             visitor.visit_body(body);
         }
         Stmt::Match(ast::StmtMatch { cases, .. }) => {
@@ -67,21 +66,7 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             handlers,
             orelse,
             finalbody,
-            range: _range,
-        }) => {
-            visitor.visit_body(body);
-            for except_handler in handlers {
-                visitor.visit_except_handler(except_handler);
-            }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
-        }
-        Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            range: _range,
+            ..
         }) => {
             visitor.visit_body(body);
             for except_handler in handlers {
@@ -103,6 +88,13 @@ pub fn walk_except_handler<'a, V: StatementVisitor<'a> + ?Sized>(
             visitor.visit_body(body);
         }
     }
+}
+
+pub fn walk_elif_else_clause<'a, V: StatementVisitor<'a> + ?Sized>(
+    visitor: &mut V,
+    elif_else_clause: &'a ElifElseClause,
+) {
+    visitor.visit_body(&elif_else_clause.body);
 }
 
 pub fn walk_match_case<'a, V: StatementVisitor<'a> + ?Sized>(

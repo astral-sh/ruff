@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Stmt;
+use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -10,7 +10,7 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 /// Checks for functions or methods with too many return statements.
 ///
 /// By default, this rule allows up to six return statements, as configured by
-/// the `pylint.max-returns` option.
+/// the [`pylint.max-returns`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many return statements are harder to understand
@@ -98,13 +98,12 @@ pub(crate) fn too_many_return_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::ast::Suite;
-    use rustpython_parser::Parse;
+    use ruff_python_parser::parse_suite;
 
     use super::num_returns;
 
     fn test_helper(source: &str, expected: usize) -> Result<()> {
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_returns(&stmts), expected);
         Ok(())
     }

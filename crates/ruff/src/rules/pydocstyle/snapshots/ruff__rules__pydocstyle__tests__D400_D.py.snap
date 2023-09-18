@@ -272,4 +272,59 @@ D.py:615:5: D400 [*] First line should end with a period
 617 617 |     """
 618 618 | 
 
+D.py:639:17: D400 [*] First line should end with a period
+    |
+639 | class SameLine: """This is a docstring on the same line"""
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
+640 | 
+641 | def same_line(): """This is a docstring on the same line"""
+    |
+    = help: Add period
+
+ℹ Suggested fix
+636 636 |     """ This is a docstring that starts with a space."""  # noqa: D210
+637 637 | 
+638 638 | 
+639     |-class SameLine: """This is a docstring on the same line"""
+    639 |+class SameLine: """This is a docstring on the same line."""
+640 640 | 
+641 641 | def same_line(): """This is a docstring on the same line"""
+642 642 | 
+
+D.py:641:18: D400 [*] First line should end with a period
+    |
+639 | class SameLine: """This is a docstring on the same line"""
+640 | 
+641 | def same_line(): """This is a docstring on the same line"""
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+638 638 | 
+639 639 | class SameLine: """This is a docstring on the same line"""
+640 640 | 
+641     |-def same_line(): """This is a docstring on the same line"""
+    641 |+def same_line(): """This is a docstring on the same line."""
+642 642 | 
+643 643 | 
+644 644 | def single_line_docstring_with_an_escaped_backslash():
+
+D.py:664:5: D400 [*] First line should end with a period
+    |
+663 |   def newline_after_closing_quote(self):
+664 |       "We enforce a newline after the closing quote for a multi-line docstring \
+    |  _____^
+665 | |     but continuations shouldn't be considered multi-line"
+    | |_________________________________________________________^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+662 662 | 
+663 663 | def newline_after_closing_quote(self):
+664 664 |     "We enforce a newline after the closing quote for a multi-line docstring \
+665     |-    but continuations shouldn't be considered multi-line"
+    665 |+    but continuations shouldn't be considered multi-line."
+
 

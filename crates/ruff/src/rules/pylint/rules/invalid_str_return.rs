@@ -1,9 +1,10 @@
-use rustpython_parser::ast::{Ranged, Stmt};
+use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{helpers::ReturnStatementVisitor, statement_visitor::StatementVisitor};
-use ruff_python_semantic::analyze::type_inference::PythonType;
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -29,7 +30,7 @@ pub(crate) fn invalid_str_return(checker: &mut Checker, name: &str, body: &[Stmt
         return;
     }
 
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     }
 
@@ -41,10 +42,9 @@ pub(crate) fn invalid_str_return(checker: &mut Checker, name: &str, body: &[Stmt
 
     for stmt in returns {
         if let Some(value) = stmt.value.as_deref() {
-            // Disallow other, non-
             if !matches!(
-                PythonType::from(value),
-                PythonType::String | PythonType::Unknown
+                ResolvedPythonType::from(value),
+                ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::String)
             ) {
                 checker
                     .diagnostics

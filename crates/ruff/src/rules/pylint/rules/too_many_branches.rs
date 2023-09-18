@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -8,7 +8,7 @@ use ruff_python_ast::identifier::Identifier;
 /// Checks for functions or methods with too many branches.
 ///
 /// By default, this rule allows up to 12 branches. This can be configured
-/// using the `max-branches` option.
+/// using the [`pylint.max-branches`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many branches are harder to understand
@@ -66,8 +66,8 @@ use ruff_python_ast::identifier::Identifier;
 ///     return city
 /// ```
 ///
-/// ## References
-/// - [Ruff configuration documentation](https://beta.ruff.rs/docs/settings/#max-branches)
+/// ## Options
+/// - `pylint.max-branches`
 #[violation]
 pub struct TooManyBranches {
     branches: usize,
@@ -88,74 +88,66 @@ impl Violation for TooManyBranches {
 fn num_branches(stmts: &[Stmt]) -> usize {
     stmts
         .iter()
-        .map(|stmt| {
-            match stmt {
-                Stmt::If(ast::StmtIf { body, orelse, .. }) => {
-                    1 + num_branches(body)
-                        + (if let Some(stmt) = orelse.first() {
-                            // `elif:` and `else: if:` have the same AST representation.
-                            // Avoid treating `elif:` as two statements.
-                            usize::from(!stmt.is_if_stmt())
-                        } else {
-                            0
-                        })
-                        + num_branches(orelse)
-                }
-                Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                    1 + cases
+        .map(|stmt| match stmt {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                1 + num_branches(body)
+                    + elif_else_clauses.len()
+                    + elif_else_clauses
                         .iter()
-                        .map(|case| num_branches(&case.body))
+                        .map(|clause| num_branches(&clause.body))
                         .sum::<usize>()
-                }
-                Stmt::For(ast::StmtFor { body, orelse, .. })
-                | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-                | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                    1 + num_branches(body)
-                        + (if orelse.is_empty() {
-                            0
-                        } else {
-                            1 + num_branches(orelse)
-                        })
-                }
-                Stmt::Try(ast::StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    range: _,
-                })
-                | Stmt::TryStar(ast::StmtTryStar {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    range: _,
-                }) => {
-                    1 + num_branches(body)
-                        + (if orelse.is_empty() {
-                            0
-                        } else {
-                            1 + num_branches(orelse)
-                        })
-                        + (if finalbody.is_empty() {
-                            0
-                        } else {
-                            1 + num_branches(finalbody)
-                        })
-                        + handlers
-                            .iter()
-                            .map(|handler| {
-                                1 + {
-                                    let ExceptHandler::ExceptHandler(
-                                        ast::ExceptHandlerExceptHandler { body, .. },
-                                    ) = handler;
-                                    num_branches(body)
-                                }
-                            })
-                            .sum::<usize>()
-                }
-                _ => 0,
             }
+            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+                1 + cases
+                    .iter()
+                    .map(|case| num_branches(&case.body))
+                    .sum::<usize>()
+            }
+            Stmt::For(ast::StmtFor { body, orelse, .. })
+            | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+                1 + num_branches(body)
+                    + (if orelse.is_empty() {
+                        0
+                    } else {
+                        1 + num_branches(orelse)
+                    })
+            }
+            Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                1 + num_branches(body)
+                    + (if orelse.is_empty() {
+                        0
+                    } else {
+                        1 + num_branches(orelse)
+                    })
+                    + (if finalbody.is_empty() {
+                        0
+                    } else {
+                        1 + num_branches(finalbody)
+                    })
+                    + handlers
+                        .iter()
+                        .map(|handler| {
+                            1 + {
+                                let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                                    body,
+                                    ..
+                                }) = handler;
+                                num_branches(body)
+                            }
+                        })
+                        .sum::<usize>()
+            }
+            _ => 0,
         })
         .sum()
 }
@@ -183,13 +175,12 @@ pub(crate) fn too_many_branches(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::ast::Suite;
-    use rustpython_parser::Parse;
+    use ruff_python_parser::parse_suite;
 
     use super::num_branches;
 
     fn test_helper(source: &str, expected_num_branches: usize) -> Result<()> {
-        let branches = Suite::parse(source, "<filename>")?;
+        let branches = parse_suite(source, "<filename>")?;
         assert_eq!(num_branches(&branches), expected_num_branches);
         Ok(())
     }
@@ -205,8 +196,7 @@ else:
     else:
         pass
 "#;
-
-        test_helper(source, 3)?;
+        test_helper(source, 4)?;
         Ok(())
     }
 

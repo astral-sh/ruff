@@ -1,0 +1,33 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/no_fmt_on.py
+---
+## Input
+```py
+def test():
+    # fmt: off
+    not   formatted
+
+    if unformatted +  a:
+        pass
+
+# Get's formatted again
+a   + b
+```
+
+## Output
+```py
+def test():
+    # fmt: off
+    not   formatted
+
+    if unformatted +  a:
+        pass
+
+
+# Get's formatted again
+a + b
+```
+
+
+

@@ -1,20 +1,18 @@
+use itertools::Itertools;
 use std::collections::BTreeSet;
 
-use itertools::Itertools;
-use nohash_hasher::IntSet;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustc_hash::FxHashMap;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel};
-use ruff_python_ast::source_code::Locator;
+use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
+use ruff_source_file::Locator;
 
-use crate::autofix::source_map::SourceMap;
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
-pub(crate) mod source_map;
+pub(crate) mod snippet;
 
 pub(crate) struct FixResult {
     /// The resulting source code, after applying all fixes.
@@ -47,7 +45,7 @@ fn apply_fixes<'a>(
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
-    let mut isolated: IntSet<u32> = IntSet::default();
+    let mut isolated: FxHashSet<u32> = FxHashSet::default();
     let mut fixed = FxHashMap::default();
     let mut source_map = SourceMap::default();
 
@@ -60,35 +58,30 @@ fn apply_fixes<'a>(
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
-        // If we already applied an identical fix as part of another correction, skip
-        // any re-application.
-        if fix.edits().iter().all(|edit| applied.contains(edit)) {
-            *fixed.entry(rule).or_default() += 1;
-            continue;
-        }
+        let mut edits = fix
+            .edits()
+            .iter()
+            .filter(|edit| !applied.contains(edit))
+            .peekable();
 
-        // Best-effort approach: if this fix overlaps with a fix we've already applied,
-        // skip it.
-        if last_pos.map_or(false, |last_pos| {
-            fix.min_start()
-                .map_or(false, |fix_location| last_pos >= fix_location)
-        }) {
-            continue;
-        }
+        // If the fix contains at least one new edit, enforce isolation and positional requirements.
+        if let Some(first) = edits.peek() {
+            // If this fix requires isolation, and we've already applied another fix in the
+            // same isolation group, skip it.
+            if let IsolationLevel::Group(id) = fix.isolation() {
+                if !isolated.insert(id) {
+                    continue;
+                }
+            }
 
-        // If this fix requires isolation, and we've already applied another fix in the
-        // same isolation group, skip it.
-        if let IsolationLevel::Group(id) = fix.isolation() {
-            if !isolated.insert(id) {
+            // If this fix overlaps with a fix we've already applied, skip it.
+            if last_pos.is_some_and(|last_pos| last_pos >= first.start()) {
                 continue;
             }
         }
 
-        for edit in fix
-            .edits()
-            .iter()
-            .sorted_unstable_by_key(|edit| edit.start())
-        {
+        let mut applied_edits = Vec::with_capacity(fix.edits().len());
+        for edit in edits {
             // Add all contents from `last_pos` to `fix.location`.
             let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);
@@ -104,9 +97,10 @@ fn apply_fixes<'a>(
 
             // Track that the edit was applied.
             last_pos = Some(edit.end());
-            applied.insert(edit);
+            applied_edits.push(edit);
         }
 
+        applied.extend(applied_edits.drain(..));
         *fixed.entry(rule).or_default() += 1;
     }
 
@@ -142,14 +136,11 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use ruff_text_size::TextSize;
+    use ruff_text_size::{Ranged, TextSize};
 
-    use ruff_diagnostics::Diagnostic;
-    use ruff_diagnostics::Edit;
-    use ruff_diagnostics::Fix;
-    use ruff_python_ast::source_code::Locator;
+    use ruff_diagnostics::{Diagnostic, Edit, Fix, SourceMarker};
+    use ruff_source_file::Locator;
 
-    use crate::autofix::source_map::SourceMarker;
     use crate::autofix::{apply_fixes, FixResult};
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
@@ -213,14 +204,8 @@ print("hello world")
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker {
-                    source: 10.into(),
-                    dest: 10.into(),
-                },
-                SourceMarker {
-                    source: 10.into(),
-                    dest: 21.into(),
-                },
+                SourceMarker::new(10.into(), 10.into(),),
+                SourceMarker::new(10.into(), 21.into(),),
             ]
         );
     }
@@ -256,14 +241,8 @@ class A(Bar):
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker {
-                    source: 8.into(),
-                    dest: 8.into(),
-                },
-                SourceMarker {
-                    source: 14.into(),
-                    dest: 11.into(),
-                },
+                SourceMarker::new(8.into(), 8.into(),),
+                SourceMarker::new(14.into(), 11.into(),),
             ]
         );
     }
@@ -295,14 +274,8 @@ class A:
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker {
-                    source: 7.into(),
-                    dest: 7.into()
-                },
-                SourceMarker {
-                    source: 15.into(),
-                    dest: 7.into()
-                }
+                SourceMarker::new(7.into(), 7.into()),
+                SourceMarker::new(15.into(), 7.into()),
             ]
         );
     }
@@ -338,22 +311,10 @@ class A(object):
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker {
-                    source: 8.into(),
-                    dest: 8.into()
-                },
-                SourceMarker {
-                    source: 16.into(),
-                    dest: 8.into()
-                },
-                SourceMarker {
-                    source: 22.into(),
-                    dest: 14.into(),
-                },
-                SourceMarker {
-                    source: 30.into(),
-                    dest: 14.into(),
-                }
+                SourceMarker::new(8.into(), 8.into()),
+                SourceMarker::new(16.into(), 8.into()),
+                SourceMarker::new(22.into(), 14.into(),),
+                SourceMarker::new(30.into(), 14.into(),),
             ]
         );
     }
@@ -388,14 +349,8 @@ class A:
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker {
-                    source: 7.into(),
-                    dest: 7.into(),
-                },
-                SourceMarker {
-                    source: 15.into(),
-                    dest: 7.into(),
-                }
+                SourceMarker::new(7.into(), 7.into(),),
+                SourceMarker::new(15.into(), 7.into(),),
             ]
         );
     }

@@ -87,28 +87,30 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
-use ruff_text_size::TextRange;
 use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use rustpython_parser::ast::{Mod, Ranged};
-
 pub(crate) use format::{
-    dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
-    leading_node_comments, trailing_comments, trailing_node_comments,
+    dangling_comments, dangling_node_comments, dangling_open_parenthesis_comments,
+    leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::source_code::CommentRanges;
+use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+use ruff_python_ast::Mod;
+use ruff_python_trivia::{CommentRanges, PythonWhitespace};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::debug::{DebugComment, DebugComments};
-use crate::comments::map::MultiMap;
+use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
 use crate::comments::node_key::NodeRefEqualityKey;
-use crate::comments::visitor::CommentsVisitor;
+use crate::comments::visitor::{CommentsMapBuilder, CommentsVisitor};
+pub(crate) use visitor::collect_comments;
 
 mod debug;
-mod format;
+pub(crate) mod format;
 mod map;
 mod node_key;
 mod placement;
@@ -148,6 +150,11 @@ impl SourceComment {
         self.formatted.set(true);
     }
 
+    /// Marks the comment as not-formatted
+    pub(crate) fn mark_unformatted(&self) {
+        self.formatted.set(false);
+    }
+
     /// If the comment has already been formatted
     pub(crate) fn is_formatted(&self) -> bool {
         self.formatted.get()
@@ -160,6 +167,62 @@ impl SourceComment {
     /// Returns a nice debug representation that prints the source code for every comment (and not just the range).
     pub(crate) fn debug<'a>(&'a self, source_code: SourceCode<'a>) -> DebugComment<'a> {
         DebugComment::new(self, source_code)
+    }
+
+    pub(crate) fn suppression_kind(&self, source: &str) -> Option<SuppressionKind> {
+        let text = self.slice.text(SourceCode::new(source));
+        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
+
+        if let Some(command) = trimmed.strip_prefix("fmt:") {
+            match command.trim_whitespace_start() {
+                "off" => Some(SuppressionKind::Off),
+                "on" => Some(SuppressionKind::On),
+                "skip" => Some(SuppressionKind::Skip),
+                _ => None,
+            }
+        } else if let Some(command) = trimmed.strip_prefix("yapf:") {
+            match command.trim_whitespace_start() {
+                "disable" => Some(SuppressionKind::Off),
+                "enable" => Some(SuppressionKind::On),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Returns true if this comment is a `fmt: off` or `yapf: disable` own line suppression comment.
+    pub(crate) fn is_suppression_off_comment(&self, source: &str) -> bool {
+        self.line_position.is_own_line()
+            && matches!(self.suppression_kind(source), Some(SuppressionKind::Off))
+    }
+
+    /// Returns true if this comment is a `fmt: on` or `yapf: enable` own line suppression comment.
+    pub(crate) fn is_suppression_on_comment(&self, source: &str) -> bool {
+        self.line_position.is_own_line()
+            && matches!(self.suppression_kind(source), Some(SuppressionKind::On))
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) enum SuppressionKind {
+    /// A `fmt: off` or `yapf: disable` comment
+    Off,
+    /// A `fmt: on` or `yapf: enable` comment
+    On,
+    /// A `fmt: skip` comment
+    Skip,
+}
+
+impl SuppressionKind {
+    pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {
+        trailing_comments.iter().any(|comment| {
+            comment.line_position().is_end_of_line()
+                && matches!(
+                    comment.suppression_kind(source),
+                    Some(SuppressionKind::Skip | SuppressionKind::Off)
+                )
+        })
     }
 }
 
@@ -217,7 +280,7 @@ type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 /// The comments of a syntax tree stored by node.
 ///
 /// Cloning `comments` is cheap as it only involves bumping a reference counter.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct Comments<'a> {
     /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [crate::Formatter].
     /// Independent lifetimes are necessary to support the use case where a (formattable object)[crate::Format]
@@ -244,13 +307,29 @@ pub(crate) struct Comments<'a> {
     data: Rc<CommentsData<'a>>,
 }
 
-#[allow(unused)]
-// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl<'a> Comments<'a> {
-    fn new(comments: CommentsMap<'a>) -> Self {
+    fn new(comments: CommentsMap<'a>, comment_ranges: &'a CommentRanges) -> Self {
         Self {
-            data: Rc::new(CommentsData { comments }),
+            data: Rc::new(CommentsData {
+                comments,
+                comment_ranges,
+            }),
         }
+    }
+
+    /// Effectively a [`Default`] implementation that works around the lifetimes for tests
+    #[cfg(test)]
+    pub(crate) fn from_ranges(comment_ranges: &'a CommentRanges) -> Self {
+        Self {
+            data: Rc::new(CommentsData {
+                comments: CommentsMap::default(),
+                comment_ranges,
+            }),
+        }
+    }
+
+    pub(crate) fn ranges(&self) -> &'a CommentRanges {
+        self.data.comment_ranges
     }
 
     /// Extracts the comments from the AST.
@@ -262,14 +341,18 @@ impl<'a> Comments<'a> {
         let map = if comment_ranges.is_empty() {
             CommentsMap::new()
         } else {
-            CommentsVisitor::new(source_code, comment_ranges).visit(root)
+            let mut builder =
+                CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
+            CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+            builder.finish()
         };
 
-        Self::new(map)
+        Self::new(map, comment_ranges)
     }
 
+    /// Returns `true` if the given `node` has any comments.
     #[inline]
-    pub(crate) fn has_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -280,16 +363,16 @@ impl<'a> Comments<'a> {
 
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn has_leading_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_leading<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        !self.leading_comments(node).is_empty()
+        !self.leading(node).is_empty()
     }
 
     /// Returns the `node`'s [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn leading_comments<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn leading<T>(&self, node: T) -> &[SourceComment]
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -299,15 +382,15 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns `true` if node has any [dangling comments](self#dangling-comments).
-    pub(crate) fn has_dangling_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_dangling<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        !self.dangling_comments(node).is_empty()
+        !self.dangling(node).is_empty()
     }
 
     /// Returns the [dangling comments](self#dangling-comments) of `node`
-    pub(crate) fn dangling_comments<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn dangling<T>(&self, node: T) -> &[SourceComment]
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -318,7 +401,7 @@ impl<'a> Comments<'a> {
 
     /// Returns the `node`'s [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn trailing_comments<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn trailing<T>(&self, node: T) -> &[SourceComment]
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -329,57 +412,49 @@ impl<'a> Comments<'a> {
 
     /// Returns `true` if the given `node` has any [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_trailing<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        !self.trailing_comments(node).is_empty()
+        !self.trailing(node).is_empty()
     }
 
     /// Returns `true` if the given `node` has any [trailing own line comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing_own_line_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_trailing_own_line<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        self.trailing_comments(node)
+        self.trailing(node)
             .iter()
             .any(|comment| comment.line_position().is_own_line())
     }
 
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.
-    pub(crate) fn leading_trailing_comments<T>(
-        &self,
-        node: T,
-    ) -> impl Iterator<Item = &SourceComment>
+    pub(crate) fn leading_trailing<T>(&self, node: T) -> impl Iterator<Item = &SourceComment>
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        let node = node.into();
-        self.leading_comments(node)
-            .iter()
-            .chain(self.trailing_comments(node).iter())
+        let comments = self.leading_dangling_trailing(node);
+        comments.leading.iter().chain(comments.trailing)
     }
 
     /// Returns an iterator over the [leading](self#leading-comments), [dangling](self#dangling-comments), and [trailing](self#trailing) comments of `node`.
-    pub(crate) fn leading_dangling_trailing_comments<T>(
-        &self,
-        node: T,
-    ) -> impl Iterator<Item = &SourceComment>
+    pub(crate) fn leading_dangling_trailing<T>(&self, node: T) -> LeadingDanglingTrailingComments
     where
         T: Into<AnyNodeRef<'a>>,
     {
         self.data
             .comments
-            .parts(&NodeRefEqualityKey::from_ref(node.into()))
+            .leading_dangling_trailing(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     #[inline(always)]
     #[cfg(not(debug_assertions))]
-    pub(crate) fn assert_formatted_all_comments(&self, _source_code: SourceCode) {}
+    pub(crate) fn assert_all_formatted(&self, _source_code: SourceCode) {}
 
     #[cfg(debug_assertions)]
-    pub(crate) fn assert_formatted_all_comments(&self, source_code: SourceCode) {
+    pub(crate) fn assert_all_formatted(&self, source_code: SourceCode) {
         use std::fmt::Write;
 
         let mut output = String::new();
@@ -400,26 +475,84 @@ impl<'a> Comments<'a> {
         );
     }
 
+    #[inline(always)]
+    #[cfg(not(debug_assertions))]
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, _node: AnyNodeRef) {}
+
+    /// Marks the comments of a node printed in verbatim (suppressed) as formatted.
+    ///
+    /// Marks the dangling comments and the comments of all descendants as formatted.
+    /// The leading and trailing comments are not marked as formatted because they are formatted
+    /// normally if `node` is the first or last node of a suppression range.
+    #[cfg(debug_assertions)]
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
+        for dangling in self.dangling(node) {
+            dangling.mark_formatted();
+        }
+
+        node.visit_preorder(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
+    }
+
     /// Returns an object that implements [Debug] for nicely printing the [`Comments`].
     pub(crate) fn debug(&'a self, source_code: SourceCode<'a>) -> DebugComments<'a> {
         DebugComments::new(&self.data.comments, source_code)
     }
 }
 
-#[derive(Debug, Default)]
+pub(crate) type LeadingDanglingTrailingComments<'a> = LeadingDanglingTrailing<'a, SourceComment>;
+
+impl LeadingDanglingTrailingComments<'_> {
+    /// Returns `true` if the struct has any [leading comments](self#leading-comments).
+    #[inline]
+    pub(crate) fn has_leading(&self) -> bool {
+        !self.leading.is_empty()
+    }
+
+    /// Returns `true` if the struct has any [trailing comments](self#trailing-comments).
+    #[inline]
+    pub(crate) fn has_trailing(&self) -> bool {
+        !self.trailing.is_empty()
+    }
+
+    /// Returns `true` if the struct has any [trailing own line comments](self#trailing-comments).
+    #[inline]
+    pub(crate) fn has_trailing_own_line(&self) -> bool {
+        self.trailing
+            .iter()
+            .any(|comment| comment.line_position().is_own_line())
+    }
+}
+
+#[derive(Debug)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
+
+    /// We need those for backwards lexing
+    comment_ranges: &'a CommentRanges,
+}
+
+struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
+
+impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        for comment in self.0.leading_dangling_trailing(node) {
+            comment.mark_formatted();
+        }
+
+        TraversalSignal::Traverse
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use rustpython_parser::ast::Mod;
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::{parse_tokens, Mode};
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder};
+    use ruff_python_ast::Mod;
+    use ruff_python_index::CommentRangesBuilder;
+    use ruff_python_parser::lexer::lex;
+    use ruff_python_parser::{parse_tokens, Mode};
+    use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
 
@@ -568,8 +701,13 @@ def test(x, y):
 def other(y, z):
     if y == z:
         pass
-            # Trailing `if` comment
-      # Trailing `other` function comment
+            # Trailing `pass` comment
+      # Trailing `if` statement comment
+
+class Test:
+    def func():
+        pass
+       # Trailing `func` function comment
 
 test(10, 20)
 "#;

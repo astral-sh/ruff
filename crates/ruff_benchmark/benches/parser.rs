@@ -1,11 +1,10 @@
-use std::time::Duration;
-
-use criterion::measurement::WallTime;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
+use ruff_benchmark::criterion::{
+    criterion_group, criterion_main, measurement::WallTime, BenchmarkId, Criterion, Throughput,
+};
+use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use rustpython_parser::ast::{Stmt, Suite};
-use rustpython_parser::Parse;
+use ruff_python_ast::Stmt;
+use ruff_python_parser::parse_suite;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -26,6 +25,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     Ok(vec![
         TestCase::fast(TestFile::try_download("numpy/globals.py", "https://raw.githubusercontent.com/numpy/numpy/89d64415e349ca75a25250f22b874aa16e5c0973/numpy/_globals.py")?),
+        TestCase::fast(TestFile::try_download("unicode/pypinyin.py", "https://raw.githubusercontent.com/mozillazg/python-pinyin/9521e47d96e3583a5477f5e43a2e82d513f27a3f/pypinyin/standard.py")?),
         TestCase::normal(TestFile::try_download(
             "pydantic/types.py",
             "https://raw.githubusercontent.com/pydantic/pydantic/83b3c49e99ceb4599d9286a3d793cea44ac36d4b/pydantic/types.py",
@@ -55,18 +55,12 @@ fn benchmark_parser(criterion: &mut Criterion<WallTime>) {
 
     for case in test_cases {
         group.throughput(Throughput::Bytes(case.code().len() as u64));
-        group.measurement_time(match case.speed() {
-            TestCaseSpeed::Fast => Duration::from_secs(10),
-            TestCaseSpeed::Normal => Duration::from_secs(20),
-            TestCaseSpeed::Slow => Duration::from_secs(45),
-        });
-
         group.bench_with_input(
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
                 b.iter(|| {
-                    let parsed = Suite::parse(case.code(), case.name()).unwrap();
+                    let parsed = parse_suite(case.code(), case.name()).unwrap();
 
                     let mut visitor = CountVisitor { count: 0 };
                     visitor.visit_body(&parsed);

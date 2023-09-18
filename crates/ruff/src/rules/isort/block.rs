@@ -1,13 +1,13 @@
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Ranged, Stmt};
 use std::iter::Peekable;
 use std::slice;
 
-use ruff_python_ast::source_code::Locator;
+use ruff_notebook::Notebook;
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::directives::IsortDirectives;
-use crate::jupyter::Notebook;
 use crate::rules::isort::helpers;
 use crate::source_kind::SourceKind;
 
@@ -43,7 +43,7 @@ impl<'a> BlockBuilder<'a> {
         locator: &'a Locator<'a>,
         directives: &'a IsortDirectives,
         is_stub: bool,
-        source_kind: Option<&'a SourceKind>,
+        source_kind: &'a SourceKind,
     ) -> Self {
         Self {
             locator,
@@ -53,7 +53,7 @@ impl<'a> BlockBuilder<'a> {
             exclusions: &directives.exclusions,
             nested: false,
             cell_offsets: source_kind
-                .and_then(SourceKind::notebook)
+                .as_ipy_notebook()
                 .map(Notebook::cell_offsets)
                 .map(|offsets| offsets.iter().peekable()),
         }
@@ -89,7 +89,7 @@ impl<'a> BlockBuilder<'a> {
             // sibling (i.e., as if the comment is the next statement, as
             // opposed to the class or function).
             match stmt {
-                Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
+                Stmt::FunctionDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
@@ -144,7 +144,7 @@ where
             while self
                 .splits
                 .peek()
-                .map_or(false, |split| stmt.start() >= **split)
+                .is_some_and(|split| stmt.start() >= **split)
             {
                 self.splits.next();
             }
@@ -165,7 +165,7 @@ where
                 // the case of multiple empty cells).
                 while cell_offsets
                     .peek()
-                    .map_or(false, |split| stmt.start() >= **split)
+                    .is_some_and(|split| stmt.start() >= **split)
                 {
                     cell_offsets.next();
                 }
@@ -196,12 +196,6 @@ where
                 }
                 self.finalize(None);
             }
-            Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-            }
             Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
@@ -209,17 +203,6 @@ where
                 self.finalize(None);
             }
             Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-            }
-            Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -241,24 +224,21 @@ where
                 }
                 self.finalize(None);
             }
-            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
 
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
+                for clause in elif_else_clauses {
+                    self.visit_elif_else_clause(clause);
                 }
-                self.finalize(None);
             }
             Stmt::With(ast::StmtWith { body, .. }) => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-            }
-            Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -274,14 +254,7 @@ where
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 for except_handler in handlers {
                     self.visit_except_handler(except_handler);
@@ -323,6 +296,13 @@ where
 
     fn visit_match_case(&mut self, match_case: &'b MatchCase) {
         for stmt in &match_case.body {
+            self.visit_stmt(stmt);
+        }
+        self.finalize(None);
+    }
+
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'b ElifElseClause) {
+        for stmt in &elif_else_clause.body {
             self.visit_stmt(stmt);
         }
         self.finalize(None);

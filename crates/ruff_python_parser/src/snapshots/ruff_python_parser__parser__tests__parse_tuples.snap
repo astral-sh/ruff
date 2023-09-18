@@ -1,0 +1,59 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: "parse_suite(source, \"<test>\").unwrap()"
+---
+[
+    Assign(
+        StmtAssign {
+            range: 0..11,
+            targets: [
+                Tuple(
+                    ExprTuple {
+                        range: 0..4,
+                        elts: [
+                            Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    range: 3..4,
+                                    id: "b",
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Tuple(
+                ExprTuple {
+                    range: 7..11,
+                    elts: [
+                        Constant(
+                            ExprConstant {
+                                range: 7..8,
+                                value: Int(
+                                    4,
+                                ),
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 10..11,
+                                value: Int(
+                                    5,
+                                ),
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+]

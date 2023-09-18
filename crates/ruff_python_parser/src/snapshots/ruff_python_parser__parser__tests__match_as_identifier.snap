@@ -1,0 +1,827 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: "parse_suite(source, \"<test>\").unwrap()"
+---
+[
+    Expr(
+        StmtExpr {
+            range: 2..17,
+            value: Tuple(
+                ExprTuple {
+                    range: 2..17,
+                    elts: [
+                        BinOp(
+                            ExprBinOp {
+                                range: 2..14,
+                                left: BinOp(
+                                    ExprBinOp {
+                                        range: 2..10,
+                                        left: Name(
+                                            ExprName {
+                                                range: 2..7,
+                                                id: "match",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Mult,
+                                        right: Name(
+                                            ExprName {
+                                                range: 9..10,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                op: Add,
+                                right: Name(
+                                    ExprName {
+                                        range: 13..14,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 16..17,
+                                id: "c",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 43..60,
+            value: Tuple(
+                ExprTuple {
+                    range: 43..60,
+                    elts: [
+                        BinOp(
+                            ExprBinOp {
+                                range: 43..57,
+                                left: Name(
+                                    ExprName {
+                                        range: 43..48,
+                                        id: "match",
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Mult,
+                                right: BinOp(
+                                    ExprBinOp {
+                                        range: 51..56,
+                                        left: Name(
+                                            ExprName {
+                                                range: 51..52,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: Name(
+                                            ExprName {
+                                                range: 55..56,
+                                                id: "b",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 59..60,
+                                id: "c",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 86..103,
+            value: Call(
+                ExprCall {
+                    range: 86..103,
+                    func: Name(
+                        ExprName {
+                            range: 86..91,
+                            id: "match",
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 92..103,
+                        args: [
+                            Starred(
+                                ExprStarred {
+                                    range: 93..99,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 94..99,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 94..95,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: Name(
+                                                ExprName {
+                                                    range: 98..99,
+                                                    id: "b",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    range: 101..102,
+                                    id: "c",
+                                    ctx: Load,
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 130..146,
+            value: BinOp(
+                ExprBinOp {
+                    range: 130..146,
+                    left: BinOp(
+                        ExprBinOp {
+                            range: 130..142,
+                            left: Name(
+                                ExprName {
+                                    range: 130..135,
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Sub,
+                            right: BinOp(
+                                ExprBinOp {
+                                    range: 137..142,
+                                    left: Name(
+                                        ExprName {
+                                            range: 137..138,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: Mult,
+                                    right: Name(
+                                        ExprName {
+                                            range: 141..142,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    op: Add,
+                    right: Name(
+                        ExprName {
+                            range: 145..146,
+                            id: "c",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 173..191,
+            value: BinOp(
+                ExprBinOp {
+                    range: 173..191,
+                    left: BinOp(
+                        ExprBinOp {
+                            range: 173..187,
+                            left: Name(
+                                ExprName {
+                                    range: 173..178,
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Sub,
+                            right: BinOp(
+                                ExprBinOp {
+                                    range: 181..186,
+                                    left: Name(
+                                        ExprName {
+                                            range: 181..182,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: Mult,
+                                    right: Name(
+                                        ExprName {
+                                            range: 185..186,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    op: Add,
+                    right: Name(
+                        ExprName {
+                            range: 190..191,
+                            id: "c",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 218..236,
+            value: BinOp(
+                ExprBinOp {
+                    range: 218..236,
+                    left: BinOp(
+                        ExprBinOp {
+                            range: 218..232,
+                            left: Call(
+                                ExprCall {
+                                    range: 218..228,
+                                    func: Name(
+                                        ExprName {
+                                            range: 218..223,
+                                            id: "match",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 224..228,
+                                        args: [
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 225..227,
+                                                    op: USub,
+                                                    operand: Name(
+                                                        ExprName {
+                                                            range: 226..227,
+                                                            id: "a",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            op: Mult,
+                            right: Name(
+                                ExprName {
+                                    range: 231..232,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    op: Add,
+                    right: Name(
+                        ExprName {
+                            range: 235..236,
+                            id: "c",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 264..274,
+            value: Attribute(
+                ExprAttribute {
+                    range: 264..274,
+                    value: Call(
+                        ExprCall {
+                            range: 264..272,
+                            func: Name(
+                                ExprName {
+                                    range: 264..269,
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 270..272,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "a",
+                        range: 273..274,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 291..303,
+            value: Attribute(
+                ExprAttribute {
+                    range: 291..303,
+                    value: Call(
+                        ExprCall {
+                            range: 291..301,
+                            func: Name(
+                                ExprName {
+                                    range: 291..296,
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 297..301,
+                                args: [
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 298..300,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "a",
+                        range: 302..303,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 322..335,
+            value: Attribute(
+                ExprAttribute {
+                    range: 322..335,
+                    value: Call(
+                        ExprCall {
+                            range: 322..333,
+                            func: Name(
+                                ExprName {
+                                    range: 322..327,
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 328..333,
+                                args: [
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 329..331,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "a",
+                        range: 334..335,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 354..365,
+            value: Attribute(
+                ExprAttribute {
+                    range: 354..365,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 354..363,
+                            value: Name(
+                                ExprName {
+                                    range: 354..359,
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Name(
+                                ExprName {
+                                    range: 361..362,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "b",
+                        range: 364..365,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 383..395,
+            value: Attribute(
+                ExprAttribute {
+                    range: 383..395,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 383..393,
+                            value: Name(
+                                ExprName {
+                                    range: 383..388,
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 390..392,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 390..391,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "b",
+                        range: 394..395,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 436..450,
+            value: Attribute(
+                ExprAttribute {
+                    range: 436..450,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 436..448,
+                            value: Name(
+                                ExprName {
+                                    range: 436..441,
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 443..447,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 444..445,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "b",
+                        range: 449..450,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 471..488,
+            value: Subscript(
+                ExprSubscript {
+                    range: 471..488,
+                    value: Call(
+                        ExprCall {
+                            range: 471..478,
+                            func: Name(
+                                ExprName {
+                                    range: 471..476,
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 476..478,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    slice: Slice(
+                        ExprSlice {
+                            range: 479..487,
+                            lower: Some(
+                                Name(
+                                    ExprName {
+                                        range: 479..480,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                            upper: Some(
+                                Name(
+                                    ExprName {
+                                        range: 486..487,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                            step: None,
+                        },
+                    ),
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    If(
+        StmtIf {
+            range: 508..527,
+            test: NamedExpr(
+                ExprNamedExpr {
+                    range: 511..521,
+                    target: Name(
+                        ExprName {
+                            range: 511..516,
+                            id: "match",
+                            ctx: Store,
+                        },
+                    ),
+                    value: Constant(
+                        ExprConstant {
+                            range: 520..521,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 523..527,
+                    },
+                ),
+            ],
+            elif_else_clauses: [],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 528..582,
+            subject: Name(
+                ExprName {
+                    range: 534..539,
+                    id: "match",
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 545..557,
+                    pattern: MatchValue(
+                        PatternMatchValue {
+                            range: 550..551,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 550..551,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 553..557,
+                            },
+                        ),
+                    ],
+                },
+                MatchCase {
+                    range: 562..582,
+                    pattern: MatchValue(
+                        PatternMatchValue {
+                            range: 567..568,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 567..568,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 578..582,
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 583..619,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 583..588,
+                        id: "match",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Lambda(
+                ExprLambda {
+                    range: 591..619,
+                    parameters: Some(
+                        Parameters {
+                            range: 598..603,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 598..603,
+                                    parameter: Parameter {
+                                        range: 598..603,
+                                        name: Identifier {
+                                            id: "query",
+                                            range: 598..603,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                    ),
+                    body: Compare(
+                        ExprCompare {
+                            range: 605..619,
+                            left: Name(
+                                ExprName {
+                                    range: 605..610,
+                                    id: "query",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Eq,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 614..619,
+                                        id: "event",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 620..636,
+            value: Call(
+                ExprCall {
+                    range: 620..636,
+                    func: Name(
+                        ExprName {
+                            range: 620..625,
+                            id: "print",
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 625..636,
+                        args: [
+                            Call(
+                                ExprCall {
+                                    range: 626..635,
+                                    func: Name(
+                                        ExprName {
+                                            range: 626..631,
+                                            id: "match",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 631..635,
+                                        args: [
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 632..634,
+                                                    value: Int(
+                                                        12,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+]

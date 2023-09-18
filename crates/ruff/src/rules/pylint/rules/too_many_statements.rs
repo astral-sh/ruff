@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -8,7 +8,7 @@ use ruff_python_ast::identifier::Identifier;
 /// Checks for functions or methods with too many statements.
 ///
 /// By default, this rule allows up to 50 statements, as configured by the
-/// `pylint.max-statements` option.
+/// [`pylint.max-statements`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many statements are harder to understand
@@ -66,20 +66,19 @@ fn num_statements(stmts: &[Stmt]) -> usize {
     let mut count = 0;
     for stmt in stmts {
         match stmt {
-            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
                 count += 1;
                 count += num_statements(body);
-                if let Some(stmt) = orelse.first() {
-                    // `elif:` and `else: if:` have the same AST representation.
-                    // Avoid treating `elif:` as two statements.
-                    if !stmt.is_if_stmt() {
-                        count += 1;
-                    }
-                    count += num_statements(orelse);
+                for clause in elif_else_clauses {
+                    count += 1;
+                    count += num_statements(&clause.body);
                 }
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
+            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
                 count += num_statements(body);
                 count += num_statements(orelse);
             }
@@ -99,14 +98,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 count += 1;
                 count += num_statements(body);
@@ -129,7 +121,6 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 }
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
             | Stmt::With(ast::StmtWith { body, .. }) => {
                 count += 1;
                 count += num_statements(body);
@@ -166,8 +157,7 @@ pub(crate) fn too_many_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::ast::Suite;
-    use rustpython_parser::Parse;
+    use ruff_python_parser::parse_suite;
 
     use super::num_statements;
 
@@ -177,7 +167,7 @@ mod tests {
 def f():
     pass
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
@@ -191,7 +181,7 @@ def f():
     else:
         print()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -206,8 +196,8 @@ def f():
         if a:
             print()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
-        assert_eq!(num_statements(&stmts), 5);
+        let stmts = parse_suite(source, "<filename>")?;
+        assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
 
@@ -220,7 +210,7 @@ def f():
     elif a:
         print()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -238,7 +228,7 @@ def f():
     else:
         print()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 9);
         Ok(())
     }
@@ -267,7 +257,7 @@ async def f():
             import time
             pass
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 19);
         Ok(())
     }
@@ -279,7 +269,7 @@ def f():
     for i in range(10):
         pass
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
@@ -293,7 +283,7 @@ def f():
     else:
         print()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
@@ -308,7 +298,7 @@ def f():
 
     print()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -326,7 +316,7 @@ def f():
 
     print()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
@@ -337,7 +327,7 @@ def f():
 def f():
     return
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 1);
         Ok(())
     }
@@ -353,7 +343,7 @@ def f():
             print()
 
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
@@ -367,7 +357,7 @@ def f():
     except Exception:
         raise
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -383,7 +373,7 @@ def f():
     else:
         print()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 7);
         Ok(())
     }
@@ -401,7 +391,7 @@ def f():
     finally:
         pass
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 10);
         Ok(())
     }
@@ -417,7 +407,7 @@ def f():
     except Exception:
         raise
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 8);
         Ok(())
     }
@@ -435,7 +425,7 @@ def f():
     finally:
         print()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 11);
         Ok(())
     }
@@ -447,7 +437,7 @@ def f():
     for i in range(10):
         yield i
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }

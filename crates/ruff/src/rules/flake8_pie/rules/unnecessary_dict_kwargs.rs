@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -53,7 +54,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
         if kw.arg.is_none() {
             if let Expr::Dict(ast::ExprDict { keys, .. }) = &kw.value {
                 // ensure foo(**{"bar-bar": 1}) doesn't error
-                if keys.iter().all(|expr| expr.as_ref().map_or(false, is_valid_kwarg_name)) ||
+                if keys.iter().all(|expr| expr.as_ref().is_some_and( is_valid_kwarg_name)) ||
                     // handle case of foo(**{**bar})
                     (keys.len() == 1 && keys[0].is_none())
                 {

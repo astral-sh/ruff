@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -54,7 +55,7 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     // Ignore strings, to avoid false positives with docstrings.
     if matches!(
         value,
-        Expr::JoinedStr(_)
+        Expr::FString(_)
             | Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(..) | Constant::Ellipsis,
                 ..

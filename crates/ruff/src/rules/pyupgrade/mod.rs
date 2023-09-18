@@ -30,7 +30,6 @@ mod tests {
     #[test_case(Rule::FString, Path::new("UP032_2.py"))]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_0.py"))]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_1.py"))]
-    #[test_case(Rule::FormatLiterals, Path::new("UP030_2.py"))]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_0.py"))]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_1.py"))]
     #[test_case(Rule::LRUCacheWithoutParameters, Path::new("UP011.py"))]
@@ -67,6 +66,12 @@ mod tests {
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_2.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_3.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_4.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_5.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_6.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_7.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_8.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_9.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_10.py"))]
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
@@ -77,6 +82,7 @@ mod tests {
     #[test_case(Rule::UselessObjectInheritance, Path::new("UP004.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_0.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_1.py"))]
+    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
@@ -84,6 +90,19 @@ mod tests {
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn non_pep695_type_alias_not_applied_py311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP040.py"),
+            &settings::Settings {
+                target_version: PythonVersion::Py311,
+                ..settings::Settings::for_rule(Rule::NonPEP695TypeAlias)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 

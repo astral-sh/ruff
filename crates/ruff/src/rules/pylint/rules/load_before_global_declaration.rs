@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::OneIndexed;
+use ruff_source_file::OneIndexed;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -58,7 +59,7 @@ pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, 
     if let Some(stmt) = checker.semantic().global(name) {
         if expr.start() < stmt.start() {
             #[allow(deprecated)]
-            let location = checker.locator.compute_source_location(stmt.start());
+            let location = checker.locator().compute_source_location(stmt.start());
             checker.diagnostics.push(Diagnostic::new(
                 LoadBeforeGlobalDeclaration {
                     name: name.to_string(),

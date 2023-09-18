@@ -1,11 +1,39 @@
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `jinja2` templates that use `autoescape=False`.
+///
+/// ## Why is this bad?
+/// `jinja2` templates that use `autoescape=False` are vulnerable to cross-site
+/// scripting (XSS) attacks that allow attackers to execute arbitrary
+/// JavaScript.
+///
+/// By default, `jinja2` sets `autoescape` to `False`, so it is important to
+/// set `autoescape=True` or use the `select_autoescape` function to mitigate
+/// XSS vulnerabilities.
+///
+/// ## Example
+/// ```python
+/// import jinja2
+///
+/// jinja2.Environment(loader=jinja2.FileSystemLoader("."))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import jinja2
+///
+/// jinja2.Environment(loader=jinja2.FileSystemLoader("."), autoescape=True)
+/// ```
+///
+/// ## References
+/// - [Jinja documentation: API](https://jinja.palletsprojects.com/en/latest/api/#autoescaping)
+/// - [Common Weakness Enumeration: CWE-94](https://cwe.mitre.org/data/definitions/94.html)
 #[violation]
 pub struct Jinja2AutoescapeFalse {
     value: bool,
@@ -30,23 +58,14 @@ impl Violation for Jinja2AutoescapeFalse {
 }
 
 /// S701
-pub(crate) fn jinja2_autoescape_false(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["jinja2", "Environment"])
-        })
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["jinja2", "Environment"]))
     {
-        let call_args = SimpleCallArgs::new(args, keywords);
-
-        if let Some(autoescape_arg) = call_args.keyword_argument("autoescape") {
-            match autoescape_arg {
+        if let Some(keyword) = call.arguments.find_keyword("autoescape") {
+            match &keyword.value {
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Bool(true),
                     ..
@@ -56,20 +75,20 @@ pub(crate) fn jinja2_autoescape_false(
                         if id != "select_autoescape" {
                             checker.diagnostics.push(Diagnostic::new(
                                 Jinja2AutoescapeFalse { value: true },
-                                autoescape_arg.range(),
+                                keyword.range(),
                             ));
                         }
                     }
                 }
                 _ => checker.diagnostics.push(Diagnostic::new(
                     Jinja2AutoescapeFalse { value: true },
-                    autoescape_arg.range(),
+                    keyword.range(),
                 )),
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 Jinja2AutoescapeFalse { value: false },
-                func.range(),
+                call.func.range(),
             ));
         }
     }

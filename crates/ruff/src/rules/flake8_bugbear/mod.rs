@@ -33,6 +33,9 @@ mod tests {
     #[test_case(Rule::JumpStatementInFinally, Path::new("B012.py"))]
     #[test_case(Rule::LoopVariableOverridesIterator, Path::new("B020.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_2.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_3.py"))]
     #[test_case(Rule::NoExplicitStacklevel, Path::new("B028.py"))]
     #[test_case(Rule::RaiseLiteral, Path::new("B016.py"))]
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"))]
@@ -42,14 +45,13 @@ mod tests {
     #[test_case(Rule::SetAttrWithConstant, Path::new("B009_B010.py"))]
     #[test_case(Rule::StarArgUnpackingAfterKeywordArg, Path::new("B026.py"))]
     #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
-    #[test_case(Rule::UnaryPrefixIncrement, Path::new("B002.py"))]
+    #[test_case(Rule::UnaryPrefixIncrementDecrement, Path::new("B002.py"))]
     #[test_case(Rule::UnintentionalTypeAnnotation, Path::new("B032.py"))]
     #[test_case(Rule::UnreliableCallableCheck, Path::new("B004.py"))]
     #[test_case(Rule::UnusedLoopControlVariable, Path::new("B007.py"))]
     #[test_case(Rule::UselessComparison, Path::new("B015.py"))]
     #[test_case(Rule::UselessContextlibSuppress, Path::new("B022.py"))]
     #[test_case(Rule::UselessExpression, Path::new("B018.py"))]
-    #[test_case(Rule::ZipWithoutExplicitStrict, Path::new("B905.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -61,8 +63,38 @@ mod tests {
     }
 
     #[test]
-    fn extend_immutable_calls() -> Result<()> {
-        let snapshot = "extend_immutable_calls".to_string();
+    fn zip_without_explicit_strict() -> Result<()> {
+        let snapshot = "B905.py";
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear").join(snapshot).as_path(),
+            &Settings::for_rule(Rule::ZipWithoutExplicitStrict),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn extend_immutable_calls_arg_annotation() -> Result<()> {
+        let snapshot = "extend_immutable_calls_arg_annotation".to_string();
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear/B006_extended.py"),
+            &Settings {
+                flake8_bugbear: super::settings::Settings {
+                    extend_immutable_calls: vec![
+                        "custom.ImmutableTypeA".to_string(),
+                        "custom.ImmutableTypeB".to_string(),
+                    ],
+                },
+                ..Settings::for_rule(Rule::MutableArgumentDefault)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn extend_immutable_calls_arg_default() -> Result<()> {
+        let snapshot = "extend_immutable_calls_arg_default".to_string();
         let diagnostics = test_path(
             Path::new("flake8_bugbear/B008_extended.py"),
             &Settings {
@@ -70,9 +102,10 @@ mod tests {
                     extend_immutable_calls: vec![
                         "fastapi.Depends".to_string(),
                         "fastapi.Query".to_string(),
+                        "custom.ImmutableTypeA".to_string(),
                     ],
                 },
-                ..Settings::for_rules(vec![Rule::FunctionCallInDefaultArgument])
+                ..Settings::for_rule(Rule::FunctionCallInDefaultArgument)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

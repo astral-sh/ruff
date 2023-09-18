@@ -1,10 +1,30 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `paramiko` calls.
+///
+/// ## Why is this bad?
+/// `paramiko` calls allow users to execute arbitrary shell commands on a
+/// remote machine. If the inputs to these calls are not properly sanitized,
+/// they can be vulnerable to shell injection attacks.
+///
+/// ## Example
+/// ```python
+/// import paramiko
+///
+/// client = paramiko.SSHClient()
+/// client.exec_command("echo $HOME")
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+/// - [Paramiko documentation: `SSHClient.exec_command()`](https://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient.exec_command)
 #[violation]
 pub struct ParamikoCall;
 
@@ -20,9 +40,7 @@ pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["paramiko", "exec_command"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["paramiko", "exec_command"]))
     {
         checker
             .diagnostics

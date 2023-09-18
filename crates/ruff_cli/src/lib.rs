@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::CommandFactory;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
@@ -13,10 +13,8 @@ use ruff::logging::{set_up_logging, LogLevel};
 use ruff::settings::types::SerializationFormat;
 use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
-use ruff_python_formatter::{format_module, PyFormatOptions};
 
-use crate::args::{Args, CheckArgs, Command};
-use crate::commands::run_stdin::read_from_stdin;
+use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -26,6 +24,7 @@ mod diagnostics;
 mod panic;
 mod printer;
 pub mod resolve;
+mod stdin;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -77,7 +76,7 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
     None
 }
 
-/// Returns true if the linter should read from standard input.
+/// Returns true if the command should read from standard input.
 fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     // If the user provided a `--stdin-filename`, always read from standard input.
     if stdin_filename.is_some() {
@@ -90,12 +89,11 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
         return true;
     }
 
+    let [file] = files else {
+        return false;
+    };
     // If the user provided exactly `-`, read from standard input.
-    if files.len() == 1 && files[0] == Path::new("-") {
-        return true;
-    }
-
-    false
+    file == Path::new("-")
 }
 
 pub fn run(
@@ -113,13 +111,15 @@ pub fn run(
             {
                 eprintln!(
                     r#"
-{}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
+{}{} {} If you could open an issue at:
 
-https://github.com/astral-sh/ruff/issues/new?title=%5BPanic%5D
+    https://github.com/astral-sh/ruff/issues/new?title=%5BPanic%5D
 
-quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
+...quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
 "#,
                     "error".red().bold(),
+                    ":".bold(),
+                    "Ruff crashed.".bold(),
                 );
             }
             default_panic_hook(info);
@@ -141,54 +141,45 @@ quoting the executed command, along with the relevant file contents and `pyproje
             if let Some(rule) = rule {
                 commands::rule::rule(rule, format)?;
             }
+            Ok(ExitStatus::Success)
         }
-        Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
-        Command::Linter { format } => commands::linter::linter(format)?,
-        Command::Clean => commands::clean::clean(log_level)?,
+        Command::Config { option } => {
+            commands::config::config(option.as_deref())?;
+            Ok(ExitStatus::Success)
+        }
+        Command::Linter { format } => {
+            commands::linter::linter(format)?;
+            Ok(ExitStatus::Success)
+        }
+        Command::Clean => {
+            commands::clean::clean(log_level)?;
+            Ok(ExitStatus::Success)
+        }
         Command::GenerateShellCompletion { shell } => {
-            shell.generate(&mut Args::command(), &mut io::stdout());
+            shell.generate(&mut Args::command(), &mut stdout());
+            Ok(ExitStatus::Success)
         }
-        Command::Check(args) => return check(args, log_level),
-        Command::Format { files } => return format(&files),
+        Command::Check(args) => check(args, log_level),
+        Command::Format(args) => format(args, log_level),
     }
-
-    Ok(ExitStatus::Success)
 }
 
-fn format(files: &[PathBuf]) -> Result<ExitStatus> {
+fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
     warn_user_once!(
-        "`ruff format` is a work-in-progress, subject to change at any time, and intended for \
-        internal use only."
+        "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
+        experimentation."
     );
 
-    let format_code = |code: &str| {
-        // dummy, to check that the function was actually called
-        let contents = code.replace("# DEL", "");
-        // real formatting that is currently a passthrough
-        format_module(&contents, PyFormatOptions::default())
-    };
+    let (cli, overrides) = args.partition();
 
-    match &files {
-        // Check if we should read from stdin
-        [path] if path == Path::new("-") => {
-            let unformatted = read_from_stdin()?;
-            let formatted = format_code(&unformatted)?;
-            stdout().lock().write_all(formatted.as_code().as_bytes())?;
-        }
-        _ => {
-            for file in files {
-                let unformatted = std::fs::read_to_string(file)
-                    .with_context(|| format!("Could not read {}: ", file.display()))?;
-                let formatted = format_code(&unformatted)?;
-                std::fs::write(file, formatted.as_code().as_bytes())
-                    .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
-            }
-        }
+    if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
+        commands::format_stdin::format_stdin(&cli, &overrides)
+    } else {
+        commands::format::format(&cli, &overrides, log_level)
     }
-    Ok(ExitStatus::Success)
 }
 
-pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
+pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -311,7 +302,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::run::run(
+        let messages = commands::check::check(
             &cli.files,
             &pyproject_config,
             &overrides,
@@ -343,7 +334,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
 
-                    let messages = commands::run::run(
+                    let messages = commands::check::check(
                         &cli.files,
                         &pyproject_config,
                         &overrides,
@@ -361,7 +352,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
         // Generate lint violations.
         let diagnostics = if is_stdin {
-            commands::run_stdin::run_stdin(
+            commands::check_stdin::check_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_config,
                 &overrides,
@@ -369,7 +360,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                 autofix,
             )?
         } else {
-            commands::run::run(
+            commands::check::check(
                 &cli.files,
                 &pyproject_config,
                 &overrides,

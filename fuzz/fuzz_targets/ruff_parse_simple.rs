@@ -4,16 +4,18 @@
 #![no_main]
 
 use libfuzzer_sys::{fuzz_target, Corpus};
-use ruff_python_ast::source_code::{Generator, Locator, Stylist};
-use rustpython_parser::ast::Suite;
-use rustpython_parser::{lexer, Mode, Parse, ParseError};
+use ruff_python_codegen::{Generator, Stylist};
+use ruff_python_parser::{lexer, parse_suite, Mode, ParseError};
+use ruff_source_file::Locator;
 
 fn do_fuzz(case: &[u8]) -> Corpus {
-    let Ok(code) = std::str::from_utf8(case) else { return Corpus::Reject; };
+    let Ok(code) = std::str::from_utf8(case) else {
+        return Corpus::Reject;
+    };
 
     // just round-trip it once to trigger both parse and unparse
     let locator = Locator::new(code);
-    let python_ast = match Suite::parse(code, "fuzzed-source.py") {
+    let python_ast = match parse_suite(code, "fuzzed-source.py") {
         Ok(stmts) => stmts,
         Err(ParseError { offset, .. }) => {
             let offset = offset.to_usize();

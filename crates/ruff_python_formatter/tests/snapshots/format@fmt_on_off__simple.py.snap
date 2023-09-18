@@ -1,0 +1,32 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/simple.py
+---
+## Input
+```py
+# Get's formatted
+a +   b
+
+# fmt: off
+a + [1, 2, 3, 4, 5  ]
+# fmt: on
+
+# Get's formatted again
+a +  b
+```
+
+## Output
+```py
+# Get's formatted
+a + b
+
+# fmt: off
+a + [1, 2, 3, 4, 5  ]
+# fmt: on
+
+# Get's formatted again
+a + b
+```
+
+
+

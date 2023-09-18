@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{Arguments, Ranged};
+use ruff_python_ast::Parameters;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -53,20 +54,20 @@ impl AlwaysAutofixableViolation for AnyEqNeAnnotation {
 }
 
 /// PYI032
-pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, args: &Arguments) {
+pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters: &Parameters) {
     if !matches!(name, "__eq__" | "__ne__") {
         return;
     }
 
-    if args.args.len() != 2 {
+    if parameters.args.len() != 2 {
         return;
     }
 
-    let Some(annotation) = &args.args[1].def.annotation else {
+    let Some(annotation) = &parameters.args[1].parameter.annotation else {
         return;
     };
 
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     }
 

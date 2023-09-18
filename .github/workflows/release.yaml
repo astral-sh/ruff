@@ -7,12 +7,15 @@ on:
         description: "The version to tag, without the leading 'v'. If omitted, will initiate a dry run (no uploads)."
         type: string
       sha:
-        description: "Optionally, the full sha of the commit to be released"
+        description: "The full sha of the commit to be released. If omitted, the latest commit on the default branch will be used."
+        default: ""
         type: string
   pull_request:
     paths:
       # When we change pyproject.toml, we want to ensure that the maturin builds still work
       - pyproject.toml
+      # And when we change this workflow itself...
+      - .github/workflows/release.yaml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,7 +33,9 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -56,7 +61,9 @@ jobs:
   macos-x86_64:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -94,7 +101,9 @@ jobs:
   macos-universal:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -140,7 +149,9 @@ jobs:
           - target: aarch64-pc-windows-msvc
             arch: x64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -186,7 +197,9 @@ jobs:
           - x86_64-unknown-linux-gnu
           - i686-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -243,7 +256,9 @@ jobs:
             arch: ppc64
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -296,7 +311,9 @@ jobs:
           - x86_64-unknown-linux-musl
           - i686-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -350,7 +367,9 @@ jobs:
             arch: armv7
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -398,9 +417,22 @@ jobs:
     # If you don't set an input tag, it's a dry run (no uploads).
     if: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: main # We checkout the main branch to check for the commit
+      - name: Check main branch
+        if: ${{ inputs.sha }}
+        run: |
+          # Fetch the main branch since a shallow checkout is used by default
+          git fetch origin main --unshallow
+          if ! git branch --contains ${{ inputs.sha }} | grep -E '(^|\s)main$'; then
+            echo "The specified sha is not on the main branch" >&2
+            exit 1
+          fi
       - name: Check tag consistency
         run: |
+          # Switch to the commit we want to release
+          git checkout ${{ inputs.sha }}
           version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
           if [ "${{ inputs.tag }}" != "${version}" ]; then
             echo "The input tag does not match the version from pyproject.toml:" >&2
@@ -409,18 +441,6 @@ jobs:
             exit 1
           else
             echo "Releasing ${version}"
-          fi
-      - name: Check SHA consistency
-        if: ${{ inputs.sha }}
-        run: |
-          git_sha=$(git rev-parse HEAD)
-          if [ "${{ inputs.sha }}" != "${git_sha}" ]; then
-            echo "The specified sha does not match the git checkout" >&2
-            echo "${{ inputs.sha }}" >&2
-            echo "${git_sha}" >&2
-            exit 1
-          else
-            echo "Releasing ${git_sha}"
           fi
 
   upload-release:
@@ -464,7 +484,9 @@ jobs:
       # For git tag
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - name: git tag
         run: |
           git config user.email "hey@astral.sh"

@@ -1,8 +1,9 @@
-use rustpython_parser::ast::Stmt;
+use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Scope, ScopeKind};
 
 use crate::settings::types::IdentifierPattern;
@@ -51,7 +52,7 @@ pub(crate) fn dunder_function_name(
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
     }
-    if !(name.starts_with("__") && name.ends_with("__")) {
+    if !visibility::is_magic(name) {
         return None;
     }
     // Allowed under PEP 562 (https://peps.python.org/pep-0562/).

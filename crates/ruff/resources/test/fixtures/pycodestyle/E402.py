@@ -30,3 +30,10 @@ def foo() -> None:
 
 if __name__ == "__main__":
     import g
+
+import h; import i
+
+
+if __name__ == "__main__":
+    import j; \
+import k

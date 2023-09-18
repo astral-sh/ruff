@@ -69,12 +69,13 @@ pub(crate) fn categorize<'a>(
     level: Option<u32>,
     src: &[PathBuf],
     package: Option<&Path>,
+    detect_same_package: bool,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
     let (import_type, reason) = {
-        if level.map_or(false, |level| level > 0) {
+        if level.is_some_and(|level| level > 0) {
             (
                 &ImportSection::Known(ImportType::LocalFolder),
                 Reason::NonZeroLevel,
@@ -88,7 +89,7 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::StandardLibrary),
                 Reason::KnownStandardLibrary,
             )
-        } else if same_package(package, module_base) {
+        } else if detect_same_package && same_package(package, module_base) {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SamePackage,
@@ -113,7 +114,7 @@ pub(crate) fn categorize<'a>(
 }
 
 fn same_package(package: Option<&Path>, module_base: &str) -> bool {
-    package.map_or(false, |package| package.ends_with(module_base))
+    package.is_some_and(|package| package.ends_with(module_base))
 }
 
 fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
@@ -137,6 +138,7 @@ pub(crate) fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
     package: Option<&Path>,
+    detect_same_package: bool,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
@@ -148,6 +150,7 @@ pub(crate) fn categorize_imports<'a>(
             None,
             src,
             package,
+            detect_same_package,
             known_modules,
             target_version,
         );
@@ -164,6 +167,7 @@ pub(crate) fn categorize_imports<'a>(
             import_from.level,
             src,
             package,
+            detect_same_package,
             known_modules,
             target_version,
         );
@@ -180,6 +184,7 @@ pub(crate) fn categorize_imports<'a>(
             import_from.level,
             src,
             package,
+            detect_same_package,
             known_modules,
             target_version,
         );
@@ -196,6 +201,7 @@ pub(crate) fn categorize_imports<'a>(
             import_from.level,
             src,
             package,
+            detect_same_package,
             known_modules,
             target_version,
         );
@@ -217,7 +223,7 @@ pub struct KnownModules {
 }
 
 impl KnownModules {
-    pub(crate) fn new(
+    pub fn new(
         first_party: Vec<glob::Pattern>,
         third_party: Vec<glob::Pattern>,
         local_folder: Vec<glob::Pattern>,
@@ -322,7 +328,7 @@ impl KnownModules {
     }
 
     /// Return the list of modules that are known to be of a given type.
-    pub(crate) fn modules_for_known_type(
+    pub fn modules_for_known_type(
         &self,
         import_type: ImportType,
     ) -> impl Iterator<Item = &glob::Pattern> {
@@ -342,7 +348,7 @@ impl KnownModules {
     }
 
     /// Return the list of user-defined modules, indexed by section.
-    pub(crate) fn user_defined(&self) -> FxHashMap<&str, Vec<&glob::Pattern>> {
+    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&glob::Pattern>> {
         let mut user_defined: FxHashMap<&str, Vec<&glob::Pattern>> = FxHashMap::default();
         for (module, section) in &self.known {
             if let ImportSection::UserDefined(section_name) = section {

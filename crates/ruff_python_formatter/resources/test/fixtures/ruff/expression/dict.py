@@ -56,3 +56,6 @@ a = {
     # comment
     3: True,
 }
+
+x={  # dangling end of line comment
+}

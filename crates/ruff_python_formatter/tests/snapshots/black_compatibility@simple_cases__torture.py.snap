@@ -50,14 +50,15 @@ assert (
  )  #
  
  assert sort_by_dependency(
-@@ -25,9 +25,7 @@
+@@ -25,9 +25,9 @@
  class A:
      def foo(self):
          for _ in range(10):
 -            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(
--                xxxxxxxxxxxx
++            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(  # pylint: disable=no-member
+                 xxxxxxxxxxxx
 -            )  # pylint: disable=no-member
-+            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(xxxxxxxxxxxx)  # pylint: disable=no-member
++            )
  
  
  def test(self, othr):
@@ -93,7 +94,9 @@ importA
 class A:
     def foo(self):
         for _ in range(10):
-            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(xxxxxxxxxxxx)  # pylint: disable=no-member
+            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(  # pylint: disable=no-member
+                xxxxxxxxxxxx
+            )
 
 
 def test(self, othr):

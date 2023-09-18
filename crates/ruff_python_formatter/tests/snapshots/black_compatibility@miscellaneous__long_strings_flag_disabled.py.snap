@@ -304,18 +304,6 @@ long_unmergable_string_with_pragma = (
 ```diff
 --- Black
 +++ Ruff
-@@ -143,9 +143,9 @@
-     )
- )
- 
--fstring = f"f-strings definitely make things more {difficult} than they need to be for {{black}}. But boy they sure are handy. The problem is that some lines will need to have the 'f' whereas others do not. This {line}, for example, needs one."
-+fstring = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
--fstring_with_no_fexprs = f"Some regular string that needs to get split certainly but is NOT an fstring by any means whatsoever."
-+fstring_with_no_fexprs = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
- comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
- 
 @@ -165,13 +165,9 @@
  
  triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
@@ -343,19 +331,6 @@ long_unmergable_string_with_pragma = (
  )
  
  func_with_bad_parens_that_wont_fit_in_one_line(
-@@ -271,10 +267,10 @@
- 
- 
- def foo():
--    yield "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
-+    NOT_YET_IMPLEMENTED_ExprYield
- 
- 
--x = f"This is a {{really}} long string that needs to be split without a doubt (i.e. most definitely). In short, this {string} that can't possibly be {{expected}} to fit all together on one line. In {fact} it may even take up three or more lines... like four or five... but probably just four."
-+x = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
- long_unmergable_string_with_pragma = (
-     "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore
 ```
 
 ## Ruff Output
@@ -506,9 +481,9 @@ old_fmt_string3 = (
     )
 )
 
-fstring = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+fstring = f"f-strings definitely make things more {difficult} than they need to be for {{black}}. But boy they sure are handy. The problem is that some lines will need to have the 'f' whereas others do not. This {line}, for example, needs one."
 
-fstring_with_no_fexprs = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+fstring_with_no_fexprs = f"Some regular string that needs to get split certainly but is NOT an fstring by any means whatsoever."
 
 comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
 
@@ -630,10 +605,10 @@ raw_strings = r"Don't" " get" r" merged" " unless they are all raw."
 
 
 def foo():
-    NOT_YET_IMPLEMENTED_ExprYield
+    yield "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
 
 
-x = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+x = f"This is a {{really}} long string that needs to be split without a doubt (i.e. most definitely). In short, this {string} that can't possibly be {{expected}} to fit all together on one line. In {fact} it may even take up three or more lines... like four or five... but probably just four."
 
 long_unmergable_string_with_pragma = (
     "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore

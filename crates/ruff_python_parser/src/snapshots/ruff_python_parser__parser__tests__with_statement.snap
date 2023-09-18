@@ -1,0 +1,1148 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: "parse_suite(source, \"<test>\").unwrap()"
+---
+[
+    With(
+        StmtWith {
+            range: 0..12,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 5..6,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 5..6,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 8..12,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 13..30,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 18..24,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 18..19,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 23..24,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 26..30,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 31..46,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 36..37,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 36..37,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+                WithItem {
+                    range: 39..40,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 39..40,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 42..46,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 47..72,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 52..58,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 52..53,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 57..58,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+                WithItem {
+                    range: 60..66,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 60..61,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 65..66,
+                                id: "y",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 68..72,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 73..97,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 78..91,
+                    context_expr: IfExp(
+                        ExprIfExp {
+                            range: 78..91,
+                            test: Constant(
+                                ExprConstant {
+                                    range: 83..84,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            body: Constant(
+                                ExprConstant {
+                                    range: 78..79,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                            orelse: Constant(
+                                ExprConstant {
+                                    range: 90..91,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 93..97,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 98..127,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 103..121,
+                    context_expr: IfExp(
+                        ExprIfExp {
+                            range: 103..116,
+                            test: Constant(
+                                ExprConstant {
+                                    range: 108..109,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            body: Constant(
+                                ExprConstant {
+                                    range: 103..104,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                            orelse: Constant(
+                                ExprConstant {
+                                    range: 115..116,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 120..121,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 123..127,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 128..141,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 133..135,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 133..135,
+                            elts: [],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 137..141,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 142..160,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 147..154,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 147..149,
+                            elts: [],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 153..154,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 156..160,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 161..175,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 167..168,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 167..168,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 171..175,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 176..195,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 181..189,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 182..183,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 188..189,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 191..195,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 196..211,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 202..203,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 202..203,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 207..211,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 212..232,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 217..226,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 217..221,
+                            elts: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 218..219,
+                                        value: Int(
+                                            0,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 225..226,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 228..232,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 233..250,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 239..240,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 239..240,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+                WithItem {
+                    range: 242..243,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 242..243,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 246..250,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 251..273,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 256..267,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 256..262,
+                            elts: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 257..258,
+                                        value: Int(
+                                            0,
+                                        ),
+                                    },
+                                ),
+                                Constant(
+                                    ExprConstant {
+                                        range: 260..261,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 266..267,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 269..273,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 274..290,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 279..284,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 279..284,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 280..282,
+                                        value: Name(
+                                            ExprName {
+                                                range: 281..282,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 286..290,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 291..312,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 296..306,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 296..301,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 297..299,
+                                        value: Name(
+                                            ExprName {
+                                                range: 298..299,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 305..306,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 308..312,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 313..331,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 318..325,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 318..325,
+                            elts: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 319..320,
+                                        value: Int(
+                                            0,
+                                        ),
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        range: 322..324,
+                                        value: Name(
+                                            ExprName {
+                                                range: 323..324,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 327..331,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 332..355,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 337..349,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 337..344,
+                            elts: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 338..339,
+                                        value: Int(
+                                            0,
+                                        ),
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        range: 341..343,
+                                        value: Name(
+                                            ExprName {
+                                                range: 342..343,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 348..349,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 351..355,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 356..375,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 362..368,
+                    context_expr: NamedExpr(
+                        ExprNamedExpr {
+                            range: 362..368,
+                            target: Name(
+                                ExprName {
+                                    range: 362..363,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Constant(
+                                ExprConstant {
+                                    range: 367..368,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 371..375,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 376..400,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 382..393,
+                    context_expr: NamedExpr(
+                        ExprNamedExpr {
+                            range: 382..388,
+                            target: Name(
+                                ExprName {
+                                    range: 382..383,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Constant(
+                                ExprConstant {
+                                    range: 387..388,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 393..394,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 396..400,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 401..428,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 406..422,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 406..422,
+                            elts: [
+                                NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 407..413,
+                                        target: Name(
+                                            ExprName {
+                                                range: 407..408,
+                                                id: "a",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 412..413,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 415..421,
+                                        target: Name(
+                                            ExprName {
+                                                range: 415..416,
+                                                id: "b",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 420..421,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 424..428,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 429..461,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 434..455,
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 434..450,
+                            elts: [
+                                NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 435..441,
+                                        target: Name(
+                                            ExprName {
+                                                range: 435..436,
+                                                id: "a",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 440..441,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 443..449,
+                                        target: Name(
+                                            ExprName {
+                                                range: 443..444,
+                                                id: "b",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 448..449,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 454..455,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 457..461,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 462..481,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 468..474,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 468..469,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 473..474,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 477..481,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 482..502,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 488..494,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 488..489,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 493..494,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 498..502,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 503..530,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 509..515,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 509..510,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 514..515,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+                WithItem {
+                    range: 517..523,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 517..518,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 522..523,
+                                id: "b",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 526..530,
+                    },
+                ),
+            ],
+        },
+    ),
+    With(
+        StmtWith {
+            range: 531..559,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 537..543,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 537..538,
+                            value: Int(
+                                0,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 542..543,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+                WithItem {
+                    range: 545..551,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 545..546,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 550..551,
+                                id: "b",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 555..559,
+                    },
+                ),
+            ],
+        },
+    ),
+]

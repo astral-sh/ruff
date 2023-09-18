@@ -1,0 +1,27 @@
+---
+source: crates/ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        Expr(
+            StmtExpr {
+                range: 0..9,
+                value: Lambda(
+                    ExprLambda {
+                        range: 0..9,
+                        parameters: None,
+                        body: Constant(
+                            ExprConstant {
+                                range: 8..9,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+)

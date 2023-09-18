@@ -1,0 +1,22 @@
+[package]
+name = "ruff_text_size"
+version = "0.0.0"
+publish = false
+edition = "2021"
+rust-version = "1.67.1"
+
+[dependencies]
+serde = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_test = { version = "1.0.152" }
+static_assertions = { version = "1.1.0" }
+
+[features]
+serde = ["dep:serde"]
+
+[[test]]
+name = "serde"
+path = "tests/serde.rs"
+required-features = ["serde"]

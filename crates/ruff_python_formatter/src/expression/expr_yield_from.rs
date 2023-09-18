@@ -1,25 +1,25 @@
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprYieldFrom;
+use ruff_python_ast::ExprYieldFrom;
+
+use crate::expression::expr_yield::AnyExpressionYield;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprYieldFrom;
 
 impl FormatNodeRule<ExprYieldFrom> for FormatExprYieldFrom {
     fn fmt_fields(&self, item: &ExprYieldFrom, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented(item)])
+        AnyExpressionYield::from(item).fmt(f)
     }
 }
 
 impl NeedsParentheses for ExprYieldFrom {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        parent: AnyNodeRef,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        AnyExpressionYield::from(self).needs_parentheses(parent, context)
     }
 }

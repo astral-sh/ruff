@@ -1,8 +1,9 @@
+use ruff_python_ast::Stmt;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for member imports that should instead be accessed by importing the

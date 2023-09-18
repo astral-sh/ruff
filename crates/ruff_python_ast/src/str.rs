@@ -184,68 +184,8 @@ pub fn is_triple_quote(content: &str) -> bool {
     TRIPLE_QUOTE_STR_PREFIXES.contains(&content) || TRIPLE_QUOTE_BYTE_PREFIXES.contains(&content)
 }
 
-/// Return `true` if the string expression is an implicit concatenation.
-///
-/// ## Examples
-///
-/// ```rust
-/// use ruff_python_ast::str::is_implicit_concatenation;
-///
-/// assert!(is_implicit_concatenation(r#"'abc' 'def'"#));
-/// assert!(!is_implicit_concatenation(r#"'abcdef'"#));
-/// ```
-pub fn is_implicit_concatenation(content: &str) -> bool {
-    let Some(leading_quote_str) = leading_quote(content) else {
-        return false;
-    };
-    let Some(trailing_quote_str) = trailing_quote(content) else {
-        return false;
-    };
-
-    // If the trailing quote doesn't match the _expected_ trailing quote, then the string is
-    // implicitly concatenated.
-    //
-    // For example, given:
-    // ```python
-    // u"""abc""" 'def'
-    // ```
-    //
-    // The leading quote would be `u"""`, and the trailing quote would be `'`, but the _expected_
-    // trailing quote would be `"""`. Since `'` does not equal `"""`, we'd return `true`.
-    if trailing_quote_str != trailing_quote(leading_quote_str).unwrap() {
-        return true;
-    }
-
-    // Search for any trailing quotes _before_ the end of the string.
-    let mut rest = &content[leading_quote_str.len()..content.len() - trailing_quote_str.len()];
-    while let Some(index) = rest.find(trailing_quote_str) {
-        let mut chars = rest[..index].chars().rev();
-
-        if let Some('\\') = chars.next() {
-            if chars.next() == Some('\\') {
-                // Either `\\'` or `\\\'` need to test one more character
-
-                // If the quote is preceded by `//` then it is not escaped, instead the backslash is escaped.
-                if chars.next() != Some('\\') {
-                    return true;
-                }
-            }
-        } else {
-            // If the quote is _not_ escaped, then it's implicitly concatenated.
-            return true;
-        }
-        rest = &rest[index + trailing_quote_str.len()..];
-    }
-
-    // Otherwise, we know the string ends with the expected trailing quote, so it's not implicitly
-    // concatenated.
-    false
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::str::is_implicit_concatenation;
-
     use super::{
         SINGLE_QUOTE_BYTE_PREFIXES, SINGLE_QUOTE_STR_PREFIXES, TRIPLE_QUOTE_BYTE_PREFIXES,
         TRIPLE_QUOTE_STR_PREFIXES,
@@ -269,40 +209,5 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn implicit_concatenation() {
-        // Positive cases.
-        assert!(is_implicit_concatenation(r#""abc" "def""#));
-        assert!(is_implicit_concatenation(r#""abc" 'def'"#));
-        assert!(is_implicit_concatenation(r#""""abc""" "def""#));
-        assert!(is_implicit_concatenation(r#"'''abc''' 'def'"#));
-        assert!(is_implicit_concatenation(r#""""abc""" 'def'"#));
-        assert!(is_implicit_concatenation(r#"'''abc''' "def""#));
-        assert!(is_implicit_concatenation(r#""""abc""""def""#));
-        assert!(is_implicit_concatenation(r#"'''abc''''def'"#));
-        assert!(is_implicit_concatenation(r#""""abc"""'def'"#));
-        assert!(is_implicit_concatenation(r#"'''abc'''"def""#));
-
-        // Negative cases.
-        assert!(!is_implicit_concatenation(r#""abc""#));
-        assert!(!is_implicit_concatenation(r#"'abc'"#));
-        assert!(!is_implicit_concatenation(r#""""abc""""#));
-        assert!(!is_implicit_concatenation(r#"'''abc'''"#));
-        assert!(!is_implicit_concatenation(r#""""ab"c""""#));
-        assert!(!is_implicit_concatenation(r#"'''ab'c'''"#));
-        assert!(!is_implicit_concatenation(r#""""ab'c""""#));
-        assert!(!is_implicit_concatenation(r#"'''ab"c'''"#));
-        assert!(!is_implicit_concatenation(r#""""ab'''c""""#));
-        assert!(!is_implicit_concatenation(r#"'''ab"""c'''"#));
-
-        // Positive cases with escaped quotes.
-        assert!(is_implicit_concatenation(r#""abc\\""def""#));
-        assert!(is_implicit_concatenation(r#""abc\\""def""#));
-
-        // Negative cases with escaped quotes.
-        assert!(!is_implicit_concatenation(r#""abc\"def""#));
-        assert!(!is_implicit_concatenation(r#"'\\\' ""'"#));
     }
 }

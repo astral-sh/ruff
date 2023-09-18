@@ -74,3 +74,10 @@ try:
 except (ValueError, binascii.Error):
     # binascii.Error is a subclass of ValueError.
     pass
+
+
+# https://github.com/astral-sh/ruff/issues/6412
+try:
+    pass
+except (ValueError, ValueError, TypeError):
+    pass

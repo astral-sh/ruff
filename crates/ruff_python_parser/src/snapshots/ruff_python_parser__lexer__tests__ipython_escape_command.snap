@@ -1,0 +1,127 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_jupyter_source(source)
+---
+[
+    (
+        IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        0..4,
+    ),
+    (
+        Newline,
+        4..5,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo",
+            kind: Help2,
+        },
+        5..10,
+    ),
+    (
+        Newline,
+        10..11,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "timeit a = b",
+            kind: Magic,
+        },
+        11..24,
+    ),
+    (
+        Newline,
+        24..25,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "timeit a % 3",
+            kind: Magic,
+        },
+        25..38,
+    ),
+    (
+        Newline,
+        38..39,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "matplotlib     --inline",
+            kind: Magic,
+        },
+        39..65,
+    ),
+    (
+        Newline,
+        65..66,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "pwd   && ls -a | sed 's/^/\\\\    /'",
+            kind: Shell,
+        },
+        66..103,
+    ),
+    (
+        Newline,
+        103..104,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "cd /Users/foo/Library/Application\\ Support/",
+            kind: ShCap,
+        },
+        104..149,
+    ),
+    (
+        Newline,
+        149..150,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo 1 2",
+            kind: Paren,
+        },
+        150..158,
+    ),
+    (
+        Newline,
+        158..159,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo 1 2",
+            kind: Quote,
+        },
+        159..167,
+    ),
+    (
+        Newline,
+        167..168,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo 1 2",
+            kind: Quote2,
+        },
+        168..176,
+    ),
+    (
+        Newline,
+        176..177,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "ls",
+            kind: Shell,
+        },
+        177..180,
+    ),
+    (
+        Newline,
+        180..180,
+    ),
+]

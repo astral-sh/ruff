@@ -19,6 +19,10 @@ logging.error("Example log %s, %s", "foo", "bar", "baz", **kwargs)
 # do not handle keyword arguments
 logging.error("%(objects)d modifications: %(modifications)d errors: %(errors)d")
 
+logging.info(msg="Hello %s")
+
+logging.info(msg="Hello %s %s")
+
 import warning
 
 warning.warning("Hello %s %s", "World!")

@@ -24,6 +24,12 @@ U"Test"
 r"Test"
 R"Test"
 
+# Block conversion if there is an unescaped quote just before the end of the triple
+# quoted string
+r'''\""'''
+r'''""'''
+r'\""'
+
 'This string will not include \
 backslashes or newline characters.'
 
@@ -118,3 +124,12 @@ test_particular = [
     'c'
     )
 }
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5893
+x = ("""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
+x = (f"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" f"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
+x = (b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
+
+# https://github.com/astral-sh/ruff/issues/7460
+trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']

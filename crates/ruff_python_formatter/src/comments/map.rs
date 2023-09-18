@@ -244,15 +244,29 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Returns `true` if `key` has any *leading*, *dangling*, or *trailing* parts.
+    #[allow(unused)]
     pub(super) fn has(&self, key: &K) -> bool {
         self.index.get(key).is_some()
     }
 
-    /// Returns an iterator over the *leading*, *dangling*, and *trailing* parts of `key`.
-    pub(super) fn parts(&self, key: &K) -> PartsIterator<V> {
+    /// Returns the *leading*, *dangling*, and *trailing* parts of `key`.
+    pub(super) fn leading_dangling_trailing(&self, key: &K) -> LeadingDanglingTrailing<V> {
         match self.index.get(key) {
-            None => PartsIterator::Slice([].iter()),
-            Some(entry) => PartsIterator::from_entry(entry, self),
+            None => LeadingDanglingTrailing {
+                leading: &[],
+                dangling: &[],
+                trailing: &[],
+            },
+            Some(Entry::InOrder(entry)) => LeadingDanglingTrailing {
+                leading: &self.parts[entry.leading_range()],
+                dangling: &self.parts[entry.dangling_range()],
+                trailing: &self.parts[entry.trailing_range()],
+            },
+            Some(Entry::OutOfOrder(entry)) => LeadingDanglingTrailing {
+                leading: &self.out_of_order_parts[entry.leading_index()],
+                dangling: &self.out_of_order_parts[entry.dangling_index()],
+                trailing: &self.out_of_order_parts[entry.trailing_index()],
+            },
         }
     }
 
@@ -261,7 +275,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     pub(super) fn all_parts(&self) -> impl Iterator<Item = &V> {
         self.index
             .values()
-            .flat_map(|entry| PartsIterator::from_entry(entry, self))
+            .flat_map(|entry| LeadingDanglingTrailing::from_entry(entry, self))
     }
 }
 
@@ -280,41 +294,30 @@ where
         let mut builder = f.debug_map();
 
         for (key, entry) in &self.index {
-            builder.entry(&key, &DebugEntry { entry, map: self });
+            builder.entry(&key, &LeadingDanglingTrailing::from_entry(entry, self));
         }
 
         builder.finish()
     }
 }
 
-/// Iterates over all *leading*, *dangling*, and *trailing* parts of a key.
-pub(super) enum PartsIterator<'a, V> {
-    /// The slice into the [CommentsMap::parts] [Vec] if this is an in-order entry or the *trailing* parts
-    /// of an out-of-order entry.
-    Slice(std::slice::Iter<'a, V>),
-
-    /// Iterator over the *leading* parts of an out-of-order entry. Returns the *dangling* parts, and then the
-    /// *trailing* parts once the *leading* iterator is fully consumed.
-    Leading {
-        leading: std::slice::Iter<'a, V>,
-        dangling: &'a [V],
-        trailing: &'a [V],
-    },
-
-    /// Iterator over the *dangling* parts of an out-of-order entry. Returns the *trailing* parts
-    /// once the *leading* iterator is fully consumed.
-    Dangling {
-        dangling: std::slice::Iter<'a, V>,
-        trailing: &'a [V],
-    },
+#[derive(Clone)]
+pub(crate) struct LeadingDanglingTrailing<'a, T> {
+    pub(crate) leading: &'a [T],
+    pub(crate) dangling: &'a [T],
+    pub(crate) trailing: &'a [T],
 }
 
-impl<'a, V> PartsIterator<'a, V> {
-    fn from_entry<K>(entry: &Entry, map: &'a MultiMap<K, V>) -> Self {
+impl<'a, T> LeadingDanglingTrailing<'a, T> {
+    fn from_entry<K>(entry: &Entry, map: &'a MultiMap<K, T>) -> Self {
         match entry {
-            Entry::InOrder(entry) => PartsIterator::Slice(map.parts[entry.range()].iter()),
-            Entry::OutOfOrder(entry) => PartsIterator::Leading {
-                leading: map.out_of_order_parts[entry.leading_index()].iter(),
+            Entry::InOrder(entry) => LeadingDanglingTrailing {
+                leading: &map.parts[entry.leading_range()],
+                dangling: &map.parts[entry.dangling_range()],
+                trailing: &map.parts[entry.trailing_range()],
+            },
+            Entry::OutOfOrder(entry) => LeadingDanglingTrailing {
+                leading: &map.out_of_order_parts[entry.leading_index()],
                 dangling: &map.out_of_order_parts[entry.dangling_index()],
                 trailing: &map.out_of_order_parts[entry.trailing_index()],
             },
@@ -322,250 +325,40 @@ impl<'a, V> PartsIterator<'a, V> {
     }
 }
 
-impl<'a, V> Iterator for PartsIterator<'a, V> {
-    type Item = &'a V;
+impl<'a, T> IntoIterator for LeadingDanglingTrailing<'a, T> {
+    type Item = &'a T;
+    type IntoIter = std::iter::Chain<
+        std::iter::Chain<std::slice::Iter<'a, T>, std::slice::Iter<'a, T>>,
+        std::slice::Iter<'a, T>,
+    >;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            PartsIterator::Slice(inner) => inner.next(),
-
-            PartsIterator::Leading {
-                leading,
-                dangling,
-                trailing,
-            } => match leading.next() {
-                Some(next) => Some(next),
-                None if !dangling.is_empty() => {
-                    let mut dangling_iterator = dangling.iter();
-                    let next = dangling_iterator.next().unwrap();
-                    *self = PartsIterator::Dangling {
-                        dangling: dangling_iterator,
-                        trailing,
-                    };
-                    Some(next)
-                }
-                None => {
-                    let mut trailing_iterator = trailing.iter();
-                    let next = trailing_iterator.next();
-                    *self = PartsIterator::Slice(trailing_iterator);
-                    next
-                }
-            },
-
-            PartsIterator::Dangling { dangling, trailing } => dangling.next().or_else(|| {
-                let mut trailing_iterator = trailing.iter();
-                let next = trailing_iterator.next();
-                *self = PartsIterator::Slice(trailing_iterator);
-                next
-            }),
-        }
-    }
-
-    fn fold<B, F>(self, init: B, f: F) -> B
-    where
-        F: FnMut(B, Self::Item) -> B,
-    {
-        match self {
-            PartsIterator::Slice(slice) => slice.fold(init, f),
-            PartsIterator::Leading {
-                leading,
-                dangling,
-                trailing,
-            } => leading
-                .chain(dangling.iter())
-                .chain(trailing.iter())
-                .fold(init, f),
-            PartsIterator::Dangling { dangling, trailing } => {
-                dangling.chain(trailing.iter()).fold(init, f)
-            }
-        }
-    }
-
-    fn all<F>(&mut self, f: F) -> bool
-    where
-        F: FnMut(Self::Item) -> bool,
-    {
-        match self {
-            PartsIterator::Slice(slice) => slice.all(f),
-            PartsIterator::Leading {
-                leading,
-                dangling,
-                trailing,
-            } => leading.chain(dangling.iter()).chain(trailing.iter()).all(f),
-            PartsIterator::Dangling { dangling, trailing } => {
-                dangling.chain(trailing.iter()).all(f)
-            }
-        }
-    }
-
-    fn any<F>(&mut self, f: F) -> bool
-    where
-        F: FnMut(Self::Item) -> bool,
-    {
-        match self {
-            PartsIterator::Slice(slice) => slice.any(f),
-            PartsIterator::Leading {
-                leading,
-                dangling,
-                trailing,
-            } => leading.chain(dangling.iter()).chain(trailing.iter()).any(f),
-            PartsIterator::Dangling { dangling, trailing } => {
-                dangling.chain(trailing.iter()).any(f)
-            }
-        }
-    }
-
-    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        P: FnMut(&Self::Item) -> bool,
-    {
-        match self {
-            PartsIterator::Slice(slice) => slice.find(predicate),
-            PartsIterator::Leading {
-                leading,
-                dangling,
-                trailing,
-            } => leading
-                .chain(dangling.iter())
-                .chain(trailing.iter())
-                .find(predicate),
-            PartsIterator::Dangling { dangling, trailing } => {
-                dangling.chain(trailing.iter()).find(predicate)
-            }
-        }
-    }
-
-    fn find_map<B, F>(&mut self, f: F) -> Option<B>
-    where
-        F: FnMut(Self::Item) -> Option<B>,
-    {
-        match self {
-            PartsIterator::Slice(slice) => slice.find_map(f),
-            PartsIterator::Leading {
-                leading,
-                dangling,
-                trailing,
-            } => leading
-                .chain(dangling.iter())
-                .chain(trailing.iter())
-                .find_map(f),
-            PartsIterator::Dangling { dangling, trailing } => {
-                dangling.chain(trailing.iter()).find_map(f)
-            }
-        }
-    }
-
-    fn position<P>(&mut self, predicate: P) -> Option<usize>
-    where
-        P: FnMut(Self::Item) -> bool,
-    {
-        match self {
-            PartsIterator::Slice(slice) => slice.position(predicate),
-            PartsIterator::Leading {
-                leading,
-                dangling,
-                trailing,
-            } => leading
-                .chain(dangling.iter())
-                .chain(trailing.iter())
-                .position(predicate),
-            PartsIterator::Dangling { dangling, trailing } => {
-                dangling.chain(trailing.iter()).position(predicate)
-            }
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match self {
-            PartsIterator::Slice(slice) => slice.size_hint(),
-            PartsIterator::Leading {
-                leading,
-                dangling,
-                trailing,
-            } => {
-                let len = leading.len() + dangling.len() + trailing.len();
-
-                (len, Some(len))
-            }
-            PartsIterator::Dangling { dangling, trailing } => {
-                let len = dangling.len() + trailing.len();
-                (len, Some(len))
-            }
-        }
-    }
-
-    fn count(self) -> usize {
-        self.size_hint().0
-    }
-
-    fn last(self) -> Option<Self::Item> {
-        match self {
-            PartsIterator::Slice(slice) => slice.last(),
-            PartsIterator::Leading {
-                leading,
-                dangling,
-                trailing,
-            } => trailing
-                .last()
-                .or_else(|| dangling.last())
-                .or_else(|| leading.last()),
-            PartsIterator::Dangling { dangling, trailing } => {
-                trailing.last().or_else(|| dangling.last())
-            }
-        }
+    fn into_iter(self) -> Self::IntoIter {
+        self.leading
+            .iter()
+            .chain(self.dangling)
+            .chain(self.trailing)
     }
 }
 
-impl<V> ExactSizeIterator for PartsIterator<'_, V> {}
+impl<'a, T> Debug for LeadingDanglingTrailing<'a, T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut list = f.debug_list();
 
-impl<V> FusedIterator for PartsIterator<'_, V> {}
+        list.entries(self.leading.iter().map(DebugValue::Leading));
+        list.entries(self.dangling.iter().map(DebugValue::Dangling));
+        list.entries(self.trailing.iter().map(DebugValue::Trailing));
+
+        list.finish()
+    }
+}
 
 #[derive(Clone, Debug)]
 enum Entry {
     InOrder(InOrderEntry),
     OutOfOrder(OutOfOrderEntry),
-}
-
-struct DebugEntry<'a, K, V> {
-    entry: &'a Entry,
-    map: &'a MultiMap<K, V>,
-}
-
-impl<K, V> Debug for DebugEntry<'_, K, V>
-where
-    K: Debug,
-    V: Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let leading = match self.entry {
-            Entry::OutOfOrder(entry) => {
-                self.map.out_of_order_parts[entry.leading_index()].as_slice()
-            }
-            Entry::InOrder(entry) => &self.map.parts[entry.leading_range()],
-        };
-
-        let dangling = match self.entry {
-            Entry::OutOfOrder(entry) => {
-                self.map.out_of_order_parts[entry.dangling_index()].as_slice()
-            }
-            Entry::InOrder(entry) => &self.map.parts[entry.dangling_range()],
-        };
-
-        let trailing = match self.entry {
-            Entry::OutOfOrder(entry) => {
-                self.map.out_of_order_parts[entry.trailing_index()].as_slice()
-            }
-            Entry::InOrder(entry) => &self.map.parts[entry.trailing_range()],
-        };
-
-        let mut list = f.debug_list();
-
-        list.entries(leading.iter().map(DebugValue::Leading));
-        list.entries(dangling.iter().map(DebugValue::Dangling));
-        list.entries(trailing.iter().map(DebugValue::Trailing));
-
-        list.finish()
-    }
 }
 
 enum DebugValue<'a, V> {
@@ -810,7 +603,10 @@ mod tests {
         assert!(map.has(&"a"));
 
         assert_eq!(
-            map.parts(&"a").copied().collect::<Vec<_>>(),
+            map.leading_dangling_trailing(&"a")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
             vec![1, 2, 3, 4]
         );
     }
@@ -831,7 +627,13 @@ mod tests {
 
         assert!(map.has(&"a"));
 
-        assert_eq!(map.parts(&"a").copied().collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(
+            map.leading_dangling_trailing(&"a")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
     }
 
     #[test]
@@ -849,7 +651,13 @@ mod tests {
 
         assert!(map.has(&"a"));
 
-        assert_eq!(map.parts(&"a").copied().collect::<Vec<_>>(), vec![1, 2]);
+        assert_eq!(
+            map.leading_dangling_trailing(&"a")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
     }
 
     #[test]
@@ -865,7 +673,10 @@ mod tests {
         assert!(!map.has(&"a"));
 
         assert_eq!(
-            map.parts(&"a").copied().collect::<Vec<_>>(),
+            map.leading_dangling_trailing(&"a")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
             Vec::<i32>::new()
         );
     }
@@ -886,22 +697,46 @@ mod tests {
         assert_eq!(map.leading(&"a"), &[1]);
         assert_eq!(map.dangling(&"a"), &EMPTY);
         assert_eq!(map.trailing(&"a"), &EMPTY);
-        assert_eq!(map.parts(&"a").copied().collect::<Vec<_>>(), vec![1]);
+        assert_eq!(
+            map.leading_dangling_trailing(&"a")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![1]
+        );
 
         assert_eq!(map.leading(&"b"), &EMPTY);
         assert_eq!(map.dangling(&"b"), &[2]);
         assert_eq!(map.trailing(&"b"), &EMPTY);
-        assert_eq!(map.parts(&"b").copied().collect::<Vec<_>>(), vec![2]);
+        assert_eq!(
+            map.leading_dangling_trailing(&"b")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![2]
+        );
 
         assert_eq!(map.leading(&"c"), &EMPTY);
         assert_eq!(map.dangling(&"c"), &EMPTY);
         assert_eq!(map.trailing(&"c"), &[3]);
-        assert_eq!(map.parts(&"c").copied().collect::<Vec<_>>(), vec![3]);
+        assert_eq!(
+            map.leading_dangling_trailing(&"c")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![3]
+        );
 
         assert_eq!(map.leading(&"d"), &[4]);
         assert_eq!(map.dangling(&"d"), &[5]);
         assert_eq!(map.trailing(&"d"), &[6]);
-        assert_eq!(map.parts(&"d").copied().collect::<Vec<_>>(), vec![4, 5, 6]);
+        assert_eq!(
+            map.leading_dangling_trailing(&"d")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![4, 5, 6]
+        );
     }
 
     #[test]
@@ -918,7 +753,10 @@ mod tests {
         assert_eq!(map.trailing(&"a"), [4]);
 
         assert_eq!(
-            map.parts(&"a").copied().collect::<Vec<_>>(),
+            map.leading_dangling_trailing(&"a")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
             vec![2, 1, 3, 4]
         );
 
@@ -939,7 +777,10 @@ mod tests {
         assert_eq!(map.trailing(&"a"), [1, 4]);
 
         assert_eq!(
-            map.parts(&"a").copied().collect::<Vec<_>>(),
+            map.leading_dangling_trailing(&"a")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
             vec![2, 3, 1, 4]
         );
 
@@ -958,7 +799,13 @@ mod tests {
         assert_eq!(map.dangling(&"a"), &[2]);
         assert_eq!(map.trailing(&"a"), &[1, 3]);
 
-        assert_eq!(map.parts(&"a").copied().collect::<Vec<_>>(), vec![2, 1, 3]);
+        assert_eq!(
+            map.leading_dangling_trailing(&"a")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![2, 1, 3]
+        );
 
         assert!(map.has(&"a"));
     }

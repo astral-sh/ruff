@@ -3,7 +3,7 @@ name: "[Playground] Release"
 on:
   workflow_dispatch:
   release:
-    types: [ published ]
+    types: [published]
 
 env:
   CARGO_INCREMENTAL: 0
@@ -17,7 +17,7 @@ jobs:
     env:
       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v3
@@ -40,8 +40,8 @@ jobs:
         working-directory: playground
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        uses: cloudflare/wrangler-action@2.0.0
+        uses: cloudflare/wrangler-action@v3.1.1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages publish playground/dist --project-name=ruff --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}
+          command: pages deploy playground/dist --project-name=ruff-playground --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}

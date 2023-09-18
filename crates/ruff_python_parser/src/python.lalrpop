@@ -1,0 +1,1948 @@
+// See also: file:///usr/share/doc/python/html/reference/grammar.html?highlight=grammar
+// See also: https://github.com/antlr/grammars-v4/blob/master/python3/Python3.g4
+// See also: file:///usr/share/doc/python/html/reference/compound_stmts.html#function-definitions
+// See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
+
+use num_bigint::BigInt;
+use ruff_text_size::{Ranged, TextSize};
+use ruff_python_ast::{self as ast, IpyEscapeKind};
+use crate::{
+    Mode,
+    lexer::{LexicalError, LexicalErrorType},
+    function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
+    context::set_context,
+    string::parse_strings,
+    token::{self, StringKind},
+};
+use lalrpop_util::ParseError;
+
+grammar(mode: Mode);
+
+// This is a hack to reduce the amount of lalrpop tables generated:
+// For each public entry point, a full parse table is generated.
+// By having only a single pub function, we reduce this to one.
+pub(crate) Top: ast::Mod = {
+    <start:@L> StartModule <body:Program> <end:@R> => ast::ModModule { body, range: (start..end).into() }.into(),
+    <start:@L> StartExpression <body:TestList> ("\n")* <end:@R> => ast::ModExpression { body: Box::new(body.into()), range: (start..end).into() }.into()
+};
+
+Program: ast::Suite = {
+    => vec![],
+    // Compound statements
+    <mut statements:Program> <next:CompoundStatement> => {
+        statements.push(next);
+        statements
+    },
+
+    // Small statements
+    <mut statements:Program> <small:(<SmallStatement> ";")*> <last:SmallStatement> ";"? "\n" => {
+        statements.extend(small);
+        statements.push(last);
+        statements
+    },
+
+    // Empty lines
+    <s:Program> "\n" => s,
+};
+
+Suite: ast::Suite = {
+    <mut statements:(<SmallStatement> ";")*> <last:SmallStatement> ";"? "\n" => {
+        statements.push(last);
+        statements
+    },
+    "\n" Indent <s:Statements> Dedent => s,
+};
+
+
+// One or more statements
+Statements: Vec<ast::Stmt> = {
+    // First simple statement
+    <mut head:(<SmallStatement> ";")*> <last:SmallStatement> ";"? "\n" => {
+        head.push(last);
+        head
+    },
+
+    // The first compound statement
+    <s:CompoundStatement> => vec![s],
+
+    // Any subsequent compound statements
+    <mut statements:Statements> <next:CompoundStatement> => {
+        statements.push(next);
+        statements
+    },
+
+    // Any subsequent small statements
+    <mut statements:Statements> <small:(<SmallStatement> ";")*> <last:SmallStatement> ";"? "\n" => {
+        statements.extend(small);
+        statements.push(last);
+        statements
+    },
+};
+
+SmallStatement: ast::Stmt = {
+    ExpressionStatement,
+    PassStatement,
+    DelStatement,
+    FlowStatement,
+    ImportStatement,
+    GlobalStatement,
+    NonlocalStatement,
+    AssertStatement,
+    TypeAliasStatement,
+    IpyEscapeCommandStatement,
+    IpyHelpEndEscapeCommandStatement,
+};
+
+PassStatement: ast::Stmt = {
+    <location:@L> "pass" <end_location:@R> => {
+        ast::Stmt::Pass(ast::StmtPass { range: (location..end_location).into() })
+    },
+};
+
+DelStatement: ast::Stmt = {
+    <location:@L> "del" <targets:ExpressionList2> <end_location:@R> => {
+        ast::Stmt::Delete(
+            ast::StmtDelete { targets: targets.into_iter().map(|expr| set_context(expr.into(), ast::ExprContext::Del)).collect(), range: (location..end_location).into()  }
+        )
+    },
+};
+
+ExpressionStatement: ast::Stmt = {
+    <location:@L> <expression:TestOrStarExprList> <suffix:AssignSuffix*> <end_location:@R> => {
+        // Just an expression, no assignment:
+        if suffix.is_empty() {
+            ast::Stmt::Expr(
+                ast::StmtExpr { value: Box::new(expression.into()), range: (location..end_location).into() }
+            )
+        } else {
+            let mut targets = vec![set_context(expression.into(), ast::ExprContext::Store)];
+            let mut values = suffix;
+
+            let value = Box::new(values.pop().unwrap().into());
+
+            for target in values {
+                targets.push(set_context(target.into(), ast::ExprContext::Store));
+            }
+
+            ast::Stmt::Assign(
+                ast::StmtAssign { targets, value, range: (location..end_location).into() }
+            )
+        }
+    },
+    <location:@L> <target:TestOrStarExprList> <op:AugAssign> <rhs:TestListOrYieldExpr> <end_location:@R> => {
+        ast::Stmt::AugAssign(
+            ast::StmtAugAssign {
+                target: Box::new(set_context(target.into(), ast::ExprContext::Store)),
+                op,
+                value: Box::new(rhs.into()),
+                range: (location..end_location).into()
+            },
+        )
+    },
+    <location:@L> <target:Test<"all">> ":" <annotation:Test<"all">> <rhs:AssignSuffix?> <end_location:@R> => {
+        let simple = target.expr.is_name_expr();
+        ast::Stmt::AnnAssign(
+            ast::StmtAnnAssign {
+                target: Box::new(set_context(target.into(), ast::ExprContext::Store)),
+                annotation: Box::new(annotation.into()),
+                value: rhs.map(ast::Expr::from).map(Box::new),
+                simple,
+                range: (location..end_location).into()
+            },
+        )
+    },
+};
+
+AssignSuffix: ast::ParenthesizedExpr = {
+    "=" <e:TestListOrYieldExpr> => e,
+    "=" <e:IpyEscapeCommandExpr> => e
+};
+
+TestListOrYieldExpr: ast::ParenthesizedExpr = {
+    TestList,
+    YieldExpr
+}
+
+#[inline]
+TestOrStarExprList: ast::ParenthesizedExpr = {
+    // as far as I can tell, these were the same
+    TestList
+};
+
+TestOrStarExpr: ast::ParenthesizedExpr = {
+    Test<"all">,
+    StarExpr,
+};
+
+NamedOrStarExpr: ast::ParenthesizedExpr = {
+    NamedExpression,
+    StarExpr,
+};
+
+TestOrStarNamedExpr: ast::ParenthesizedExpr = {
+    NamedExpressionTest,
+    StarExpr,
+};
+
+AugAssign: ast::Operator = {
+    "+=" => ast::Operator::Add,
+    "-=" => ast::Operator::Sub,
+    "*=" => ast::Operator::Mult,
+    "@=" => ast::Operator::MatMult,
+    "/=" => ast::Operator::Div,
+    "%=" => ast::Operator::Mod,
+    "&=" => ast::Operator::BitAnd,
+    "|=" => ast::Operator::BitOr,
+    "^=" => ast::Operator::BitXor,
+    "<<=" => ast::Operator::LShift,
+    ">>=" => ast::Operator::RShift,
+    "**=" => ast::Operator::Pow,
+    "//=" => ast::Operator::FloorDiv,
+};
+
+FlowStatement: ast::Stmt = {
+    <location:@L> "break" <end_location:@R> => {
+
+        ast::Stmt::Break(ast::StmtBreak { range: (location..end_location).into() })
+    },
+    <location:@L> "continue" <end_location:@R> => {
+        ast::Stmt::Continue(ast::StmtContinue { range: (location..end_location).into() })
+    },
+    <location:@L> "return" <value:TestList?> <end_location:@R> => {
+        ast::Stmt::Return(
+            ast::StmtReturn { value: value.map(ast::Expr::from).map(Box::new), range: (location..end_location).into() }
+        )
+    },
+    <location:@L> <expression:YieldExpr> <end_location:@R> => {
+        ast::Stmt::Expr(
+            ast::StmtExpr { value: Box::new(expression.into()), range: (location..end_location).into() }
+        )
+    },
+    RaiseStatement,
+};
+
+RaiseStatement: ast::Stmt = {
+    <location:@L> "raise" <end_location:@R> => {
+        ast::Stmt::Raise(
+            ast::StmtRaise { exc: None, cause: None, range: (location..end_location).into() }
+        )
+    },
+    <location:@L> "raise" <exc:Test<"all">> <cause:("from" <Test<"all">>)?> <end_location:@R> => {
+        ast::Stmt::Raise(
+            ast::StmtRaise { exc: Some(Box::new(exc.into())), cause: cause.map(ast::Expr::from).map(Box::new), range: (location..end_location).into() }
+        )
+    },
+};
+
+ImportStatement: ast::Stmt = {
+    <location:@L> "import" <names: OneOrMore<ImportAsAlias<DottedName>>> <end_location:@R> => {
+        ast::Stmt::Import(
+            ast::StmtImport { names, range: (location..end_location).into() }
+        )
+    },
+    <location:@L> "from" <source:ImportFromLocation> "import" <names: ImportAsNames> <end_location:@R> => {
+        let (level, module) = source;
+        ast::Stmt::ImportFrom(
+            ast::StmtImportFrom {
+                level,
+                module,
+                names,
+                range: (location..end_location).into()
+            },
+        )
+    },
+};
+
+ImportFromLocation: (Option<ast::Int>, Option<ast::Identifier>) = {
+    <dots: ImportDots*> <name:DottedName> => {
+        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), Some(name))
+    },
+    <dots: ImportDots+> => {
+        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), None)
+    },
+};
+
+ImportDots: ast::Int = {
+    "..." => ast::Int::new(3),
+    "." => ast::Int::new(1),
+};
+
+ImportAsNames: Vec<ast::Alias> = {
+    <location:@L> <i:OneOrMore<ImportAsAlias<Identifier>>> <end_location:@R> => i,
+    <location:@L> "(" <i:OneOrMore<ImportAsAlias<Identifier>>> ","? ")" <end_location:@R> => i,
+    <location:@L> "*" <end_location:@R> => {
+        // Star import all
+        vec![ast::Alias { name: ast::Identifier::new("*", (location..end_location).into()), asname: None, range: (location..end_location).into() }]
+    },
+};
+
+
+#[inline]
+ImportAsAlias<I>: ast::Alias = {
+    <location:@L> <name:I> <a: ("as" <Identifier>)?> <end_location:@R> => ast::Alias { name, asname: a, range: (location..end_location).into() },
+}
+
+// A name like abc or abc.def.ghi
+DottedName: ast::Identifier = {
+    <location:@L> <n:name> <end_location:@R> => ast::Identifier::new(n, (location..end_location).into()),
+    <location:@L> <n:name> <n2: ("." Identifier)+> <end_location:@R> => {
+        let mut r = n;
+        for x in n2 {
+            r.push('.');
+            r.push_str(x.1.as_str());
+        }
+        ast::Identifier::new(r, (location..end_location).into())
+    },
+};
+
+GlobalStatement: ast::Stmt = {
+    <location:@L> "global" <names:OneOrMore<Identifier>> <end_location:@R> => {
+        ast::Stmt::Global(
+            ast::StmtGlobal { names, range: (location..end_location).into() }
+        )
+    },
+};
+
+NonlocalStatement: ast::Stmt = {
+    <location:@L> "nonlocal" <names:OneOrMore<Identifier>> <end_location:@R> => {
+        ast::Stmt::Nonlocal(
+            ast::StmtNonlocal { names, range: (location..end_location).into() }
+        )
+    },
+};
+
+AssertStatement: ast::Stmt = {
+    <location:@L> "assert" <test:Test<"all">> <msg: ("," <Test<"all">>)?> <end_location:@R> => {
+        ast::Stmt::Assert(
+            ast::StmtAssert {
+                test: Box::new(test.into()),
+                msg: msg.map(ast::Expr::from).map(Box::new),
+                range: (location..end_location).into()
+            }
+        )
+    },
+};
+
+IpyEscapeCommandStatement: ast::Stmt = {
+    <location:@L> <c:ipy_escape_command> <end_location:@R> =>? {
+        if mode == Mode::Ipython {
+            Ok(ast::Stmt::IpyEscapeCommand(
+                ast::StmtIpyEscapeCommand {
+                    kind: c.0,
+                    value: c.1,
+                    range: (location..end_location).into()
+                }
+            ))
+        } else {
+            Err(LexicalError {
+                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+                location,
+            })?
+        }
+    }
+}
+
+IpyEscapeCommandExpr: ast::ParenthesizedExpr = {
+    <location:@L> <c:ipy_escape_command> <end_location:@R> =>? {
+        if mode == Mode::Ipython {
+            // This should never occur as the lexer won't allow it.
+            if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
+                return Err(LexicalError {
+                    error: LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string()),
+                    location,
+                })?;
+            }
+            Ok(ast::ExprIpyEscapeCommand {
+                kind: c.0,
+                value: c.1,
+                range: (location..end_location).into()
+            }.into())
+        } else {
+            Err(LexicalError {
+                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+                location,
+            })?
+        }
+    }
+}
+
+IpyHelpEndEscapeCommandStatement: ast::Stmt = {
+    // We are permissive than the original implementation because we would allow whitespace
+    // between the expression and the suffix while the IPython implementation doesn't allow it.
+    // For example, `foo ?` would be valid in our case but invalid from IPython.
+    <location:@L> <e:Expression<"all">> <suffix:("?")+> <end_location:@R> =>? {
+        fn unparse_expr(expr: &ast::Expr, buffer: &mut String) -> Result<(), LexicalError> {
+            match expr {
+                ast::Expr::Name(ast::ExprName { id, .. }) => {
+                    buffer.push_str(id.as_str());
+                },
+                ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
+                    let ast::Expr::Constant(ast::ExprConstant { value: ast::Constant::Int(integer), .. }) = slice.as_ref() else {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::OtherError("only integer constants are allowed in Subscript expressions in help end escape command".to_string()),
+                            location: range.start(),
+                        });
+                    };
+                    unparse_expr(value, buffer)?;
+                    buffer.push('[');
+                    buffer.push_str(&format!("{}", integer));
+                    buffer.push(']');
+                },
+                ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                    unparse_expr(value, buffer)?;
+                    buffer.push('.');
+                    buffer.push_str(attr.as_str());
+                },
+                _ => {
+                    return Err(LexicalError {
+                        error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
+                        location: expr.range().start(),
+                    });
+                }
+            }
+            Ok(())
+        }
+
+        if mode != Mode::Ipython {
+            return Err(ParseError::User {
+                error: LexicalError {
+                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+                    location,
+                },
+            });
+        }
+
+        let kind = match suffix.len() {
+            1 => IpyEscapeKind::Help,
+            2 => IpyEscapeKind::Help2,
+            _ => {
+                return Err(ParseError::User {
+                    error: LexicalError {
+                        error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
+                        location,
+                    },
+                });
+            }
+        };
+
+        let mut value = String::new();
+        unparse_expr(&e.into(), &mut value)?;
+
+        Ok(ast::Stmt::IpyEscapeCommand(
+            ast::StmtIpyEscapeCommand {
+                kind,
+                value,
+                range: (location..end_location).into()
+            }
+        ))
+    }
+}
+
+CompoundStatement: ast::Stmt = {
+    MatchStatement,
+    IfStatement,
+    WhileStatement,
+    ForStatement,
+    TryStatement,
+    WithStatement,
+    FuncDef,
+    ClassDef,
+};
+
+MatchStatement: ast::Stmt = {
+    <location:@L> "match" <subject:TestOrStarNamedExpr> ":" "\n" Indent <cases:MatchCase+> Dedent => {
+       let end_location = cases
+            .last()
+            .unwrap()
+            .body
+            .last()
+            .unwrap()
+            .end();
+        ast::Stmt::Match(
+            ast::StmtMatch {
+                subject: Box::new(subject.into()),
+                cases,
+                range: (location..end_location).into()
+            }
+        )
+    },
+    <location:@L> "match" <subject:TestOrStarNamedExpr> "," ":" "\n" Indent <cases:MatchCase+> Dedent => {
+       let end_location = cases
+            .last()
+            .unwrap()
+            .body
+            .last()
+            .unwrap()
+            .end();
+        ast::Stmt::Match(
+            ast::StmtMatch {
+                subject: Box::new(subject.into()),
+                cases,
+                range: (location..end_location).into()
+            }
+        )
+    },
+    <location:@L> "match" <elts:TwoOrMore<TestOrStarNamedExpr, ",">> ","? ":" "\n" Indent <cases:MatchCase+> Dedent => {
+        let end_location = cases
+            .last()
+            .unwrap()
+            .body
+            .last()
+            .unwrap()
+            .end();
+        let elts = elts.into_iter().map(ast::Expr::from).collect();
+        ast::Stmt::Match(
+            ast::StmtMatch {
+                subject: Box::new(ast::Expr::Tuple(
+                    ast::ExprTuple {
+                        elts,
+                        ctx: ast::ExprContext::Load,
+                        range: (location..end_location).into()
+                    },
+                )),
+                cases,
+                range: (location..end_location).into()
+            }
+        )
+    }
+}
+
+MatchCase: ast::MatchCase = {
+    <start:@L> "case" <pattern:Patterns> <guard:(Guard)?> ":" <body:Suite> => {
+        // SAFETY: `body` is never empty because it is non-optional and `Suite` matches one or more statements.
+        let end = body.last().unwrap().end();
+        ast::MatchCase {
+            pattern,
+            guard: guard.map(Box::new),
+            body,
+            range: (start..end).into()
+        }
+    },
+}
+
+Guard: ast::Expr = {
+    "if" <guard:NamedExpressionTest> => {
+        guard.into()
+    }
+}
+
+Patterns: ast::Pattern = {
+    <location:@L> <pattern:Pattern> "," <end_location:@R> => ast::Pattern::MatchSequence(
+        ast::PatternMatchSequence {
+            patterns: vec![pattern],
+            range: (location..end_location).into()
+        },
+    ),
+    <location:@L> <patterns:TwoOrMore<Pattern, ",">> ","? <end_location:@R> => {
+        ast::Pattern::MatchSequence(
+            ast::PatternMatchSequence {
+                patterns,
+                range: (location..end_location).into()
+            },
+        )
+    },
+    <pattern:Pattern> => pattern
+}
+
+Pattern: ast::Pattern = {
+    <pattern:AsPattern> => pattern,
+    <pattern:OrPattern> => pattern,
+}
+
+AsPattern: ast::Pattern = {
+    <location:@L> <pattern:OrPattern> "as" <name:Identifier> <end_location:@R> =>? {
+        if name.as_str() == "_" {
+            Err(LexicalError {
+                error: LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
+                location,
+            })?
+        } else {
+            Ok(ast::Pattern::MatchAs(
+                ast::PatternMatchAs {
+                   pattern: Some(Box::new(pattern)),
+                   name: Some(name),
+                   range: (location..end_location).into()
+                },
+            ))
+        }
+    },
+}
+
+OrPattern: ast::Pattern = {
+    <pattern:ClosedPattern> => pattern,
+    <location:@L> <patterns:TwoOrMore<ClosedPattern, "|">> <end_location:@R> => {
+        ast::Pattern::MatchOr(
+            ast::PatternMatchOr { patterns, range: (location..end_location).into() }
+        )
+    }
+}
+
+ClosedPattern: ast::Pattern = {
+    <node:LiteralPattern> => node,
+    <node:CapturePattern> => node,
+    <node:StarPattern> => node,
+    <node:ValuePattern> => node,
+    <node:SequencePattern> => node,
+    <node:MappingPattern> => node,
+    <node:ClassPattern> => node,
+}
+
+SequencePattern: ast::Pattern = {
+    // A single-item tuple is a special case: it's a group pattern, _not_ a sequence pattern.
+    <location:@L> "(" <pattern:Pattern> ")" <end_location:@R> => pattern,
+    <location:@L> "(" ")" <end_location:@R> => ast::PatternMatchSequence {
+        patterns: vec![],
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> "(" <pattern:Pattern> "," ")" <end_location:@R> => {
+            ast::PatternMatchSequence {
+                patterns: vec![pattern],
+                range: (location..end_location).into()
+            }.into()
+        },
+    <location:@L> "(" <patterns:(<Pattern> ",")+> <last:Pattern> ","? ")" <end_location:@R> => {
+        let mut patterns = patterns;
+        patterns.push(last);
+        ast::PatternMatchSequence {
+            patterns,
+            range: (location..end_location).into()
+        }.into()
+    },
+    <location:@L> "[" <patterns:Comma<Pattern>> "]" <end_location:@R> => ast::PatternMatchSequence {
+        patterns,
+        range: (location..end_location).into()
+    }.into(),
+}
+
+StarPattern: ast::Pattern = {
+    <location:@L> "*" <name:Identifier> <end_location:@R> => ast::PatternMatchStar {
+        name: if name.as_str() == "_" { None } else { Some(name) },
+        range: (location..end_location).into()
+    }.into(),
+}
+
+ConstantAtom: ast::ParenthesizedExpr = {
+    <location:@L> <value:Constant> <end_location:@R> => ast::Expr::Constant(
+        ast::ExprConstant { value, range: (location..end_location).into() }
+    ).into(),
+}
+
+ConstantExpr: ast::ParenthesizedExpr = {
+    ConstantAtom,
+    <location:@L> "-" <operand:ConstantAtom> <end_location:@R> => ast::Expr::UnaryOp(
+        ast::ExprUnaryOp {
+            op: ast::UnaryOp::USub,
+            operand: Box::new(operand.into()),
+            range: (location..end_location).into()
+        }
+    ).into(),
+}
+
+AddOpExpr: ast::ParenthesizedExpr = {
+    <location:@L> <left:ConstantExpr> <op:AddOp> <right:ConstantAtom> <end_location:@R> => ast::ExprBinOp {
+        left: Box::new(left.into()),
+        op,
+        right: Box::new(right.into()),
+        range: (location..end_location).into()
+    }.into(),
+}
+
+LiteralPattern: ast::Pattern = {
+    <location:@L> "None" <end_location:@R> => ast::PatternMatchSingleton {
+        value: ast::Constant::None,
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> "True" <end_location:@R> => ast::PatternMatchSingleton {
+        value: true.into(),
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> "False" <end_location:@R> => ast::PatternMatchSingleton {
+        value: false.into(),
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> <value:ConstantExpr> <end_location:@R> => ast::PatternMatchValue {
+        value: Box::new(value.into()),
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> <value:AddOpExpr> <end_location:@R> => ast::PatternMatchValue {
+        value: Box::new(value.into()),
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> <s:(@L string @R)+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
+        value: Box::new(parse_strings(s)?),
+        range: (location..end_location).into()
+    }.into()),
+}
+
+CapturePattern: ast::Pattern = {
+    <location:@L> <name:Identifier> <end_location:@R> => ast::PatternMatchAs {
+        pattern: None,
+        name: if name.as_str() == "_" { None } else { Some(name) },
+        range: (location..end_location).into()
+    }.into(),
+}
+
+MatchName: ast::Expr = {
+    <location:@L> <id:Identifier> <end_location:@R> => ast::Expr::Name(
+        ast::ExprName { id: id.into(), ctx: ast::ExprContext::Load, range: (location..end_location).into() },
+    ),
+}
+
+MatchNameOrAttr: ast::Expr = {
+    <location:@L> <name:MatchName> "." <attr:Identifier> <end_location:@R> => ast::ExprAttribute {
+        value: Box::new(name),
+        attr,
+        ctx: ast::ExprContext::Load,
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> <e:MatchNameOrAttr> "." <attr:Identifier> <end_location:@R> => ast::ExprAttribute {
+        value: Box::new(e),
+        attr,
+        ctx: ast::ExprContext::Load,
+        range: (location..end_location).into()
+    }.into(),
+}
+
+ValuePattern: ast::Pattern = {
+   <location:@L> <e:MatchNameOrAttr> <end_location:@R> => ast::PatternMatchValue {
+       value: Box::new(e),
+       range: (location..end_location).into()
+   }.into(),
+}
+
+MappingKey: ast::Expr = {
+    MatchNameOrAttr,
+    <e:ConstantExpr> => e.into(),
+    <e:AddOpExpr> => e.into(),
+    <location:@L> "None" <end_location:@R> => ast::ExprConstant {
+        value: ast::Constant::None,
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> "True" <end_location:@R> => ast::ExprConstant {
+        value: true.into(),
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> "False" <end_location:@R> => ast::ExprConstant {
+        value: false.into(),
+        range: (location..end_location).into()
+    }.into(),
+    <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?),
+}
+
+MatchMappingEntry: (ast::Expr, ast::Pattern) = {
+    <k:MappingKey> ":" <v:Pattern> => (k, v),
+};
+
+MappingPattern: ast::Pattern = {
+    <location:@L> "{" "}" <end_location:@R> => {
+        ast::PatternMatchMapping {
+            keys: vec![],
+            patterns: vec![],
+            rest: None,
+            range: (location..end_location).into()
+        }.into()
+    },
+    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","? "}" <end_location:@R> => {
+        let (keys, patterns) = e
+            .into_iter()
+            .unzip();
+        ast::PatternMatchMapping {
+            keys,
+            patterns,
+            rest: None,
+            range: (location..end_location).into()
+        }.into()
+    },
+    <location:@L> "{" "**" <rest:Identifier> ","? "}" <end_location:@R> => {
+        ast::PatternMatchMapping {
+            keys: vec![],
+            patterns: vec![],
+            rest: Some(rest),
+            range: (location..end_location).into()
+        }.into()
+    },
+    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","  "**" <rest:Identifier> ","? "}" <end_location:@R> => {
+        let (keys, patterns) = e
+            .into_iter()
+            .unzip();
+        ast::PatternMatchMapping {
+            keys,
+            patterns,
+            rest: Some(rest),
+            range: (location..end_location).into()
+        }.into()
+    },
+}
+
+MatchKeywordEntry: ast::PatternKeyword = {
+    <location:@L> <attr:Identifier> "=" <pattern:Pattern> <end_location:@R> => ast::PatternKeyword {
+        attr,
+        pattern,
+        range: (location..end_location).into()
+    },
+};
+
+ClassPattern: ast::Pattern = {
+    <location:@L> <cls:MatchName> <arguments:PatternArguments> <end_location:@R> => {
+        ast::PatternMatchClass {
+            cls: Box::new(cls),
+            arguments,
+            range: (location..end_location).into()
+        }.into()
+    },
+    <location:@L> <cls:MatchNameOrAttr> <arguments:PatternArguments> <end_location:@R> => {
+        ast::PatternMatchClass {
+            cls: Box::new(cls),
+            arguments,
+            range: (location..end_location).into()
+        }.into()
+    },
+}
+
+PatternArguments: ast::PatternArguments = {
+    <location:@L> "(" <patterns: OneOrMore<Pattern>> "," <keywords:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
+        ast::PatternArguments {
+            patterns,
+            keywords,
+            range: (location..end_location).into()
+        }
+    },
+    <location:@L> "(" <patterns: OneOrMore<Pattern>> ","? ")" <end_location:@R> => {
+        ast::PatternArguments {
+            patterns,
+            keywords: vec![],
+            range: (location..end_location).into()
+        }
+    },
+    <location:@L> "(" <keywords:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
+        ast::PatternArguments {
+            patterns: vec![],
+            keywords,
+            range: (location..end_location).into()
+        }
+    },
+    <location:@L> "(" ")" <end_location:@R> => {
+        ast::PatternArguments {
+            patterns: vec![],
+            keywords: vec![],
+            range: (location..end_location).into()
+        }
+    },
+};
+
+IfStatement: ast::Stmt = {
+    <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(<@L> "elif" <NamedExpressionTest> ":" <Suite>)*> <s3:(<@L> "else" ":" <Suite>)?> => {
+        let elif_else_clauses: Vec<_> = s2.into_iter().map(|(start, test, body)| ast::ElifElseClause {
+            range: (start..body.last().unwrap().end()).into(),
+            test: Some(test.into()),
+            body,
+        }).chain(s3.into_iter().map(|(start, body)| ast::ElifElseClause {
+            range: (start..body.last().unwrap().end()).into(),
+            test: None,
+            body,
+        })).collect();
+
+        let end_location = elif_else_clauses
+            .last()
+            .map_or_else(|| body.last().unwrap().end(), Ranged::end);
+
+        ast::Stmt::If(
+            ast::StmtIf { test: Box::new(test.into()), body, elif_else_clauses, range: (location..end_location).into() }
+        )
+    },
+};
+
+WhileStatement: ast::Stmt = {
+    <location:@L> "while" <test:NamedExpressionTest> ":" <body:Suite> <s2:("else" ":" <Suite>)?> => {
+        let orelse = s2.unwrap_or_default();
+        let end_location = orelse
+            .last()
+            .or_else(|| body.last())
+            .unwrap()
+            .end();
+        ast::Stmt::While(
+            ast::StmtWhile {
+                test: Box::new(test.into()),
+                body,
+                orelse,
+                range: (location..end_location).into()
+            },
+        )
+    },
+};
+
+ForStatement: ast::Stmt = {
+    <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:TestList> ":" <body:Suite> <orelse:("else" ":" <Suite>)?> => {
+        let orelse = orelse.unwrap_or_default();
+        let end_location = orelse
+            .last()
+            .or_else(|| body.last())
+            .unwrap()
+            .end();
+        let target = Box::new(set_context(target.into(), ast::ExprContext::Store));
+        let iter = Box::new(iter.into());
+        ast::Stmt::For(ast::StmtFor { target, iter, body, orelse, is_async: is_async.is_some(), range: (location..end_location).into() })
+    },
+};
+
+TryStatement: ast::Stmt = {
+    <location:@L> "try" ":" <body:Suite> <handlers:ExceptClause+> <orelse:("else" ":" <Suite>)?> <finalbody:("finally" ":" <Suite>)?> <end_location:@R> => {
+        let orelse = orelse.unwrap_or_default();
+        let finalbody = finalbody.unwrap_or_default();
+        let end_location = finalbody
+            .last()
+            .map(Ranged::end)
+            .or_else(|| orelse.last().map(Ranged::end))
+            .or_else(|| handlers.last().map(Ranged::end))
+            .unwrap();
+        ast::Stmt::Try(
+            ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star: false,
+                range: (location..end_location).into()
+            },
+        )
+    },
+    <location:@L> "try" ":" <body:Suite> <handlers:ExceptStarClause+> <orelse:("else" ":" <Suite>)?> <finalbody:("finally" ":" <Suite>)?> <end_location:@R> => {
+        let orelse = orelse.unwrap_or_default();
+        let finalbody = finalbody.unwrap_or_default();
+        let end_location = finalbody
+            .last()
+            .or_else(|| orelse.last())
+            .map(Ranged::end)
+            .or_else(|| handlers.last().map(Ranged::end))
+            .unwrap();
+        ast::Stmt::Try(
+            ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star: true,
+                range: (location..end_location).into()
+            },
+        )
+    },
+    <location:@L> "try" ":" <body:Suite> <finalbody:("finally" ":" <Suite>)> => {
+        let handlers = vec![];
+        let orelse = vec![];
+        let end_location = finalbody.last().unwrap().end();
+        ast::Stmt::Try(
+            ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star: false,
+                range: (location..end_location).into()
+            },
+        )
+    },
+};
+
+ExceptStarClause: ast::ExceptHandler = {
+    <location:@L> "except" "*" <typ:Test<"all">> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end();
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
+                type_: Some(Box::new(typ.into())),
+                name: None,
+                body,
+                range: (location..end_location).into()
+            },
+        )
+    },
+    <location:@L> "except" "*" <x:(<Test<"all">> "as" <Identifier>)> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end();
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
+                type_: Some(Box::new(x.0.into())),
+                name: Some(x.1),
+                body,
+                range: (location..end_location).into()
+            },
+        )
+    },
+};
+
+
+ExceptClause: ast::ExceptHandler = {
+    <location:@L> "except" <typ:Test<"all">?> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end();
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
+                type_: typ.map(ast::Expr::from).map(Box::new),
+                name: None,
+                body,
+                range: (location..end_location).into()
+            },
+        )
+    },
+    <location:@L> "except" <x:(<Test<"all">> "as" <Identifier>)> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end();
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
+                type_: Some(Box::new(x.0.into())),
+                name: Some(x.1),
+                body,
+                range: (location..end_location).into()
+            },
+        )
+    },
+};
+
+WithStatement: ast::Stmt = {
+    <location:@L> <is_async:"async"?> "with" <items:WithItems> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end();
+        ast::StmtWith { items, body, is_async: is_async.is_some(), range: (location..end_location).into() }.into()
+    },
+};
+
+WithItems: Vec<ast::WithItem> = {
+    "(" <WithItemsNoAs> ","? ")",
+    "(" <left:(<WithItemsNoAs> ",")?> <mid:WithItemAs> <right:("," <WithItem<"all">>)*> ","? ")" => {
+        left.into_iter().flatten().chain([mid]).chain(right).collect()
+    },
+    <item:WithItem<"no-withitems">> => {
+        // Special-case: if the `WithItem` is a parenthesized named expression, then the item
+        // should _exclude_ the outer parentheses in its range. For example:
+        // ```python
+        // with (a := 0): pass
+        // ```
+        // In this case, the `(` and `)` are part of the `with` statement.
+        // The same applies to `yield` and `yield from`.
+        let item = if matches!(item.context_expr, ast::Expr::NamedExpr(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
+            ast::WithItem {
+                range: item.range().add_start(TextSize::new(1)).sub_end(TextSize::new(1)),
+                context_expr: item.context_expr,
+                optional_vars: item.optional_vars,
+            }
+        } else {
+            item
+        };
+        vec![item]
+    },
+    <item:WithItem<"all">> <items:("," <WithItem<"all">>)+> => {
+        [item].into_iter().chain(items).collect()
+    }
+};
+
+#[inline]
+WithItemsNoAs: Vec<ast::WithItem> = {
+    <all:OneOrMore<Test<"all">>> => {
+        all.into_iter().map(|context_expr| ast::WithItem {
+            range: context_expr.range(),
+            context_expr: context_expr.into(),
+            optional_vars: None,
+        }).collect()
+    },
+}
+
+WithItem<Goal>: ast::WithItem = {
+    <context_expr: Test<Goal>> => {
+        ast::WithItem {
+            range: context_expr.range(),
+            context_expr: context_expr.into(),
+            optional_vars: None,
+        }
+    },
+    <WithItemAs>,
+};
+
+WithItemAs: ast::WithItem = {
+    <location:@L> <context_expr:Test<"all">> "as" <optional_vars:Expression<"all">> <end_location:@R> => {
+        let optional_vars = Some(Box::new(set_context(optional_vars.into(), ast::ExprContext::Store)));
+        ast::WithItem {
+            context_expr: context_expr.into(),
+            optional_vars,
+            range: (location..end_location).into(),
+        }
+    },
+}
+
+FuncDef: ast::Stmt = {
+     <location:@L> <decorator_list:Decorator*> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParams?> <parameters:Parameters> <returns:("->" <Test<"all">>)?> ":" <body:Suite> => {
+        let parameters = Box::new(parameters);
+        let returns = returns.map(ast::Expr::from).map(Box::new);
+        let end_location = body.last().unwrap().end();
+        ast::StmtFunctionDef {
+            name,
+            parameters,
+            body,
+            decorator_list,
+            returns,
+            type_params,
+            is_async: is_async.is_some(),
+            range: (location..end_location).into(),
+        }.into()
+    },
+};
+
+TypeAliasName: ast::Expr = {
+    <location:@L> <name:Identifier> <end_location:@R> => ast::ExprName {
+        id: name.into(),
+        ctx: ast::ExprContext::Store,
+        range: (location..end_location).into(),
+    }.into(),
+}
+
+TypeAliasStatement: ast::Stmt = {
+    <location:@L> "type" <name:TypeAliasName> <type_params:TypeParams?> "=" <value:Test<"all">> <end_location:@R> => {
+        ast::Stmt::TypeAlias(
+            ast::StmtTypeAlias {
+                name: Box::new(name),
+                value: Box::new(value.into()),
+                type_params,
+                range: (location..end_location).into()
+            },
+        )
+    },
+};
+
+Parameters: ast::Parameters = {
+    <location:@L> "(" <a: (ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>)?> ")" <end_location:@R> =>? {
+        a.as_ref().map(validate_arguments).transpose()?;
+
+        let range = (location..end_location).into();
+        let args = a
+            .map_or_else(|| ast::Parameters::empty(range), |mut arguments| {
+                arguments.range = range;
+                arguments
+            });
+
+        Ok(args)
+    }
+};
+
+// Note that this is a macro which is used once for function defs, and
+// once for lambda defs.
+ParameterList<ParameterType, StarParameterType, DoubleStarParameterType>: ast::Parameters = {
+    <location:@L> <param1:ParameterDefs<ParameterType>> <args2:("," <ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>>)?> ","? <end_location:@R> =>? {
+        validate_pos_params(&param1)?;
+        let (posonlyargs, args) = param1;
+
+        // Now gather rest of parameters:
+        let (vararg, kwonlyargs, kwarg) = args2.unwrap_or((None, vec![], None));
+
+        Ok(ast::Parameters {
+            posonlyargs,
+            args,
+            kwonlyargs,
+            vararg,
+            kwarg,
+            range: (location..end_location).into()
+        })
+    },
+    <location:@L> <param1:ParameterDefs<ParameterType>> <kw:("," <KwargParameter<DoubleStarParameterType>>)> ","? <end_location:@R> =>? {
+        validate_pos_params(&param1)?;
+        let (posonlyargs, args) = param1;
+
+        // Now gather rest of parameters:
+        let vararg = None;
+        let kwonlyargs = vec![];
+        let kwarg = kw;
+
+        Ok(ast::Parameters {
+            posonlyargs,
+            args,
+            kwonlyargs,
+            vararg,
+            kwarg,
+            range: (location..end_location).into()
+        })
+    },
+    <location:@L> <params:ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>> ","? <end_location:@R> => {
+        let (vararg, kwonlyargs, kwarg) = params;
+        ast::Parameters {
+            posonlyargs: vec![],
+            args: vec![],
+            kwonlyargs,
+            vararg,
+            kwarg,
+            range: (location..end_location).into()
+        }
+    },
+    <location:@L> <kwarg:KwargParameter<DoubleStarParameterType>> ","? <end_location:@R> => {
+        ast::Parameters {
+            posonlyargs: vec![],
+            args: vec![],
+            kwonlyargs: vec![],
+            vararg: None,
+            kwarg,
+            range: (location..end_location).into()
+        }
+    },
+};
+
+// Use inline here to make sure the "," is not creating an ambiguity.
+#[inline]
+ParameterDefs<ParameterType>: (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>) = {
+    <args:OneOrMore<ParameterDef<ParameterType>>> => {
+        (vec![], args)
+    },
+    <posonlyargs:OneOrMore<ParameterDef<ParameterType>>> "," "/" <args:("," <ParameterDef<ParameterType>>)*>  => {
+        (posonlyargs, args)
+    },
+};
+
+ParameterDef<ParameterType>: ast::ParameterWithDefault = {
+    <i:ParameterType> => i,
+    <mut i:ParameterType> "=" <default:Test<"all">> <end_location:@R> => {
+        i.default = Some(Box::new(default.into()));
+        i.range = (i.range.start()..end_location).into();
+        i
+    },
+};
+
+UntypedParameter: ast::ParameterWithDefault = {
+    <location:@L> <name:Identifier> <end_location:@R> => {
+        let parameter = ast::Parameter { name, annotation: None, range: (location..end_location).into() };
+        ast::ParameterWithDefault { parameter, default: None, range: (location..end_location).into() }
+    },
+};
+StarUntypedParameter: ast::Parameter = {
+    <location:@L> <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
+};
+
+TypedParameter: ast::ParameterWithDefault = {
+    <location:@L> <name:Identifier> <annotation:(":" <Test<"all">>)?> <end_location:@R> => {
+        let annotation = annotation.map(ast::Expr::from).map(Box::new);
+        let parameter = ast::Parameter { name, annotation, range: (location..end_location).into() };
+        ast::ParameterWithDefault { parameter, default: None, range: (location..end_location).into() }
+    },
+};
+
+StarTypedParameter: ast::Parameter = {
+    <location:@L> <name:Identifier> <annotation:(":" <TestOrStarExpr>)?> <end_location:@R> => {
+        let annotation = annotation.map(ast::Expr::from).map(Box::new);
+        ast::Parameter { name, annotation, range: (location..end_location).into() }
+    },
+};
+
+DoubleStarTypedParameter: ast::Parameter = {
+    <location:@L> <name:Identifier> <annotation:(":" <Test<"all">>)?> <end_location:@R> => {
+        let annotation = annotation.map(ast::Expr::from).map(Box::new);
+        ast::Parameter { name, annotation, range: (location..end_location).into() }
+    },
+};
+
+// Use inline here to make sure the "," is not creating an ambiguity.
+// TODO: figure out another grammar that makes this inline no longer required.
+#[inline]
+ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>: (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>) = {
+    <location:@L> "*" <va:StarParameterType?> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <KwargParameter<DoubleStarParameterType>>)?> =>? {
+        if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
+            return Err(LexicalError {
+                error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
+                location,
+            })?;
+        }
+
+        let kwarg = kwarg.flatten();
+        let va = va.map(Box::new);
+
+        Ok((va, kwonlyargs, kwarg))
+    }
+};
+
+KwargParameter<ParameterType>: Option<Box<ast::Parameter>> = {
+    "**" <kwarg:ParameterType?> => {
+        kwarg.map(Box::new)
+    }
+};
+
+ClassDef: ast::Stmt = {
+    <location:@L>  <decorator_list:Decorator*> "class" <name:Identifier> <type_params:TypeParams?> <arguments:Arguments?> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end();
+        ast::Stmt::ClassDef(
+            ast::StmtClassDef {
+                name,
+                arguments: arguments.map(Box::new),
+                body,
+                decorator_list,
+                type_params: type_params.map(Box::new),
+                range: (location..end_location).into()
+            },
+        )
+    },
+};
+
+TypeParams: ast::TypeParams = {
+    <location:@L> "[" <vars:OneOrMore<TypeParam>> ","? "]" <end_location:@R> => {
+        ast::TypeParams {
+            type_params: vars,
+            range: (location..end_location).into()
+        }
+    }
+};
+
+TypeParam: ast::TypeParam = {
+    <location:@L> <name:Identifier> <bound:(":" <Test<"all">>)?> <end_location:@R>  => {
+        ast::TypeParam::TypeVar(
+            ast::TypeParamTypeVar { name, bound: bound.map(ast::Expr::from).map(Box::new), range: (location..end_location).into() }
+        )
+    },
+    <location:@L> "*" <name:Identifier> <end_location:@R>  => {
+        ast::TypeParam::TypeVarTuple(
+            ast::TypeParamTypeVarTuple { name, range: (location..end_location).into() }
+        )
+    },
+    <location:@L> "**" <name:Identifier> <end_location:@R>  => {
+        ast::TypeParam::ParamSpec(
+            ast::TypeParamParamSpec { name, range: (location..end_location).into() }
+        )
+    }
+};
+
+// Decorators:
+Decorator: ast::Decorator = {
+    <location:@L> "@" <expression:NamedExpressionTest> <end_location:@R> "\n" => {
+        ast::Decorator { range: (location..end_location).into(), expression: expression.into() }
+    },
+};
+
+YieldExpr: ast::ParenthesizedExpr = {
+    <location:@L> "yield" <value:TestList?> <end_location:@R> => ast::ExprYield {
+        value: value.map(ast::Expr::from).map(Box::new),
+        range: (location..end_location).into(),
+    }.into(),
+    <location:@L> "yield" "from" <value:Test<"all">> <end_location:@R> => ast::ExprYieldFrom {
+        value: Box::new(value.into()),
+        range: (location..end_location).into(),
+    }.into(),
+};
+
+Test<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <body:OrTest<"all">> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::ExprIfExp {
+        test: Box::new(test.into()),
+        body: Box::new(body.into()),
+        orelse: Box::new(orelse.into()),
+        range: (location..end_location).into()
+    }.into(),
+    OrTest<Goal>,
+    LambdaDef,
+};
+
+NamedExpressionTest: ast::ParenthesizedExpr = {
+    NamedExpression,
+    Test<"all">,
+}
+
+NamedExpressionName: ast::ParenthesizedExpr = {
+    <location:@L> <id:Identifier> <end_location:@R> => ast::ExprName {
+        id: id.into(),
+        ctx: ast::ExprContext::Store,
+        range: (location..end_location).into(),
+    }.into(),
+}
+
+NamedExpression: ast::ParenthesizedExpr = {
+    <location:@L> <target:NamedExpressionName> ":=" <value:Test<"all">> <end_location:@R> => {
+        ast::ExprNamedExpr {
+            target: Box::new(target.into()),
+            value: Box::new(value.into()),
+            range: (location..end_location).into(),
+        }.into()
+    },
+};
+
+LambdaDef: ast::ParenthesizedExpr = {
+    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <body:Test<"all">> <end_location:@R> =>? {
+        parameters.as_ref().map(validate_arguments).transpose()?;
+
+        Ok(ast::ExprLambda {
+            parameters: parameters.map(Box::new),
+            body: Box::new(body.into()),
+            range: (location..end_location).into()
+        }.into())
+    }
+}
+
+OrTest<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <values:(<AndTest<"all">> "or")+> <last: AndTest<"all">> <end_location:@R> => {
+        let values = values.into_iter().chain(std::iter::once(last)).map(ast::Expr::from).collect();
+        ast::ExprBoolOp { op: ast::BoolOp::Or, values, range: (location..end_location).into() }.into()
+    },
+    AndTest<Goal>,
+};
+
+AndTest<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <values:(<NotTest<"all">> "and")+> <last:NotTest<"all">> <end_location:@R> => {
+        let values = values.into_iter().chain(std::iter::once(last)).map(ast::Expr::from).collect();
+        ast::ExprBoolOp { op: ast::BoolOp::And, values, range: (location..end_location).into() }.into()
+    },
+    NotTest<Goal>,
+};
+
+NotTest<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> "not" <operand:NotTest<"all">> <end_location:@R> => ast::ExprUnaryOp {
+        operand: Box::new(operand.into()),
+        op: ast::UnaryOp::Not,
+        range: (location..end_location).into(),
+    }.into(),
+    Comparison<Goal>,
+};
+
+Comparison<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <left:Expression<"all">> <comparisons:(CompOp Expression<"all">)+> <end_location:@R> => {
+        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
+        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+    },
+    Expression<Goal>,
+};
+
+CompOp: ast::CmpOp = {
+    "==" => ast::CmpOp::Eq,
+    "!=" => ast::CmpOp::NotEq,
+    "<" => ast::CmpOp::Lt,
+    "<=" => ast::CmpOp::LtE,
+    ">" => ast::CmpOp::Gt,
+    ">=" => ast::CmpOp::GtE,
+    "in" => ast::CmpOp::In,
+    "not" "in" => ast::CmpOp::NotIn,
+    "is" => ast::CmpOp::Is,
+    "is" "not" => ast::CmpOp::IsNot,
+};
+
+Expression<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <left:Expression<"all">> "|" <right:XorExpression<"all">> <end_location:@R> => ast::ExprBinOp {
+        left: Box::new(left.into()),
+        op: ast::Operator::BitOr,
+        right: Box::new(right.into()),
+        range: (location..end_location).into()
+    }.into(),
+    XorExpression<Goal>,
+};
+
+XorExpression<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <left:XorExpression<"all">> "^" <right:AndExpression<"all">> <end_location:@R> => ast::ExprBinOp {
+        left: Box::new(left.into()),
+        op: ast::Operator::BitXor,
+        right: Box::new(right.into()),
+        range: (location..end_location).into()
+    }.into(),
+    AndExpression<Goal>,
+};
+
+AndExpression<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <left:AndExpression<"all">> "&" <right:ShiftExpression<"all">> <end_location:@R> => ast::ExprBinOp {
+        left: Box::new(left.into()),
+        op: ast::Operator::BitAnd,
+        right: Box::new(right.into()),
+        range: (location..end_location).into()
+    }.into(),
+    ShiftExpression<Goal>,
+};
+
+ShiftExpression<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <left:ShiftExpression<"all">> <op:ShiftOp> <right:ArithmeticExpression<"all">> <end_location:@R> => ast::ExprBinOp {
+        left: Box::new(left.into()),
+        op,
+        right: Box::new(right.into()),
+        range: (location..end_location).into()
+    }.into(),
+    ArithmeticExpression<Goal>,
+};
+
+ShiftOp: ast::Operator = {
+    "<<" => ast::Operator::LShift,
+    ">>" => ast::Operator::RShift,
+};
+
+ArithmeticExpression<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <left:ArithmeticExpression<"all">> <op:AddOp> <right:Term<"all">> <end_location:@R> => ast::ExprBinOp {
+        left: Box::new(left.into()),
+        op,
+        right: Box::new(right.into()),
+        range: (location..end_location).into(),
+    }.into(),
+    Term<Goal>,
+};
+
+AddOp: ast::Operator = {
+    "+" => ast::Operator::Add,
+    "-" => ast::Operator::Sub,
+};
+
+Term<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <left:Term<"all">> <op:MulOp> <right:Factor<"all">> <end_location:@R> => ast::ExprBinOp {
+        left: Box::new(left.into()),
+        op,
+        right: Box::new(right.into()),
+        range: (location..end_location).into(),
+    }.into(),
+    Factor<Goal>,
+};
+
+MulOp: ast::Operator = {
+    "*" => ast::Operator::Mult,
+    "/" => ast::Operator::Div,
+    "//" => ast::Operator::FloorDiv,
+    "%" => ast::Operator::Mod,
+    "@" => ast::Operator::MatMult,
+};
+
+Factor<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <op:UnaryOp> <operand:Factor<"all">> <end_location:@R> => ast::ExprUnaryOp {
+        operand: Box::new(operand.into()),
+        op,
+        range: (location..end_location).into(),
+    }.into(),
+    Power<Goal>,
+};
+
+UnaryOp: ast::UnaryOp = {
+    "+" => ast::UnaryOp::UAdd,
+    "-" => ast::UnaryOp::USub,
+    "~" => ast::UnaryOp::Invert,
+};
+
+Power<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <left:AtomExpr<"all">> "**" <right:Factor<"all">> <end_location:@R> => ast::ExprBinOp {
+        left: Box::new(left.into()),
+        op: ast::Operator::Pow,
+        right: Box::new(right.into()),
+        range: (location..end_location).into(),
+    }.into(),
+    AtomExpr<Goal>,
+};
+
+AtomExpr<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> "await" <value:AtomExpr2<"all">> <end_location:@R> => {
+        ast::ExprAwait { value: Box::new(value.into()), range: (location..end_location).into() }.into()
+    },
+    AtomExpr2<Goal>,
+}
+
+AtomExpr2<Goal>: ast::ParenthesizedExpr = {
+    Atom<Goal>,
+    <location:@L> <func:AtomExpr2<"all">> <arguments:Arguments> <end_location:@R> => ast::ExprCall {
+        func: Box::new(func.into()),
+        arguments,
+        range: (location..end_location).into(),
+    }.into(),
+    <location:@L> <value:AtomExpr2<"all">> "[" <slice:SubscriptList> "]" <end_location:@R> => ast::ExprSubscript {
+        value: Box::new(value.into()),
+        slice: Box::new(slice.into()),
+        ctx: ast::ExprContext::Load,
+        range: (location..end_location).into(),
+    }.into(),
+    <location:@L> <value:AtomExpr2<"all">> "." <attr:Identifier> <end_location:@R> => ast::ExprAttribute {
+        value: Box::new(value.into()),
+        attr,
+        ctx: ast::ExprContext::Load,
+        range: (location..end_location).into(),
+    }.into(),
+};
+
+SubscriptList: ast::ParenthesizedExpr = {
+    Subscript,
+    <location:@L> <s1:Subscript> "," <end_location:@R> => {
+        ast::ExprTuple {
+            elts: vec![s1.into()],
+            ctx: ast::ExprContext::Load,
+            range: (location..end_location).into(),
+        }.into()
+    },
+    <location:@L> <elts:TwoOrMore<Subscript, ",">> ","? <end_location:@R> => {
+        let elts = elts.into_iter().map(ast::Expr::from).collect();
+        ast::ExprTuple {
+            elts,
+            ctx: ast::ExprContext::Load,
+            range: (location..end_location).into(),
+        }.into()
+    }
+};
+
+Subscript: ast::ParenthesizedExpr = {
+    TestOrStarNamedExpr,
+    <location:@L> <lower:Test<"all">?> ":" <upper:Test<"all">?> <step:SliceOp?> <end_location:@R> => {
+        let lower = lower.map(ast::Expr::from).map(Box::new);
+        let upper = upper.map(ast::Expr::from).map(Box::new);
+        let step = step.flatten().map(ast::Expr::from).map(Box::new);
+        ast::Expr::Slice(
+            ast::ExprSlice { lower, upper, step, range: (location..end_location).into() }
+        ).into()
+    }
+};
+
+SliceOp: Option<ast::ParenthesizedExpr> = {
+    <location:@L> ":" <e:Test<"all">?> => e,
+}
+
+Atom<Goal>: ast::ParenthesizedExpr = {
+    <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?.into()),
+    <location:@L> <value:Constant> <end_location:@R> => ast::ExprConstant {
+        value,
+        range: (location..end_location).into(),
+    }.into(),
+    <location:@L> <id:Identifier> <end_location:@R> => ast::ExprName {
+        id: id.into(),
+        ctx: ast::ExprContext::Load,
+        range: (location..end_location).into(),
+    }.into(),
+    <location:@L> "[" <elts:ListLiteralValues?> "]"<end_location:@R>  => {
+        let elts = elts.into_iter().flatten().map(ast::Expr::from).collect();
+        ast::ExprList { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+    },
+    <location:@L> "[" <elt:TestOrStarNamedExpr> <generators:CompFor> "]" <end_location:@R> => {
+        ast::ExprListComp { elt: Box::new(elt.into()), generators, range: (location..end_location).into() }.into()
+    },
+    <location:@L> "(" <elts:OneOrMore<Test<"all">>> <trailing_comma:","?> ")" <end_location:@R> if Goal != "no-withitems" => {
+        if elts.len() == 1 && trailing_comma.is_none() {
+            ast::ParenthesizedExpr {
+                expr: elts.into_iter().next().unwrap().into(),
+                range: (location..end_location).into(),
+            }
+        } else {
+            let elts = elts.into_iter().map(ast::Expr::from).collect();
+            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+        }
+    },
+    <location:@L> "(" <left:(<OneOrMore<Test<"all">>> ",")?> <mid:NamedOrStarExpr> <right:("," <TestOrStarNamedExpr>)*> <trailing_comma:","?> ")" <end_location:@R> =>? {
+        if left.is_none() && right.is_empty() && trailing_comma.is_none() {
+            if mid.expr.is_starred_expr() {
+                return Err(LexicalError{
+                    error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
+                    location: mid.start(),
+                })?;
+            }
+            Ok(ast::ParenthesizedExpr {
+                expr: mid.into(),
+                range: (location..end_location).into(),
+            })
+        } else {
+            let elts = left.into_iter().flatten().chain([mid]).chain(right).map(ast::Expr::from).collect();
+            Ok(ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into())
+        }
+    },
+    <location:@L> "(" ")" <end_location:@R> => ast::ExprTuple {
+        elts: Vec::new(),
+        ctx: ast::ExprContext::Load,
+        range: (location..end_location).into(),
+    }.into(),
+    <location:@L> "(" <e:YieldExpr> ")" <end_location:@R> => ast::ParenthesizedExpr {
+        expr: e.into(),
+        range: (location..end_location).into(),
+    },
+    <location:@L> "(" <elt:NamedExpressionTest> <generators:CompFor> ")" <end_location:@R> => ast::ExprGeneratorExp {
+        elt: Box::new(elt.into()),
+        generators,
+        range: (location..end_location).into(),
+    }.into(),
+    "(" <location:@L> "**" <e:Expression<"all">> ")" <end_location:@R> =>? {
+        Err(LexicalError{
+            error : LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
+            location,
+        }.into())
+    },
+    <location:@L> "{" <e:DictLiteralValues?> "}" <end_location:@R> => {
+        let (keys, values) = e
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k.map(|x| ast::Expr::from(*x)), ast::Expr::from(v)))
+            .unzip();
+        ast::ExprDict { keys, values, range: (location..end_location).into() }.into()
+    },
+    <location:@L> "{" <e1:DictEntry> <generators:CompFor> "}" <end_location:@R> => {
+        ast::ExprDictComp {
+            key: Box::new(e1.0.into()),
+            value: Box::new(e1.1.into()),
+            generators,
+            range: (location..end_location).into()
+        }.into()
+    },
+    <location:@L> "{" <elts:SetLiteralValues> "}" <end_location:@R> => {
+        let elts = elts.into_iter().map(ast::Expr::from).collect();
+        ast::ExprSet {
+            elts,
+            range: (location..end_location).into(),
+        }.into()
+    },
+    <location:@L> "{" <elt:NamedExpressionTest> <generators:CompFor> "}" <end_location:@R> => ast::ExprSetComp {
+        elt: Box::new(elt.into()),
+        generators,
+        range: (location..end_location).into(),
+    }.into(),
+    <location:@L> "True" <end_location:@R> => ast::ExprConstant { value: true.into(), range: (location..end_location).into() }.into(),
+    <location:@L> "False" <end_location:@R> => ast::ExprConstant { value: false.into(), range: (location..end_location).into() }.into(),
+    <location:@L> "None" <end_location:@R> => ast::ExprConstant { value: ast::Constant::None, range: (location..end_location).into() }.into(),
+    <location:@L> "..." <end_location:@R> => ast::ExprConstant { value: ast::Constant::Ellipsis, range: (location..end_location).into() }.into(),
+};
+
+ListLiteralValues: Vec<ast::ParenthesizedExpr> = {
+    <e:OneOrMore<TestOrStarNamedExpr>> ","? => e,
+};
+
+DictLiteralValues: Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)> = {
+    <elements:OneOrMore<DictElement>> ","? => elements,
+};
+
+DictEntry: (ast::ParenthesizedExpr, ast::ParenthesizedExpr) = {
+    <e1: Test<"all">> ":" <e2: Test<"all">> => (e1, e2),
+};
+
+DictElement: (Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr) = {
+    <e:DictEntry> => (Some(Box::new(e.0)), e.1),
+    "**" <e:Expression<"all">> => (None, e),
+};
+
+SetLiteralValues: Vec<ast::ParenthesizedExpr> = {
+    <e1:OneOrMore<TestOrStarNamedExpr>> ","? => e1
+};
+
+ExpressionOrStarExpression: ast::ParenthesizedExpr = {
+    Expression<"all">,
+    StarExpr
+};
+
+ExpressionList: ast::ParenthesizedExpr = {
+    GenericList<ExpressionOrStarExpression>
+};
+
+ExpressionList2: Vec<ast::ParenthesizedExpr> = {
+    <elements:OneOrMore<ExpressionOrStarExpression>> ","? => elements,
+};
+
+// A test list is one of:
+// - a list of expressions
+// - a single expression
+// - a single expression followed by a trailing comma
+#[inline]
+TestList: ast::ParenthesizedExpr = {
+    GenericList<TestOrStarExpr>
+};
+
+GenericList<Element>: ast::ParenthesizedExpr = {
+    <location:@L> <elts:OneOrMore<Element>> <trailing_comma:","?> <end_location:@R> => {
+        if elts.len() == 1 && trailing_comma.is_none() {
+            ast::ParenthesizedExpr {
+              expr: elts.into_iter().next().unwrap().into(),
+              range: (location..end_location).into(),
+            }
+        } else {
+            let elts = elts.into_iter().map(ast::Expr::from).collect();
+            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+        }
+    }
+}
+
+// Test
+StarExpr: ast::ParenthesizedExpr = {
+    <location:@L> "*" <value:Expression<"all">> <end_location:@R> => ast::ExprStarred {
+        value: Box::new(value.into()),
+        ctx: ast::ExprContext::Load,
+        range: (location..end_location).into(),
+    }.into(),
+};
+
+// Comprehensions:
+CompFor: Vec<ast::Comprehension> = <c:SingleForComprehension+> => c;
+
+SingleForComprehension: ast::Comprehension = {
+    <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:OrTest<"all">> <ifs:ComprehensionIf*> <end_location:@R> => {
+        let is_async = is_async.is_some();
+        let ifs = ifs.into_iter().map(ast::Expr::from).collect();
+        ast::Comprehension {
+            target: set_context(target.into(), ast::ExprContext::Store),
+            iter: iter.into(),
+            ifs,
+            is_async,
+            range: (location..end_location).into()
+        }
+    }
+};
+
+ExpressionNoCond: ast::ParenthesizedExpr = OrTest<"all">;
+ComprehensionIf: ast::ParenthesizedExpr = "if" <c:ExpressionNoCond> => c;
+
+Arguments: ast::Arguments = {
+    <location:@L> "(" <e: Comma<FunctionArgument>> ")" <end_location:@R> =>? {
+        let ArgumentList { args, keywords } = parse_arguments(e)?;
+        Ok(ast::Arguments {
+            args,
+            keywords,
+            range: (location..end_location).into()
+        })
+    }
+};
+
+FunctionArgument: (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr) = {
+    <location:@L> <elt:NamedExpressionTest> <generators:CompFor?> <end_location:@R> => {
+        let expr = match generators {
+            Some(generators) => ast::Expr::GeneratorExp(
+                ast::ExprGeneratorExp {
+                    elt: Box::new(elt.into()),
+                    generators,
+                    range: (location..end_location).into()
+                }
+            ),
+            None => elt.into(),
+        };
+        (None, expr)
+    },
+    <location:@L> <i:Identifier> "=" <e:Test<"all">> <end_location:@R> => (Some((location, end_location, Some(i))), e.into()),
+    <location:@L> "*" <value:Test<"all">> <end_location:@R> => {
+        let expr = ast::Expr::Starred(ast::ExprStarred {
+            value: Box::new(value.into()), ctx: ast::ExprContext::Load, range: (location..end_location).into(),
+        });
+        (None, expr)
+    },
+    <location:@L> "**" <e:Test<"all">> <end_location:@R> => (Some((location, end_location, None)), e.into()),
+};
+
+/// Comma separated sequence that allows an optional trailing comma.
+#[inline]
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <last:T?> => {
+        if let Some(element) = last {
+            v.push(element);
+        }
+        v
+    }
+};
+
+/// One ore more items that are separated by a comma.
+OneOrMore<T>: Vec<T> = {
+    <e:T> => vec![e],
+    <mut v: OneOrMore<T>> "," <e:T> => {
+        v.push(e);
+        v
+    }
+};
+
+/// Two or more items that are separated by `Sep`
+TwoOrMore<T, Sep>: Vec<T> = {
+    <e1:T> Sep <e2:T> => vec![e1, e2],
+    <mut v: TwoOrMore<T, Sep>> Sep <e:T> => {
+        v.push(e);
+        v
+    }
+};
+
+Constant: ast::Constant = {
+    <value:int> => ast::Constant::Int(value),
+    <value:float> => ast::Constant::Float(value),
+    <s:complex> => ast::Constant::Complex { real: s.0, imag: s.1 },
+};
+
+Identifier: ast::Identifier = {
+    <location:@L> <s:name> <end_location:@R> => ast::Identifier::new(s, (location..end_location).into())
+};
+
+// Hook external lexer:
+extern {
+    type Location = TextSize;
+    type Error = LexicalError;
+
+    enum token::Tok {
+        Indent => token::Tok::Indent,
+        Dedent => token::Tok::Dedent,
+        StartModule => token::Tok::StartModule,
+        StartExpression => token::Tok::StartExpression,
+        "?" => token::Tok::Question,
+        "+" => token::Tok::Plus,
+        "-" => token::Tok::Minus,
+        "~" => token::Tok::Tilde,
+        ":" => token::Tok::Colon,
+        "." => token::Tok::Dot,
+        "..." => token::Tok::Ellipsis,
+        "," => token::Tok::Comma,
+        "*" => token::Tok::Star,
+        "**" => token::Tok::DoubleStar,
+        "&" => token::Tok::Amper,
+        "@" => token::Tok::At,
+        "%" => token::Tok::Percent,
+        "//" => token::Tok::DoubleSlash,
+        "^" => token::Tok::CircumFlex,
+        "|" => token::Tok::Vbar,
+        "<<" => token::Tok::LeftShift,
+        ">>" => token::Tok::RightShift,
+        "/" => token::Tok::Slash,
+        "(" => token::Tok::Lpar,
+        ")" => token::Tok::Rpar,
+        "[" => token::Tok::Lsqb,
+        "]" => token::Tok::Rsqb,
+        "{" => token::Tok::Lbrace,
+        "}" => token::Tok::Rbrace,
+        "=" => token::Tok::Equal,
+        "+=" => token::Tok::PlusEqual,
+        "-=" => token::Tok::MinusEqual,
+        "*=" => token::Tok::StarEqual,
+        "@=" => token::Tok::AtEqual,
+        "/=" => token::Tok::SlashEqual,
+        "%=" => token::Tok::PercentEqual,
+        "&=" => token::Tok::AmperEqual,
+        "|=" => token::Tok::VbarEqual,
+        "^=" => token::Tok::CircumflexEqual,
+        "<<=" => token::Tok::LeftShiftEqual,
+        ">>=" => token::Tok::RightShiftEqual,
+        "**=" => token::Tok::DoubleStarEqual,
+        "//=" => token::Tok::DoubleSlashEqual,
+        ":=" => token::Tok::ColonEqual,
+        "==" => token::Tok::EqEqual,
+        "!=" => token::Tok::NotEqual,
+        "<" => token::Tok::Less,
+        "<=" => token::Tok::LessEqual,
+        ">" => token::Tok::Greater,
+        ">=" => token::Tok::GreaterEqual,
+        "->" => token::Tok::Rarrow,
+        "and" => token::Tok::And,
+        "as" => token::Tok::As,
+        "assert" => token::Tok::Assert,
+        "async" => token::Tok::Async,
+        "await" => token::Tok::Await,
+        "break" => token::Tok::Break,
+        "class" => token::Tok::Class,
+        "continue" => token::Tok::Continue,
+        "def" => token::Tok::Def,
+        "del" => token::Tok::Del,
+        "elif" => token::Tok::Elif,
+        "else" => token::Tok::Else,
+        "except" => token::Tok::Except,
+        "finally" => token::Tok::Finally,
+        "for" => token::Tok::For,
+        "from" => token::Tok::From,
+        "global" => token::Tok::Global,
+        "if" => token::Tok::If,
+        "import" => token::Tok::Import,
+        "in" => token::Tok::In,
+        "is" => token::Tok::Is,
+        "lambda" => token::Tok::Lambda,
+        "nonlocal" => token::Tok::Nonlocal,
+        "not" => token::Tok::Not,
+        "or" => token::Tok::Or,
+        "pass" => token::Tok::Pass,
+        "raise" => token::Tok::Raise,
+        "return" => token::Tok::Return,
+        "try" => token::Tok::Try,
+        "type" => token::Tok::Type,
+        "while" => token::Tok::While,
+        "match" => token::Tok::Match,
+        "case" => token::Tok::Case,
+        "with" => token::Tok::With,
+        "yield" => token::Tok::Yield,
+        "True" => token::Tok::True,
+        "False" => token::Tok::False,
+        "None" => token::Tok::None,
+        int => token::Tok::Int { value: <BigInt> },
+        float => token::Tok::Float { value: <f64> },
+        complex => token::Tok::Complex { real: <f64>, imag: <f64> },
+        string => token::Tok::String {
+            value: <String>,
+            kind: <StringKind>,
+            triple_quoted: <bool>
+        },
+        name => token::Tok::Name { name: <String> },
+        ipy_escape_command => token::Tok::IpyEscapeCommand {
+            kind: <IpyEscapeKind>,
+            value: <String>
+        },
+        "\n" => token::Tok::Newline,
+        ";" => token::Tok::Semi,
+        // "#" => token::Tok::Comment(_),
+    }
+}

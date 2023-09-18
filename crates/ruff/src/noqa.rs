@@ -8,14 +8,14 @@ use std::path::Path;
 use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::Locator;
-use ruff_python_whitespace::LineEnding;
+use ruff_python_trivia::{indentation_at_offset, CommentRanges};
+use ruff_source_file::{LineEnding, Locator};
 
 use crate::codes::NoqaCode;
+use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
@@ -59,7 +59,7 @@ impl<'a> Directive<'a> {
             if text[..comment_start]
                 .chars()
                 .last()
-                .map_or(false, |c| c != '#')
+                .map_or(true, |c| c != '#')
             {
                 continue;
             }
@@ -67,12 +67,8 @@ impl<'a> Directive<'a> {
 
             // If the next character is `:`, then it's a list of codes. Otherwise, it's a directive
             // to ignore all rules.
-            return Ok(Some(
-                if text[noqa_literal_end..]
-                    .chars()
-                    .next()
-                    .map_or(false, |c| c == ':')
-                {
+            let directive = match text[noqa_literal_end..].chars().next() {
+                Some(':') => {
                     // E.g., `# noqa: F401, F841`.
                     let mut codes_start = noqa_literal_end;
 
@@ -119,8 +115,9 @@ impl<'a> Directive<'a> {
                         range: range.add(offset),
                         codes,
                     })
-                } else {
-                    // E.g., `# noqa`.
+                }
+                None | Some('#') => {
+                    // E.g., `# noqa` or `# noqa# ignore`.
                     let range = TextRange::new(
                         TextSize::try_from(comment_start).unwrap(),
                         TextSize::try_from(noqa_literal_end).unwrap(),
@@ -128,8 +125,21 @@ impl<'a> Directive<'a> {
                     Self::All(All {
                         range: range.add(offset),
                     })
-                },
-            ));
+                }
+                Some(c) if c.is_whitespace() => {
+                    // E.g., `# noqa # ignore`.
+                    let range = TextRange::new(
+                        TextSize::try_from(comment_start).unwrap(),
+                        TextSize::try_from(noqa_literal_end).unwrap(),
+                    );
+                    Self::All(All {
+                        range: range.add(offset),
+                    })
+                }
+                _ => return Err(ParseError::InvalidSuffix),
+            };
+
+            return Ok(Some(directive));
         }
 
         Ok(None)
@@ -224,7 +234,8 @@ impl FileExemption {
     /// globally ignored within the file.
     pub(crate) fn try_extract(
         contents: &str,
-        comment_ranges: &[TextRange],
+        comment_ranges: &CommentRanges,
+        path: &Path,
         locator: &Locator,
     ) -> Option<Self> {
         let mut exempt_codes: Vec<NoqaCode> = vec![];
@@ -234,23 +245,37 @@ impl FileExemption {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
-                    warn!("Invalid `# noqa` directive on line {line}: {err}");
+                    let path_display = relativize_path(path);
+                    warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
                 }
-                Ok(Some(ParsedFileExemption::All)) => {
-                    return Some(Self::All);
-                }
-                Ok(Some(ParsedFileExemption::Codes(codes))) => {
-                    exempt_codes.extend(codes.into_iter().filter_map(|code| {
-                        if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
-                        {
-                            Some(rule.noqa_code())
-                        } else {
-                            #[allow(deprecated)]
-                            let line = locator.compute_line_index(range.start());
-                            warn!("Invalid code provided to `# ruff: noqa` on line {line}: {code}");
-                            None
+                Ok(Some(exemption)) => {
+                    if indentation_at_offset(range.start(), locator).is_none() {
+                        #[allow(deprecated)]
+                        let line = locator.compute_line_index(range.start());
+                        let path_display = relativize_path(path);
+                        warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line.");
+                        continue;
+                    }
+
+                    match exemption {
+                        ParsedFileExemption::All => {
+                            return Some(Self::All);
                         }
-                    }));
+                        ParsedFileExemption::Codes(codes) => {
+                            exempt_codes.extend(codes.into_iter().filter_map(|code| {
+                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
+                                {
+                                    Some(rule.noqa_code())
+                                } else {
+                                    #[allow(deprecated)]
+                                    let line = locator.compute_line_index(range.start());
+                                    let path_display = relativize_path(path);
+                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
+                                    None
+                                }
+                            }));
+                        }
+                    }
                 }
                 Ok(None) => {}
             }
@@ -432,14 +457,15 @@ pub(crate) fn add_noqa(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
-    commented_lines: &[TextRange],
+    comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
+        path,
         diagnostics,
         locator,
-        commented_lines,
+        comment_ranges,
         noqa_line_for,
         line_ending,
     );
@@ -448,9 +474,10 @@ pub(crate) fn add_noqa(
 }
 
 fn add_noqa_inner(
+    path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
-    commented_ranges: &[TextRange],
+    comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> (usize, String) {
@@ -460,8 +487,8 @@ fn add_noqa_inner(
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), commented_ranges, locator);
-    let directives = NoqaDirectives::from_commented_ranges(commented_ranges, locator);
+    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
@@ -509,7 +536,7 @@ fn add_noqa_inner(
                     let rule = diagnostic.kind.rule();
                     if !includes(rule, codes) {
                         matches_by_line
-                            .entry(directive_line.range.start())
+                            .entry(directive_line.start())
                             .or_insert_with(|| {
                                 (RuleSet::default(), Some(&directive_line.directive))
                             })
@@ -534,7 +561,7 @@ fn add_noqa_inner(
     let mut prev_end = TextSize::default();
 
     for (offset, (rules, directive)) in matches_by_line {
-        output.push_str(&locator.contents()[TextRange::new(prev_end, offset)]);
+        output.push_str(locator.slice(TextRange::new(prev_end, offset)));
 
         let line = locator.full_line(offset);
 
@@ -591,7 +618,7 @@ fn add_noqa_inner(
         prev_end = offset + line.text_len();
     }
 
-    output.push_str(&locator.contents()[usize::from(prev_end)..]);
+    output.push_str(locator.after(prev_end));
 
     (count, output)
 }
@@ -617,6 +644,13 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) matches: Vec<NoqaCode>,
 }
 
+impl Ranged for NoqaDirectiveLine<'_> {
+    /// The range of the `noqa` directive.
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct NoqaDirectives<'a> {
     inner: Vec<NoqaDirectiveLine<'a>>,
@@ -624,7 +658,8 @@ pub(crate) struct NoqaDirectives<'a> {
 
 impl<'a> NoqaDirectives<'a> {
     pub(crate) fn from_commented_ranges(
-        comment_ranges: &[TextRange],
+        comment_ranges: &CommentRanges,
+        path: &Path,
         locator: &'a Locator<'a>,
     ) -> Self {
         let mut directives = Vec::new();
@@ -634,7 +669,8 @@ impl<'a> NoqaDirectives<'a> {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
-                    warn!("Invalid `# noqa` directive on line {line}: {err}");
+                    let path_display = relativize_path(path);
+                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
                 }
                 Ok(Some(directive)) => {
                     // noqa comments are guaranteed to be single line.
@@ -758,12 +794,14 @@ impl FromIterator<TextRange> for NoqaMapping {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextRange, TextSize};
 
     use ruff_diagnostics::Diagnostic;
-    use ruff_python_ast::source_code::Locator;
-    use ruff_python_whitespace::LineEnding;
+    use ruff_python_trivia::CommentRanges;
+    use ruff_source_file::{LineEnding, Locator};
 
     use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
@@ -896,6 +934,12 @@ mod tests {
     }
 
     #[test]
+    fn noqa_invalid_suffix() {
+        let source = "# noqa[F401]";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
     fn flake8_exemption_all() {
         let source = "# flake8: noqa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
@@ -946,12 +990,15 @@ mod tests {
 
     #[test]
     fn modification() {
+        let path = Path::new("/tmp/foo.txt");
+
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
+            path,
             &[],
             &Locator::new(contents),
-            &[],
+            &CommentRanges::default(),
             &noqa_line_for,
             LineEnding::Lf,
         );
@@ -968,9 +1015,10 @@ mod tests {
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
+            path,
             &diagnostics,
             &Locator::new(contents),
-            &[],
+            &CommentRanges::default(),
             &noqa_line_for,
             LineEnding::Lf,
         );
@@ -991,10 +1039,13 @@ mod tests {
         ];
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = NoqaMapping::default();
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(19))]);
         let (count, output) = add_noqa_inner(
+            path,
             &diagnostics,
             &Locator::new(contents),
-            &[TextRange::new(TextSize::from(7), TextSize::from(19))],
+            &comment_ranges,
             &noqa_line_for,
             LineEnding::Lf,
         );
@@ -1015,10 +1066,13 @@ mod tests {
         ];
         let contents = "x = 1  # noqa";
         let noqa_line_for = NoqaMapping::default();
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(13))]);
         let (count, output) = add_noqa_inner(
+            path,
             &diagnostics,
             &Locator::new(contents),
-            &[TextRange::new(TextSize::from(7), TextSize::from(13))],
+            &comment_ranges,
             &noqa_line_for,
             LineEnding::Lf,
         );

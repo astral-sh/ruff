@@ -1,0 +1,78 @@
+---
+source: crates/ruff_python_parser/src/context.rs
+expression: parse_ast
+---
+[
+    Assign(
+        StmtAssign {
+            range: 0..26,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 0..1,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: ListComp(
+                ExprListComp {
+                    range: 4..26,
+                    elt: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: "y",
+                            ctx: Load,
+                        },
+                    ),
+                    generators: [
+                        Comprehension {
+                            range: 7..25,
+                            target: Name(
+                                ExprName {
+                                    range: 11..12,
+                                    id: "y",
+                                    ctx: Store,
+                                },
+                            ),
+                            iter: Tuple(
+                                ExprTuple {
+                                    range: 16..25,
+                                    elts: [
+                                        Constant(
+                                            ExprConstant {
+                                                range: 17..18,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        Constant(
+                                            ExprConstant {
+                                                range: 20..21,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                        Constant(
+                                            ExprConstant {
+                                                range: 23..24,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                },
+                            ),
+                            ifs: [],
+                            is_async: false,
+                        },
+                    ],
+                },
+            ),
+        },
+    ),
+]

@@ -35,7 +35,7 @@ impl<'buf, Context> Formatter<'buf, Context> {
     }
 
     /// Creates a new group id that is unique to this document. The passed debug name is used in the
-    /// [std::fmt::Debug] of the document if this is a debug build.
+    /// [`std::fmt::Debug`] of the document if this is a debug build.
     /// The name is unused for production builds and has no meaning on the equality of two group ids.
     pub fn group_id(&self, debug_name: &'static str) -> GroupId {
         self.state().group_id(debug_name)
@@ -52,11 +52,11 @@ impl<'buf, Context> Formatter<'buf, Context> {
     /// # fn main() -> FormatResult<()> {
     /// let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
     ///     f.join()
-    ///         .entry(&text("a"))
+    ///         .entry(&token("a"))
     ///         .entry(&space())
-    ///         .entry(&text("+"))
+    ///         .entry(&token("+"))
     ///         .entry(&space())
-    ///         .entry(&text("b"))
+    ///         .entry(&token("b"))
     ///         .finish()
     /// })])?;
     ///
@@ -83,11 +83,11 @@ impl<'buf, Context> Formatter<'buf, Context> {
     ///
     /// # fn main() -> FormatResult<()> {
     /// let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
-    ///     f.join_with(&format_args!(text(","), space()))
-    ///         .entry(&text("1"))
-    ///         .entry(&text("2"))
-    ///         .entry(&text("3"))
-    ///         .entry(&text("4"))
+    ///     f.join_with(&format_args!(token(","), space()))
+    ///         .entry(&token("1"))
+    ///         .entry(&token("2"))
+    ///         .entry(&token("3"))
+    ///         .entry(&token("4"))
     ///         .finish()
     /// })])?;
     ///
@@ -108,7 +108,7 @@ impl<'buf, Context> Formatter<'buf, Context> {
         JoinBuilder::with_separator(self, joiner)
     }
 
-    /// Concatenates a list of [crate::Format] objects with spaces and line breaks to fit
+    /// Concatenates a list of [`crate::Format`] objects with spaces and line breaks to fit
     /// them on as few lines as possible. Each element introduces a conceptual group. The printer
     /// first tries to print the item in flat mode but then prints it in expanded mode if it doesn't fit.
     ///
@@ -121,10 +121,10 @@ impl<'buf, Context> Formatter<'buf, Context> {
     /// # fn main() -> FormatResult<()> {
     /// let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
     ///     f.fill()
-    ///         .entry(&soft_line_break_or_space(), &text("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
-    ///         .entry(&soft_line_break_or_space(), &text("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
-    ///         .entry(&soft_line_break_or_space(), &text("cccccccccccccccccccccccccccccc"))
-    ///         .entry(&soft_line_break_or_space(), &text("dddddddddddddddddddddddddddddd"))
+    ///         .entry(&soft_line_break_or_space(), &token("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+    ///         .entry(&soft_line_break_or_space(), &token("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
+    ///         .entry(&soft_line_break_or_space(), &token("cccccccccccccccccccccccccccccc"))
+    ///         .entry(&soft_line_break_or_space(), &token("dddddddddddddddddddddddddddddd"))
     ///         .finish()
     /// })])?;
     ///
@@ -142,10 +142,10 @@ impl<'buf, Context> Formatter<'buf, Context> {
     ///
     /// # fn main() -> FormatResult<()> {
     /// let entries = vec![
-    ///     text("<b>Important: </b>"),
-    ///     text("Please do not commit memory bugs such as segfaults, buffer overflows, etc. otherwise you "),
-    ///     text("<em>will</em>"),
-    ///     text(" be reprimanded")
+    ///     token("<b>Important: </b>"),
+    ///     token("Please do not commit memory bugs such as segfaults, buffer overflows, etc. otherwise you "),
+    ///     token("<em>will</em>"),
+    ///     token(" be reprimanded")
     /// ];
     ///
     /// let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
@@ -205,16 +205,16 @@ where
 impl<Context> Buffer for Formatter<'_, Context> {
     type Context = Context;
 
-    #[inline(always)]
-    fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
-        self.buffer.write_element(element)
+    #[inline]
+    fn write_element(&mut self, element: FormatElement) {
+        self.buffer.write_element(element);
     }
 
     fn elements(&self) -> &[FormatElement] {
         self.buffer.elements()
     }
 
-    #[inline(always)]
+    #[inline]
     fn write_fmt(&mut self, arguments: Arguments<Self::Context>) -> FormatResult<()> {
         for argument in arguments.items() {
             argument.format(self)?;
@@ -235,7 +235,7 @@ impl<Context> Buffer for Formatter<'_, Context> {
     }
 
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
-        self.buffer.restore_snapshot(snapshot)
+        self.buffer.restore_snapshot(snapshot);
     }
 }
 

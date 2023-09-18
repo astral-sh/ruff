@@ -1,10 +1,11 @@
+use ruff_python_ast::{self as ast, Arguments, Constant, ConversionFlag, Expr};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, ConversionFlag, Expr};
 
 /// Wrap an expression in a `FormattedValue` with no special formatting.
 fn to_formatted_value_expr(inner: &Expr) -> Expr {
     let node = ast::ExprFormattedValue {
         value: Box::new(inner.clone()),
+        debug_text: None,
         conversion: ConversionFlag::None,
         format_spec: None,
         range: TextRange::default(),
@@ -15,8 +16,7 @@ fn to_formatted_value_expr(inner: &Expr) -> Expr {
 /// Convert a string to a constant string expression.
 pub(super) fn to_constant_string(s: &str) -> Expr {
     let node = ast::ExprConstant {
-        value: Constant::Str(s.to_owned()),
-        kind: None,
+        value: s.to_owned().into(),
         range: TextRange::default(),
     };
     node.into()
@@ -28,8 +28,12 @@ fn is_simple_call(expr: &Expr) -> bool {
     match expr {
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) => args.is_empty() && keywords.is_empty() && is_simple_callee(func),
         _ => false,
@@ -47,14 +51,14 @@ fn is_simple_callee(func: &Expr) -> bool {
 }
 
 /// Convert an expression to a f-string element (if it looks like a good idea).
-pub(super) fn to_fstring_elem(expr: &Expr) -> Option<Expr> {
+pub(super) fn to_f_string_element(expr: &Expr) -> Option<Expr> {
     match expr {
-        // These are directly handled by `unparse_fstring_elem`:
+        // These are directly handled by `unparse_f_string_element`:
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(_),
             ..
         })
-        | Expr::JoinedStr(_)
+        | Expr::FString(_)
         | Expr::FormattedValue(_) => Some(expr.clone()),
         // These should be pretty safe to wrap in a formatted value.
         Expr::Constant(ast::ExprConstant {

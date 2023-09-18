@@ -1,9 +1,9 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Identifier, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Constant, Expr, ExprContext, Identifier, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Generator;
+use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
 use crate::checkers::ast::Checker;
@@ -57,7 +57,6 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
             range: TextRange::default(),
         })],
         value: Box::new(value.clone()),
-        type_comment: None,
         range: TextRange::default(),
     });
     generator.stmt(&stmt)
@@ -89,7 +88,7 @@ pub(crate) fn setattr_with_constant(
     if !is_identifier(name) {
         return;
     }
-    if is_mangled_private(name.as_str()) {
+    if is_mangled_private(name) {
         return;
     }
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
@@ -98,7 +97,7 @@ pub(crate) fn setattr_with_constant(
     if let Stmt::Expr(ast::StmtExpr {
         value: child,
         range: _,
-    }) = checker.semantic().stmt()
+    }) = checker.semantic().current_statement()
     {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());

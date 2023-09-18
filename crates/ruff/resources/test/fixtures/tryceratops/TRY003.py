@@ -52,3 +52,7 @@ def good(a: int):
 def another_good(a):
     if a % 2 == 0:
         raise GoodArgCantBeEven(a)
+
+
+def another_good():
+    raise NotImplementedError("This is acceptable too")

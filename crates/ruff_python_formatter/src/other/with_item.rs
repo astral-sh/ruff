@@ -1,9 +1,10 @@
+use ruff_formatter::write;
+use ruff_python_ast::WithItem;
+
+use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::Parenthesize;
+use crate::expression::parentheses::{parenthesized, Parentheses, Parenthesize};
 use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::WithItem;
 
 #[derive(Default)]
 pub struct FormatWithItem;
@@ -16,20 +17,44 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
             optional_vars,
         } = item;
 
-        let inner = format_with(|f| {
-            write!(
-                f,
-                [maybe_parenthesize_expression(
-                    context_expr,
-                    item,
-                    Parenthesize::IfBreaks
-                )]
-            )?;
-            if let Some(optional_vars) = optional_vars {
-                write!(f, [space(), text("as"), space(), optional_vars.format()])?;
+        let comments = f.context().comments().clone();
+        let trailing_as_comments = comments.dangling(item);
+
+        write!(
+            f,
+            [maybe_parenthesize_expression(
+                context_expr,
+                item,
+                Parenthesize::IfRequired
+            )]
+        )?;
+
+        if let Some(optional_vars) = optional_vars {
+            write!(f, [space(), token("as"), space()])?;
+
+            if trailing_as_comments.is_empty() {
+                write!(f, [optional_vars.format()])?;
+            } else {
+                write!(
+                    f,
+                    [parenthesized(
+                        "(",
+                        &optional_vars.format().with_options(Parentheses::Never),
+                        ")",
+                    )
+                    .with_dangling_comments(trailing_as_comments)]
+                )?;
             }
-            Ok(())
-        });
-        write!(f, [group(&inner)])
+        }
+
+        Ok(())
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        Ok(())
     }
 }

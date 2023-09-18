@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_whitespace::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -69,6 +70,10 @@ impl Violation for BlankLineAfterSummary {
 pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
+    if !docstring.triple_quoted() {
+        return;
+    }
+
     let mut lines_count: usize = 1;
     let mut blanks_count = 0;
     for line in body.trim().universal_newlines().skip(1) {
@@ -110,7 +115,7 @@ pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) 
 
                 // Insert one blank line after the summary (replacing any existing lines).
                 diagnostic.set_fix(Fix::automatic(Edit::replacement(
-                    checker.stylist.line_ending().to_string(),
+                    checker.stylist().line_ending().to_string(),
                     summary_end,
                     blank_end,
                 )));

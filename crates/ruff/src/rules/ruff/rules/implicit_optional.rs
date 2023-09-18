@@ -1,13 +1,13 @@
 use std::fmt;
 
 use anyhow::Result;
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::typing::parse_type_annotation;
+use ruff_python_ast::{self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters};
+use ruff_python_parser::typing::parse_type_annotation;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -88,7 +88,8 @@ impl Violation for ImplicitOptional {
     }
 
     fn autofix_title(&self) -> Option<String> {
-        Some(format!("Convert to `{}`", self.conversion_type))
+        let ImplicitOptional { conversion_type } = self;
+        Some(format!("Convert to `{conversion_type}`"))
     }
 }
 
@@ -128,7 +129,6 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 op: Operator::BitOr,
                 right: Box::new(Expr::Constant(ast::ExprConstant {
                     value: Constant::None,
-                    kind: None,
                     range: TextRange::default(),
                 })),
                 range: TextRange::default(),
@@ -140,7 +140,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             )))
         }
         ConversionType::Optional => {
-            let (import_edit, binding) = checker.importer.get_or_import_symbol(
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from("typing", "Optional"),
                 expr.start(),
                 checker.semantic(),
@@ -165,37 +165,38 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 }
 
 /// RUF013
-pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
-    for ArgWithDefault {
-        def,
+pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) {
+    for ParameterWithDefault {
+        parameter,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else { continue };
         if !is_const_none(default) {
             continue;
         }
-        let Some(annotation) = &def.annotation else {
+        let Some(annotation) = &parameter.annotation else {
             continue;
         };
 
         if let Expr::Constant(ast::ExprConstant {
             range,
             value: Constant::Str(string),
-            ..
         }) = annotation.as_ref()
         {
             // Quoted annotation.
-            if let Ok((annotation, kind)) = parse_type_annotation(string, *range, checker.locator) {
+            if let Ok((annotation, kind)) =
+                parse_type_annotation(string, *range, checker.locator().contents())
+            {
                 let Some(expr) = type_hint_explicitly_allows_none(
                     &annotation,
                     checker.semantic(),
-                    checker.locator,
+                    checker.locator(),
                     checker.settings.target_version.minor(),
                 ) else {
                     continue;
@@ -216,7 +217,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
             let Some(expr) = type_hint_explicitly_allows_none(
                 annotation,
                 checker.semantic(),
-                checker.locator,
+                checker.locator(),
                 checker.settings.target_version.minor(),
             ) else {
                 continue;

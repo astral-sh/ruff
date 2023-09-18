@@ -1,5 +1,5 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,12 +53,15 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             })),
-            args: if let Some(msg) = msg {
-                vec![msg.clone()]
-            } else {
-                vec![]
+            arguments: Arguments {
+                args: if let Some(msg) = msg {
+                    vec![msg.clone()]
+                } else {
+                    vec![]
+                },
+                keywords: vec![],
+                range: TextRange::default(),
             },
-            keywords: vec![],
             range: TextRange::default(),
         }))),
         cause: None,

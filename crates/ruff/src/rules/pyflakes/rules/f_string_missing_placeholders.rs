@@ -1,10 +1,9 @@
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Expr, Ranged};
-use rustpython_parser::{lexer, Mode, StringKind, Tok};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::{Expr, PySourceType};
+use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -13,7 +12,7 @@ use crate::registry::AsRule;
 /// Checks for f-strings that do not contain any placeholder expressions.
 ///
 /// ## Why is this bad?
-/// F-strings are a convenient way to format strings, but they are not
+/// f-strings are a convenient way to format strings, but they are not
 /// necessary if there are no placeholder expressions to format. In this
 /// case, a regular string should be used instead, as an f-string without
 /// placeholders can be confusing for readers, who may expect such a
@@ -48,21 +47,21 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
     }
 }
 
-/// Find f-strings that don't contain any formatted values in a `JoinedStr`.
+/// Find f-strings that don't contain any formatted values in an [`FString`].
 fn find_useless_f_strings<'a>(
     expr: &'a Expr,
     locator: &'a Locator,
+    source_type: PySourceType,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
-    let contents = locator.slice(expr.range());
-    lexer::lex_starts_at(contents, Mode::Module, expr.start())
+    let contents = locator.slice(expr);
+    lexer::lex_starts_at(contents, source_type.as_mode(), expr.start())
         .flatten()
         .filter_map(|(tok, range)| match tok {
             Tok::String {
                 kind: StringKind::FString | StringKind::RawFString,
                 ..
             } => {
-                let first_char =
-                    &locator.contents()[TextRange::at(range.start(), TextSize::from(1))];
+                let first_char = locator.slice(TextRange::at(range.start(), TextSize::from(1)));
                 // f"..."  => f_position = 0
                 // fr"..." => f_position = 0
                 // rf"..." => f_position = 1
@@ -85,13 +84,15 @@ pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checke
         .iter()
         .any(|value| matches!(value, Expr::FormattedValue(_)))
     {
-        for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
+        for (prefix_range, tok_range) in
+            find_useless_f_strings(expr, checker.locator(), checker.source_type)
+        {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(convert_f_string_to_regular_string(
                     prefix_range,
                     tok_range,
-                    checker.locator,
+                    checker.locator(),
                 ));
             }
             checker.diagnostics.push(diagnostic);
@@ -125,7 +126,7 @@ fn convert_f_string_to_regular_string(
         .slice(TextRange::up_to(prefix_range.start()))
         .chars()
         .last()
-        .map_or(false, |char| content.starts_with(char))
+        .is_some_and(|char| content.starts_with(char))
     {
         content.insert(0, ' ');
     }

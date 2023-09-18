@@ -74,3 +74,13 @@ field22: typing.Union[int, typing.Union[int, typing.Union[int, int]]]  # Error
 # Should emit in cases with newlines
 field23: set[  # foo
     int] | set[int]
+
+# Should emit twice (once for each `int` in the nested union, both of which are
+# duplicates of the outer `int`), but not three times (which would indicate that
+# we incorrectly re-checked the nested union).
+field24: typing.Union[int, typing.Union[int, int]]  # PYI016: Duplicate union member `int`
+
+# Should emit twice (once for each `int` in the nested union, both of which are
+# duplicates of the outer `int`), but not three times (which would indicate that
+# we incorrectly re-checked the nested union).
+field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`

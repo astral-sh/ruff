@@ -1,4 +1,4 @@
-use ruff_textwrap::dedent;
+use ruff_python_trivia::textwrap::dedent;
 
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
@@ -53,12 +53,11 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
             let options_len = output.len();
 
             Ok(quote! {
-              use crate::settings::options_base::{OptionEntry, OptionField, OptionGroup};
 
                 impl #ident {
-                    pub const fn metadata() -> OptionGroup {
-                        const OPTIONS: [(&'static str, OptionEntry); #options_len] = [#(#output),*];
-                        OptionGroup::new(&OPTIONS)
+                    pub const fn metadata() -> crate::options_base::OptionGroup {
+                        const OPTIONS: [(&'static str, crate::options_base::OptionEntry); #options_len] = [#(#output),*];
+                        crate::options_base::OptionGroup::new(&OPTIONS)
                     }
                 }
             })
@@ -93,7 +92,7 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
                 let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
                 Ok(quote_spanned!(
-                    ident.span() => (#kebab_name, OptionEntry::Group(#path::metadata()))
+                    ident.span() => (#kebab_name, crate::options_base::OptionEntry::Group(#path::metadata()))
                 ))
             }
             _ => Err(syn::Error::new(
@@ -151,7 +150,7 @@ fn handle_option(
     let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
     Ok(quote_spanned!(
-        ident.span() => (#kebab_name, OptionEntry::Field(OptionField {
+        ident.span() => (#kebab_name, crate::options_base::OptionEntry::Field(crate::options_base::OptionField {
             doc: &#doc,
             default: &#default,
             value_type: &#value_type,

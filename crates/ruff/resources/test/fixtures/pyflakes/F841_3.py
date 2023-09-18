@@ -147,3 +147,27 @@ def f() -> None:
     global CONSTANT
     CONSTANT = 1
     CONSTANT = 2
+
+
+def f() -> None:
+    try:
+        print("hello")
+    except A as e :
+        print("oh no!")
+
+
+def f():
+    x = 1
+    y = 2
+
+
+def f():
+    x = 1
+
+    y = 2
+
+
+def f():
+    (x) = foo()
+    ((x)) = foo()
+    (x) = (y.z) = foo()

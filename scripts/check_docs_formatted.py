@@ -37,8 +37,16 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "indentation-with-invalid-multiple",
     "line-too-long",
     "missing-trailing-comma",
+    "missing-whitespace",
+    "missing-whitespace-after-keyword",
+    "missing-whitespace-around-arithmetic-operator",
+    "missing-whitespace-around-bitwise-or-shift-operator",
+    "missing-whitespace-around-modulo-operator",
+    "missing-whitespace-around-operator",
+    "missing-whitespace-around-parameter-equals",
     "multi-line-implicit-string-concatenation",
     "multiple-leading-hashes-for-block-comment",
+    "multiple-spaces-after-comma",
     "multiple-spaces-after-keyword",
     "multiple-spaces-after-operator",
     "multiple-spaces-before-keyword",
@@ -52,19 +60,23 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "one-blank-line-after-class",
     "over-indentation",
     "over-indented",
+    "pass-statement-stub-body",
     "prohibited-trailing-comma",
     "shebang-leading-whitespace",
     "surrounding-whitespace",
+    "tab-indentation",
     "too-few-spaces-before-inline-comment",
     "trailing-comma-on-bare-tuple",
     "triple-single-quotes",
     "under-indentation",
     "unexpected-indentation-comment",
+    "unexpected-spaces-around-keyword-parameter-equals",
     "unicode-kind-prefix",
     "unnecessary-class-parentheses",
     "useless-semicolon",
     "whitespace-after-open-bracket",
     "whitespace-before-close-bracket",
+    "whitespace-before-parameters",
     "whitespace-before-punctuation",
 ]
 
@@ -75,6 +87,9 @@ KNOWN_PARSE_ERRORS = [
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",
     "no-indented-block",
+    "non-pep695-type-alias",  # requires Python 3.12
+    "syntax-error",
+    "tab-after-comma",
     "tab-after-keyword",
     "tab-after-operator",
     "tab-before-keyword",
@@ -144,15 +159,19 @@ def format_file(
     if errors and not args.skip_errors and not error_known:
         for error in errors:
             rule_name = file.name.split(".")[0]
-            print(f"Docs parse error for `{rule_name}` docs: {error}")
+            print(
+                f"Docs parse error for `{rule_name}` docs. Either fix or add to "
+                f"`KNOWN_PARSE_ERRORS`. {error}",
+            )
 
         return 2
 
     if contents != new_contents:
         rule_name = file.name.split(".")[0]
         print(
-            f"Rule `{rule_name}` docs are not formatted. The example section "
-            f"should be rewritten to:",
+            f"Rule `{rule_name}` docs are not formatted. Either format the rule or add "
+            f"to `KNOWN_FORMATTING_VIOLATIONS`. The example section should be "
+            f"rewritten to:",
         )
 
         # Add indentation so that snipped can be copied directly to docs

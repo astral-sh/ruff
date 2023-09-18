@@ -212,6 +212,23 @@ mod tests {
     #[test_case(
         r#"
         import pandas as pd
+        x = pd.DataFrame()
+        x.values = 1
+    "#,
+        "PD011_pass_values_store"
+    )]
+    #[test_case(
+        r#"
+        class Class:
+            def __init__(self, values: str) -> None:
+                self.values = values
+                print(self.values)
+    "#,
+        "PD011_pass_values_instance"
+    )]
+    #[test_case(
+        r#"
+        import pandas as pd
         result = {}.values
     "#,
         "PD011_pass_values_dict"
@@ -236,27 +253,6 @@ mod tests {
         result = values
     "#,
         "PD011_pass_node_name"
-    )]
-    #[test_case(
-        r#"
-        import pandas as pd
-        employees = pd.read_csv(input_file)
-    "#,
-        "PD012_pass_read_csv"
-    )]
-    #[test_case(
-        r#"
-        import pandas as pd
-        employees = pd.read_table(input_file)
-    "#,
-        "PD012_fail_read_table"
-    )]
-    #[test_case(
-        r#"
-        import pandas as pd
-        employees = read_table
-    "#,
-        "PD012_node_Name_pass"
     )]
     #[test_case(
         r#"
@@ -360,7 +356,12 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
     }
 
+    #[test_case(
+        Rule::PandasUseOfDotReadTable,
+        Path::new("pandas_use_of_dot_read_table.py")
+    )]
     #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
+    #[test_case(Rule::PandasNuniqueConstantSeriesCheck, Path::new("PD101.py"))]
     fn paths(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

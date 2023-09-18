@@ -4,6 +4,7 @@ changelog:
     labels:
       - internal
       - documentation
+      - formatter
   categories:
     - title: Breaking Changes
       labels:
@@ -19,6 +20,9 @@ changelog:
     - title: Bug Fixes
       labels:
         - bug
+    - title: Preview
+      labels:
+        - preview
     - title: Other Changes
       labels:
         - "*"

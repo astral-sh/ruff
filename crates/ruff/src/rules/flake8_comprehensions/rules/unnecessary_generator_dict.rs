@@ -1,7 +1,7 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -54,19 +54,23 @@ pub(crate) fn unnecessary_generator_dict(
     else {
         return;
     };
-    if let Expr::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument {
-        match elt.as_ref() {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) if elts.len() == 2 => {
-                let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    #[allow(deprecated)]
-                    diagnostic.try_set_fix_from_edit(|| {
-                        fixes::fix_unnecessary_generator_dict(checker, expr)
-                    });
-                }
-                checker.diagnostics.push(diagnostic);
-            }
-            _ => {}
-        }
+    let Expr::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument else {
+        return;
+    };
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = elt.as_ref() else {
+        return;
+    };
+    if elts.len() != 2 {
+        return;
     }
+    if elts.iter().any(Expr::is_starred_expr) {
+        return;
+    }
+    let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::suggested)
+        });
+    }
+    checker.diagnostics.push(diagnostic);
 }

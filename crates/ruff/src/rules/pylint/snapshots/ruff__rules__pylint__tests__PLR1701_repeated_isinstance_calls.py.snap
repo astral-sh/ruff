@@ -124,4 +124,21 @@ repeated_isinstance_calls.py:30:14: PLR1701 [*] Merge `isinstance` calls: `isins
 32 32 |     # not merged but valid
 33 33 |     result = isinstance(var[5], int) and var[5] * 14 or isinstance(var[5], float) and var[5] * 14.4
 
+repeated_isinstance_calls.py:42:3: PLR1701 [*] Merge `isinstance` calls: `isinstance(self.k, float | int)`
+   |
+41 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
+42 | if(isinstance(self.k, int)) or (isinstance(self.k, float)):
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1701
+43 |     ...
+   |
+   = help: Replace with `isinstance(self.k, float | int)`
+
+ℹ Fix
+39 39 | 
+40 40 | 
+41 41 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
+42    |-if(isinstance(self.k, int)) or (isinstance(self.k, float)):
+   42 |+if isinstance(self.k, float | int):
+43 43 |     ...
+
 

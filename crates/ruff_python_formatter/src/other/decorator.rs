@@ -1,9 +1,10 @@
+use ruff_formatter::write;
+use ruff_python_ast::Decorator;
+
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::write;
-use rustpython_parser::ast::Decorator;
 
 #[derive(Default)]
 pub struct FormatDecorator;
@@ -18,9 +19,17 @@ impl FormatNodeRule<Decorator> for FormatDecorator {
         write!(
             f,
             [
-                text("@"),
+                token("@"),
                 maybe_parenthesize_expression(expression, item, Parenthesize::Optional)
             ]
         )
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }

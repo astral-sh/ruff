@@ -1,10 +1,9 @@
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -86,64 +85,74 @@ impl Violation for LoggingTooManyArgs {
 
 /// PLE1205
 /// PLE1206
-pub(crate) fn logging_call(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
     // If there are any starred arguments, abort.
-    if args.iter().any(Expr::is_starred_expr) {
+    if call.arguments.args.iter().any(Expr::is_starred_expr) {
         return;
     }
 
     // If there are any starred keyword arguments, abort.
-    if keywords.iter().any(|keyword| keyword.arg.is_none()) {
+    if call
+        .arguments
+        .keywords
+        .iter()
+        .any(|keyword| keyword.arg.is_none())
+    {
         return;
     }
 
-    if !logging::is_logger_candidate(func, checker.semantic()) {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
+        return;
+    };
+
+    if LoggingLevel::from_attribute(attr.as_str()).is_none() {
         return;
     }
 
-    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
-        if LoggingLevel::from_attribute(attr.as_str()).is_some() {
-            let call_args = SimpleCallArgs::new(args, keywords);
-            if let Some(Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
-                ..
-            })) = call_args.argument("msg", 0)
-            {
-                if let Ok(summary) = CFormatSummary::try_from(value.as_str()) {
-                    if summary.starred {
-                        return;
-                    }
-                    if !summary.keywords.is_empty() {
-                        return;
-                    }
+    let Some(Expr::Constant(ast::ExprConstant {
+        value: Constant::Str(ast::StringConstant { value, .. }),
+        ..
+    })) = call.arguments.find_positional(0)
+    else {
+        return;
+    };
 
-                    let message_args = call_args.num_args() - 1;
+    if !logging::is_logger_candidate(
+        &call.func,
+        checker.semantic(),
+        &checker.settings.logger_objects,
+    ) {
+        return;
+    }
 
-                    if checker.enabled(Rule::LoggingTooManyArgs) {
-                        if summary.num_positional < message_args {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(LoggingTooManyArgs, func.range()));
-                        }
-                    }
+    let Ok(summary) = CFormatSummary::try_from(value.as_str()) else {
+        return;
+    };
 
-                    if checker.enabled(Rule::LoggingTooFewArgs) {
-                        if message_args > 0
-                            && call_args.num_kwargs() == 0
-                            && summary.num_positional > message_args
-                        {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(LoggingTooFewArgs, func.range()));
-                        }
-                    }
-                }
-            }
+    if summary.starred {
+        return;
+    }
+
+    if !summary.keywords.is_empty() {
+        return;
+    }
+
+    let num_message_args = call.arguments.args.len() - 1;
+    let num_keywords = call.arguments.keywords.len();
+
+    if checker.enabled(Rule::LoggingTooManyArgs) {
+        if summary.num_positional < num_message_args {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(LoggingTooManyArgs, call.func.range()));
+        }
+    }
+
+    if checker.enabled(Rule::LoggingTooFewArgs) {
+        if num_message_args > 0 && num_keywords == 0 && summary.num_positional > num_message_args {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(LoggingTooFewArgs, call.func.range()));
         }
     }
 }

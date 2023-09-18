@@ -1,5 +1,5 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::Stmt;
+use ruff_python_ast as ast;
+use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -48,7 +48,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         name,
         decorator_list,
         returns,
-        args,
+        parameters,
         ..
     }) = stmt
     else {
@@ -63,13 +63,15 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     }
 
     // It is a violation only if the method signature matches that of `object.__str__`
     // or `object.__repr__` exactly and the method is not decorated as abstract.
-    if !args.kwonlyargs.is_empty() || (args.args.len() + args.posonlyargs.len()) > 1 {
+    if !parameters.kwonlyargs.is_empty()
+        || (parameters.args.len() + parameters.posonlyargs.len()) > 1
+    {
         return;
     }
 
@@ -94,12 +96,12 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         stmt.identifier(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        let stmt = checker.semantic().stmt();
-        let parent = checker.semantic().stmt_parent();
-        let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
-        diagnostic.set_fix(
-            Fix::automatic(edit).isolate(checker.isolation(checker.semantic().stmt_parent())),
-        );
+        let stmt = checker.semantic().current_statement();
+        let parent = checker.semantic().current_statement_parent();
+        let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
+        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(
+            checker.semantic().current_statement_parent_id(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

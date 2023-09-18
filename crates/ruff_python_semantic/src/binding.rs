@@ -1,27 +1,32 @@
+use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::call_path::format_call_path;
+use ruff_python_ast::Stmt;
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
-use crate::node::NodeId;
-use crate::reference::ReferenceId;
+use crate::nodes::NodeId;
+use crate::reference::ResolvedReferenceId;
 use crate::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: TextRange,
+    /// The [`ScopeId`] of the scope in which the [`Binding`] was defined.
+    pub scope: ScopeId,
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
     /// The references to the [`Binding`].
-    pub references: Vec<ReferenceId>,
+    pub references: Vec<ResolvedReferenceId>,
     /// The exceptions that were handled when the [`Binding`] was defined.
     pub exceptions: Exceptions,
     /// Flags for the [`Binding`].
@@ -35,39 +40,51 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns an iterator over all references for the current [`Binding`].
-    pub fn references(&self) -> impl Iterator<Item = ReferenceId> + '_ {
+    pub fn references(&self) -> impl Iterator<Item = ResolvedReferenceId> + '_ {
         self.references.iter().copied()
     }
 
     /// Return `true` if this [`Binding`] represents an explicit re-export
     /// (e.g., `FastAPI` in `from fastapi import FastAPI as FastAPI`).
     pub const fn is_explicit_export(&self) -> bool {
-        self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
+        self.flags.intersects(BindingFlags::EXPLICIT_EXPORT)
     }
 
     /// Return `true` if this [`Binding`] represents an external symbol
     /// (e.g., `FastAPI` in `from fastapi import FastAPI`).
     pub const fn is_external(&self) -> bool {
-        self.flags.contains(BindingFlags::EXTERNAL)
+        self.flags.intersects(BindingFlags::EXTERNAL)
     }
 
     /// Return `true` if this [`Binding`] represents an aliased symbol
     /// (e.g., `app` in `from fastapi import FastAPI as app`).
     pub const fn is_alias(&self) -> bool {
-        self.flags.contains(BindingFlags::ALIAS)
+        self.flags.intersects(BindingFlags::ALIAS)
     }
 
     /// Return `true` if this [`Binding`] represents a `nonlocal`. A [`Binding`] is a `nonlocal`
     /// if it's declared by a `nonlocal` statement, or shadows a [`Binding`] declared by a
     /// `nonlocal` statement.
     pub const fn is_nonlocal(&self) -> bool {
-        self.flags.contains(BindingFlags::NONLOCAL)
+        self.flags.intersects(BindingFlags::NONLOCAL)
     }
 
     /// Return `true` if this [`Binding`] represents a `global`. A [`Binding`] is a `global` if it's
     /// declared by a `global` statement, or shadows a [`Binding`] declared by a `global` statement.
     pub const fn is_global(&self) -> bool {
-        self.flags.contains(BindingFlags::GLOBAL)
+        self.flags.intersects(BindingFlags::GLOBAL)
+    }
+
+    /// Return `true` if this [`Binding`] represents an assignment to `__all__` with an invalid
+    /// value (e.g., `__all__ = "Foo"`).
+    pub const fn is_invalid_all_format(&self) -> bool {
+        self.flags.intersects(BindingFlags::INVALID_ALL_FORMAT)
+    }
+
+    /// Return `true` if this [`Binding`] represents an assignment to `__all__` that includes an
+    /// invalid member (e.g., `__all__ = ["Foo", 1]`).
+    pub const fn is_invalid_all_object(&self) -> bool {
+        self.flags.intersects(BindingFlags::INVALID_ALL_OBJECT)
     }
 
     /// Return `true` if this [`Binding`] represents an unbound variable
@@ -79,43 +96,68 @@ impl<'a> Binding<'a> {
         )
     }
 
-    /// Return `true` if this binding redefines the given binding.
+    /// Return `true` if this [`Binding`] represents an private declaration
+    /// (e.g., `_x` in `_x = "private variable"`)
+    pub const fn is_private_declaration(&self) -> bool {
+        self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
+    }
+
+    /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
+    /// redefinition.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Import(Import { qualified_name }) => {
+            // Submodule imports are only considered redefinitions if they import the same
+            // submodule. For example, this is a redefinition:
+            // ```python
+            // import foo.bar
+            // import foo.bar
+            // ```
+            //
+            // This, however, is not:
+            // ```python
+            // import foo.bar
+            // import foo.baz
+            // ```
+            BindingKind::Import(Import {
+                call_path: redefinition,
+            }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    qualified_name: existing,
+                    call_path: definition,
                 }) = &existing.kind
                 {
-                    return qualified_name == existing;
+                    return redefinition == definition;
                 }
             }
-            BindingKind::FromImport(FromImport { qualified_name }) => {
+            BindingKind::FromImport(FromImport {
+                call_path: redefinition,
+            }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    qualified_name: existing,
+                    call_path: definition,
                 }) = &existing.kind
                 {
-                    return qualified_name == existing;
+                    return redefinition == definition;
                 }
             }
-            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                match &existing.kind {
-                    BindingKind::Import(Import {
-                        qualified_name: existing,
-                    })
-                    | BindingKind::SubmoduleImport(SubmoduleImport {
-                        qualified_name: existing,
-                    }) => {
-                        return qualified_name == existing;
-                    }
-                    BindingKind::FromImport(FromImport {
-                        qualified_name: existing,
-                    }) => {
-                        return qualified_name == existing;
-                    }
-                    _ => {}
+            BindingKind::SubmoduleImport(SubmoduleImport {
+                call_path: redefinition,
+            }) => match &existing.kind {
+                BindingKind::Import(Import {
+                    call_path: definition,
+                })
+                | BindingKind::SubmoduleImport(SubmoduleImport {
+                    call_path: definition,
+                }) => {
+                    return redefinition == definition;
                 }
-            }
+                BindingKind::FromImport(FromImport {
+                    call_path: definition,
+                }) => {
+                    return redefinition == definition;
+                }
+                _ => {}
+            },
+            // Deletions, annotations, `__future__` imports, and builtins are never considered
+            // redefinitions.
             BindingKind::Deletion
             | BindingKind::Annotation
             | BindingKind::FutureImport
@@ -124,56 +166,46 @@ impl<'a> Binding<'a> {
             }
             _ => {}
         }
+        // Otherwise, the shadowed binding must be a class definition, function definition, or
+        // import to be considered a redefinition.
         matches!(
             existing.kind,
             BindingKind::ClassDefinition(_)
                 | BindingKind::FunctionDefinition(_)
                 | BindingKind::Import(_)
                 | BindingKind::FromImport(_)
-                | BindingKind::SubmoduleImport(_)
         )
     }
 
-    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
-    pub fn qualified_name(&self) -> Option<&str> {
-        match &self.kind {
-            BindingKind::Import(Import { qualified_name }) => Some(qualified_name),
-            BindingKind::FromImport(FromImport { qualified_name }) => Some(qualified_name),
-            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                Some(qualified_name)
-            }
-            _ => None,
-        }
+    /// Returns the name of the binding (e.g., `x` in `x = 1`).
+    pub fn name<'b>(&self, locator: &'b Locator) -> &'b str {
+        locator.slice(self.range)
     }
 
-    /// Returns the fully-qualified name of the module from which this symbol was imported, if this
-    /// symbol was imported from another module.
-    pub fn module_name(&self) -> Option<&str> {
-        match &self.kind {
-            BindingKind::Import(Import { qualified_name })
-            | BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                Some(qualified_name.split('.').next().unwrap_or(qualified_name))
-            }
-            BindingKind::FromImport(FromImport { qualified_name }) => Some(
-                qualified_name
-                    .rsplit_once('.')
-                    .map_or(qualified_name, |(module, _)| module),
-            ),
-            _ => None,
-        }
+    /// Returns the statement in which the binding was defined.
+    pub fn statement<'b>(&self, semantic: &'b SemanticModel) -> Option<&'b Stmt> {
+        self.source
+            .map(|statement_id| semantic.statement(statement_id))
     }
 
     /// Returns the range of the binding's parent.
     pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
-        self.source
-            .map(|node_id| semantic.stmts[node_id])
-            .and_then(|parent| {
-                if parent.is_import_from_stmt() {
-                    Some(parent.range())
-                } else {
-                    None
-                }
-            })
+        self.statement(semantic).and_then(|parent| {
+            if parent.is_import_from_stmt() {
+                Some(parent.range())
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn as_any_import(&'a self) -> Option<AnyImport<'a>> {
+        match &self.kind {
+            BindingKind::Import(import) => Some(AnyImport::Import(import)),
+            BindingKind::SubmoduleImport(import) => Some(AnyImport::SubmoduleImport(import)),
+            BindingKind::FromImport(import) => Some(AnyImport::FromImport(import)),
+            _ => None,
+        }
     }
 }
 
@@ -226,6 +258,38 @@ bitflags! {
         ///     x = 1
         /// ```
         const GLOBAL = 1 << 4;
+
+        /// The binding represents an export via `__all__`, but the assigned value uses an invalid
+        /// expression (i.e., a non-container type).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = 1
+        /// ```
+        const INVALID_ALL_FORMAT = 1 << 5;
+
+        /// The binding represents an export via `__all__`, but the assigned value contains an
+        /// invalid member (i.e., a non-string).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = [1]
+        /// ```
+        const INVALID_ALL_OBJECT = 1 << 6;
+
+        /// The binding represents a private declaration.
+        ///
+        /// For example, the binding could be `_T` in:
+        /// ```python
+        /// _T = "This is a private variable"
+        /// ```
+        const PRIVATE_DECLARATION = 1 << 7;
+    }
+}
+
+impl Ranged for Binding<'_> {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -236,8 +300,6 @@ bitflags! {
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
 pub struct BindingId;
-
-impl nohash_hasher::IsEnabled for BindingId {}
 
 /// The bindings in a program.
 ///
@@ -275,7 +337,7 @@ impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
 #[derive(Debug, Clone)]
 pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
-    pub names: Vec<&'a str>,
+    pub names: Box<[&'a str]>,
 }
 
 /// A binding for an `import`, keyed on the name to which the import is bound.
@@ -286,18 +348,18 @@ pub struct Import<'a> {
     /// The full name of the module being imported.
     /// Ex) Given `import foo`, `qualified_name` would be "foo".
     /// Ex) Given `import foo as bar`, `qualified_name` would be "foo".
-    pub qualified_name: &'a str,
+    pub call_path: Box<[&'a str]>,
 }
 
 /// A binding for a member imported from a module, keyed on the name to which the member is bound.
 /// Ex) `from foo import bar` would be keyed on "bar".
 /// Ex) `from foo import bar as baz` would be keyed on "baz".
 #[derive(Debug, Clone)]
-pub struct FromImport {
+pub struct FromImport<'a> {
     /// The full name of the member being imported.
     /// Ex) Given `from foo import bar`, `qualified_name` would be "foo.bar".
     /// Ex) Given `from foo import bar as baz`, `qualified_name` would be "foo.bar".
-    pub qualified_name: String,
+    pub call_path: Box<[&'a str]>,
 }
 
 /// A binding for a submodule imported from a module, keyed on the name of the parent module.
@@ -306,7 +368,7 @@ pub struct FromImport {
 pub struct SubmoduleImport<'a> {
     /// The full name of the submodule being imported.
     /// Ex) Given `import foo.bar`, `qualified_name` would be "foo.bar".
-    pub qualified_name: &'a str,
+    pub call_path: Box<[&'a str]>,
 }
 
 #[derive(Debug, Clone, is_macro::Is)]
@@ -342,6 +404,18 @@ pub enum BindingKind<'a> {
     /// x = 1
     /// ```
     Assignment,
+
+    /// A binding for a generic type parameter, like `X` in:
+    /// ```python
+    /// def foo[X](x: X):
+    ///    ...
+    ///
+    /// class Foo[X](x: X):
+    ///   ...
+    ///
+    /// type Foo[X] = ...
+    /// ```
+    TypeParam,
 
     /// A binding for a for-loop variable, like `x` in:
     /// ```python
@@ -403,7 +477,7 @@ pub enum BindingKind<'a> {
     /// ```python
     /// from foo import bar
     /// ```
-    FromImport(FromImport),
+    FromImport(FromImport<'a>),
 
     /// A binding for a submodule imported from a module, like `bar` in:
     /// ```python
@@ -417,7 +491,16 @@ pub enum BindingKind<'a> {
     /// ```
     Deletion,
 
-    /// A binding to unbind the local variable, like `x` in:
+    /// A binding to bind an exception to a local variable, like `x` in:
+    /// ```python
+    /// try:
+    ///    ...
+    /// except Exception as x:
+    ///   ...
+    /// ```
+    BoundException,
+
+    /// A binding to unbind a bound local exception, like `x` in:
     /// ```python
     /// try:
     ///    ...
@@ -427,7 +510,6 @@ pub enum BindingKind<'a> {
     ///
     /// After the `except` block, `x` is unbound, despite the lack
     /// of an explicit `del` statement.
-    ///
     ///
     /// Stores the ID of the binding that was shadowed in the enclosing
     /// scope, if any.
@@ -440,5 +522,108 @@ bitflags! {
         const NAME_ERROR = 0b0000_0001;
         const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
         const IMPORT_ERROR = 0b0000_0100;
+    }
+}
+
+/// A trait for imported symbols.
+pub trait Imported<'a> {
+    /// Returns the call path to the imported symbol.
+    fn call_path(&self) -> &[&str];
+
+    /// Returns the module name of the imported symbol.
+    fn module_name(&self) -> &[&str];
+
+    /// Returns the member name of the imported symbol. For a straight import, this is equivalent
+    /// to the qualified name; for a `from` import, this is the name of the imported symbol.
+    fn member_name(&self) -> Cow<'a, str>;
+
+    /// Returns the fully-qualified name of the imported symbol.
+    fn qualified_name(&self) -> String {
+        format_call_path(self.call_path())
+    }
+}
+
+impl<'a> Imported<'a> for Import<'a> {
+    /// For example, given `import foo`, returns `["foo"]`.
+    fn call_path(&self) -> &[&str] {
+        self.call_path.as_ref()
+    }
+
+    /// For example, given `import foo`, returns `["foo"]`.
+    fn module_name(&self) -> &[&str] {
+        &self.call_path[..1]
+    }
+
+    /// For example, given `import foo`, returns `"foo"`.
+    fn member_name(&self) -> Cow<'a, str> {
+        Cow::Owned(self.qualified_name())
+    }
+}
+
+impl<'a> Imported<'a> for SubmoduleImport<'a> {
+    /// For example, given `import foo.bar`, returns `["foo", "bar"]`.
+    fn call_path(&self) -> &[&str] {
+        self.call_path.as_ref()
+    }
+
+    /// For example, given `import foo.bar`, returns `["foo"]`.
+    fn module_name(&self) -> &[&str] {
+        &self.call_path[..1]
+    }
+
+    /// For example, given `import foo.bar`, returns `"foo.bar"`.
+    fn member_name(&self) -> Cow<'a, str> {
+        Cow::Owned(self.qualified_name())
+    }
+}
+
+impl<'a> Imported<'a> for FromImport<'a> {
+    /// For example, given `from foo import bar`, returns `["foo", "bar"]`.
+    fn call_path(&self) -> &[&str] {
+        self.call_path.as_ref()
+    }
+
+    /// For example, given `from foo import bar`, returns `["foo"]`.
+    fn module_name(&self) -> &[&str] {
+        &self.call_path[..self.call_path.len() - 1]
+    }
+
+    /// For example, given `from foo import bar`, returns `"bar"`.
+    fn member_name(&self) -> Cow<'a, str> {
+        Cow::Borrowed(self.call_path[self.call_path.len() - 1])
+    }
+}
+
+/// A wrapper around an import [`BindingKind`] that can be any of the three types of imports.
+#[derive(Debug, Clone, is_macro::Is)]
+pub enum AnyImport<'a> {
+    Import(&'a Import<'a>),
+    SubmoduleImport(&'a SubmoduleImport<'a>),
+    FromImport(&'a FromImport<'a>),
+}
+
+impl<'a> Imported<'a> for AnyImport<'a> {
+    fn call_path(&self) -> &[&str] {
+        match self {
+            Self::Import(import) => import.call_path(),
+            Self::SubmoduleImport(import) => import.call_path(),
+            Self::FromImport(import) => import.call_path(),
+        }
+    }
+
+    fn module_name(&self) -> &[&str] {
+        match self {
+            Self::Import(import) => import.module_name(),
+            Self::SubmoduleImport(import) => import.module_name(),
+            Self::FromImport(import) => import.module_name(),
+        }
+    }
+
+    fn member_name(&self) -> Cow<'a, str> {
+        match self {
+            Self::Import(import) => import.member_name(),
+            Self::SubmoduleImport(import) => import.member_name(),
+            Self::FromImport(import) => import.member_name(),
+        }
     }
 }

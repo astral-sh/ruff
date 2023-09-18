@@ -1,71 +1,101 @@
 some_dict = {"a": 12, "b": 32, "c": 44}
 
-for _, value in some_dict.items():  # PERF102
-    print(value)
+
+def f():
+    for _, value in some_dict.items():  # PERF102
+        print(value)
 
 
-for key, _ in some_dict.items():  # PERF102
-    print(key)
+def f():
+    for key, _ in some_dict.items():  # PERF102
+        print(key)
 
 
-for weird_arg_name, _ in some_dict.items():  # PERF102
-    print(weird_arg_name)
+def f():
+    for weird_arg_name, _ in some_dict.items():  # PERF102
+        print(weird_arg_name)
 
 
-for name, (_, _) in some_dict.items():  # PERF102
-    pass
+def f():
+    for name, (_, _) in some_dict.items():  # PERF102
+        print(name)
 
 
-for name, (value1, _) in some_dict.items():  # OK
-    pass
+def f():
+    for name, (value1, _) in some_dict.items():  # OK
+        print(name, value1)
 
 
-for (key1, _), (_, _) in some_dict.items():  # PERF102
-    pass
+def f():
+    for (key1, _), (_, _) in some_dict.items():  # PERF102
+        print(key1)
 
 
-for (_, (_, _)), (value, _) in some_dict.items():  # PERF102
-    pass
+def f():
+    for (_, (_, _)), (value, _) in some_dict.items():  # PERF102
+        print(value)
 
 
-for (_, key2), (value1, _) in some_dict.items():  # OK
-    pass
+def f():
+    for (_, key2), (value1, _) in some_dict.items():  # OK
+        print(key2, value1)
 
 
-for ((_, key2), (value1, _)) in some_dict.items():  # OK
-    pass
+def f():
+    for ((_, key2), (value1, _)) in some_dict.items():  # OK
+        print(key2, value1)
 
 
-for ((_, key2), (_, _)) in some_dict.items():  # PERF102
-    pass
+def f():
+    for ((_, key2), (_, _)) in some_dict.items():  # PERF102
+        print(key2)
 
 
-for (_, _, _, variants), (r_language, _, _, _) in some_dict.items():  # OK
-    pass
+def f():
+    for (_, _, _, variants), (r_language, _, _, _) in some_dict.items():  # OK
+        print(variants, r_language)
 
 
-for (_, _, (_, variants)), (_, (_, (r_language, _))) in some_dict.items():  # OK
-    pass
+def f():
+    for (_, _, (_, variants)), (_, (_, (r_language, _))) in some_dict.items():  # OK
+        print(variants, r_language)
 
 
-for key, value in some_dict.items():  # OK
-    print(key, value)
+def f():
+    for key, value in some_dict.items():  # OK
+        print(key, value)
 
 
-for _, value in some_dict.items(12):  # OK
-    print(value)
+def f():
+    for _, value in some_dict.items(12):  # OK
+        print(value)
 
 
-for key in some_dict.keys():  # OK
-    print(key)
+def f():
+    for key in some_dict.keys():  # OK
+        print(key)
 
 
-for value in some_dict.values():  # OK
-    print(value)
+def f():
+    for value in some_dict.values():  # OK
+        print(value)
 
 
-for name, (_, _) in (some_function()).items():  # PERF102
-    pass
+def f():
+    for name, (_, _) in (some_function()).items():  # PERF102
+        print(name)
 
-for name, (_, _) in (some_function().some_attribute).items():  # PERF102
-    pass
+
+def f():
+    for name, (_, _) in (some_function().some_attribute).items():  # PERF102
+        print(name)
+
+
+def f():
+    for name, unused_value in some_dict.items():  # PERF102
+        print(name)
+
+
+def f():
+    for unused_name, value in some_dict.items():  # PERF102
+        print(value)

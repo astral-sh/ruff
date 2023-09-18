@@ -31,9 +31,10 @@ pub fn main() -> ExitCode {
     // default for convenience and backwards-compatibility, so we just
     // preprocess the arguments accordingly before passing them to Clap.
     if let Some(arg) = args.get(1) {
-        if arg.to_str().map_or(false, |arg| {
-            !Command::has_subcommand(rewrite_legacy_subcommand(arg))
-        }) && arg != "-h"
+        if arg
+            .to_str()
+            .is_some_and(|arg| !Command::has_subcommand(rewrite_legacy_subcommand(arg)))
+            && arg != "-h"
             && arg != "--help"
             && arg != "-V"
             && arg != "--version"
@@ -50,7 +51,15 @@ pub fn main() -> ExitCode {
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
+                // This communicates that this isn't a linter error but ruff itself hard-errored for
+                // some reason (e.g. failed to resolve the configuration)
+                eprintln!("{}", "ruff failed".red().bold());
+                // Currently we generally only see one error, but e.g. with io errors when resolving
+                // the configuration it is help to chain errors ("resolving configuration failed" ->
+                // "failed to read file: subdir/pyproject.toml")
+                for cause in err.chain() {
+                    eprintln!("  {} {cause}", "Cause:".bold());
+                }
             }
             ExitStatus::Error.into()
         }

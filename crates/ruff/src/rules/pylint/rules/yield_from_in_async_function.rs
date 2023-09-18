@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{ExprYieldFrom, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast};
+use ruff_python_semantic::ScopeKind;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -37,9 +38,11 @@ impl Violation for YieldFromInAsyncFunction {
 }
 
 /// PLE1700
-pub(crate) fn yield_from_in_async_function(checker: &mut Checker, expr: &ExprYieldFrom) {
-    let scope = checker.semantic().scope();
-    if scope.kind.is_async_function() {
+pub(crate) fn yield_from_in_async_function(checker: &mut Checker, expr: &ast::ExprYieldFrom) {
+    if matches!(
+        checker.semantic().current_scope().kind,
+        ScopeKind::Function(ast::StmtFunctionDef { is_async: true, .. })
+    ) {
         checker
             .diagnostics
             .push(Diagnostic::new(YieldFromInAsyncFunction, expr.range()));

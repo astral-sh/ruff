@@ -20,16 +20,6 @@ E721.py:5:4: E721 Do not compare types, use `isinstance()`
 7 | #: E721
   |
 
-E721.py:10:4: E721 Do not compare types, use `isinstance()`
-   |
- 8 | import types
- 9 | 
-10 | if res == types.IntType:
-   |    ^^^^^^^^^^^^^^^^^^^^ E721
-11 |     pass
-12 | #: E721
-   |
-
 E721.py:15:4: E721 Do not compare types, use `isinstance()`
    |
 13 | import types
@@ -153,6 +143,31 @@ E721.py:42:8: E721 Do not compare types, use `isinstance()`
    |        ^^^^^^^^^^^^^^^^^^^^^^^ E721
 43 | 
 44 | #: Okay
+   |
+
+E721.py:63:8: E721 Do not compare types, use `isinstance()`
+   |
+62 | #: E721
+63 | assert type(res) is int
+   |        ^^^^^^^^^^^^^^^^ E721
+   |
+
+E721.py:69:12: E721 Do not compare types, use `isinstance()`
+   |
+67 |     def asdf(self, value: str | None):
+68 |         #: E721
+69 |         if type(value) is str:
+   |            ^^^^^^^^^^^^^^^^^^ E721
+70 |             ...
+   |
+
+E721.py:79:12: E721 Do not compare types, use `isinstance()`
+   |
+77 |     def asdf(self, value: str | None):
+78 |         #: E721
+79 |         if type(value) is str:
+   |            ^^^^^^^^^^^^^^^^^^ E721
+80 |             ...
    |
 
 

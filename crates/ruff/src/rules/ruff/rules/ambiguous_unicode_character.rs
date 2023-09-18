@@ -1,13 +1,14 @@
-use bitflags::bitflags;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::fmt;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
+use bitflags::bitflags;
+
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::registry::AsRule;
-use crate::rules::ruff::rules::confusables::CONFUSABLES;
+use crate::rules::ruff::rules::confusables::confusable;
 use crate::rules::ruff::rules::Context;
 use crate::settings::Settings;
 
@@ -33,7 +34,7 @@ pub struct AmbiguousUnicodeCharacterString {
     representant: char,
 }
 
-impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
+impl Violation for AmbiguousUnicodeCharacterString {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AmbiguousUnicodeCharacterString {
@@ -42,18 +43,6 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
         } = self;
         format!(
             "String contains ambiguous {}. Did you mean {}?",
-            NamedUnicode(*confusable),
-            NamedUnicode(*representant)
-        )
-    }
-
-    fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterString {
-            confusable,
-            representant,
-        } = self;
-        format!(
-            "Replace {} with {}",
             NamedUnicode(*confusable),
             NamedUnicode(*representant)
         )
@@ -82,7 +71,7 @@ pub struct AmbiguousUnicodeCharacterDocstring {
     representant: char,
 }
 
-impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
+impl Violation for AmbiguousUnicodeCharacterDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AmbiguousUnicodeCharacterDocstring {
@@ -91,18 +80,6 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
         } = self;
         format!(
             "Docstring contains ambiguous {}. Did you mean {}?",
-            NamedUnicode(*confusable),
-            NamedUnicode(*representant)
-        )
-    }
-
-    fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterDocstring {
-            confusable,
-            representant,
-        } = self;
-        format!(
-            "Replace {} with {}",
             NamedUnicode(*confusable),
             NamedUnicode(*representant)
         )
@@ -131,7 +108,7 @@ pub struct AmbiguousUnicodeCharacterComment {
     representant: char,
 }
 
-impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
+impl Violation for AmbiguousUnicodeCharacterComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AmbiguousUnicodeCharacterComment {
@@ -140,18 +117,6 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
         } = self;
         format!(
             "Comment contains ambiguous {}. Did you mean {}?",
-            NamedUnicode(*confusable),
-            NamedUnicode(*representant)
-        )
-    }
-
-    fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterComment {
-            confusable,
-            representant,
-        } = self;
-        format!(
-            "Replace {} with {}",
             NamedUnicode(*confusable),
             NamedUnicode(*representant)
         )
@@ -193,7 +158,7 @@ pub(crate) fn ambiguous_unicode_character(
             // Check if the boundary character is itself an ambiguous unicode character, in which
             // case, it's always included as a diagnostic.
             if !current_char.is_ascii() {
-                if let Some(representant) = CONFUSABLES.get(&(current_char as u32)).copied() {
+                if let Some(representant) = confusable(current_char as u32) {
                     let candidate = Candidate::new(
                         TextSize::try_from(relative_offset).unwrap() + range.start(),
                         current_char,
@@ -207,7 +172,7 @@ pub(crate) fn ambiguous_unicode_character(
         } else if current_char.is_ascii() {
             // The current word contains at least one ASCII character.
             word_flags |= WordFlags::ASCII;
-        } else if let Some(representant) = CONFUSABLES.get(&(current_char as u32)).copied() {
+        } else if let Some(representant) = confusable(current_char as u32) {
             // The current word contains an ambiguous unicode character.
             word_candidates.push(Candidate::new(
                 TextSize::try_from(relative_offset).unwrap() + range.start(),
@@ -279,7 +244,7 @@ impl Candidate {
     fn into_diagnostic(self, context: Context, settings: &Settings) -> Option<Diagnostic> {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
-            let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
+            let diagnostic = Diagnostic::new::<DiagnosticKind>(
                 match context {
                     Context::String => AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
@@ -300,12 +265,6 @@ impl Candidate {
                 char_range,
             );
             if settings.rules.enabled(diagnostic.kind.rule()) {
-                if settings.rules.should_fix(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::manual(Edit::range_replacement(
-                        self.representant.to_string(),
-                        char_range,
-                    )));
-                }
                 return Some(diagnostic);
             }
         }

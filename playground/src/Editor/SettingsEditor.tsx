@@ -46,6 +46,7 @@ export default function SettingsEditor({
         fontSize: 14,
         roundedSelection: false,
         scrollBeyondLastLine: false,
+        contextmenu: false,
       }}
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       language={"json"}

@@ -9,8 +9,8 @@ use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 
 use ruff::registry::{Linter, Rule, RuleNamespace};
-use ruff::settings::options::Options;
 use ruff_diagnostics::AutofixKind;
+use ruff_workspace::options::Options;
 
 use crate::ROOT_DIR;
 
@@ -43,13 +43,10 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            if rule.is_nursery() {
-                output.push_str(&format!(
-                    r#"This rule is part of the **nursery**, a collection of newer lints that are
-still under development. As such, it must be enabled by explicitly selecting
-{}."#,
-                    rule.noqa_code()
-                ));
+            if rule.is_preview() {
+                output.push_str(
+                    r#"This rule is in preview and is not stable. The `--preview` flag is required for use."#,
+                );
                 output.push('\n');
                 output.push('\n');
             }
@@ -81,7 +78,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
     // a non-CommonMark-compliant Markdown parser, which doesn't support code
     // tags in link definitions
     // (see https://github.com/Python-Markdown/markdown/issues/280).
-    let documentation = Regex::new(r"\[`(.*?)`]($|[^\[])").unwrap().replace_all(
+    let documentation = Regex::new(r"\[`([^`]*?)`]($|[^\[])").unwrap().replace_all(
         documentation,
         |caps: &Captures| {
             format!(

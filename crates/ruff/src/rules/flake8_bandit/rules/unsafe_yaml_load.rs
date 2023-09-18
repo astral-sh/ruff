@@ -1,11 +1,39 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for uses of the `yaml.load` function.
+///
+/// ## Why is this bad?
+/// Running the `yaml.load` function over untrusted YAML files is insecure, as
+/// `yaml.load` allows for the creation of arbitrary Python objects, which can
+/// then be used to execute arbitrary code.
+///
+/// Instead, consider using `yaml.safe_load`, which allows for the creation of
+/// simple Python objects like integers and lists, but prohibits the creation of
+/// more complex objects like functions and classes.
+///
+/// ## Example
+/// ```python
+/// import yaml
+///
+/// yaml.load(untrusted_yaml)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import yaml
+///
+/// yaml.safe_load(untrusted_yaml)
+/// ```
+///
+/// ## References
+/// - [PyYAML documentation: Loading YAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
+/// - [Common Weakness Enumeration: CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 #[violation]
 pub struct UnsafeYAMLLoad {
     pub loader: Option<String>,
@@ -31,25 +59,17 @@ impl Violation for UnsafeYAMLLoad {
 }
 
 /// S506
-pub(crate) fn unsafe_yaml_load(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn unsafe_yaml_load(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["yaml", "load"])
-        })
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["yaml", "load"]))
     {
-        let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(loader_arg) = call_args.argument("Loader", 1) {
+        if let Some(loader_arg) = call.arguments.find_argument("Loader", 1) {
             if !checker
                 .semantic()
                 .resolve_call_path(loader_arg)
-                .map_or(false, |call_path| {
+                .is_some_and(|call_path| {
                     matches!(call_path.as_slice(), ["yaml", "SafeLoader" | "CSafeLoader"])
                 })
             {
@@ -66,7 +86,7 @@ pub(crate) fn unsafe_yaml_load(
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 UnsafeYAMLLoad { loader: None },
-                func.range(),
+                call.func.range(),
             ));
         }
     }

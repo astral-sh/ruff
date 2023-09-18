@@ -19,7 +19,7 @@ jobs:
   macos-x86_64:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -42,7 +42,7 @@ jobs:
   macos-universal:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -66,9 +66,9 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        target: [ x64, x86 ]
+        target: [x64, x86]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -94,9 +94,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [ x86_64, i686 ]
+        target: [x86_64, i686]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -121,9 +121,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [ aarch64, armv7, s390x, ppc64le, ppc64 ]
+        target: [aarch64, armv7, s390x, ppc64le, ppc64]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -160,7 +160,7 @@ jobs:
           - x86_64-unknown-linux-musl
           - i686-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -196,7 +196,7 @@ jobs:
           - target: armv7-unknown-linux-musleabihf
             arch: armv7
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}

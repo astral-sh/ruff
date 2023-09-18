@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -16,14 +16,53 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.11" # to build abi3 wheels
+  PYTHON_VERSION: "3.11"
 
 jobs:
+  determine_changes:
+    name: "Determine changes"
+    runs-on: ubuntu-latest
+    outputs:
+      linter: ${{ steps.changed.outputs.linter_any_changed }}
+      formatter: ${{ steps.changed.outputs.formatter_any_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: tj-actions/changed-files@v39
+        id: changed
+        with:
+          files_yaml: |
+            linter:
+              - Cargo.toml
+              - Cargo.lock
+              - crates/**
+              - "!crates/ruff_python_formatter/**"
+              - "!crates/ruff_formatter/**"
+              - "!crates/ruff_dev/**"
+              - "!crates/ruff_shrinking/**"
+              - scripts/*
+
+            formatter:
+              - Cargo.toml
+              - Cargo.lock
+              - crates/ruff_python_formatter/**
+              - crates/ruff_formatter/**
+              - crates/ruff_python_trivia/**
+              - crates/ruff_python_ast/**
+              - crates/ruff_source_file/**
+              - crates/ruff_python_index/**
+              - crates/ruff_text_size/**
+              - crates/ruff_python_parser/**
+              - crates/ruff_dev/**
+              - scripts/*
+
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       - run: cargo fmt --all --check
@@ -32,7 +71,7 @@ jobs:
     name: "cargo clippy"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: |
           rustup component add clippy
@@ -46,17 +85,19 @@ jobs:
   cargo-test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     name: "cargo test | ${{ matrix.os }}"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
-      # cargo insta 1.30.0 fails for some reason (https://github.com/mitsuhiko/insta/issues/392)
-      - run: cargo install cargo-insta@=1.29.0
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
       - run: pip install black[d]==23.1.0
+      - uses: Swatinem/rust-cache@v2
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: cargo insta test --all --all-features --unreferenced reject
@@ -84,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     name: "cargo fuzz"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
@@ -100,7 +141,7 @@ jobs:
     runs-on: ubuntu-latest
     name: "cargo test (wasm)"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v3
@@ -119,7 +160,7 @@ jobs:
     name: "test scripts"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       - uses: Swatinem/rust-cache@v2
@@ -135,11 +176,13 @@ jobs:
   ecosystem:
     name: "ecosystem"
     runs-on: ubuntu-latest
-    needs: cargo-test
+    needs:
+      - cargo-test
+      - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && needs.determine_changes.outputs.linter == 'true'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -184,7 +227,7 @@ jobs:
     name: "cargo udeps"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install nightly Rust toolchain"
         # Only pinned to make caching work, update freely
         run: rustup toolchain install nightly-2023-06-08
@@ -194,12 +237,11 @@ jobs:
       - name: "Run cargo-udeps"
         run: cargo +nightly-2023-06-08 udeps
 
-
   python-package:
     name: "python package"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -223,7 +265,7 @@ jobs:
     name: "pre-commit"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -253,7 +295,7 @@ jobs:
     env:
       MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
       - name: "Add SSH key"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
@@ -282,16 +324,45 @@ jobs:
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
         run: mkdocs build --strict -f mkdocs.generated.yml
 
-  check-formatter-stability:
-    name: "Check formatter stability"
+  check-formatter-ecosystem:
+    name: "Formatter ecosystem and progress checks"
     runs-on: ubuntu-latest
+    needs: determine_changes
+    if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Cache rust"
         uses: Swatinem/rust-cache@v2
-      - name: "Clone CPython 3.10"
-        run: git clone --branch 3.10 --depth 1 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
-      - name: "Check stability"
-        run: cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
+      - name: "Formatter progress"
+        run: scripts/formatter_ecosystem_checks.sh
+      - name: "Github step summary"
+        run: cat target/progress_projects_stats.txt > $GITHUB_STEP_SUMMARY
+      - name: "Remove checkouts from cache"
+        run: rm -r target/progress_projects
+
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@v4
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: "Install codspeed"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-codspeed
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: "Build benchmarks"
+        run: cargo codspeed build --features codspeed -p ruff_benchmark
+
+      - name: "Run benchmarks"
+        uses: CodSpeedHQ/action@v1
+        with:
+          run: cargo codspeed run
+          token: ${{ secrets.CODSPEED_TOKEN }}

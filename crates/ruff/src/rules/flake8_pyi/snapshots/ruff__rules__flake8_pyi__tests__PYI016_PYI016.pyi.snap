@@ -471,6 +471,8 @@ PYI016.pyi:76:12: PYI016 [*] Duplicate union member `set[int]`
 75 | field23: set[  # foo
 76 |     int] | set[int]
    |            ^^^^^^^^ PYI016
+77 | 
+78 | # Should emit twice (once for each `int` in the nested union, both of which are
    |
    = help: Remove duplicate union member `set[int]`
 
@@ -480,5 +482,62 @@ PYI016.pyi:76:12: PYI016 [*] Duplicate union member `set[int]`
 75 75 | field23: set[  # foo
 76    |-    int] | set[int]
    76 |+    int]
+77 77 | 
+78 78 | # Should emit twice (once for each `int` in the nested union, both of which are
+79 79 | # duplicates of the outer `int`), but not three times (which would indicate that
+
+PYI016.pyi:81:41: PYI016 Duplicate union member `int`
+   |
+79 | # duplicates of the outer `int`), but not three times (which would indicate that
+80 | # we incorrectly re-checked the nested union).
+81 | field24: typing.Union[int, typing.Union[int, int]]  # PYI016: Duplicate union member `int`
+   |                                         ^^^ PYI016
+82 | 
+83 | # Should emit twice (once for each `int` in the nested union, both of which are
+   |
+   = help: Remove duplicate union member `int`
+
+PYI016.pyi:81:46: PYI016 Duplicate union member `int`
+   |
+79 | # duplicates of the outer `int`), but not three times (which would indicate that
+80 | # we incorrectly re-checked the nested union).
+81 | field24: typing.Union[int, typing.Union[int, int]]  # PYI016: Duplicate union member `int`
+   |                                              ^^^ PYI016
+82 | 
+83 | # Should emit twice (once for each `int` in the nested union, both of which are
+   |
+   = help: Remove duplicate union member `int`
+
+PYI016.pyi:86:28: PYI016 [*] Duplicate union member `int`
+   |
+84 | # duplicates of the outer `int`), but not three times (which would indicate that
+85 | # we incorrectly re-checked the nested union).
+86 | field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
+   |                            ^^^ PYI016
+   |
+   = help: Remove duplicate union member `int`
+
+ℹ Fix
+83 83 | # Should emit twice (once for each `int` in the nested union, both of which are
+84 84 | # duplicates of the outer `int`), but not three times (which would indicate that
+85 85 | # we incorrectly re-checked the nested union).
+86    |-field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
+   86 |+field25: typing.Union[int, int]  # PYI016: Duplicate union member `int`
+
+PYI016.pyi:86:34: PYI016 [*] Duplicate union member `int`
+   |
+84 | # duplicates of the outer `int`), but not three times (which would indicate that
+85 | # we incorrectly re-checked the nested union).
+86 | field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
+   |                                  ^^^ PYI016
+   |
+   = help: Remove duplicate union member `int`
+
+ℹ Fix
+83 83 | # Should emit twice (once for each `int` in the nested union, both of which are
+84 84 | # duplicates of the outer `int`), but not three times (which would indicate that
+85 85 | # we incorrectly re-checked the nested union).
+86    |-field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
+   86 |+field25: typing.Union[int, int]  # PYI016: Duplicate union member `int`
 
 

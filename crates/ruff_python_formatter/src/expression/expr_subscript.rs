@@ -1,20 +1,28 @@
-use rustpython_parser::ast::{Expr, ExprSubscript};
-
-use ruff_formatter::{format_args, write};
+use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::{Expr, ExprSubscript};
 
-use crate::comments::trailing_comments;
-use crate::context::NodeLevel;
-use crate::context::PyFormatContext;
+use crate::comments::SourceComment;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
+    is_expression_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
+use crate::expression::CallChainLayout;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
-pub struct FormatExprSubscript;
+pub struct FormatExprSubscript {
+    call_chain_layout: CallChainLayout,
+}
+
+impl FormatRuleWithOptions<ExprSubscript, PyFormatContext<'_>> for FormatExprSubscript {
+    type Options = CallChainLayout;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.call_chain_layout = options;
+        self
+    }
+}
 
 impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
     fn fmt_fields(&self, item: &ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
@@ -25,57 +33,56 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             ctx: _,
         } = item;
 
+        let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
+
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item.as_any_node_ref());
         debug_assert!(
             dangling_comments.len() <= 1,
-            "The subscript expression must have at most a single comment, the one after the bracket"
+            "A subscript expression can only have a single dangling comment, the one after the bracket"
         );
 
-        if let NodeLevel::Expression(Some(group_id)) = f.context().node_level() {
-            // Enforce the optional parentheses for parenthesized values.
-            f.context_mut().set_node_level(NodeLevel::Expression(None));
-            let result = value.format().fmt(f);
-            f.context_mut()
-                .set_node_level(NodeLevel::Expression(Some(group_id)));
-            result?;
-        } else {
-            value.format().fmt(f)?;
-        }
-
-        let format_slice = format_with(|f: &mut PyFormatter| {
-            let saved_level = f.context().node_level();
-            f.context_mut()
-                .set_node_level(NodeLevel::ParenthesizedExpression);
-
-            let result = if let Expr::Tuple(tuple) = slice.as_ref() {
-                tuple
-                    .format()
-                    .with_options(TupleParentheses::Subscript)
-                    .fmt(f)
+        let format_inner = format_with(|f: &mut PyFormatter| {
+            if is_expression_parenthesized(
+                value.into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            ) {
+                value.format().with_options(Parentheses::Always).fmt(f)
             } else {
-                slice.format().fmt(f)
-            };
+                match value.as_ref() {
+                    Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    _ => value.format().with_options(Parentheses::Never).fmt(f),
+                }
+            }?;
 
-            f.context_mut().set_node_level(saved_level);
+            let format_slice = format_with(|f: &mut PyFormatter| {
+                if let Expr::Tuple(tuple) = slice.as_ref() {
+                    write!(f, [tuple.format().with_options(TupleParentheses::Preserve)])
+                } else {
+                    write!(f, [slice.format()])
+                }
+            });
 
-            result
+            parenthesized("[", &format_slice, "]")
+                .with_dangling_comments(dangling_comments)
+                .fmt(f)
         });
 
-        write!(
-            f,
-            [in_parentheses_only_group(&format_args![
-                text("["),
-                trailing_comments(dangling_comments),
-                soft_block_indent(&format_slice),
-                text("]")
-            ])]
-        )
+        let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
+            && call_chain_layout == CallChainLayout::Fluent;
+        if is_call_chain_root {
+            write!(f, [group(&format_inner)])
+        } else {
+            write!(f, [format_inner])
+        }
     }
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprSubscript,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled inside of `fmt_fields`
@@ -86,11 +93,43 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
 impl NeedsParentheses for ExprSubscript {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        parent: AnyNodeRef,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
         {
-            OptionalParentheses::Never
+            if CallChainLayout::from_expression(
+                self.into(),
+                context.comments().ranges(),
+                context.source(),
+            ) == CallChainLayout::Fluent
+            {
+                OptionalParentheses::Multiline
+            } else if is_expression_parenthesized(
+                self.value.as_ref().into(),
+                context.comments().ranges(),
+                context.source(),
+            ) {
+                OptionalParentheses::Never
+            } else {
+                match self.value.needs_parentheses(self.into(), context) {
+                    OptionalParentheses::BestFit => {
+                        if parent.as_stmt_function_def().is_some_and(|function_def| {
+                            function_def
+                                .returns
+                                .as_deref()
+                                .and_then(Expr::as_subscript_expr)
+                                == Some(self)
+                        }) {
+                            // Don't use the best fitting layout for return type annotation because it results in the
+                            // return type expanding before the parameters.
+                            OptionalParentheses::Never
+                        } else {
+                            OptionalParentheses::BestFit
+                        }
+                    }
+                    parentheses => parentheses,
+                }
+            }
         }
     }
 }

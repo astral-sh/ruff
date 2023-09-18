@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `break` statements outside of loops.
@@ -33,19 +34,15 @@ pub(crate) fn break_outside_loop<'a>(
     stmt: &'a Stmt,
     parents: &mut impl Iterator<Item = &'a Stmt>,
 ) -> Option<Diagnostic> {
-    let mut allowed: bool = false;
     let mut child = stmt;
     for parent in parents {
         match parent {
-            Stmt::For(ast::StmtFor { orelse, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-            | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+            Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
                 if !orelse.contains(child) {
-                    allowed = true;
-                    break;
+                    return None;
                 }
             }
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 break;
             }
             _ => {}
@@ -53,9 +50,5 @@ pub(crate) fn break_outside_loop<'a>(
         child = parent;
     }
 
-    if allowed {
-        None
-    } else {
-        Some(Diagnostic::new(BreakOutsideLoop, stmt.range()))
-    }
+    Some(Diagnostic::new(BreakOutsideLoop, stmt.range()))
 }

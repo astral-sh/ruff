@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::{self as ast};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -76,18 +76,16 @@ impl Violation for PPrint {
 }
 
 /// T201, T203
-pub(crate) fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
+pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
     let diagnostic = {
-        let call_path = checker.semantic().resolve_call_path(func);
-        if call_path.as_ref().map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["", "print"])
-        }) {
+        let call_path = checker.semantic().resolve_call_path(&call.func);
+        if call_path
+            .as_ref()
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "print"]))
+        {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
-            if let Some(keyword) = keywords
-                .iter()
-                .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "file"))
-            {
+            if let Some(keyword) = call.arguments.find_keyword("file") {
                 if !is_const_none(&keyword.value) {
                     if checker.semantic().resolve_call_path(&keyword.value).map_or(
                         true,
@@ -100,11 +98,12 @@ pub(crate) fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword
                     }
                 }
             }
-            Diagnostic::new(Print, func.range())
-        } else if call_path.as_ref().map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["pprint", "pprint"])
-        }) {
-            Diagnostic::new(PPrint, func.range())
+            Diagnostic::new(Print, call.func.range())
+        } else if call_path
+            .as_ref()
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["pprint", "pprint"]))
+        {
+            Diagnostic::new(PPrint, call.func.range())
         } else {
             return;
         }

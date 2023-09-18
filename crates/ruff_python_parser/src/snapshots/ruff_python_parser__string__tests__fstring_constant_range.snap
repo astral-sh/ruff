@@ -1,0 +1,85 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..22,
+            value: FString(
+                ExprFString {
+                    range: 0..22,
+                    values: [
+                        Constant(
+                            ExprConstant {
+                                range: 2..5,
+                                value: Str(
+                                    StringConstant {
+                                        value: "aaa",
+                                        unicode: false,
+                                        implicit_concatenated: false,
+                                    },
+                                ),
+                            },
+                        ),
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 5..10,
+                                value: Name(
+                                    ExprName {
+                                        range: 6..9,
+                                        id: "bbb",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 10..13,
+                                value: Str(
+                                    StringConstant {
+                                        value: "ccc",
+                                        unicode: false,
+                                        implicit_concatenated: false,
+                                    },
+                                ),
+                            },
+                        ),
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 13..18,
+                                value: Name(
+                                    ExprName {
+                                        range: 14..17,
+                                        id: "ddd",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 18..21,
+                                value: Str(
+                                    StringConstant {
+                                        value: "eee",
+                                        unicode: false,
+                                        implicit_concatenated: false,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+]

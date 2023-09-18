@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 
-use ruff_text_size::{TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// A text edit to be applied to a source file. Inserts, deletes, or replaces
 /// content at a given location.
@@ -61,20 +62,6 @@ impl Edit {
         self.content.as_deref()
     }
 
-    /// Returns the start location of the edit in the source document.
-    pub const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    pub const fn range(&self) -> TextRange {
-        self.range
-    }
-
-    /// Returns the edit's end location in the source document.
-    pub const fn end(&self) -> TextSize {
-        self.range.end()
-    }
-
     fn kind(&self) -> EditOperationKind {
         if self.content.is_none() {
             EditOperationKind::Deletion
@@ -116,6 +103,12 @@ impl Ord for Edit {
 impl PartialOrd for Edit {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl Ranged for Edit {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 

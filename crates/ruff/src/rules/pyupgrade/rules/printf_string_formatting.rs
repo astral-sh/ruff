@@ -1,18 +1,18 @@
 use std::str::FromStr;
 
-use ruff_text_size::TextRange;
-use rustpython_format::cformat::{
-    CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
-};
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
-use rustpython_parser::{lexer, Mode, Tok};
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_codegen::Stylist;
+use ruff_python_literal::cformat::{
+    CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
+};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -43,35 +43,37 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 #[violation]
 pub struct PrintfStringFormatting;
 
-impl AlwaysAutofixableViolation for PrintfStringFormatting {
+impl Violation for PrintfStringFormatting {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use format specifiers instead of percent format")
     }
 
-    fn autofix_title(&self) -> String {
-        "Replace with format specifiers".to_string()
+    fn autofix_title(&self) -> Option<String> {
+        Some("Replace with format specifiers".to_string())
     }
 }
 
 fn simplify_conversion_flag(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();
-    if flags.contains(CConversionFlags::LEFT_ADJUST) {
+    if flags.intersects(CConversionFlags::LEFT_ADJUST) {
         flag_string.push('<');
     }
-    if flags.contains(CConversionFlags::SIGN_CHAR) {
+    if flags.intersects(CConversionFlags::SIGN_CHAR) {
         flag_string.push('+');
     }
-    if flags.contains(CConversionFlags::ALTERNATE_FORM) {
+    if flags.intersects(CConversionFlags::ALTERNATE_FORM) {
         flag_string.push('#');
     }
-    if flags.contains(CConversionFlags::BLANK_SIGN) {
-        if !flags.contains(CConversionFlags::SIGN_CHAR) {
+    if flags.intersects(CConversionFlags::BLANK_SIGN) {
+        if !flags.intersects(CConversionFlags::SIGN_CHAR) {
             flag_string.push(' ');
         }
     }
-    if flags.contains(CConversionFlags::ZERO_PAD) {
-        if !flags.contains(CConversionFlags::LEFT_ADJUST) {
+    if flags.intersects(CConversionFlags::ZERO_PAD) {
+        if !flags.intersects(CConversionFlags::LEFT_ADJUST) {
             flag_string.push('0');
         }
     }
@@ -160,8 +162,8 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 }
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
-fn clean_params_tuple(checker: &mut Checker, right: &Expr, locator: &Locator) -> String {
-    let mut contents = checker.locator.slice(right.range()).to_string();
+fn clean_params_tuple(right: &Expr, locator: &Locator) -> String {
+    let mut contents = locator.slice(right).to_string();
     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &right {
         if elts.len() == 1 {
             if !locator.contains_line_break(right.range()) {
@@ -180,11 +182,7 @@ fn clean_params_tuple(checker: &mut Checker, right: &Expr, locator: &Locator) ->
 
 /// Converts a dictionary to a function call while preserving as much styling as
 /// possible.
-fn clean_params_dictionary(
-    checker: &mut Checker,
-    right: &Expr,
-    locator: &Locator,
-) -> Option<String> {
+fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -> Option<String> {
     let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
     if let Expr::Dict(ast::ExprDict {
@@ -200,7 +198,10 @@ fn clean_params_dictionary(
             match key {
                 Some(key) => {
                     if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(key_string),
+                        value:
+                            Constant::Str(ast::StringConstant {
+                                value: key_string, ..
+                            }),
                         ..
                     }) = key
                     {
@@ -215,11 +216,11 @@ fn clean_params_dictionary(
                         seen.push(key_string);
                         if is_multi_line {
                             if indent.is_none() {
-                                indent = indentation(checker.locator, key);
+                                indent = indentation(locator, key);
                             }
                         }
 
-                        let value_string = checker.locator.slice(value.range());
+                        let value_string = locator.slice(value);
                         arguments.push(format!("{key_string}={value_string}"));
                     } else {
                         // If there are any non-string keys, abort.
@@ -227,7 +228,7 @@ fn clean_params_dictionary(
                     }
                 }
                 None => {
-                    let value_string = checker.locator.slice(value.range());
+                    let value_string = locator.slice(value);
                     arguments.push(format!("**{value_string}"));
                 }
             }
@@ -243,16 +244,16 @@ fn clean_params_dictionary(
             };
 
             for item in &arguments {
-                contents.push_str(checker.stylist.line_ending().as_str());
+                contents.push_str(stylist.line_ending().as_str());
                 contents.push_str(indent);
                 contents.push_str(item);
                 contents.push(',');
             }
 
-            contents.push_str(checker.stylist.line_ending().as_str());
+            contents.push_str(stylist.line_ending().as_str());
 
             // For the ending parentheses, go back one indent.
-            let default_indent: &str = checker.stylist.indentation();
+            let default_indent: &str = stylist.indentation();
             if let Some(ident) = indent.strip_prefix(default_indent) {
                 contents.push_str(ident);
             } else {
@@ -295,7 +296,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
         }
 
         // No equivalent in format.
-        if fmt.mapping_key.as_ref().map_or(false, String::is_empty) {
+        if fmt.mapping_key.as_ref().is_some_and(String::is_empty) {
             return false;
         }
 
@@ -328,18 +329,13 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 }
 
 /// UP031
-pub(crate) fn printf_string_formatting(
-    checker: &mut Checker,
-    expr: &Expr,
-    right: &Expr,
-    locator: &Locator,
-) {
+pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<TextRange> = vec![];
     let mut extension = None;
     for (tok, range) in lexer::lex_starts_at(
-        checker.locator.slice(expr.range()),
-        Mode::Module,
+        checker.locator().slice(expr),
+        checker.source_type.as_mode(),
         expr.start(),
     )
     .flatten()
@@ -365,7 +361,7 @@ pub(crate) fn printf_string_formatting(
     let mut num_keyword_arguments = 0;
     let mut format_strings = Vec::with_capacity(strings.len());
     for range in &strings {
-        let string = checker.locator.slice(*range);
+        let string = checker.locator().slice(*range);
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
@@ -398,17 +394,17 @@ pub(crate) fn printf_string_formatting(
 
     // Parse the parameters.
     let params_string = match right {
-        Expr::Constant(_) | Expr::JoinedStr(_) => {
-            format!("({})", checker.locator.slice(right.range()))
+        Expr::Constant(_) | Expr::FString(_) => {
+            format!("({})", checker.locator().slice(right))
         }
         Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
-                format!("(**{})", checker.locator.slice(right.range()))
+                format!("(**{})", checker.locator().slice(right))
             } else if num_positional_arguments > 1 {
                 // If we have multiple fields, but no named fields, assume the right-hand side is a
                 // tuple.
-                format!("(*{})", checker.locator.slice(right.range()))
+                format!("(*{})", checker.locator().slice(right))
             } else {
                 // Otherwise, if we have a single field, we can't make any assumptions about the
                 // right-hand side. It _could_ be a tuple, but it could also be a single value,
@@ -422,9 +418,11 @@ pub(crate) fn printf_string_formatting(
                 return;
             }
         }
-        Expr::Tuple(_) => clean_params_tuple(checker, right, locator),
+        Expr::Tuple(_) => clean_params_tuple(right, checker.locator()),
         Expr::Dict(_) => {
-            if let Some(params_string) = clean_params_dictionary(checker, right, locator) {
+            if let Some(params_string) =
+                clean_params_dictionary(right, checker.locator(), checker.stylist())
+            {
                 params_string
             } else {
                 return;
@@ -442,12 +440,12 @@ pub(crate) fn printf_string_formatting(
             None => {
                 contents.push_str(
                     checker
-                        .locator
+                        .locator()
                         .slice(TextRange::new(expr.start(), range.start())),
                 );
             }
             Some(prev) => {
-                contents.push_str(checker.locator.slice(TextRange::new(prev, range.start())));
+                contents.push_str(checker.locator().slice(TextRange::new(prev, range.start())));
             }
         }
         // Add the string itself.
@@ -458,7 +456,7 @@ pub(crate) fn printf_string_formatting(
     if let Some(range) = extension {
         contents.push_str(
             checker
-                .locator
+                .locator()
                 .slice(TextRange::new(prev.unwrap(), range.end())),
         );
     }
@@ -467,7 +465,15 @@ pub(crate) fn printf_string_formatting(
     contents.push_str(&format!(".format{params_string}"));
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
+    // Avoid autofix if there are comments within the right-hand side:
+    // ```
+    // "%s" % (
+    //     0,  # 0
+    // )
+    // ```
+    if checker.patch(diagnostic.kind.rule())
+        && !checker.indexer().comment_ranges().intersects(right.range())
+    {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents,
             expr.range(),

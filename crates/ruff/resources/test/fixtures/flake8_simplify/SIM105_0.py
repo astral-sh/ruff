@@ -8,10 +8,17 @@ try:
 except ValueError:
     pass
 
+
 # SIM105
 try:
     foo()
 except (ValueError, OSError):
+    pass
+
+# SIM105
+try:
+    foo()
+except (ValueError, OSError) as e:
     pass
 
 # SIM105
@@ -94,3 +101,30 @@ def with_comment():
         foo()
     except (ValueError, OSError):
         pass  # Trailing comment.
+
+try:
+    print()
+except ("not", "an", "exception"):
+    pass
+
+try:
+    print()
+except "not an exception":
+    pass
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7123
+def write_models(directory, Models):
+    try:
+        os.makedirs(model_dir);
+    except OSError:
+        pass;
+
+    try: os.makedirs(model_dir);
+    except OSError:
+        pass;
+
+    try: os.makedirs(model_dir);
+    except OSError:
+        pass; \
+            \
+            #

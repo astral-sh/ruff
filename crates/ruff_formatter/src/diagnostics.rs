@@ -1,4 +1,5 @@
 use crate::prelude::TagKind;
+use crate::GroupId;
 use ruff_text_size::TextRange;
 use std::error::Error;
 
@@ -8,7 +9,7 @@ use std::error::Error;
 pub enum FormatError {
     /// In case a node can't be formatted because it either misses a require child element or
     /// a child is present that should not (e.g. a trailing comma after a rest element).
-    SyntaxError,
+    SyntaxError { message: &'static str },
     /// In case range formatting failed because the provided range was larger
     /// than the formatted syntax tree
     RangeError { input: TextRange, tree: TextRange },
@@ -28,7 +29,9 @@ pub enum FormatError {
 impl std::fmt::Display for FormatError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FormatError::SyntaxError => fmt.write_str("syntax error"),
+            FormatError::SyntaxError {message} => {
+                std::write!(fmt, "syntax error: {message}")
+            },
             FormatError::RangeError { input, tree } => std::write!(
                 fmt,
                 "formatting range {input:?} is larger than syntax tree {tree:?}"
@@ -57,6 +60,12 @@ impl From<&PrintError> for FormatError {
     }
 }
 
+impl FormatError {
+    pub fn syntax_error(message: &'static str) -> Self {
+        Self::SyntaxError { message }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InvalidDocumentError {
@@ -78,7 +87,9 @@ pub enum InvalidDocumentError {
     /// Text
     /// EndGroup
     /// ```
-    StartTagMissing { kind: TagKind },
+    StartTagMissing {
+        kind: TagKind,
+    },
 
     /// Expected a specific start tag but instead is:
     /// - at the end of the document
@@ -87,6 +98,10 @@ pub enum InvalidDocumentError {
     ExpectedStart {
         expected_start: TagKind,
         actual: ActualStart,
+    },
+
+    UnknownGroupId {
+        group_id: GroupId,
     },
 }
 
@@ -139,6 +154,9 @@ impl std::fmt::Display for InvalidDocumentError {
                         std::write!(f, "Expected start tag of kind {expected_start:?} but found non-tag element.")
                     }
                 }
+            }
+            InvalidDocumentError::UnknownGroupId { group_id } => {
+                std::write!(f, "Encountered unknown group id {group_id:?}. Ensure that the group with the id {group_id:?} exists and that the group is a parent of or comes before the element referring to it.")
             }
         }
     }

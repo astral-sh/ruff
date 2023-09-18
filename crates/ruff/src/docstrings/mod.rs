@@ -1,10 +1,9 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Expr, Ranged};
-
+use ruff_python_ast::Expr;
 use ruff_python_semantic::Definition;
+use ruff_text_size::{Ranged, TextRange};
 
 pub(crate) mod extraction;
 pub(crate) mod google;
@@ -28,20 +27,19 @@ impl<'a> Docstring<'a> {
         DocstringBody { docstring: self }
     }
 
-    pub(crate) fn start(&self) -> TextSize {
-        self.expr.start()
-    }
-
-    pub(crate) fn end(&self) -> TextSize {
-        self.expr.end()
-    }
-
-    pub(crate) fn range(&self) -> TextRange {
-        self.expr.range()
-    }
-
     pub(crate) fn leading_quote(&self) -> &'a str {
         &self.contents[TextRange::up_to(self.body_range.start())]
+    }
+
+    pub(crate) fn triple_quoted(&self) -> bool {
+        let leading_quote = self.leading_quote();
+        leading_quote.ends_with("\"\"\"") || leading_quote.ends_with("'''")
+    }
+}
+
+impl Ranged for Docstring<'_> {
+    fn range(&self) -> TextRange {
+        self.expr.range()
     }
 }
 
@@ -51,17 +49,14 @@ pub(crate) struct DocstringBody<'a> {
 }
 
 impl<'a> DocstringBody<'a> {
-    #[inline]
-    pub(crate) fn start(self) -> TextSize {
-        self.range().start()
-    }
-
-    pub(crate) fn range(self) -> TextRange {
-        self.docstring.body_range + self.docstring.start()
-    }
-
     pub(crate) fn as_str(self) -> &'a str {
         &self.docstring.contents[self.docstring.body_range]
+    }
+}
+
+impl Ranged for DocstringBody<'_> {
+    fn range(&self) -> TextRange {
+        self.docstring.body_range + self.docstring.start()
     }
 }
 

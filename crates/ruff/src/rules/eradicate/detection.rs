@@ -1,8 +1,8 @@
 /// See: [eradicate.py](https://github.com/myint/eradicate/blob/98f199940979c94447a461d50d27862b118b282d/eradicate.py)
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::Suite;
-use rustpython_parser::Parse;
+
+use ruff_python_parser::parse_suite;
 
 static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -28,7 +28,7 @@ static HASH_NUMBER: Lazy<Regex> = Lazy::new(|| Regex::new(r"#\d").unwrap());
 static MULTILINE_ASSIGNMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*([(\[]\s*)?(\w+\s*,\s*)*\w+\s*([)\]]\s*)?=.*[(\[{]$").unwrap());
 static PARTIAL_DICTIONARY_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"^\s*['"]\w+['"]\s*:.+[,{]\s*$"#).unwrap());
+    Lazy::new(|| Regex::new(r#"^\s*['"]\w+['"]\s*:.+[,{]\s*(#.*)?$"#).unwrap());
 static PRINT_RETURN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(print|return)\b\s*").unwrap());
 
 /// Returns `true` if a comment contains Python code.
@@ -79,7 +79,7 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     }
 
     // Finally, compile the source code.
-    Suite::parse(&line, "<filename>").is_ok()
+    parse_suite(&line, "<filename>").is_ok()
 }
 
 /// Returns `true` if a line is probably part of some multiline code.

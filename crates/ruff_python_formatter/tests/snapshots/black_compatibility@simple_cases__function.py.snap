@@ -107,33 +107,7 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -5,8 +5,7 @@
- from third_party import X, Y, Z
- 
- from library import some_connection, some_decorator
--
--f"trigger 3.6 mode"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
- 
- def func_no_args():
-@@ -41,12 +40,12 @@
-     debug: bool = False,
-     **kwargs,
- ) -> str:
--    return text[number:-1]
-+    return text[number : -1]
- 
- 
- def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
--    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(10000, 200000)))
--    assert task._cancel_stack[: len(old_stack)] == old_stack
-+    offset = attr.ib(default=attr.Factory(lambda NOT_YET_IMPLEMENTED_lambda: True))
-+    assert task._cancel_stack[ : len(old_stack)] == old_stack
- 
- 
- def spaces_types(
-@@ -65,18 +64,14 @@
+@@ -65,6 +65,7 @@
  
  def spaces2(result=_core.Value(None)):
      assert fut is self._read_fut, (fut, self._read_fut)
@@ -141,39 +115,6 @@ def __await__(): return (yield)
  
  
  def example(session):
--    result = (
--        session.query(models.Customer.id)
--        .filter(
--            models.Customer.account_id == account_id,
--            models.Customer.email == email_address,
--        )
--        .order_by(models.Customer.id.asc())
--        .all()
--    )
-+    result = session.query(models.Customer.id).filter(
-+        models.Customer.account_id == account_id,
-+        models.Customer.email == email_address,
-+    ).order_by(models.Customer.id.asc()).all()
- 
- 
- def long_lines():
-@@ -135,14 +130,8 @@
-     a,
-     **kwargs,
- ) -> A:
--    return (
--        yield from A(
--            very_long_argument_name1=very_long_value_for_the_argument,
--            very_long_argument_name2=very_long_value_for_the_argument,
--            **kwargs,
--        )
--    )
-+    return NOT_YET_IMPLEMENTED_ExprYieldFrom
- 
- 
- def __await__():
--    return (yield)
-+    return NOT_YET_IMPLEMENTED_ExprYield
 ```
 
 ## Ruff Output
@@ -186,7 +127,8 @@ import sys
 from third_party import X, Y, Z
 
 from library import some_connection, some_decorator
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+
+f"trigger 3.6 mode"
 
 
 def func_no_args():
@@ -221,12 +163,12 @@ def function_signature_stress_test(
     debug: bool = False,
     **kwargs,
 ) -> str:
-    return text[number : -1]
+    return text[number:-1]
 
 
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
-    offset = attr.ib(default=attr.Factory(lambda NOT_YET_IMPLEMENTED_lambda: True))
-    assert task._cancel_stack[ : len(old_stack)] == old_stack
+    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(10000, 200000)))
+    assert task._cancel_stack[: len(old_stack)] == old_stack
 
 
 def spaces_types(
@@ -249,10 +191,15 @@ def spaces2(result=_core.Value(None)):
 
 
 def example(session):
-    result = session.query(models.Customer.id).filter(
-        models.Customer.account_id == account_id,
-        models.Customer.email == email_address,
-    ).order_by(models.Customer.id.asc()).all()
+    result = (
+        session.query(models.Customer.id)
+        .filter(
+            models.Customer.account_id == account_id,
+            models.Customer.email == email_address,
+        )
+        .order_by(models.Customer.id.asc())
+        .all()
+    )
 
 
 def long_lines():
@@ -311,11 +258,17 @@ def f(
     a,
     **kwargs,
 ) -> A:
-    return NOT_YET_IMPLEMENTED_ExprYieldFrom
+    return (
+        yield from A(
+            very_long_argument_name1=very_long_value_for_the_argument,
+            very_long_argument_name2=very_long_value_for_the_argument,
+            **kwargs,
+        )
+    )
 
 
 def __await__():
-    return NOT_YET_IMPLEMENTED_ExprYield
+    return (yield)
 ```
 
 ## Black Output

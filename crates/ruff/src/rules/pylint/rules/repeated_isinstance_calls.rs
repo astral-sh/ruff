@@ -1,10 +1,13 @@
 use itertools::Itertools;
+use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr};
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, BoolOp, Expr, Ranged};
 
+use crate::autofix::edits::pad;
+use crate::autofix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -43,19 +46,27 @@ use crate::settings::types::PythonVersion;
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct RepeatedIsinstanceCalls {
-    expr: String,
+    expression: SourceCodeSnippet,
 }
 
 impl AlwaysAutofixableViolation for RepeatedIsinstanceCalls {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RepeatedIsinstanceCalls { expr } = self;
-        format!("Merge `isinstance` calls: `{expr}`")
+        let RepeatedIsinstanceCalls { expression } = self;
+        if let Some(expression) = expression.full_display() {
+            format!("Merge `isinstance` calls: `{expression}`")
+        } else {
+            format!("Merge `isinstance` calls")
+        }
     }
 
     fn autofix_title(&self) -> String {
-        let RepeatedIsinstanceCalls { expr } = self;
-        format!("Replace with `{expr}`")
+        let RepeatedIsinstanceCalls { expression } = self;
+        if let Some(expression) = expression.full_display() {
+            format!("Replace with `{expression}`")
+        } else {
+            format!("Replace with merged `isinstance` call")
+        }
     }
 }
 
@@ -73,7 +84,12 @@ pub(crate) fn repeated_isinstance_calls(
     let mut obj_to_types: FxHashMap<HashableExpr, (usize, FxHashSet<HashableExpr>)> =
         FxHashMap::default();
     for value in values {
-        let Expr::Call(ast::ExprCall { func, args, .. }) = value else {
+        let Expr::Call(ast::ExprCall {
+            func,
+            arguments: Arguments { args, .. },
+            ..
+        }) = value
+        else {
             continue;
         };
         if !matches!(func.as_ref(), Expr::Name(ast::ExprName { id, .. }) if id == "isinstance") {
@@ -111,10 +127,17 @@ pub(crate) fn repeated_isinstance_calls(
                     .sorted(),
                 checker.settings.target_version,
             );
-            let mut diagnostic =
-                Diagnostic::new(RepeatedIsinstanceCalls { expr: call.clone() }, expr.range());
+            let mut diagnostic = Diagnostic::new(
+                RepeatedIsinstanceCalls {
+                    expression: SourceCodeSnippet::new(call.clone()),
+                },
+                expr.range(),
+            );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(call, expr.range())));
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    pad(call, expr.range(), checker.locator()),
+                    expr.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

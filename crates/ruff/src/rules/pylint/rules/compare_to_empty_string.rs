@@ -1,9 +1,10 @@
 use anyhow::bail;
 use itertools::Itertools;
-use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -15,22 +16,30 @@ use crate::checkers::ast::Checker;
 /// the value can be something else Python considers falsy, such as `None` or
 /// `0` or another empty container, then the code is not equivalent.
 ///
+/// ## Known problems
+/// High false positive rate, as the check is context-insensitive and does not
+/// consider the type of the variable being compared ([#4282]).
+///
 /// ## Example
 /// ```python
-/// def foo(x):
-///     if x == "":
-///         print("x is empty")
+/// x: str = ...
+///
+/// if x == "":
+///     print("x is empty")
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo(x):
-///     if not x:
-///         print("x is empty")
+/// x: str = ...
+///
+/// if not x:
+///     print("x is empty")
 /// ```
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
+///
+/// [#4282]: https://github.com/astral-sh/ruff/issues/4282
 #[violation]
 pub struct CompareToEmptyString {
     existing: String,
@@ -59,8 +68,8 @@ pub(crate) fn compare_to_empty_string(
     // DataFrame and np.ndarray indexing.
     if checker
         .semantic()
-        .expr_ancestors()
-        .any(|parent| parent.is_subscript_expr())
+        .current_expressions()
+        .any(Expr::is_subscript_expr)
     {
         return;
     }

@@ -105,7 +105,7 @@ src = ["src"]
 
 ### Rule Selection
 
-Ruff supports [over 500 lint rules](rules.md) split across over 40 built-in plugins, but
+Ruff supports [over 600 lint rules](rules.md) split across over 40 built-in plugins, but
 determining the right set of rules will depend on your project's needs: some rules may be too
 strict, some are framework-specific, and so on.
 
@@ -205,6 +205,11 @@ def sum_even_numbers(numbers: List[int]) -> int:
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
+For more in-depth instructions on ignoring errors,
+please see [_Configuration_](configuration.md#error-suppression).
+
+### Adding Rules
+
 When enabling a new rule on an existing codebase, you may want to ignore all _existing_
 violations of that rule and instead focus on enforcing it going forward.
 
@@ -242,7 +247,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.278
+  rev: v0.0.290
   hooks:
     - id: ruff
 ```

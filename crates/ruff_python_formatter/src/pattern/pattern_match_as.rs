@@ -1,12 +1,69 @@
-use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::PatternMatchAs;
+use ruff_formatter::write;
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::PatternMatchAs;
+
+use crate::comments::{dangling_comments, SourceComment};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatPatternMatchAs;
 
 impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
     fn fmt_fields(&self, item: &PatternMatchAs, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented(item)])
+        let PatternMatchAs {
+            range: _,
+            pattern,
+            name,
+        } = item;
+
+        let comments = f.context().comments().clone();
+
+        if let Some(name) = name {
+            if let Some(pattern) = pattern {
+                pattern.format().fmt(f)?;
+
+                if comments.has_trailing(pattern.as_ref()) {
+                    write!(f, [hard_line_break()])?;
+                } else {
+                    write!(f, [space()])?;
+                }
+
+                write!(f, [token("as")])?;
+
+                let trailing_as_comments = comments.dangling(item);
+                if trailing_as_comments.is_empty() {
+                    write!(f, [space()])?;
+                } else if trailing_as_comments
+                    .iter()
+                    .all(|comment| comment.line_position().is_own_line())
+                {
+                    write!(f, [hard_line_break()])?;
+                }
+                write!(f, [dangling_comments(trailing_as_comments)])?;
+            }
+            name.format().fmt(f)
+        } else {
+            debug_assert!(pattern.is_none());
+            token("_").fmt(f)
+        }
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        Ok(())
+    }
+}
+
+impl NeedsParentheses for PatternMatchAs {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Multiline
     }
 }

@@ -1,11 +1,9 @@
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
-use ruff_python_semantic::{Definition, Member};
-use ruff_python_whitespace::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_python_semantic::Definition;
+use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -50,7 +48,7 @@ use crate::registry::{AsRule, Rule};
 ///     """
 /// ```
 ///
-/// [D213]: https://beta.ruff.rs/docs/rules/multi-line-summary-second-line
+/// [D213]: https://docs.astral.sh/ruff/rules/multi-line-summary-second-line
 #[violation]
 pub struct MultiLineSummaryFirstLine;
 
@@ -104,7 +102,7 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
 ///     """
 /// ```
 ///
-/// [D212]: https://beta.ruff.rs/docs/rules/multi-line-summary-first-line
+/// [D212]: https://docs.astral.sh/ruff/rules/multi-line-summary-first-line
 #[violation]
 pub struct MultiLineSummarySecondLine;
 
@@ -153,6 +151,15 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
             }
             checker.diagnostics.push(diagnostic);
         }
+    } else if first_line.as_str().ends_with('\\') {
+        // Ignore the edge case whether a single quoted string is multiple lines through an
+        // escape (https://github.com/astral-sh/ruff/issues/7139). Single quote docstrings are
+        // flagged by D300.
+        // ```python
+        // "\
+        // "
+        // ```
+        return;
     } else {
         if checker.enabled(Rule::MultiLineSummarySecondLine) {
             let mut diagnostic = Diagnostic::new(MultiLineSummarySecondLine, docstring.range());
@@ -164,16 +171,16 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
 
                     // If the docstring isn't on its own line, look at the statement indentation,
                     // and add the default indentation to get the "right" level.
-                    if let Definition::Member(Member { stmt, .. }) = &docstring.definition {
-                        let stmt_line_start = checker.locator.line_start(stmt.start());
+                    if let Definition::Member(member) = &docstring.definition {
+                        let stmt_line_start = checker.locator().line_start(member.start());
                         let stmt_indentation = checker
-                            .locator
-                            .slice(TextRange::new(stmt_line_start, stmt.start()));
+                            .locator()
+                            .slice(TextRange::new(stmt_line_start, member.start()));
 
                         if stmt_indentation.chars().all(char::is_whitespace) {
                             indentation.clear();
                             indentation.push_str(stmt_indentation);
-                            indentation.push_str(checker.stylist.indentation());
+                            indentation.push_str(checker.stylist().indentation());
                             fixable = true;
                         }
                     };
@@ -185,7 +192,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     // quote and text.
                     let repl = format!(
                         "{}{}{}",
-                        checker.stylist.line_ending().as_str(),
+                        checker.stylist().line_ending().as_str(),
                         indentation,
                         first_line.strip_prefix(prefix).unwrap().trim_start()
                     );

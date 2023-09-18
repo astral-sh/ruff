@@ -1,11 +1,11 @@
 use std::hash::BuildHasherDefault;
 
 use anyhow::{anyhow, bail, Result};
+use ruff_python_ast::{
+    self as ast, Arguments, CmpOp, Constant, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
+};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{
-    self, CmpOp, Constant, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
-};
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
@@ -19,6 +19,13 @@ pub(crate) enum UnittestAssert {
     DictEqual,
     Equal,
     Equals,
+    FailIf,
+    FailIfAlmostEqual,
+    FailIfEqual,
+    FailUnless,
+    FailUnlessAlmostEqual,
+    FailUnlessEqual,
+    // FailUnlessRaises,
     False,
     Greater,
     GreaterEqual,
@@ -62,10 +69,16 @@ impl std::fmt::Display for UnittestAssert {
             UnittestAssert::AlmostEqual => write!(f, "assertAlmostEqual"),
             UnittestAssert::AlmostEquals => write!(f, "assertAlmostEquals"),
             UnittestAssert::CountEqual => write!(f, "assertCountEqual"),
-            UnittestAssert::DictEqual => write!(f, "assertDictEqual"),
             UnittestAssert::DictContainsSubset => write!(f, "assertDictContainsSubset"),
+            UnittestAssert::DictEqual => write!(f, "assertDictEqual"),
             UnittestAssert::Equal => write!(f, "assertEqual"),
             UnittestAssert::Equals => write!(f, "assertEquals"),
+            UnittestAssert::FailIf => write!(f, "failIf"),
+            UnittestAssert::FailIfAlmostEqual => write!(f, "failIfAlmostEqual"),
+            UnittestAssert::FailIfEqual => write!(f, "failIfEqual"),
+            UnittestAssert::FailUnless => write!(f, "failUnless"),
+            UnittestAssert::FailUnlessAlmostEqual => write!(f, "failUnlessAlmostEqual"),
+            UnittestAssert::FailUnlessEqual => write!(f, "failUnlessEqual"),
             UnittestAssert::False => write!(f, "assertFalse"),
             UnittestAssert::Greater => write!(f, "assertGreater"),
             UnittestAssert::GreaterEqual => write!(f, "assertGreaterEqual"),
@@ -110,6 +123,12 @@ impl TryFrom<&str> for UnittestAssert {
             "assertDictEqual" => Ok(UnittestAssert::DictEqual),
             "assertEqual" => Ok(UnittestAssert::Equal),
             "assertEquals" => Ok(UnittestAssert::Equals),
+            "failIf" => Ok(UnittestAssert::FailIf),
+            "failIfAlmostEqual" => Ok(UnittestAssert::FailIfAlmostEqual),
+            "failIfEqual" => Ok(UnittestAssert::FailIfEqual),
+            "failUnless" => Ok(UnittestAssert::FailUnless),
+            "failUnlessAlmostEqual" => Ok(UnittestAssert::FailUnlessAlmostEqual),
+            "failUnlessEqual" => Ok(UnittestAssert::FailUnlessEqual),
             "assertFalse" => Ok(UnittestAssert::False),
             "assertGreater" => Ok(UnittestAssert::Greater),
             "assertGreaterEqual" => Ok(UnittestAssert::GreaterEqual),
@@ -198,6 +217,12 @@ impl UnittestAssert {
             UnittestAssert::True => &["expr", "msg"],
             UnittestAssert::TupleEqual => &["first", "second", "msg"],
             UnittestAssert::Underscore => &["expr", "msg"],
+            UnittestAssert::FailIf => &["expr", "msg"],
+            UnittestAssert::FailIfAlmostEqual => &["first", "second", "msg"],
+            UnittestAssert::FailIfEqual => &["first", "second", "msg"],
+            UnittestAssert::FailUnless => &["expr", "msg"],
+            UnittestAssert::FailUnlessAlmostEqual => &["first", "second", "places", "msg", "delta"],
+            UnittestAssert::FailUnlessEqual => &["first", "second", "places", "msg", "delta"],
         }
     }
 
@@ -218,7 +243,7 @@ impl UnittestAssert {
         if keywords.iter().any(|kw| {
             kw.arg
                 .as_ref()
-                .map_or(false, |kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
+                .is_some_and(|kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
         }) {
             bail!("Unknown keyword argument");
         }
@@ -240,7 +265,7 @@ impl UnittestAssert {
                 if keyword
                     .arg
                     .as_ref()
-                    .map_or(false, |kwarg_name| &kwarg_name == arg_name)
+                    .is_some_and(|kwarg_name| &kwarg_name == arg_name)
                 {
                     Some(&keyword.value)
                 } else {
@@ -257,28 +282,35 @@ impl UnittestAssert {
     pub(crate) fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
         let args = self.args_map(args, keywords)?;
         match self {
-            UnittestAssert::True | UnittestAssert::False => {
+            UnittestAssert::True
+            | UnittestAssert::False
+            | UnittestAssert::FailUnless
+            | UnittestAssert::FailIf => {
                 let expr = *args
                     .get("expr")
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
-                Ok(if matches!(self, UnittestAssert::False) {
-                    assert(
-                        &Expr::UnaryOp(ast::ExprUnaryOp {
-                            op: UnaryOp::Not,
-                            operand: Box::new(expr.clone()),
-                            range: TextRange::default(),
-                        }),
-                        msg,
-                    )
-                } else {
-                    assert(expr, msg)
-                })
+                Ok(
+                    if matches!(self, UnittestAssert::False | UnittestAssert::FailIf) {
+                        assert(
+                            &Expr::UnaryOp(ast::ExprUnaryOp {
+                                op: UnaryOp::Not,
+                                operand: Box::new(expr.clone()),
+                                range: TextRange::default(),
+                            }),
+                            msg,
+                        )
+                    } else {
+                        assert(expr, msg)
+                    },
+                )
             }
             UnittestAssert::Equal
             | UnittestAssert::Equals
+            | UnittestAssert::FailUnlessEqual
             | UnittestAssert::NotEqual
             | UnittestAssert::NotEquals
+            | UnittestAssert::FailIfEqual
             | UnittestAssert::Greater
             | UnittestAssert::GreaterEqual
             | UnittestAssert::Less
@@ -293,8 +325,12 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `second`"))?;
                 let msg = args.get("msg").copied();
                 let cmp_op = match self {
-                    UnittestAssert::Equal | UnittestAssert::Equals => CmpOp::Eq,
-                    UnittestAssert::NotEqual | UnittestAssert::NotEquals => CmpOp::NotEq,
+                    UnittestAssert::Equal
+                    | UnittestAssert::Equals
+                    | UnittestAssert::FailUnlessEqual => CmpOp::Eq,
+                    UnittestAssert::NotEqual
+                    | UnittestAssert::NotEquals
+                    | UnittestAssert::FailIfEqual => CmpOp::NotEq,
                     UnittestAssert::Greater => CmpOp::Gt,
                     UnittestAssert::GreaterEqual => CmpOp::GtE,
                     UnittestAssert::Less => CmpOp::Lt,
@@ -334,7 +370,6 @@ impl UnittestAssert {
                 };
                 let node = Expr::Constant(ast::ExprConstant {
                     value: Constant::None,
-                    kind: None,
                     range: TextRange::default(),
                 });
                 let expr = compare(expr, cmp_op, &node);
@@ -355,8 +390,11 @@ impl UnittestAssert {
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
-                    args: vec![(**obj).clone(), (**cls).clone()],
-                    keywords: vec![],
+                    arguments: Arguments {
+                        args: vec![(**obj).clone(), (**cls).clone()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
                     range: TextRange::default(),
                 };
                 let isinstance = node1.into();
@@ -396,8 +434,11 @@ impl UnittestAssert {
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
-                    args: vec![(**regex).clone(), (**text).clone()],
-                    keywords: vec![],
+                    arguments: Arguments {
+                        args: vec![(**regex).clone(), (**text).clone()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
                     range: TextRange::default(),
                 };
                 let re_search = node2.into();

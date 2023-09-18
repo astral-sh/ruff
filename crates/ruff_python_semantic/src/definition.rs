@@ -5,7 +5,8 @@ use std::fmt::Debug;
 use std::ops::Deref;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use rustpython_parser::ast::{self, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::analyze::visibility::{
     class_visibility, function_visibility, method_visibility, ModuleSource, Visibility,
@@ -23,7 +24,7 @@ impl DefinitionId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, is_macro::Is)]
 pub enum ModuleKind {
     /// A Python file that represents a module within a package.
     Module,
@@ -47,43 +48,76 @@ impl<'a> Module<'a> {
             None
         }
     }
+
+    /// Return the name of the module.
+    pub fn name(&self) -> Option<&'a str> {
+        match self.source {
+            ModuleSource::Path(path) => path.last().map(Deref::deref),
+            ModuleSource::File(file) => file.file_stem().and_then(std::ffi::OsStr::to_str),
+        }
+    }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum MemberKind {
+#[derive(Debug, Copy, Clone, is_macro::Is)]
+pub enum MemberKind<'a> {
     /// A class definition within a program.
-    Class,
+    Class(&'a ast::StmtClassDef),
     /// A nested class definition within a program.
-    NestedClass,
+    NestedClass(&'a ast::StmtClassDef),
     /// A function definition within a program.
-    Function,
+    Function(&'a ast::StmtFunctionDef),
     /// A nested function definition within a program.
-    NestedFunction,
+    NestedFunction(&'a ast::StmtFunctionDef),
     /// A method definition within a program.
-    Method,
+    Method(&'a ast::StmtFunctionDef),
 }
 
 /// A member of a Python module.
 #[derive(Debug)]
 pub struct Member<'a> {
-    pub kind: MemberKind,
+    pub kind: MemberKind<'a>,
     pub parent: DefinitionId,
-    pub stmt: &'a Stmt,
 }
 
 impl<'a> Member<'a> {
-    fn name(&self) -> &'a str {
-        match &self.stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name,
-            Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name,
-            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => name,
-            _ => unreachable!("Unexpected member kind: {:?}", self.kind),
+    /// Return the name of the member.
+    pub fn name(&self) -> &str {
+        match self.kind {
+            MemberKind::Class(class) => &class.name,
+            MemberKind::NestedClass(class) => &class.name,
+            MemberKind::Function(function) => &function.name,
+            MemberKind::NestedFunction(function) => &function.name,
+            MemberKind::Method(method) => &method.name,
+        }
+    }
+
+    /// Return the body of the member.
+    pub fn body(&self) -> &[Stmt] {
+        match self.kind {
+            MemberKind::Class(class) => &class.body,
+            MemberKind::NestedClass(class) => &class.body,
+            MemberKind::Function(function) => &function.body,
+            MemberKind::NestedFunction(function) => &function.body,
+            MemberKind::Method(method) => &method.body,
+        }
+    }
+}
+
+impl Ranged for Member<'_> {
+    /// Return the range of the member.
+    fn range(&self) -> TextRange {
+        match self.kind {
+            MemberKind::Class(class) => class.range(),
+            MemberKind::NestedClass(class) => class.range(),
+            MemberKind::Function(function) => function.range(),
+            MemberKind::NestedFunction(function) => function.range(),
+            MemberKind::Method(method) => method.range(),
         }
     }
 }
 
 /// A definition within a Python program.
-#[derive(Debug)]
+#[derive(Debug, is_macro::Is)]
 pub enum Definition<'a> {
     Module(Module<'a>),
     Member(Member<'a>),
@@ -95,10 +129,43 @@ impl Definition<'_> {
         matches!(
             self,
             Definition::Member(Member {
-                kind: MemberKind::Method,
+                kind: MemberKind::Method(_),
                 ..
             })
         )
+    }
+
+    /// Return the name of the definition.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Definition::Module(module) => module.name(),
+            Definition::Member(member) => Some(member.name()),
+        }
+    }
+
+    /// Return the [`ast::StmtFunctionDef`] of the definition, if it's a function definition.
+    pub fn as_function_def(&self) -> Option<&ast::StmtFunctionDef> {
+        match self {
+            Definition::Member(Member {
+                kind:
+                    MemberKind::Function(function)
+                    | MemberKind::NestedFunction(function)
+                    | MemberKind::Method(function),
+                ..
+            }) => Some(function),
+            _ => None,
+        }
+    }
+
+    /// Return the [`ast::StmtClassDef`] of the definition, if it's a class definition.
+    pub fn as_class_def(&self) -> Option<&ast::StmtClassDef> {
+        match self {
+            Definition::Member(Member {
+                kind: MemberKind::Class(class) | MemberKind::NestedClass(class),
+                ..
+            }) => Some(class),
+            _ => None,
+        }
     }
 }
 
@@ -131,53 +198,43 @@ impl<'a> Definitions<'a> {
                 match &definition {
                     Definition::Module(module) => module.source.to_visibility(),
                     Definition::Member(member) => match member.kind {
-                        MemberKind::Class => {
+                        MemberKind::Class(class) => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports
-                                    .map_or(false, |exports| !exports.contains(&member.name()))
+                                || exports.is_some_and(|exports| !exports.contains(&member.name()))
                             {
                                 Visibility::Private
                             } else {
-                                class_visibility(member.stmt)
+                                class_visibility(class)
                             }
                         }
-                        MemberKind::NestedClass => {
+                        MemberKind::NestedClass(class) => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || matches!(
-                                    parent.definition,
-                                    Definition::Member(Member {
-                                        kind: MemberKind::Function
-                                            | MemberKind::NestedFunction
-                                            | MemberKind::Method,
-                                        ..
-                                    })
-                                )
+                                || parent.definition.as_function_def().is_some()
                             {
                                 Visibility::Private
                             } else {
-                                class_visibility(member.stmt)
+                                class_visibility(class)
                             }
                         }
-                        MemberKind::Function => {
+                        MemberKind::Function(function) => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports
-                                    .map_or(false, |exports| !exports.contains(&member.name()))
+                                || exports.is_some_and(|exports| !exports.contains(&member.name()))
                             {
                                 Visibility::Private
                             } else {
-                                function_visibility(member.stmt)
+                                function_visibility(function)
                             }
                         }
-                        MemberKind::NestedFunction => Visibility::Private,
-                        MemberKind::Method => {
+                        MemberKind::NestedFunction(_) => Visibility::Private,
+                        MemberKind::Method(function) => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private() {
                                 Visibility::Private
                             } else {
-                                method_visibility(member.stmt)
+                                method_visibility(function)
                             }
                         }
                     },

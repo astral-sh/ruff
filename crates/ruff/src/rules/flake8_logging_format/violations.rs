@@ -21,6 +21,19 @@ use ruff_macros::{derive_message_formats, violation};
 /// As an alternative to `extra`, passing values as arguments to the logging
 /// method can also be used to defer string formatting until required.
 ///
+/// ## Known problems
+///
+/// This rule detects uses of the `logging` module via a heuristic.
+/// Specifically, it matches against:
+///
+/// - Uses of the `logging` module itself (e.g., `import logging; logging.info(...)`).
+/// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
+/// - Objects whose name starts with `log` or ends with `logger` or `logging`,
+///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
+/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
+///   when [`logger-objects`] is set to `["module.logger"]`).
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -53,6 +66,9 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// logging.info("%s - Something happened", user)
 /// ```
+///
+/// ## Options
+/// - `logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
@@ -89,6 +105,19 @@ impl Violation for LoggingStringFormat {
 /// As an alternative to `extra`, passing values as arguments to the logging
 /// method can also be used to defer string formatting until required.
 ///
+/// ## Known problems
+///
+/// This rule detects uses of the `logging` module via a heuristic.
+/// Specifically, it matches against:
+///
+/// - Uses of the `logging` module itself (e.g., `import logging; logging.info(...)`).
+/// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
+/// - Objects whose name starts with `log` or ends with `logger` or `logging`,
+///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
+/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
+///   when [`logger-objects`] is set to `["module.logger"]`).
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -121,6 +150,9 @@ impl Violation for LoggingStringFormat {
 ///
 /// logging.info("%s - Something happened", user)
 /// ```
+///
+/// ## Options
+/// - `logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
@@ -156,6 +188,19 @@ impl Violation for LoggingPercentFormat {
 /// As an alternative to `extra`, passing values as arguments to the logging
 /// method can also be used to defer string formatting until required.
 ///
+/// ## Known problems
+///
+/// This rule detects uses of the `logging` module via a heuristic.
+/// Specifically, it matches against:
+///
+/// - Uses of the `logging` module itself (e.g., `import logging; logging.info(...)`).
+/// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
+/// - Objects whose name starts with `log` or ends with `logger` or `logging`,
+///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
+/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
+///   when [`logger-objects`] is set to `["module.logger"]`).
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -188,6 +233,9 @@ impl Violation for LoggingPercentFormat {
 ///
 /// logging.info("%s - Something happened", user)
 /// ```
+///
+/// ## Options
+/// - `logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
@@ -222,6 +270,19 @@ impl Violation for LoggingStringConcat {
 /// As an alternative to `extra`, passing values as arguments to the logging
 /// method can also be used to defer string formatting until required.
 ///
+/// ## Known problems
+///
+/// This rule detects uses of the `logging` module via a heuristic.
+/// Specifically, it matches against:
+///
+/// - Uses of the `logging` module itself (e.g., `import logging; logging.info(...)`).
+/// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
+/// - Objects whose name starts with `log` or ends with `logger` or `logging`,
+///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
+/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
+///   when [`logger-objects`] is set to `["module.logger"]`).
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -255,6 +316,9 @@ impl Violation for LoggingStringConcat {
 /// logging.info("%s - Something happened", user)
 /// ```
 ///
+/// ## Options
+/// - `logger-objects`
+///
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
@@ -276,6 +340,19 @@ impl Violation for LoggingFString {
 /// `logging.warning` and `logging.Logger.warning`, which are functionally
 /// equivalent.
 ///
+/// ## Known problems
+///
+/// This rule detects uses of the `logging` module via a heuristic.
+/// Specifically, it matches against:
+///
+/// - Uses of the `logging` module itself (e.g., `import logging; logging.info(...)`).
+/// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
+/// - Objects whose name starts with `log` or ends with `logger` or `logging`,
+///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
+/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
+///   when [`logger-objects`] is set to `["module.logger"]`).
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -289,6 +366,9 @@ impl Violation for LoggingFString {
 ///
 /// logging.warning("Something happened")
 /// ```
+///
+/// ## Options
+/// - `logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging.warning`](https://docs.python.org/3/library/logging.html#logging.warning)
@@ -320,6 +400,19 @@ impl AlwaysAutofixableViolation for LoggingWarn {
 /// the `LogRecord` constructor will raise a `KeyError` when the `LogRecord` is
 /// constructed.
 ///
+/// ## Known problems
+///
+/// This rule detects uses of the `logging` module via a heuristic.
+/// Specifically, it matches against:
+///
+/// - Uses of the `logging` module itself (e.g., `import logging; logging.info(...)`).
+/// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
+/// - Objects whose name starts with `log` or ends with `logger` or `logging`,
+///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
+/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
+///   when [`logger-objects`] is set to `["module.logger"]`).
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -341,6 +434,9 @@ impl AlwaysAutofixableViolation for LoggingWarn {
 ///
 /// logging.info("Something happened", extra=dict(user=username))
 /// ```
+///
+/// ## Options
+/// - `logger-objects`
 ///
 /// ## References
 /// - [Python documentation: LogRecord attributes](https://docs.python.org/3/library/logging.html#logrecord-attributes)
@@ -365,6 +461,19 @@ impl Violation for LoggingExtraAttrClash {
 /// `logging.exception`. Using `logging.exception` is more concise, more
 /// readable, and conveys the intent of the logging statement more clearly.
 ///
+/// ## Known problems
+///
+/// This rule detects uses of the `logging` module via a heuristic.
+/// Specifically, it matches against:
+///
+/// - Uses of the `logging` module itself (e.g., `import logging; logging.info(...)`).
+/// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
+/// - Objects whose name starts with `log` or ends with `logger` or `logging`,
+///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
+/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
+///   when [`logger-objects`] is set to `["module.logger"]`).
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -384,6 +493,9 @@ impl Violation for LoggingExtraAttrClash {
 /// except ValueError:
 ///     logging.exception("Exception occurred")
 /// ```
+///
+/// ## Options
+/// - `logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
@@ -410,6 +522,19 @@ impl Violation for LoggingExcInfo {
 /// Passing `exc_info=True` to `logging.exception` calls is redundant, as is
 /// passing `exc_info=False` to `logging.error` calls.
 ///
+/// ## Known problems
+///
+/// This rule detects uses of the `logging` module via a heuristic.
+/// Specifically, it matches against:
+///
+/// - Uses of the `logging` module itself (e.g., `import logging; logging.info(...)`).
+/// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
+/// - Objects whose name starts with `log` or ends with `logger` or `logging`,
+///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
+/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
+///   when [`logger-objects`] is set to `["module.logger"]`).
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -429,6 +554,9 @@ impl Violation for LoggingExcInfo {
 /// except ValueError:
 ///     logging.exception("Exception occurred")
 /// ```
+///
+/// ## Options
+/// - `logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)

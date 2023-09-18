@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_fixme/mod.rs
 ---
-T00.py:3:3: FIX003 Line contains XXX
+T00.py:3:3: FIX003 Line contains XXX, consider resolving the issue
   |
 1 | # TODO: todo
 2 | # todo: todo
@@ -11,7 +11,7 @@ T00.py:3:3: FIX003 Line contains XXX
 5 | # HACK: hack
   |
 
-T00.py:4:3: FIX003 Line contains XXX
+T00.py:4:3: FIX003 Line contains XXX, consider resolving the issue
   |
 2 | # todo: todo
 3 | # XXX: xxx

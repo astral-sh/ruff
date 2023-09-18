@@ -23,8 +23,6 @@ repos:
       - id: mdformat
         additional_dependencies:
           - mdformat-mkdocs
-          - mdformat-black
-          - black==23.1.0 # Must be the latest version of Black
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.33.0
@@ -42,13 +40,13 @@ repos:
         name: cargo fmt
         entry: cargo fmt --
         language: system
-        types: [ rust ]
+        types: [rust]
         pass_filenames: false # This makes it a lot faster
       - id: ruff
         name: ruff
         entry: cargo run --bin ruff -- check --no-cache --force-exclude --fix --exit-non-zero-on-fix
         language: system
-        types_or: [ python, pyi ]
+        types_or: [python, pyi]
         require_serial: true
         exclude: |
           (?x)^(
@@ -62,5 +60,12 @@ repos:
     hooks:
       - id: black
 
+  # Prettier
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.0.0
+    hooks:
+      - id: prettier
+        types: [yaml]
+
 ci:
-  skip: [ cargo-fmt, dev-generate-all ]
+  skip: [cargo-fmt, dev-generate-all]

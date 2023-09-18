@@ -1,16 +1,51 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged, Stmt, WithItem};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::format_call_path;
-use ruff_python_ast::call_path::from_qualified_name;
+use ruff_python_ast::helpers::is_compound_statement;
+use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 use super::helpers::is_empty_or_null_string;
 
+/// ## What it does
+/// Checks for `pytest.raises` context managers with multiple statements.
+///
+/// ## Why is this bad?
+/// When a `pytest.raises` is used as a context manager and contains multiple
+/// statements, it can lead to the test passing when it actually should fail.
+/// To avoid this, a `pytest.raises` context manager should only contain
+/// a single simple statement that raises the expected exception.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(MyError):
+///         setup()  # may raise `MyError`
+///         func_to_test()
+///         assert foo()  # not executed
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     setup()
+///     with pytest.raises(MyException):
+///         func_to_test()
+///     assert foo()
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[violation]
 pub struct PytestRaisesWithMultipleStatements;
 
@@ -21,6 +56,47 @@ impl Violation for PytestRaisesWithMultipleStatements {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.raises` calls without a `match` parameter.
+///
+/// ## Why is this bad?
+/// `pytest.raises(Error)` will catch any `Error` and may catch errors that are
+/// unrelated to the code under test. To avoid this, `pytest.raises` should be
+/// called with a `match` parameter. The exception names that require a `match`
+/// parameter can be configured via the
+/// `flake8-pytest-style.raises-require-match-for` and
+/// `flake8-pytest-style.raises-extend-require-match-for` settings.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(ValueError):
+///         ...
+///
+///     # empty string is also an error
+///     with pytest.raises(ValueError, match=""):
+///         ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(ValueError, match="expected message"):
+///         ...
+/// ```
+///
+/// ## Options
+/// - `flake8-pytest-style.raises-require-match-for`
+/// - `flake8-pytest-style.raises-extend-require-match-for`
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[violation]
 pub struct PytestRaisesTooBroad {
     exception: String,
@@ -37,6 +113,35 @@ impl Violation for PytestRaisesTooBroad {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.raises` calls without an expected exception.
+///
+/// ## Why is this bad?
+/// `pytest.raises` expects to receive an expected exception as its first
+/// argument. If omitted, the `pytest.raises` call will fail at runtime.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises():
+///         do_something()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(SomeException):
+///         do_something()
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[violation]
 pub struct PytestRaisesWithoutException;
 
@@ -48,40 +153,33 @@ impl Violation for PytestRaisesWithoutException {
 }
 
 fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["pytest", "raises"])
-    })
+    semantic
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["pytest", "raises"]))
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
-    if body.len() > 1 {
-        true
-    } else if let Some(first_body_stmt) = body.first() {
-        !first_body_stmt.is_pass_stmt()
+    if let [stmt] = body {
+        is_compound_statement(stmt)
     } else {
-        false
+        true
     }
 }
 
-pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_raises(func, checker.semantic()) {
+pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
+    if is_pytest_raises(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestRaisesWithoutException) {
-            if args.is_empty() && keywords.is_empty() {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PytestRaisesWithoutException, func.range()));
+            if call.arguments.is_empty() {
+                checker.diagnostics.push(Diagnostic::new(
+                    PytestRaisesWithoutException,
+                    call.func.range(),
+                ));
             }
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            let match_keyword = keywords.iter().find(|keyword| {
-                keyword
-                    .arg
-                    .as_ref()
-                    .map_or(false, |arg| arg.as_str() == "match")
-            });
-
-            if let Some(exception) = args.first() {
+            let match_keyword = call.arguments.find_keyword("match");
+            if let Some(exception) = call.arguments.args.first() {
                 if let Some(match_keyword) = match_keyword {
                     if is_empty_or_null_string(&match_keyword.value) {
                         exception_needs_match(checker, exception);
@@ -100,8 +198,6 @@ pub(crate) fn complex_raises(
     items: &[WithItem],
     body: &[Stmt],
 ) {
-    let mut is_too_complex = false;
-
     let raises_called = items.iter().any(|item| match &item.context_expr {
         Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic()),
         _ => false,
@@ -109,28 +205,16 @@ pub(crate) fn complex_raises(
 
     // Check body for `pytest.raises` context manager
     if raises_called {
-        if body.len() > 1 {
-            is_too_complex = true;
-        } else if let Some(first_stmt) = body.first() {
-            match first_stmt {
-                Stmt::With(ast::StmtWith { body, .. })
-                | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
-                    if is_non_trivial_with_body(body) {
-                        is_too_complex = true;
-                    }
-                }
-                Stmt::If(_)
-                | Stmt::For(_)
-                | Stmt::Match(_)
-                | Stmt::AsyncFor(_)
-                | Stmt::While(_)
-                | Stmt::Try(_)
-                | Stmt::TryStar(_) => {
-                    is_too_complex = true;
-                }
-                _ => {}
+        let is_too_complex = if let [stmt] = body {
+            match stmt {
+                Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
+                // Allow function and class definitions to test decorators
+                Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
+                stmt => is_compound_statement(stmt),
             }
-        }
+        } else {
+            true
+        };
 
         if is_too_complex {
             checker.diagnostics.push(Diagnostic::new(
@@ -147,7 +231,8 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
         .semantic()
         .resolve_call_path(exception)
         .and_then(|call_path| {
-            let is_broad_exception = checker
+            let call_path = format_call_path(&call_path);
+            checker
                 .settings
                 .flake8_pytest_style
                 .raises_require_match_for
@@ -158,12 +243,8 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )
-                .any(|target| call_path == from_qualified_name(target));
-            if is_broad_exception {
-                Some(format_call_path(&call_path))
-            } else {
-                None
-            }
+                .any(|pattern| pattern.matches(&call_path))
+                .then_some(call_path)
         })
     {
         checker.diagnostics.push(Diagnostic::new(

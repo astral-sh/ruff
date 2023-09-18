@@ -1,9 +1,10 @@
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprSet;
+use ruff_text_size::Ranged;
+
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::format_args;
-use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprSet;
 
 #[derive(Default)]
 pub struct FormatExprSet;
@@ -14,13 +15,27 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
         // That would be a dict expression
         assert!(!elts.is_empty());
         // Avoid second mutable borrow of f
-        let joined = format_with(|f| {
-            f.join_with(format_args!(text(","), soft_line_break_or_space()))
-                .entries(elts.iter().formatted())
+        let joined = format_with(|f: &mut PyFormatter| {
+            f.join_comma_separated(item.end())
+                .nodes(elts.iter())
                 .finish()
         });
 
-        parenthesized("{", &format_args![joined, if_group_breaks(&text(","))], "}").fmt(f)
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
+        parenthesized("{", &joined, "}")
+            .with_dangling_comments(dangling)
+            .fmt(f)
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
+        Ok(())
     }
 }
 

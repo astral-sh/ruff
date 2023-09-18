@@ -634,3 +634,32 @@ def starts_with_this():
 @expect('D404: First word of the docstring should not be "This"')
 def starts_with_space_then_this():
     """ This is a docstring that starts with a space."""  # noqa: D210
+
+
+class SameLine: """This is a docstring on the same line"""
+
+def same_line(): """This is a docstring on the same line"""
+
+
+def single_line_docstring_with_an_escaped_backslash():
+    "\
+    "
+
+class StatementOnSameLineAsDocstring:
+    "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
+    def sort_services(self):
+        pass
+
+class StatementOnSameLineAsDocstring:
+    "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
+
+
+class CommentAfterDocstring:
+    "After this docstring there's a comment."  # priorities=1
+    def sort_services(self):
+        pass
+
+
+def newline_after_closing_quote(self):
+    "We enforce a newline after the closing quote for a multi-line docstring \
+    but continuations shouldn't be considered multi-line"

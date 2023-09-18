@@ -1,7 +1,7 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Ranged, Stmt};
+use ruff_python_ast::{self as ast, PySourceType, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use super::comments::Comment;
 use super::helpers::trailing_comma;
@@ -13,6 +13,7 @@ pub(crate) fn annotate_imports<'a>(
     comments: Vec<Comment<'a>>,
     locator: &Locator,
     split_on_trailing_comma: bool,
+    source_type: PySourceType,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut comments_iter = comments.into_iter().peekable();
 
@@ -71,7 +72,7 @@ pub(crate) fn annotate_imports<'a>(
                     // import bar  # noqa`).
                     let mut inline = vec![];
                     if names.len() > 1
-                        || names.first().map_or(false, |alias| {
+                        || names.first().is_some_and(|alias| {
                             locator
                                 .contains_line_break(TextRange::new(import.start(), alias.start()))
                         })
@@ -119,7 +120,7 @@ pub(crate) fn annotate_imports<'a>(
                         names: aliases,
                         level: level.map(|level| level.to_u32()),
                         trailing_comma: if split_on_trailing_comma {
-                            trailing_comma(import, locator)
+                            trailing_comma(import, locator, source_type)
                         } else {
                             TrailingComma::default()
                         },

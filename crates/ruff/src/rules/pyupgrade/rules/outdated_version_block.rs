@@ -1,14 +1,13 @@
 use std::cmp::Ordering;
 
 use num_bigint::{BigInt, Sign};
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged, Stmt};
-use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_ast::{self as ast, CmpOp, Constant, ElifElseClause, Expr, StmtIf};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -61,96 +60,297 @@ impl AlwaysAutofixableViolation for OutdatedVersionBlock {
     }
 }
 
-/// The metadata for a version-comparison block.
-#[derive(Debug)]
-struct BlockMetadata {
-    /// The first `if` or `elif` token in the block, used to signal the start of the
-    /// version-comparison block.
-    leading_token: StartToken,
-    /// The first `elif` or `else` token following the start token, if any, used to signal the end
-    /// of the version-comparison block.
-    trailing_token: Option<EndToken>,
-}
+/// UP036
+pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
+    for branch in if_elif_branches(stmt_if) {
+        let Expr::Compare(ast::ExprCompare {
+            left,
+            ops,
+            comparators,
+            range: _,
+        }) = &branch.test
+        else {
+            continue;
+        };
 
-/// The set of tokens that can start a block, i.e., the first token in an `if` statement.
-#[derive(Debug)]
-enum StartTok {
-    If,
-    Elif,
-}
+        let ([op], [comparison]) = (ops.as_slice(), comparators.as_slice()) else {
+            continue;
+        };
 
-impl StartTok {
-    fn from_tok(tok: &Tok) -> Option<Self> {
-        match tok {
-            Tok::If => Some(Self::If),
-            Tok::Elif => Some(Self::Elif),
-            _ => None,
+        if !checker
+            .semantic()
+            .resolve_call_path(left)
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "version_info"]))
+        {
+            continue;
+        }
+
+        match comparison {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => match op {
+                CmpOp::Lt | CmpOp::LtE => {
+                    let version = extract_version(elts);
+                    let target = checker.settings.target_version;
+                    if compare_version(&version, target, op == &CmpOp::LtE) {
+                        let mut diagnostic =
+                            Diagnostic::new(OutdatedVersionBlock, branch.test.range());
+                        if checker.patch(diagnostic.kind.rule()) {
+                            if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
+                            }
+                        }
+                        checker.diagnostics.push(diagnostic);
+                    }
+                }
+                CmpOp::Gt | CmpOp::GtE => {
+                    let version = extract_version(elts);
+                    let target = checker.settings.target_version;
+                    if compare_version(&version, target, op == &CmpOp::GtE) {
+                        let mut diagnostic =
+                            Diagnostic::new(OutdatedVersionBlock, branch.test.range());
+                        if checker.patch(diagnostic.kind.rule()) {
+                            if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
+                            }
+                        }
+                        checker.diagnostics.push(diagnostic);
+                    }
+                }
+                _ => {}
+            },
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Int(number),
+                ..
+            }) => {
+                if op == &CmpOp::Eq {
+                    match bigint_to_u32(number) {
+                        2 => {
+                            let mut diagnostic =
+                                Diagnostic::new(OutdatedVersionBlock, branch.test.range());
+                            if checker.patch(diagnostic.kind.rule()) {
+                                if let Some(fix) =
+                                    fix_always_false_branch(checker, stmt_if, &branch)
+                                {
+                                    diagnostic.set_fix(fix);
+                                }
+                            }
+                            checker.diagnostics.push(diagnostic);
+                        }
+                        3 => {
+                            let mut diagnostic =
+                                Diagnostic::new(OutdatedVersionBlock, branch.test.range());
+                            if checker.patch(diagnostic.kind.rule()) {
+                                if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch)
+                                {
+                                    diagnostic.set_fix(fix);
+                                }
+                            }
+                            checker.diagnostics.push(diagnostic);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => (),
         }
     }
 }
 
-#[derive(Debug)]
-struct StartToken {
-    tok: StartTok,
-    range: TextRange,
-}
+/// Returns true if the `target_version` is always less than the [`PythonVersion`].
+fn compare_version(target_version: &[u32], py_version: PythonVersion, or_equal: bool) -> bool {
+    let mut target_version_iter = target_version.iter();
 
-/// The set of tokens that can end a block, i.e., the first token in the subsequent `elif` or `else`
-/// branch that follows an `if` or `elif` statement.
-#[derive(Debug)]
-enum EndTok {
-    Elif,
-    Else,
-}
-
-impl EndTok {
-    fn from_tok(tok: &Tok) -> Option<Self> {
-        match tok {
-            Tok::Elif => Some(Self::Elif),
-            Tok::Else => Some(Self::Else),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct EndToken {
-    tok: EndTok,
-    range: TextRange,
-}
-
-fn metadata<T>(locator: &Locator, located: &T, body: &[Stmt]) -> Option<BlockMetadata>
-where
-    T: Ranged,
-{
-    indentation(locator, located)?;
-
-    let mut iter = lexer::lex_starts_at(
-        locator.slice(located.range()),
-        Mode::Module,
-        located.start(),
-    )
-    .flatten();
-
-    // First the leading `if` or `elif` token.
-    let (tok, range) = iter.next()?;
-    let leading_token = StartToken {
-        tok: StartTok::from_tok(&tok)?,
-        range,
+    let Some(if_major) = target_version_iter.next() else {
+        return false;
     };
 
-    // Skip any tokens until we reach the end of the `if` body.
-    let body_end = body.last()?.range().end();
+    let (py_major, py_minor) = py_version.as_tuple();
 
-    // Find the trailing `elif` or `else` token, if any.
-    let trailing_token = iter
-        .skip_while(|(_, range)| range.start() < body_end)
-        .find_map(|(tok, range)| EndTok::from_tok(&tok).map(|tok| EndToken { tok, range }));
+    match if_major.cmp(&py_major) {
+        Ordering::Less => true,
+        Ordering::Greater => false,
+        Ordering::Equal => {
+            let Some(if_minor) = target_version_iter.next() else {
+                return true;
+            };
+            if or_equal {
+                // Ex) `sys.version_info <= 3.8`. If Python 3.8 is the minimum supported version,
+                // the condition won't always evaluate to `false`, so we want to return `false`.
+                *if_minor < py_minor
+            } else {
+                // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
+                // the condition _will_ always evaluate to `false`, so we want to return `true`.
+                *if_minor <= py_minor
+            }
+        }
+    }
+}
 
-    Some(BlockMetadata {
-        leading_token,
-        trailing_token,
-    })
+/// Fix a branch that is known to always evaluate to `false`.
+///
+/// For example, when running with a minimum supported version of Python 3.8, the following branch
+/// would be considered redundant:
+/// ```python
+/// if sys.version_info < (3, 7): ...
+/// ```
+///
+/// In this case, the fix would involve removing the branch; however, there are multiple cases to
+/// consider. For example, if the `if` has an `else`, then the `if` should be removed, and the
+/// `else` should be inlined at the top level.
+fn fix_always_false_branch(
+    checker: &Checker,
+    stmt_if: &StmtIf,
+    branch: &IfElifBranch,
+) -> Option<Fix> {
+    match branch.kind {
+        BranchKind::If => match stmt_if.elif_else_clauses.first() {
+            // If we have a lone `if`, delete as statement (insert pass in parent if required)
+            None => {
+                let stmt = checker.semantic().current_statement();
+                let parent = checker.semantic().current_statement_parent();
+                let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
+                Some(Fix::suggested(edit))
+            }
+            // If we have an `if` and an `elif`, turn the `elif` into an `if`
+            Some(ElifElseClause {
+                test: Some(_),
+                range,
+                ..
+            }) => {
+                debug_assert!(
+                    &checker.locator().contents()[TextRange::at(range.start(), "elif".text_len())]
+                        == "elif"
+                );
+                let end_location = range.start() + ("elif".text_len() - "if".text_len());
+                Some(Fix::suggested(Edit::deletion(
+                    stmt_if.start(),
+                    end_location,
+                )))
+            }
+            // If we only have an `if` and an `else`, dedent the `else` block
+            Some(ElifElseClause {
+                body, test: None, ..
+            }) => {
+                let start = body.first()?;
+                let end = body.last()?;
+                if indentation(checker.locator(), start).is_none() {
+                    // Inline `else` block (e.g., `else: x = 1`).
+                    Some(Fix::suggested(Edit::range_replacement(
+                        checker
+                            .locator()
+                            .slice(TextRange::new(start.start(), end.end()))
+                            .to_string(),
+                        stmt_if.range(),
+                    )))
+                } else {
+                    indentation(checker.locator(), stmt_if)
+                        .and_then(|indentation| {
+                            adjust_indentation(
+                                TextRange::new(
+                                    checker.locator().line_start(start.start()),
+                                    end.end(),
+                                ),
+                                indentation,
+                                checker.locator(),
+                                checker.stylist(),
+                            )
+                            .ok()
+                        })
+                        .map(|contents| {
+                            Fix::suggested(Edit::replacement(
+                                contents,
+                                checker.locator().line_start(stmt_if.start()),
+                                stmt_if.end(),
+                            ))
+                        })
+                }
+            }
+        },
+        BranchKind::Elif => {
+            // The range of the `ElifElseClause` ends in the line of the last statement. To avoid
+            // inserting an empty line between the end of `if` branch and the beginning `elif` or
+            // `else` branch after the deleted branch we find the next branch after the current, if
+            // any, and delete to its start.
+            // ```python
+            //                         if cond:
+            //                             x = 1
+            //                         elif sys.version < (3.0):
+            //    delete from here ... ^   x = 2
+            //                         else:
+            // ... to here (exclusive) ^    x = 3
+            // ```
+            let next_start = stmt_if
+                .elif_else_clauses
+                .iter()
+                .map(Ranged::start)
+                .find(|start| *start > branch.start());
+            Some(Fix::suggested(Edit::deletion(
+                branch.start(),
+                next_start.unwrap_or(branch.end()),
+            )))
+        }
+    }
+}
+
+/// Fix a branch that is known to always evaluate to `true`.
+///
+/// For example, when running with a minimum supported version of Python 3.8, the following branch
+/// would be considered redundant, as it's known to always evaluate to `true`:
+/// ```python
+/// if sys.version_info >= (3, 8): ...
+/// ```
+fn fix_always_true_branch(
+    checker: &mut Checker,
+    stmt_if: &StmtIf,
+    branch: &IfElifBranch,
+) -> Option<Fix> {
+    match branch.kind {
+        BranchKind::If => {
+            // If the first statement is an `if`, use the body of this statement, and ignore
+            // the rest.
+            let start = branch.body.first()?;
+            let end = branch.body.last()?;
+            if indentation(checker.locator(), start).is_none() {
+                // Inline `if` block (e.g., `if ...: x = 1`).
+                Some(Fix::suggested(Edit::range_replacement(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(start.start(), end.end()))
+                        .to_string(),
+                    stmt_if.range,
+                )))
+            } else {
+                indentation(checker.locator(), &stmt_if)
+                    .and_then(|indentation| {
+                        adjust_indentation(
+                            TextRange::new(checker.locator().line_start(start.start()), end.end()),
+                            indentation,
+                            checker.locator(),
+                            checker.stylist(),
+                        )
+                        .ok()
+                    })
+                    .map(|contents| {
+                        Fix::suggested(Edit::replacement(
+                            contents,
+                            checker.locator().line_start(stmt_if.start()),
+                            stmt_if.end(),
+                        ))
+                    })
+            }
+        }
+        BranchKind::Elif => {
+            // Replace the `elif` with an `else`, preserve the body of the elif, and remove
+            // the rest.
+            let end = branch.body.last()?;
+            let text = checker
+                .locator()
+                .slice(TextRange::new(branch.test.end(), end.end()));
+            Some(Fix::suggested(Edit::range_replacement(
+                format!("else{text}"),
+                TextRange::new(branch.start(), stmt_if.end()),
+            )))
+        }
+    }
 }
 
 /// Converts a `BigInt` to a `u32`. If the number is negative, it will return 0.
@@ -180,259 +380,6 @@ fn extract_version(elts: &[Expr]) -> Vec<u32> {
     version
 }
 
-/// Returns true if the `if_version` is less than the `PythonVersion`
-fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool) -> bool {
-    let mut if_version_iter = if_version.iter();
-    if let Some(if_major) = if_version_iter.next() {
-        let (py_major, py_minor) = py_version.as_tuple();
-        match if_major.cmp(&py_major) {
-            Ordering::Less => true,
-            Ordering::Equal => {
-                if let Some(if_minor) = if_version_iter.next() {
-                    // Check the if_minor number (the minor version).
-                    if or_equal {
-                        *if_minor <= py_minor
-                    } else {
-                        *if_minor < py_minor
-                    }
-                } else {
-                    // Assume Python 3.0.
-                    true
-                }
-            }
-            Ordering::Greater => false,
-        }
-    } else {
-        false
-    }
-}
-
-/// Convert a [`Stmt::If`], retaining the `else`.
-fn fix_py2_block(
-    checker: &Checker,
-    stmt: &Stmt,
-    orelse: &[Stmt],
-    block: &BlockMetadata,
-) -> Option<Fix> {
-    let leading_token = &block.leading_token;
-    let Some(trailing_token) = &block.trailing_token else {
-        // Delete the entire statement. If this is an `elif`, know it's the only child
-        // of its parent, so avoid passing in the parent at all. Otherwise,
-        // `delete_stmt` will erroneously include a `pass`.
-        let stmt = checker.semantic().stmt();
-        let parent = checker.semantic().stmt_parent();
-        let edit = delete_stmt(
-            stmt,
-            if matches!(block.leading_token.tok, StartTok::If) {
-                parent
-            } else {
-                None
-            },
-            checker.locator,
-            checker.indexer,
-        );
-        return Some(Fix::suggested(edit));
-    };
-
-    match (&leading_token.tok, &trailing_token.tok) {
-        // If we only have an `if` and an `else`, dedent the `else` block.
-        (StartTok::If, EndTok::Else) => {
-            let start = orelse.first()?;
-            let end = orelse.last()?;
-            if indentation(checker.locator, start).is_none() {
-                // Inline `else` block (e.g., `else: x = 1`).
-                Some(Fix::suggested(Edit::range_replacement(
-                    checker
-                        .locator
-                        .slice(TextRange::new(start.start(), end.end()))
-                        .to_string(),
-                    stmt.range(),
-                )))
-            } else {
-                indentation(checker.locator, stmt)
-                    .and_then(|indentation| {
-                        adjust_indentation(
-                            TextRange::new(checker.locator.line_start(start.start()), end.end()),
-                            indentation,
-                            checker.locator,
-                            checker.stylist,
-                        )
-                        .ok()
-                    })
-                    .map(|contents| {
-                        Fix::suggested(Edit::replacement(
-                            contents,
-                            checker.locator.line_start(stmt.start()),
-                            stmt.end(),
-                        ))
-                    })
-            }
-        }
-        (StartTok::If, EndTok::Elif) => {
-            // If we have an `if` and an `elif`, turn the `elif` into an `if`.
-            let start_location = leading_token.range.start();
-            let end_location = trailing_token.range.start() + TextSize::from(2);
-            Some(Fix::suggested(Edit::deletion(start_location, end_location)))
-        }
-        (StartTok::Elif, _) => {
-            // If we have an `elif`, delete up to the `else` or the end of the statement.
-            let start_location = leading_token.range.start();
-            let end_location = trailing_token.range.start();
-            Some(Fix::suggested(Edit::deletion(start_location, end_location)))
-        }
-    }
-}
-
-/// Convert a [`Stmt::If`], removing the `else` block.
-fn fix_py3_block(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    block: &BlockMetadata,
-) -> Option<Fix> {
-    match block.leading_token.tok {
-        StartTok::If => {
-            // If the first statement is an if, use the body of this statement, and ignore
-            // the rest.
-            let start = body.first()?;
-            let end = body.last()?;
-            if indentation(checker.locator, start).is_none() {
-                // Inline `if` block (e.g., `if ...: x = 1`).
-                Some(Fix::suggested(Edit::range_replacement(
-                    checker
-                        .locator
-                        .slice(TextRange::new(start.start(), end.end()))
-                        .to_string(),
-                    stmt.range(),
-                )))
-            } else {
-                indentation(checker.locator, stmt)
-                    .and_then(|indentation| {
-                        adjust_indentation(
-                            TextRange::new(checker.locator.line_start(start.start()), end.end()),
-                            indentation,
-                            checker.locator,
-                            checker.stylist,
-                        )
-                        .ok()
-                    })
-                    .map(|contents| {
-                        Fix::suggested(Edit::replacement(
-                            contents,
-                            checker.locator.line_start(stmt.start()),
-                            stmt.end(),
-                        ))
-                    })
-            }
-        }
-        StartTok::Elif => {
-            // Replace the `elif` with an `else, preserve the body of the elif, and remove
-            // the rest.
-            let end = body.last()?;
-            let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
-            Some(Fix::suggested(Edit::range_replacement(
-                format!("else{text}"),
-                stmt.range(),
-            )))
-        }
-    }
-}
-
-/// UP036
-pub(crate) fn outdated_version_block(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    orelse: &[Stmt],
-) {
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        range: _,
-    }) = &test
-    else {
-        return;
-    };
-
-    if !checker
-        .semantic()
-        .resolve_call_path(left)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["sys", "version_info"])
-        })
-    {
-        return;
-    }
-
-    if ops.len() == 1 && comparators.len() == 1 {
-        let comparison = &comparators[0];
-        let op = &ops[0];
-        match comparison {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let version = extract_version(elts);
-                let target = checker.settings.target_version;
-                if op == &CmpOp::Lt || op == &CmpOp::LtE {
-                    if compare_version(&version, target, op == &CmpOp::LtE) {
-                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(block) = metadata(checker.locator, stmt, body) {
-                                if let Some(fix) = fix_py2_block(checker, stmt, orelse, &block) {
-                                    diagnostic.set_fix(fix);
-                                }
-                            }
-                        }
-                        checker.diagnostics.push(diagnostic);
-                    }
-                } else if op == &CmpOp::Gt || op == &CmpOp::GtE {
-                    if compare_version(&version, target, op == &CmpOp::GtE) {
-                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(block) = metadata(checker.locator, stmt, body) {
-                                if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
-                            }
-                        }
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
-            }
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(number),
-                ..
-            }) => {
-                let version_number = bigint_to_u32(number);
-                if version_number == 2 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(block) = metadata(checker.locator, stmt, body) {
-                            if let Some(fix) = fix_py2_block(checker, stmt, orelse, &block) {
-                                diagnostic.set_fix(fix);
-                            }
-                        }
-                    }
-                    checker.diagnostics.push(diagnostic);
-                } else if version_number == 3 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(block) = metadata(checker.locator, stmt, body) {
-                            if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block) {
-                                diagnostic.set_fix(fix);
-                            }
-                        }
-                    }
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            _ => (),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use test_case::test_case;
@@ -445,8 +392,8 @@ mod tests {
     #[test_case(PythonVersion::Py37, &[3, 0], true, true; "compare-3.0-whole")]
     #[test_case(PythonVersion::Py37, &[3, 1], true, true; "compare-3.1")]
     #[test_case(PythonVersion::Py37, &[3, 5], true, true; "compare-3.5")]
-    #[test_case(PythonVersion::Py37, &[3, 7], true, true; "compare-3.7")]
-    #[test_case(PythonVersion::Py37, &[3, 7], false, false; "compare-3.7-not-equal")]
+    #[test_case(PythonVersion::Py37, &[3, 7], true, false; "compare-3.7")]
+    #[test_case(PythonVersion::Py37, &[3, 7], false, true; "compare-3.7-not-equal")]
     #[test_case(PythonVersion::Py37, &[3, 8], false , false; "compare-3.8")]
     #[test_case(PythonVersion::Py310, &[3,9], true, true; "compare-3.9")]
     #[test_case(PythonVersion::Py310, &[3, 11], true, false; "compare-3.11")]

@@ -2,13 +2,13 @@
 
 # Ruff
 
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
 
-[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
+[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
 An extremely fast Python linter, written in Rust.
 
@@ -30,13 +30,13 @@ An extremely fast Python linter, written in Rust.
 - 🤝 Python 3.11 compatibility
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
-- ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
+- 📏 Over [600 built-in rules](https://docs.astral.sh/ruff/rules/)
+- ⚖️ [Near-parity](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8) with the
     built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party [editor integrations](https://beta.ruff.rs/docs/editor-integrations/) for
+- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/editor-integrations/) for
     [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
-- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
+- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
@@ -98,7 +98,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
 
 ## Table of Contents
 
-For more, see the [documentation](https://beta.ruff.rs/docs/).
+For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 1. [Getting Started](#getting-started)
 1. [Configuration](#configuration)
@@ -111,7 +111,7 @@ For more, see the [documentation](https://beta.ruff.rs/docs/).
 
 ## Getting Started
 
-For more, see the [documentation](https://beta.ruff.rs/docs/).
+For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 ### Installation
 
@@ -122,7 +122,7 @@ pip install ruff
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
-and with [a variety of other package managers](https://beta.ruff.rs/docs/installation/).
+and with [a variety of other package managers](https://docs.astral.sh/ruff/installation/).
 
 ### Usage
 
@@ -140,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.278
+  rev: v0.0.290
   hooks:
     - id: ruff
 ```
@@ -165,7 +165,7 @@ jobs:
 ### Configuration
 
 Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (see:
-[_Configuration_](https://beta.ruff.rs/docs/configuration/), or [_Settings_](https://beta.ruff.rs/docs/settings/)
+[_Configuration_](https://docs.astral.sh/ruff/configuration/), or [_Settings_](https://docs.astral.sh/ruff/settings/)
 for a complete list of all configuration options).
 
 If left unspecified, the default configuration is equivalent to:
@@ -211,8 +211,8 @@ line-length = 88
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.10.
-target-version = "py310"
+# Assume Python 3.8
+target-version = "py38"
 
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
@@ -233,12 +233,12 @@ linting command.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 500 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 600 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
 By default, Ruff enables Flake8's `E` and `F` rules. Ruff supports all rules from the `F` category,
-and a [subset](https://beta.ruff.rs/docs/rules/#error-e) of the `E` category, omitting those
+and a [subset](https://docs.astral.sh/ruff/rules/#error-e) of the `E` category, omitting those
 stylistic rules made obsolete by the use of an autoformatter, like
 [Black](https://github.com/psf/black).
 
@@ -274,6 +274,7 @@ quality tools, including:
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
 - [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-logging](https://pypi.org/project/flake8-logging/)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
 - [flake8-pie](https://pypi.org/project/flake8-pie/)
@@ -303,12 +304,12 @@ quality tools, including:
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)
 
-For a complete enumeration of the supported rules, see [_Rules_](https://beta.ruff.rs/docs/rules/).
+For a complete enumeration of the supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
 
 ## Contributing
 
 Contributions are welcome and highly appreciated. To get started, check out the
-[**contributing guidelines**](https://beta.ruff.rs/docs/contributing/).
+[**contributing guidelines**](https://docs.astral.sh/ruff/contributing/).
 
 You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
@@ -397,7 +398,8 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
-- [Pynecone](https://github.com/pynecone-io/pynecone)
+- [Reflex](https://github.com/reflex-dev/reflex)
+- [Rippling](https://rippling.com)
 - [Robyn](https://github.com/sansyrox/robyn)
 - Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
 - Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
@@ -424,13 +426,13 @@ Ruff is used by a number of major open-source projects and companies, including:
 If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
 
 ```md
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 ```
 
 ...or `README.rst`:
 
 ```rst
-.. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json
+.. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json
     :target: https://github.com/astral-sh/ruff
     :alt: Ruff
 ```
@@ -438,7 +440,7 @@ If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
 ...or, as HTML:
 
 ```html
-<a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
+<a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
 ```
 
 ## License
@@ -447,6 +449,6 @@ MIT
 
 <div align="center">
   <a target="_blank" href="https://astral.sh" style="background:none">
-    <img src="https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/svg/Astral.svg">
+    <img src="https://raw.githubusercontent.com/astral-sh/ruff/main/assets/svg/Astral.svg">
   </a>
 </div>

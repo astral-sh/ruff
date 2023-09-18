@@ -1,10 +1,9 @@
-use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -50,24 +49,39 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 }
 
 /// UP021
-pub(crate) fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
+pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["subprocess", "run"])
-        })
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "run"]))
     {
-        let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else {
+        let Some(kwarg) = call.arguments.find_keyword("universal_newlines") else {
             return;
         };
-        let range = TextRange::at(kwarg.start(), "universal_newlines".text_len());
-        let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
+
+        let Some(arg) = kwarg.arg.as_ref() else {
+            return;
+        };
+
+        let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, arg.range());
+
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                "text".to_string(),
-                range,
-            )));
+            if call.arguments.find_keyword("text").is_some() {
+                diagnostic.try_set_fix(|| {
+                    remove_argument(
+                        kwarg,
+                        &call.arguments,
+                        Parentheses::Preserve,
+                        checker.locator().contents(),
+                    )
+                    .map(Fix::suggested)
+                });
+            } else {
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    "text".to_string(),
+                    arg.range(),
+                )));
+            }
         }
         checker.diagnostics.push(diagnostic);
     }

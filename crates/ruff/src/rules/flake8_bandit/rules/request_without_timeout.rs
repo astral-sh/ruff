@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{is_const_none, SimpleCallArgs};
+use ruff_python_ast as ast;
+use ruff_python_ast::helpers::is_const_none;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -49,16 +49,11 @@ impl Violation for RequestWithoutTimeout {
 }
 
 /// S113
-pub(crate) fn request_without_timeout(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 [
@@ -68,18 +63,17 @@ pub(crate) fn request_without_timeout(
             )
         })
     {
-        let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(timeout) = call_args.keyword_argument("timeout") {
-            if is_const_none(timeout) {
+        if let Some(keyword) = call.arguments.find_keyword("timeout") {
+            if is_const_none(&keyword.value) {
                 checker.diagnostics.push(Diagnostic::new(
                     RequestWithoutTimeout { implicit: false },
-                    timeout.range(),
+                    keyword.range(),
                 ));
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 RequestWithoutTimeout { implicit: true },
-                func.range(),
+                call.func.range(),
             ));
         }
     }

@@ -1,0 +1,576 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: "parse_suite(source, \"<test>\").unwrap()"
+---
+[
+    FunctionDef(
+        StmtFunctionDef {
+            range: 0..20,
+            is_async: false,
+            decorator_list: [],
+            name: Identifier {
+                id: "func",
+                range: 4..8,
+            },
+            type_params: None,
+            parameters: Parameters {
+                range: 8..11,
+                posonlyargs: [],
+                args: [
+                    ParameterWithDefault {
+                        range: 9..10,
+                        parameter: Parameter {
+                            range: 9..10,
+                            name: Identifier {
+                                id: "a",
+                                range: 9..10,
+                            },
+                            annotation: None,
+                        },
+                        default: None,
+                    },
+                ],
+                vararg: None,
+                kwonlyargs: [],
+                kwarg: None,
+            },
+            returns: None,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 17..20,
+                        value: Constant(
+                            ExprConstant {
+                                range: 17..20,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    FunctionDef(
+        StmtFunctionDef {
+            range: 22..53,
+            is_async: false,
+            decorator_list: [],
+            name: Identifier {
+                id: "func",
+                range: 26..30,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 30..33,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 31..32,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 31..32,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            parameters: Parameters {
+                range: 33..39,
+                posonlyargs: [],
+                args: [
+                    ParameterWithDefault {
+                        range: 34..38,
+                        parameter: Parameter {
+                            range: 34..38,
+                            name: Identifier {
+                                id: "a",
+                                range: 34..35,
+                            },
+                            annotation: Some(
+                                Name(
+                                    ExprName {
+                                        range: 37..38,
+                                        id: "T",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                        default: None,
+                    },
+                ],
+                vararg: None,
+                kwonlyargs: [],
+                kwarg: None,
+            },
+            returns: Some(
+                Name(
+                    ExprName {
+                        range: 43..44,
+                        id: "T",
+                        ctx: Load,
+                    },
+                ),
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 50..53,
+                        value: Constant(
+                            ExprConstant {
+                                range: 50..53,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    FunctionDef(
+        StmtFunctionDef {
+            range: 55..91,
+            is_async: false,
+            decorator_list: [],
+            name: Identifier {
+                id: "func",
+                range: 59..63,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 63..71,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 64..70,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 64..65,
+                                },
+                                bound: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 67..70,
+                                            id: "str",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            parameters: Parameters {
+                range: 71..77,
+                posonlyargs: [],
+                args: [
+                    ParameterWithDefault {
+                        range: 72..76,
+                        parameter: Parameter {
+                            range: 72..76,
+                            name: Identifier {
+                                id: "a",
+                                range: 72..73,
+                            },
+                            annotation: Some(
+                                Name(
+                                    ExprName {
+                                        range: 75..76,
+                                        id: "T",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                        default: None,
+                    },
+                ],
+                vararg: None,
+                kwonlyargs: [],
+                kwarg: None,
+            },
+            returns: Some(
+                Name(
+                    ExprName {
+                        range: 81..82,
+                        id: "T",
+                        ctx: Load,
+                    },
+                ),
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 88..91,
+                        value: Constant(
+                            ExprConstant {
+                                range: 88..91,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    FunctionDef(
+        StmtFunctionDef {
+            range: 93..138,
+            is_async: false,
+            decorator_list: [],
+            name: Identifier {
+                id: "func",
+                range: 97..101,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 101..118,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 102..117,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 102..103,
+                                },
+                                bound: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 105..117,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 106..109,
+                                                        id: "str",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 111..116,
+                                                        id: "bytes",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            parameters: Parameters {
+                range: 118..124,
+                posonlyargs: [],
+                args: [
+                    ParameterWithDefault {
+                        range: 119..123,
+                        parameter: Parameter {
+                            range: 119..123,
+                            name: Identifier {
+                                id: "a",
+                                range: 119..120,
+                            },
+                            annotation: Some(
+                                Name(
+                                    ExprName {
+                                        range: 122..123,
+                                        id: "T",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                        default: None,
+                    },
+                ],
+                vararg: None,
+                kwonlyargs: [],
+                kwarg: None,
+            },
+            returns: Some(
+                Name(
+                    ExprName {
+                        range: 128..129,
+                        id: "T",
+                        ctx: Load,
+                    },
+                ),
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 135..138,
+                        value: Constant(
+                            ExprConstant {
+                                range: 135..138,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    FunctionDef(
+        StmtFunctionDef {
+            range: 140..171,
+            is_async: false,
+            decorator_list: [],
+            name: Identifier {
+                id: "func",
+                range: 144..148,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 148..153,
+                    type_params: [
+                        TypeVarTuple(
+                            TypeParamTypeVarTuple {
+                                range: 149..152,
+                                name: Identifier {
+                                    id: "Ts",
+                                    range: 150..152,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
+            parameters: Parameters {
+                range: 153..162,
+                posonlyargs: [],
+                args: [],
+                vararg: Some(
+                    Parameter {
+                        range: 155..161,
+                        name: Identifier {
+                            id: "a",
+                            range: 155..156,
+                        },
+                        annotation: Some(
+                            Starred(
+                                ExprStarred {
+                                    range: 158..161,
+                                    value: Name(
+                                        ExprName {
+                                            range: 159..161,
+                                            id: "Ts",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                kwonlyargs: [],
+                kwarg: None,
+            },
+            returns: None,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 168..171,
+                        value: Constant(
+                            ExprConstant {
+                                range: 168..171,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    FunctionDef(
+        StmtFunctionDef {
+            range: 173..230,
+            is_async: false,
+            decorator_list: [],
+            name: Identifier {
+                id: "func",
+                range: 177..181,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 181..186,
+                    type_params: [
+                        ParamSpec(
+                            TypeParamParamSpec {
+                                range: 182..185,
+                                name: Identifier {
+                                    id: "P",
+                                    range: 184..185,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
+            parameters: Parameters {
+                range: 186..221,
+                posonlyargs: [],
+                args: [],
+                vararg: Some(
+                    Parameter {
+                        range: 188..200,
+                        name: Identifier {
+                            id: "args",
+                            range: 188..192,
+                        },
+                        annotation: Some(
+                            Attribute(
+                                ExprAttribute {
+                                    range: 194..200,
+                                    value: Name(
+                                        ExprName {
+                                            range: 194..195,
+                                            id: "P",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: "args",
+                                        range: 196..200,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                kwonlyargs: [],
+                kwarg: Some(
+                    Parameter {
+                        range: 204..220,
+                        name: Identifier {
+                            id: "kwargs",
+                            range: 204..210,
+                        },
+                        annotation: Some(
+                            Attribute(
+                                ExprAttribute {
+                                    range: 212..220,
+                                    value: Name(
+                                        ExprName {
+                                            range: 212..213,
+                                            id: "P",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: "kwargs",
+                                        range: 214..220,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                    },
+                ),
+            },
+            returns: None,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 227..230,
+                        value: Constant(
+                            ExprConstant {
+                                range: 227..230,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    FunctionDef(
+        StmtFunctionDef {
+            range: 232..273,
+            is_async: false,
+            decorator_list: [],
+            name: Identifier {
+                id: "func",
+                range: 236..240,
+            },
+            type_params: Some(
+                TypeParams {
+                    range: 240..261,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 241..242,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 241..242,
+                                },
+                                bound: None,
+                            },
+                        ),
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 244..250,
+                                name: Identifier {
+                                    id: "U",
+                                    range: 244..245,
+                                },
+                                bound: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 247..250,
+                                            id: "str",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                        TypeVarTuple(
+                            TypeParamTypeVarTuple {
+                                range: 252..255,
+                                name: Identifier {
+                                    id: "Ts",
+                                    range: 253..255,
+                                },
+                            },
+                        ),
+                        ParamSpec(
+                            TypeParamParamSpec {
+                                range: 257..260,
+                                name: Identifier {
+                                    id: "P",
+                                    range: 259..260,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
+            parameters: Parameters {
+                range: 261..263,
+                posonlyargs: [],
+                args: [],
+                vararg: None,
+                kwonlyargs: [],
+                kwarg: None,
+            },
+            returns: None,
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 269..273,
+                    },
+                ),
+            ],
+        },
+    ),
+]

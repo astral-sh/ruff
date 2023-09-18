@@ -1,0 +1,23 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..13,
+            value: Constant(
+                ExprConstant {
+                    range: 0..13,
+                    value: Str(
+                        StringConstant {
+                            value: "Hello world",
+                            unicode: false,
+                            implicit_concatenated: false,
+                        },
+                    ),
+                },
+            ),
+        },
+    ),
+]

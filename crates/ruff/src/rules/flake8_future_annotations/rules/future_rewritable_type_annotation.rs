@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::format_call_path;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -13,13 +14,24 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// PEP 563 enabled the use of a number of convenient type annotations, such as
-/// `list[str]` instead of `List[str]`, or `str | None` instead of
-/// `Optional[str]`. However, these annotations are only available on Python
-/// 3.9 and higher, _unless_ the `from __future__ import annotations` import is present.
+/// `list[str]` instead of `List[str]`. However, these annotations are only
+/// available on Python 3.9 and higher, _unless_ the `from __future__ import annotations`
+/// import is present.
+///
+/// Similarly, PEP 604 enabled the use of the `|` operator for unions, such as
+/// `str | None` instead of `Optional[str]`. However, these annotations are only
+/// available on Python 3.10 and higher, _unless_ the `from __future__ import annotations`
+/// import is present.
 ///
 /// By adding the `__future__` import, the pyupgrade rules can automatically
 /// migrate existing code to use the new syntax, even for older Python versions.
 /// This rule thus pairs well with pyupgrade and with Ruff's pyupgrade rules.
+///
+/// This rule respects the [`target-version`] setting. For example, if your
+/// project targets Python 3.10 and above, adding `from __future__ import annotations`
+/// does not impact your ability to leverage PEP 604-style unions (e.g., to
+/// convert `Optional[str]` to `str | None`). As such, this rule will only
+/// flag such usages if your project targets Python 3.9 or below.
 ///
 /// ## Example
 /// ```python

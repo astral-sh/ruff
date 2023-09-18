@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -54,14 +55,12 @@ pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
     if checker
         .semantic()
         .resolve_call_path(expr)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["datetime", "timezone", "utc"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "timezone", "utc"]))
     {
         let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import_from("datetime", "UTC"),
                     expr.start(),
                     checker.semantic(),

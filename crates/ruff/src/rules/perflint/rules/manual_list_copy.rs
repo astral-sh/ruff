@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Expr, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_semantic::analyze::typing::is_list;
+use ruff_python_semantic::Binding;
 
 use crate::checkers::ast::Checker;
 
@@ -60,9 +61,13 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
 
     let Expr::Call(ast::ExprCall {
         func,
+        arguments:
+            Arguments {
+                args,
+                keywords,
+                range: _,
+            },
         range,
-        args,
-        keywords,
     }) = value.as_ref()
     else {
         return;
@@ -76,11 +81,6 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
         return;
     };
 
-    // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if !arg.as_name_expr().map_or(false, |arg| arg.id == *id) {
-        return;
-    }
-
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
@@ -89,10 +89,34 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
         return;
     }
 
-    // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
+    // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
+    if !arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
+        return;
+    }
+
+    // Avoid, e.g., `for x in y: filtered[x].append(x)`.
     if any_over_expr(value, &|expr| {
-        expr.as_name_expr().map_or(false, |expr| expr.id == *id)
+        expr.as_name_expr().is_some_and(|expr| expr.id == *id)
     }) {
+        return;
+    }
+
+    // Avoid non-list values.
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+        return;
+    };
+    let bindings: Vec<&Binding> = checker
+        .semantic()
+        .current_scope()
+        .get_all(id)
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .collect();
+
+    let [binding] = bindings.as_slice() else {
+        return;
+    };
+
+    if !is_list(binding, checker.semantic()) {
         return;
     }
 

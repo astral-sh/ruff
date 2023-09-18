@@ -1,10 +1,11 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -143,13 +144,15 @@ fn get_element_type(element: &Stmt, semantic: &SemanticModel) -> Option<ContentT
 /// DJ012
 pub(crate) fn unordered_body_content_in_model(
     checker: &mut Checker,
-    bases: &[Expr],
+    arguments: Option<&Arguments>,
     body: &[Stmt],
 ) {
-    if !bases
-        .iter()
-        .any(|base| helpers::is_model(base, checker.semantic()))
-    {
+    if !arguments.is_some_and(|arguments| {
+        arguments
+            .args
+            .iter()
+            .any(|base| helpers::is_model(base, checker.semantic()))
+    }) {
         return;
     }
 

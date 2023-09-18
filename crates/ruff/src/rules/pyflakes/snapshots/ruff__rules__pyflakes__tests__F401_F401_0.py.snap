@@ -151,6 +151,8 @@ F401_0.py:93:16: F401 [*] `x` imported but unused
 92 92 |     case 0,:
 93    |-        import x
 94 93 |         import y
+95 94 | 
+96 95 | 
 
 F401_0.py:94:16: F401 [*] `y` imported but unused
    |
@@ -166,5 +168,119 @@ F401_0.py:94:16: F401 [*] `y` imported but unused
 92 92 |     case 0,:
 93 93 |         import x
 94    |-        import y
+95 94 | 
+96 95 | 
+97 96 | # Test: access a sub-importation via an alias.
+
+F401_0.py:99:8: F401 [*] `foo.bar.baz` imported but unused
+    |
+ 97 | # Test: access a sub-importation via an alias.
+ 98 | import foo.bar as bop
+ 99 | import foo.bar.baz
+    |        ^^^^^^^^^^^ F401
+100 | 
+101 | print(bop.baz.read_csv("test.csv"))
+    |
+    = help: Remove unused import: `foo.bar.baz`
+
+ℹ Fix
+96  96  | 
+97  97  | # Test: access a sub-importation via an alias.
+98  98  | import foo.bar as bop
+99      |-import foo.bar.baz
+100 99  | 
+101 100 | print(bop.baz.read_csv("test.csv"))
+102 101 | 
+
+F401_0.py:105:12: F401 [*] `a1` imported but unused
+    |
+103 | # Test: isolated deletions.
+104 | if TYPE_CHECKING:
+105 |     import a1
+    |            ^^ F401
+106 | 
+107 |     import a2
+    |
+    = help: Remove unused import: `a1`
+
+ℹ Fix
+102 102 | 
+103 103 | # Test: isolated deletions.
+104 104 | if TYPE_CHECKING:
+105     |-    import a1
+106 105 | 
+107 106 |     import a2
+108 107 | 
+
+F401_0.py:107:12: F401 [*] `a2` imported but unused
+    |
+105 |     import a1
+106 | 
+107 |     import a2
+    |            ^^ F401
+    |
+    = help: Remove unused import: `a2`
+
+ℹ Fix
+104 104 | if TYPE_CHECKING:
+105 105 |     import a1
+106 106 | 
+107     |-    import a2
+108 107 | 
+109 108 | 
+110 109 | match *0, 1, *2:
+
+F401_0.py:112:16: F401 [*] `b1` imported but unused
+    |
+110 | match *0, 1, *2:
+111 |     case 0,:
+112 |         import b1
+    |                ^^ F401
+113 | 
+114 |         import b2
+    |
+    = help: Remove unused import: `b1`
+
+ℹ Fix
+109 109 | 
+110 110 | match *0, 1, *2:
+111 111 |     case 0,:
+112     |-        import b1
+113 112 | 
+114 113 |         import b2
+115 114 | 
+
+F401_0.py:114:16: F401 [*] `b2` imported but unused
+    |
+112 |         import b1
+113 | 
+114 |         import b2
+    |                ^^ F401
+    |
+    = help: Remove unused import: `b2`
+
+ℹ Fix
+111 111 |     case 0,:
+112 112 |         import b1
+113 113 | 
+114     |-        import b2
+115 114 | 
+116 115 | 
+117 116 | # Regression test for: https://github.com/astral-sh/ruff/issues/7244
+
+F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused
+    |
+121 | from datameta_client_lib.model_helpers import (
+122 | noqa )
+    | ^^^^ F401
+    |
+    = help: Remove unused import: `datameta_client_lib.model_helpers.noqa`
+
+ℹ Fix
+118 118 | from datameta_client_lib.model_utils import (  # noqa: F401
+119 119 | noqa )
+120 120 | 
+121     |-from datameta_client_lib.model_helpers import (
+122     |-noqa )
 
 

@@ -93,29 +93,12 @@ async def main():
 ```diff
 --- Black
 +++ Ruff
-@@ -8,28 +8,33 @@
- 
- # Remove brackets for short coroutine/task
- async def main():
--    await asyncio.sleep(1)
-+    await (asyncio.sleep(1))
- 
- 
- async def main():
--    await asyncio.sleep(1)
-+    await (asyncio.sleep(1))
- 
- 
- async def main():
--    await asyncio.sleep(1)
-+    await (asyncio.sleep(1))
- 
+@@ -21,11 +21,15 @@
  
  # Check comments
  async def main():
 -    await asyncio.sleep(1)  # Hello
-+    (
-+        await # Hello
++    await (  # Hello
 +        asyncio.sleep(1)
 +    )
  
@@ -128,41 +111,6 @@ async def main():
  
  
  async def main():
--    await asyncio.sleep(1)  # Hello
-+    await (asyncio.sleep(1))  # Hello
- 
- 
- # Long lines
-@@ -60,7 +65,7 @@
- 
- # Cr@zY Br@ck3Tz
- async def main():
--    await black(1)
-+    await (black(1))
- 
- 
- # Keep brackets around non power operations and nested awaits
-@@ -78,16 +83,16 @@
- 
- 
- async def main():
--    await (yield x)
-+    await (NOT_YET_IMPLEMENTED_ExprYield)
- 
- 
- async def main():
--    await (await asyncio.sleep(1))
-+    await (await (asyncio.sleep(1)))
- 
- 
- async def main():
--    await (await (await (await (await asyncio.sleep(1)))))
-+    await (await (await (await (await (asyncio.sleep(1))))))
- 
- 
- async def main():
--    await (yield)
-+    await (NOT_YET_IMPLEMENTED_ExprYield)
 ```
 
 ## Ruff Output
@@ -178,21 +126,20 @@ async def main():
 
 # Remove brackets for short coroutine/task
 async def main():
-    await (asyncio.sleep(1))
+    await asyncio.sleep(1)
 
 
 async def main():
-    await (asyncio.sleep(1))
+    await asyncio.sleep(1)
 
 
 async def main():
-    await (asyncio.sleep(1))
+    await asyncio.sleep(1)
 
 
 # Check comments
 async def main():
-    (
-        await # Hello
+    await (  # Hello
         asyncio.sleep(1)
     )
 
@@ -204,7 +151,7 @@ async def main():
 
 
 async def main():
-    await (asyncio.sleep(1))  # Hello
+    await asyncio.sleep(1)  # Hello
 
 
 # Long lines
@@ -235,7 +182,7 @@ async def main():
 
 # Cr@zY Br@ck3Tz
 async def main():
-    await (black(1))
+    await black(1)
 
 
 # Keep brackets around non power operations and nested awaits
@@ -253,19 +200,19 @@ async def main():
 
 
 async def main():
-    await (NOT_YET_IMPLEMENTED_ExprYield)
+    await (yield x)
 
 
 async def main():
-    await (await (asyncio.sleep(1)))
+    await (await asyncio.sleep(1))
 
 
 async def main():
-    await (await (await (await (await (asyncio.sleep(1))))))
+    await (await (await (await (await asyncio.sleep(1)))))
 
 
 async def main():
-    await (NOT_YET_IMPLEMENTED_ExprYield)
+    await (yield)
 ```
 
 ## Black Output

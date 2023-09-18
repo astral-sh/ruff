@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Ranged};
-use rustpython_parser::ast::{ExceptHandler, Expr};
+use ruff_python_ast::{self as ast};
+use ruff_python_ast::{ExceptHandler, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 

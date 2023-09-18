@@ -1,9 +1,10 @@
 use once_cell::sync::Lazy;
+use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -59,21 +60,21 @@ impl AlwaysAutofixableViolation for DeprecatedUnittestAlias {
 
 static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::new(|| {
     FxHashMap::from_iter([
-        ("failUnlessEqual", "assertEqual"),
-        ("assertEquals", "assertEqual"),
-        ("failIfEqual", "assertNotEqual"),
-        ("assertNotEquals", "assertNotEqual"),
-        ("failUnless", "assertTrue"),
-        ("assert_", "assertTrue"),
-        ("failIf", "assertFalse"),
-        ("failUnlessRaises", "assertRaises"),
-        ("failUnlessAlmostEqual", "assertAlmostEqual"),
         ("assertAlmostEquals", "assertAlmostEqual"),
-        ("failIfAlmostEqual", "assertNotAlmostEqual"),
+        ("assertEquals", "assertEqual"),
         ("assertNotAlmostEquals", "assertNotAlmostEqual"),
-        ("assertRegexpMatches", "assertRegex"),
+        ("assertNotEquals", "assertNotEqual"),
         ("assertNotRegexpMatches", "assertNotRegex"),
         ("assertRaisesRegexp", "assertRaisesRegex"),
+        ("assertRegexpMatches", "assertRegex"),
+        ("assert_", "assertTrue"),
+        ("failIf", "assertFalse"),
+        ("failIfAlmostEqual", "assertNotAlmostEqual"),
+        ("failIfEqual", "assertNotEqual"),
+        ("failUnless", "assertTrue"),
+        ("failUnlessAlmostEqual", "assertAlmostEqual"),
+        ("failUnlessEqual", "assertEqual"),
+        ("failUnlessRaises", "assertRaises"),
     ])
 });
 

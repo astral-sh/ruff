@@ -1,11 +1,11 @@
+use ruff_text_size::TextRange;
+
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
-
-use super::super::helpers::{shadows_builtin, AnyShadowing};
+use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
 /// Checks for variable (and function) assignments that use the same name
@@ -59,17 +59,13 @@ impl Violation for BuiltinVariableShadowing {
 }
 
 /// A001
-pub(crate) fn builtin_variable_shadowing(
-    checker: &mut Checker,
-    name: &str,
-    shadowing: AnyShadowing,
-) {
+pub(crate) fn builtin_variable_shadowing(checker: &mut Checker, name: &str, range: TextRange) {
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinVariableShadowing {
                 name: name.to_string(),
             },
-            shadowing.identifier(),
+            range,
         ));
     }
 }

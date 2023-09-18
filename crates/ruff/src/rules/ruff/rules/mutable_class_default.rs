@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
@@ -60,7 +61,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                     && is_mutable_expr(value, checker.semantic())
                     && !is_class_var_annotation(annotation, checker.semantic())
                     && !is_final_annotation(annotation, checker.semantic())
-                    && !is_immutable_annotation(annotation, checker.semantic())
+                    && !is_immutable_annotation(annotation, checker.semantic(), &[])
                     && !is_dataclass(class_def, checker.semantic())
                 {
                     // Avoid Pydantic models, which end up copying defaults on instance creation.

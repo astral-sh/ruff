@@ -4,12 +4,12 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
-use super::types::{FilePattern, PythonVersion};
+use super::types::{FilePattern, PreviewMode, PythonVersion};
 use super::Settings;
 use crate::codes::{self, RuleCodePrefix};
 use crate::line_width::{LineLength, TabSize};
 use crate::registry::Linter;
-use crate::rule_selector::{prefix_to_selector, RuleSelector};
+use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
@@ -20,11 +20,12 @@ use crate::rules::{
 use crate::settings::types::FilePatternSet;
 
 pub const PREFIXES: &[RuleSelector] = &[
-    prefix_to_selector(RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E)),
+    RuleSelector::Prefix {
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E),
+        redirected_from: None,
+    },
     RuleSelector::Linter(Linter::Pyflakes),
 ];
-
-pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
@@ -72,7 +73,10 @@ pub static INCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            rules: PREFIXES.iter().flat_map(IntoIterator::into_iter).collect(),
+            rules: PREFIXES
+                .iter()
+                .flat_map(|selector| selector.rules(PreviewMode::default()))
+                .collect(),
             allowed_confusables: FxHashSet::from_iter([]),
             builtins: vec![],
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
@@ -84,13 +88,15 @@ impl Default for Settings {
             ignore_init_module_imports: false,
             include: FilePatternSet::try_from_vec(INCLUDE.clone()).unwrap(),
             line_length: LineLength::default(),
-            tab_size: TabSize::default(),
+            logger_objects: vec![],
             namespace_packages: vec![],
+            preview: PreviewMode::default(),
             per_file_ignores: vec![],
+            project_root: path_dedot::CWD.clone(),
             respect_gitignore: true,
             src: vec![path_dedot::CWD.clone()],
-            project_root: path_dedot::CWD.clone(),
-            target_version: TARGET_VERSION,
+            tab_size: TabSize::default(),
+            target_version: PythonVersion::default(),
             task_tags: TASK_TAGS.iter().map(ToString::to_string).collect(),
             typing_modules: vec![],
             flake8_annotations: flake8_annotations::settings::Settings::default(),

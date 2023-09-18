@@ -1,0 +1,157 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+Call(
+    ExprCall {
+        range: 0..141,
+        func: Attribute(
+            ExprAttribute {
+                range: 0..8,
+                value: Constant(
+                    ExprConstant {
+                        range: 0..3,
+                        value: Str(
+                            StringConstant {
+                                value: " ",
+                                unicode: false,
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                attr: Identifier {
+                    id: "join",
+                    range: 4..8,
+                },
+                ctx: Load,
+            },
+        ),
+        arguments: Arguments {
+            range: 8..141,
+            args: [
+                GeneratorExp(
+                    ExprGeneratorExp {
+                        range: 14..139,
+                        elt: Name(
+                            ExprName {
+                                range: 14..17,
+                                id: "sql",
+                                ctx: Load,
+                            },
+                        ),
+                        generators: [
+                            Comprehension {
+                                range: 22..139,
+                                target: Name(
+                                    ExprName {
+                                        range: 26..29,
+                                        id: "sql",
+                                        ctx: Store,
+                                    },
+                                ),
+                                iter: Tuple(
+                                    ExprTuple {
+                                        range: 33..139,
+                                        elts: [
+                                            IfExp(
+                                                ExprIfExp {
+                                                    range: 43..80,
+                                                    test: Name(
+                                                        ExprName {
+                                                            range: 65..70,
+                                                            id: "limit",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    body: BinOp(
+                                                        ExprBinOp {
+                                                            range: 43..61,
+                                                            left: Constant(
+                                                                ExprConstant {
+                                                                    range: 43..53,
+                                                                    value: Str(
+                                                                        StringConstant {
+                                                                            value: "LIMIT %d",
+                                                                            unicode: false,
+                                                                            implicit_concatenated: false,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                            op: Mod,
+                                                            right: Name(
+                                                                ExprName {
+                                                                    range: 56..61,
+                                                                    id: "limit",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    orelse: Constant(
+                                                        ExprConstant {
+                                                            range: 76..80,
+                                                            value: None,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            IfExp(
+                                                ExprIfExp {
+                                                    range: 90..132,
+                                                    test: Name(
+                                                        ExprName {
+                                                            range: 116..122,
+                                                            id: "offset",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    body: BinOp(
+                                                        ExprBinOp {
+                                                            range: 91..111,
+                                                            left: Constant(
+                                                                ExprConstant {
+                                                                    range: 91..102,
+                                                                    value: Str(
+                                                                        StringConstant {
+                                                                            value: "OFFSET %d",
+                                                                            unicode: false,
+                                                                            implicit_concatenated: false,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                            op: Mod,
+                                                            right: Name(
+                                                                ExprName {
+                                                                    range: 105..111,
+                                                                    id: "offset",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    orelse: Constant(
+                                                        ExprConstant {
+                                                            range: 128..132,
+                                                            value: None,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                ifs: [],
+                                is_async: false,
+                            },
+                        ],
+                    },
+                ),
+            ],
+            keywords: [],
+        },
+    },
+)

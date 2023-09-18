@@ -16,7 +16,13 @@ expression: comments.debug(test_case.source_code)
             },
         ],
         "dangling": [],
-        "trailing": [],
+        "trailing": [
+            SourceComment {
+                text: "# own line comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
     },
     Node {
         kind: StmtIf,
@@ -34,28 +40,13 @@ expression: comments.debug(test_case.source_code)
         "trailing": [],
     },
     Node {
-        kind: StmtIf,
-        range: 144..212,
+        kind: ElifElseClause,
+        range: 144..177,
         source: `elif x < y:⏎`,
     }: {
         "leading": [
             SourceComment {
                 text: "# Leading comment",
-                position: OwnLine,
-                formatted: false,
-            },
-        ],
-        "dangling": [],
-        "trailing": [],
-    },
-    Node {
-        kind: StmtExpr,
-        range: 234..246,
-        source: `test(10, 20)`,
-    }: {
-        "leading": [
-            SourceComment {
-                text: "# own line comment",
                 position: OwnLine,
                 formatted: false,
             },

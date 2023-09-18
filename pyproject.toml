@@ -5,7 +5,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.278"
+version = "0.0.290"
 description = "An extremely fast Python linter, written in Rust."
 authors = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
 maintainers = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
@@ -21,7 +21,7 @@ keywords = [
   "clippy",
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
@@ -40,7 +40,7 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/astral-sh/ruff"
-Documentation = "https://beta.ruff.rs/docs/"
+Documentation = "https://docs.astral.sh/ruff/"
 Changelog = "https://github.com/astral-sh/ruff/releases"
 
 [tool.maturin]

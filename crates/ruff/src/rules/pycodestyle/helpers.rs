@@ -1,20 +1,24 @@
-use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{CmpOp, Expr, Ranged};
 use unicode_width::UnicodeWidthStr;
 
-use ruff_python_ast::source_code::Locator;
-use ruff_python_whitespace::Line;
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{CmpOp, Expr};
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::{Line, Locator};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
-use crate::line_width::{LineLength, LineWidth, TabSize};
+use crate::line_width::{LineLength, LineWidthBuilder, TabSize};
 
 pub(super) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }
 
-pub(super) fn compare(
+pub(super) fn generate_comparison(
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],
+    parent: AnyNodeRef,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) -> String {
     let start = left.start();
@@ -22,7 +26,12 @@ pub(super) fn compare(
     let mut contents = String::with_capacity(usize::from(end - start));
 
     // Add the left side of the comparison.
-    contents.push_str(locator.slice(left.range()));
+    contents.push_str(
+        locator.slice(
+            parenthesized_range(left.into(), parent, comment_ranges, locator.contents())
+                .unwrap_or(left.range()),
+        ),
+    );
 
     for (op, comparator) in ops.iter().zip(comparators) {
         // Add the operator.
@@ -40,7 +49,17 @@ pub(super) fn compare(
         });
 
         // Add the right side of the comparison.
-        contents.push_str(locator.slice(comparator.range()));
+        contents.push_str(
+            locator.slice(
+                parenthesized_range(
+                    comparator.into(),
+                    parent,
+                    comment_ranges,
+                    locator.contents(),
+                )
+                .unwrap_or(comparator.range()),
+            ),
+        );
     }
 
     contents
@@ -53,16 +72,16 @@ pub(super) fn is_overlong(
     task_tags: &[String],
     tab_size: TabSize,
 ) -> Option<Overlong> {
-    let mut start_offset = line.start();
-    let mut width = LineWidth::new(tab_size);
-
-    for c in line.chars() {
-        if width < limit {
-            start_offset += c.text_len();
-        }
-        width = width.add_char(c);
+    // The maximum width of the line is the number of bytes multiplied by the tab size (the
+    // worst-case scenario is that the line is all tabs). If the maximum width is less than the
+    // limit, then the line is not overlong.
+    let max_width = line.len() * tab_size.as_usize();
+    if max_width < limit.value() as usize {
+        return None;
     }
 
+    let mut width = LineWidthBuilder::new(tab_size);
+    width = width.add_str(line.as_str());
     if width <= limit {
         return None;
     }
@@ -86,11 +105,22 @@ pub(super) fn is_overlong(
     // begins before the limit.
     let last_chunk = chunks.last().unwrap_or(second_chunk);
     if last_chunk.contains("://") {
-        if width.get() - last_chunk.width() <= limit.get() {
+        if width.get() - last_chunk.width() <= limit.value() as usize {
             return None;
         }
     }
 
+    // Obtain the start offset of the part of the line that exceeds the limit
+    let mut start_offset = line.start();
+    let mut start_width = LineWidthBuilder::new(tab_size);
+    for c in line.chars() {
+        if start_width < limit {
+            start_offset += c.text_len();
+            start_width = start_width.add_char(c);
+        } else {
+            break;
+        }
+    }
     Some(Overlong {
         range: TextRange::new(start_offset, line.end()),
         width: width.get(),

@@ -1,14 +1,52 @@
-use rustpython_parser::ast::{self, Decorator, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
 use super::helpers::get_mark_decorators;
 
+/// ## What it does
+/// Checks for argument-free `@pytest.mark.<marker>()` decorators with or
+/// without parentheses, depending on the `flake8-pytest-style.mark-parentheses`
+/// setting.
+///
+/// ## Why is this bad?
+/// If a `@pytest.mark.<marker>()` doesn't take any arguments, the parentheses are
+/// optional.
+///
+/// Either removing those unnecessary parentheses _or_ requiring them for all
+/// fixtures is fine, but it's best to be consistent.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.foo
+/// def test_something():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.foo()
+/// def test_something():
+///     ...
+/// ```
+///
+/// ## Options
+/// - `flake8-pytest-style.mark-parentheses`
+///
+/// ## References
+/// - [`pytest` documentation: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
     mark_name: String,
@@ -34,6 +72,33 @@ impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
         "Add/remove parentheses".to_string()
     }
 }
+
+/// ## What it does
+/// Checks for `@pytest.mark.usefixtures()` decorators that aren't passed any
+/// arguments.
+///
+/// ## Why is this bad?
+/// A `@pytest.mark.usefixtures()` decorator that isn't passed any arguments is
+/// useless and should be removed.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.usefixtures()
+/// def test_something():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_something():
+///     ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 
 #[violation]
 pub struct PytestUseFixturesWithoutParameters;
@@ -75,8 +140,12 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, call_pat
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) => {
             if !checker.settings.flake8_pytest_style.mark_parentheses
@@ -103,7 +172,11 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, call_
 
     let mut has_parameters = false;
 
-    if let Expr::Call(ast::ExprCall { args, keywords, .. }) = &decorator.expression {
+    if let Expr::Call(ast::ExprCall {
+        arguments: Arguments { args, keywords, .. },
+        ..
+    }) = &decorator.expression
+    {
         if !args.is_empty() || !keywords.is_empty() {
             has_parameters = true;
         }

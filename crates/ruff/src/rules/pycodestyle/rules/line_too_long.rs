@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_whitespace::Line;
+use ruff_source_file::Line;
 
 use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
@@ -10,7 +10,9 @@ use crate::settings::Settings;
 ///
 /// ## Why is this bad?
 /// Overlong lines can hurt readability. [PEP 8], for example, recommends
-/// limiting lines to 79 characters.
+/// limiting lines to 79 characters. By default, this rule enforces a limit
+/// of 88 characters for compatibility with Black, though that limit is
+/// configurable via the [`line-length`] setting.
 ///
 /// In the interest of pragmatism, this rule makes a few exceptions when
 /// determining whether a line is overlong. Namely, it ignores lines that
@@ -36,6 +38,7 @@ use crate::settings::Settings;
 /// ```
 ///
 /// ## Options
+/// - `line-length`
 /// - `task-tags`
 /// - `pycodestyle.ignore-overlong-task-comments`
 ///
@@ -62,5 +65,10 @@ pub(crate) fn line_too_long(line: &Line, settings: &Settings) -> Option<Diagnost
         &settings.task_tags,
         settings.tab_size,
     )
-    .map(|overlong| Diagnostic::new(LineTooLong(overlong.width(), limit.get()), overlong.range()))
+    .map(|overlong| {
+        Diagnostic::new(
+            LineTooLong(overlong.width(), limit.value() as usize),
+            overlong.range(),
+        )
+    })
 }

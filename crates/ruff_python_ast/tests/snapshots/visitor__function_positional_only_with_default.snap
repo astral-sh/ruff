@@ -1,0 +1,14 @@
+---
+source: crates/ruff_python_ast/tests/visitor.rs
+expression: trace
+---
+- StmtFunctionDef
+  - Parameters
+    - ExprConstant
+    - ExprConstant
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+  - StmtPass
+

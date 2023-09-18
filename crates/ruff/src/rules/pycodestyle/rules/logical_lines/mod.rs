@@ -13,12 +13,12 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use bitflags::bitflags;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::lexer::LexResult;
+use ruff_python_parser::lexer::LexResult;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::token_kind::TokenKind;
-use ruff_python_whitespace::is_python_whitespace;
+use ruff_python_parser::TokenKind;
+use ruff_python_trivia::is_python_whitespace;
+use ruff_source_file::Locator;
 
 mod extraneous_whitespace;
 mod indentation;
@@ -310,22 +310,11 @@ impl LogicalLineToken {
     pub(crate) const fn kind(&self) -> TokenKind {
         self.kind
     }
+}
 
-    /// Returns the token's start location
-    #[inline]
-    pub(crate) const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    /// Returns the token's end location
-    #[inline]
-    pub(crate) const fn end(&self) -> TextSize {
-        self.range.end()
-    }
-
+impl Ranged for LogicalLineToken {
     /// Returns a tuple with the token's `(start, end)` locations
-    #[inline]
-    pub(crate) const fn range(&self) -> TextRange {
+    fn range(&self) -> TextRange {
         self.range
     }
 }
@@ -521,10 +510,10 @@ struct Line {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::{lexer, Mode};
+    use ruff_python_parser::lexer::LexResult;
+    use ruff_python_parser::{lexer, Mode};
 
-    use ruff_python_ast::source_code::Locator;
+    use ruff_source_file::Locator;
 
     use super::LogicalLines;
 

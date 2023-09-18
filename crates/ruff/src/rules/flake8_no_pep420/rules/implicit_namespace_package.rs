@@ -47,15 +47,15 @@ pub(crate) fn implicit_namespace_package(
 ) -> Option<Diagnostic> {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
-        && path.extension().map_or(false, |ext| ext == "py")
+        && path.extension().is_some_and( |ext| ext == "py")
         // Ignore any files that are direct children of the project root.
         && !path
             .parent()
-            .map_or(false, |parent| parent == project_root)
+            .is_some_and( |parent| parent == project_root)
         // Ignore any files that are direct children of a source directory (e.g., `src/manage.py`).
         && !path
             .parent()
-            .map_or(false, |parent| src.iter().any(|src| src == parent))
+            .is_some_and( |parent| src.iter().any(|src| src == parent))
     {
         #[cfg(all(test, windows))]
         let path = path

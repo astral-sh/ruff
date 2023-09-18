@@ -1,0 +1,112 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/mixed_space_and_tab.py
+---
+## Input
+```py
+def test():
+ # fmt: off
+ 	a_very_small_indent
+ 	(
+not_fixed
+ )
+
+ 	if True:
+# Fun tab, space, tab, space. Followed by space, tab, tab, space
+	 	 pass
+ 		 more
+ 	else:
+  	   other
+ # fmt: on
+
+```
+
+## Outputs
+### Output 1
+```
+indent-style            = space
+line-width              = 88
+indent-width            = 4
+quote-style             = Double
+magic-trailing-comma    = Respect
+```
+
+```py
+def test():
+    # fmt: off
+    a_very_small_indent
+    (
+not_fixed
+ )
+
+    if True:
+    # Fun tab, space, tab, space. Followed by space, tab, tab, space
+    	 pass
+    	 more
+    else:
+    	   other
+
+
+# fmt: on
+```
+
+
+### Output 2
+```
+indent-style            = space
+line-width              = 88
+indent-width            = 2
+quote-style             = Double
+magic-trailing-comma    = Respect
+```
+
+```py
+def test():
+  # fmt: off
+  a_very_small_indent
+  (
+not_fixed
+ )
+
+  if True:
+  # Fun tab, space, tab, space. Followed by space, tab, tab, space
+  	 pass
+  	 more
+  else:
+  	   other
+
+
+# fmt: on
+```
+
+
+### Output 3
+```
+indent-style            = tab
+line-width              = 88
+indent-width            = 4
+quote-style             = Double
+magic-trailing-comma    = Respect
+```
+
+```py
+def test():
+	# fmt: off
+	a_very_small_indent
+	(
+not_fixed
+ )
+
+	if True:
+	# Fun tab, space, tab, space. Followed by space, tab, tab, space
+		 pass
+		 more
+	else:
+		   other
+
+
+# fmt: on
+```
+
+
+

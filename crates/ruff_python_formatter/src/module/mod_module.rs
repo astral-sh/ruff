@@ -1,28 +1,46 @@
-use crate::statement::suite::SuiteLevel;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::hard_line_break;
-use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::ModModule;
+use ruff_formatter::write;
+use ruff_python_ast::ModModule;
+use ruff_python_trivia::lines_after;
+
+use crate::comments::SourceComment;
+use crate::prelude::*;
+use crate::statement::suite::SuiteKind;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatModModule;
 
 impl FormatNodeRule<ModModule> for FormatModModule {
     fn fmt_fields(&self, item: &ModModule, f: &mut PyFormatter) -> FormatResult<()> {
-        let ModModule {
-            range: _,
-            body,
-            type_ignores,
-        } = item;
-        // https://docs.python.org/3/library/ast.html#ast-helpers
-        debug_assert!(type_ignores.is_empty());
-        write!(
-            f,
-            [
-                body.format().with_options(SuiteLevel::TopLevel),
-                // Trailing newline at the end of the file
-                hard_line_break()
-            ]
-        )
+        let ModModule { range, body } = item;
+
+        if body.is_empty() {
+            // Only preserve an empty line if the source contains an empty line too.
+            if !f.context().comments().has_leading(item)
+                && lines_after(range.end(), f.context().source()) != 0
+            {
+                empty_line().fmt(f)
+            } else {
+                Ok(())
+            }
+        } else {
+            write!(
+                f,
+                [
+                    body.format().with_options(SuiteKind::TopLevel),
+                    // Trailing newline at the end of the file
+                    hard_line_break()
+                ]
+            )
+        }
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
+        Ok(())
     }
 }

@@ -34,6 +34,8 @@ FBT.py:69:38: FBT003 Boolean positional value in function call
 68 | g_action.set_enabled(True)
 69 | settings.set_enable_developer_extras(True)
    |                                      ^^^^ FBT003
+70 | foo.is_(True)
+71 | bar.is_not(False)
    |
 
 

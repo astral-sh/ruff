@@ -1,9 +1,9 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Expr, Ranged, WithItem};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, WithItem};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -80,23 +80,24 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
     for item in items {
         let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments,
             range: _,
         }) = &item.context_expr
         else {
             return;
         };
-        if args.len() != 1 {
-            return;
-        }
+
         if item.optional_vars.is_some() {
             return;
         }
 
+        let [arg] = arguments.args.as_slice() else {
+            return;
+        };
+
         let Some(exception) = checker
             .semantic()
-            .resolve_call_path(args.first().unwrap())
+            .resolve_call_path(arg)
             .and_then(|call_path| match call_path.as_slice() {
                 ["", "Exception"] => Some(ExceptionKind::Exception),
                 ["", "BaseException"] => Some(ExceptionKind::BaseException),
@@ -112,12 +113,8 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
         } else if checker
             .semantic()
             .resolve_call_path(func)
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["pytest", "raises"])
-            })
-            && !keywords
-                .iter()
-                .any(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "match"))
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["pytest", "raises"]))
+            && arguments.find_keyword("match").is_none()
         {
             AssertionKind::PytestRaises
         } else {

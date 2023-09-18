@@ -15,6 +15,15 @@ G004.py:5:27: G004 Logging statement uses f-string
 4 | logging.info(f"Hello {name}")
 5 | logging.log(logging.INFO, f"Hello {name}")
   |                           ^^^^^^^^^^^^^^^ G004
+6 | 
+7 | _LOGGER = logging.getLogger()
+  |
+
+G004.py:8:14: G004 Logging statement uses f-string
+  |
+7 | _LOGGER = logging.getLogger()
+8 | _LOGGER.info(f"{__name__}")
+  |              ^^^^^^^^^^^^^ G004
   |
 
 

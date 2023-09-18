@@ -1,13 +1,11 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
-
-use super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary `list` or `reversed` calls around `sorted`
@@ -57,10 +55,10 @@ pub(crate) fn unnecessary_call_around_sorted(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Some(outer) = helpers::expr_name(func) else {
+    let Some(outer) = func.as_name_expr() else {
         return;
     };
-    if !(outer == "list" || outer == "reversed") {
+    if !matches!(outer.id.as_str(), "list" | "reversed") {
         return;
     }
     let Some(arg) = args.first() else {
@@ -69,26 +67,29 @@ pub(crate) fn unnecessary_call_around_sorted(
     let Expr::Call(ast::ExprCall { func, .. }) = arg else {
         return;
     };
-    let Some(inner) = helpers::expr_name(func) else {
+    let Some(inner) = func.as_name_expr() else {
         return;
     };
-    if inner != "sorted" {
+    if inner.id != "sorted" {
         return;
     }
-    if !checker.semantic().is_builtin(inner) || !checker.semantic().is_builtin(outer) {
+    if !checker.semantic().is_builtin(&inner.id) || !checker.semantic().is_builtin(&outer.id) {
         return;
     }
     let mut diagnostic = Diagnostic::new(
         UnnecessaryCallAroundSorted {
-            func: outer.to_string(),
+            func: outer.id.to_string(),
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let edit =
-                fixes::fix_unnecessary_call_around_sorted(checker.locator, checker.stylist, expr)?;
-            if outer == "reversed" {
+            let edit = fixes::fix_unnecessary_call_around_sorted(
+                expr,
+                checker.locator(),
+                checker.stylist(),
+            )?;
+            if outer.id == "reversed" {
                 Ok(Fix::suggested(edit))
             } else {
                 Ok(Fix::automatic(edit))

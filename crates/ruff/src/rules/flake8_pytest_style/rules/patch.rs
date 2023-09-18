@@ -1,12 +1,44 @@
-use rustpython_parser::ast::{self, Arguments, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::{includes_arg_name, SimpleCallArgs};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr, Parameters};
+use ruff_text_size::Ranged;
 
+/// ## What it does
+/// Checks for mocked calls that use a dummy `lambda` function instead of
+/// `return_value`.
+///
+/// ## Why is this bad?
+/// When patching calls, an explicit `return_value` better conveys the intent
+/// than a `lambda` function, assuming the `lambda` does not use the arguments
+/// passed to it.
+///
+/// `return_value` is also robust to changes in the patched function's
+/// signature, and enables additional assertions to verify behavior. For
+/// example, `return_value` allows for verification of the number of calls or
+/// the arguments passed to the patched function via `assert_called_once_with`
+/// and related methods.
+///
+/// ## Example
+/// ```python
+/// def test_foo(mocker):
+///     mocker.patch("module.target", lambda x, y: 7)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_foo(mocker):
+///     mocker.patch("module.target", return_value=7)
+///
+///     # If the lambda makes use of the arguments, no diagnostic is emitted.
+///     mocker.patch("module.other_target", lambda x, y: x)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
+/// - [`pytest-mock`](https://pypi.org/project/pytest-mock/)
 #[violation]
 pub struct PytestPatchWithLambda;
 
@@ -20,7 +52,7 @@ impl Violation for PytestPatchWithLambda {
 /// Visitor that checks references the argument names in the lambda body.
 #[derive(Debug)]
 struct LambdaBodyVisitor<'a> {
-    arguments: &'a Arguments,
+    parameters: &'a Parameters,
     uses_args: bool,
 }
 
@@ -31,7 +63,7 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                if includes_arg_name(id, self.arguments) {
+                if self.parameters.includes(id) {
                     self.uses_args = true;
                 }
             }
@@ -44,44 +76,38 @@ where
     }
 }
 
-fn check_patch_call(
-    call: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-    new_arg_number: usize,
-) -> Option<Diagnostic> {
-    let simple_args = SimpleCallArgs::new(args, keywords);
-    if simple_args.keyword_argument("return_value").is_some() {
+fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
+    if call.arguments.find_keyword("return_value").is_some() {
         return None;
     }
 
-    if let Some(Expr::Lambda(ast::ExprLambda {
-        args,
+    let ast::ExprLambda {
+        parameters,
         body,
         range: _,
-    })) = simple_args.argument("new", new_arg_number)
-    {
-        // Walk the lambda body.
+    } = call
+        .arguments
+        .find_argument("new", index)?
+        .as_lambda_expr()?;
+
+    // Walk the lambda body. If the lambda uses the arguments, then it's valid.
+    if let Some(parameters) = parameters {
         let mut visitor = LambdaBodyVisitor {
-            arguments: args,
+            parameters,
             uses_args: false,
         };
         visitor.visit_expr(body);
-
-        if !visitor.uses_args {
-            return Some(Diagnostic::new(PytestPatchWithLambda, call.range()));
+        if visitor.uses_args {
+            return None;
         }
     }
 
-    None
+    Some(Diagnostic::new(PytestPatchWithLambda, call.func.range()))
 }
 
-pub(crate) fn patch_with_lambda(
-    call: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) -> Option<Diagnostic> {
-    let call_path = collect_call_path(call)?;
+/// PT008
+pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
+    let call_path = collect_call_path(&call.func)?;
 
     if matches!(
         call_path.as_slice(),
@@ -95,7 +121,7 @@ pub(crate) fn patch_with_lambda(
             "patch"
         ] | ["unittest", "mock", "patch"]
     ) {
-        check_patch_call(call, args, keywords, 1)
+        check_patch_call(call, 1)
     } else if matches!(
         call_path.as_slice(),
         [
@@ -109,7 +135,7 @@ pub(crate) fn patch_with_lambda(
             "object"
         ] | ["unittest", "mock", "patch", "object"]
     ) {
-        check_patch_call(call, args, keywords, 2)
+        check_patch_call(call, 2)
     } else {
         None
     }

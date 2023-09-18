@@ -1,9 +1,7 @@
-use rustpython_parser::ast::{self, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Definition, Member, MemberKind};
-use ruff_python_whitespace::UniversalNewlines;
+use ruff_source_file::UniversalNewlines;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -54,15 +52,7 @@ impl Violation for NoSignature {
 
 /// D402
 pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
-    let Definition::Member(Member {
-        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-        stmt,
-        ..
-    }) = docstring.definition
-    else {
-        return;
-    };
-    let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = stmt else {
+    let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 
@@ -72,11 +62,14 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
         return;
     };
 
-    if !first_line.contains(&format!("{name}(")) {
-        return;
-    };
-
-    checker
-        .diagnostics
-        .push(Diagnostic::new(NoSignature, docstring.range()));
+    // Search for occurrences of the function name followed by an open parenthesis (e.g., `foo(` for
+    // a function named `foo`).
+    if first_line
+        .match_indices(function.name.as_str())
+        .any(|(index, _)| first_line[index + function.name.len()..].starts_with('('))
+    {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(NoSignature, docstring.range()));
+    }
 }

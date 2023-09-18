@@ -70,4 +70,13 @@ RET508.py:82:9: RET508 Unnecessary `else` after `break` statement
 84 |                 return
    |
 
+RET508.py:158:13: RET508 Unnecessary `else` after `break` statement
+    |
+156 |             if i > w:
+157 |                 break
+158 |             else:
+    |             ^^^^ RET508
+159 |                 a = z
+    |
+
 

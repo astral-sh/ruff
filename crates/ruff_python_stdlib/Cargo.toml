@@ -13,3 +13,4 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+unicode-ident = { workspace = true }

@@ -268,7 +268,7 @@ SIM300.py:14:1: SIM300 [*] Yoda conditions are discouraged, use `age == JediOrde
    14 |+age == JediOrder.YODA  # SIM300
 15 15 | 0 < (number - 100)  # SIM300
 16 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
-17 17 | 
+17 17 | B<A[0][0]or B
 
 SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) > 0` instead
    |
@@ -277,6 +277,7 @@ SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) 
 15 | 0 < (number - 100)  # SIM300
    | ^^^^^^^^^^^^^^^^^^ SIM300
 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+17 | B<A[0][0]or B
    |
    = help: Replace Yoda condition with `(number - 100) > 0`
 
@@ -287,19 +288,19 @@ SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) 
 15    |-0 < (number - 100)  # SIM300
    15 |+(number - 100) > 0  # SIM300
 16 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
-17 17 | 
-18 18 | # OK
+17 17 | B<A[0][0]or B
+18 18 | B or(B)<A[0][0]
 
-SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged, use `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE` instead
+SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged
    |
 14 | JediOrder.YODA == age  # SIM300
 15 | 0 < (number - 100)  # SIM300
 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300
-17 | 
-18 | # OK
+17 | B<A[0][0]or B
+18 | B or(B)<A[0][0]
    |
-   = help: Replace Yoda condition with `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE`
+   = help: Replace Yoda condition
 
 ℹ Fix
 13 13 | YODA >= age  # SIM300
@@ -307,8 +308,49 @@ SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged, use `(60 * 60) < Som
 15 15 | 0 < (number - 100)  # SIM300
 16    |-SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
    16 |+(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE  # SIM300
-17 17 | 
-18 18 | # OK
-19 19 | compare == "yoda"
+17 17 | B<A[0][0]or B
+18 18 | B or(B)<A[0][0]
+19 19 | 
+
+SIM300.py:17:1: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > B` instead
+   |
+15 | 0 < (number - 100)  # SIM300
+16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+17 | B<A[0][0]or B
+   | ^^^^^^^^^ SIM300
+18 | B or(B)<A[0][0]
+   |
+   = help: Replace Yoda condition with `A[0][0] > B`
+
+ℹ Fix
+14 14 | JediOrder.YODA == age  # SIM300
+15 15 | 0 < (number - 100)  # SIM300
+16 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+17    |-B<A[0][0]or B
+   17 |+A[0][0] > B or B
+18 18 | B or(B)<A[0][0]
+19 19 | 
+20 20 | # OK
+
+SIM300.py:18:5: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > (B)` instead
+   |
+16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+17 | B<A[0][0]or B
+18 | B or(B)<A[0][0]
+   |     ^^^^^^^^^^^ SIM300
+19 | 
+20 | # OK
+   |
+   = help: Replace Yoda condition with `A[0][0] > (B)`
+
+ℹ Fix
+15 15 | 0 < (number - 100)  # SIM300
+16 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+17 17 | B<A[0][0]or B
+18    |-B or(B)<A[0][0]
+   18 |+B or A[0][0] > (B)
+19 19 | 
+20 20 | # OK
+21 21 | compare == "yoda"
 
 

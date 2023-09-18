@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{Decorator, Ranged};
+use ruff_python_ast::Decorator;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -52,11 +53,11 @@ impl Violation for DjangoNonLeadingReceiverDecorator {
 pub(crate) fn non_leading_receiver_decorator(checker: &mut Checker, decorator_list: &[Decorator]) {
     let mut seen_receiver = false;
     for (i, decorator) in decorator_list.iter().enumerate() {
-        let is_receiver = decorator.expression.as_call_expr().map_or(false, |call| {
+        let is_receiver = decorator.expression.as_call_expr().is_some_and(|call| {
             checker
                 .semantic()
                 .resolve_call_path(&call.func)
-                .map_or(false, |call_path| {
+                .is_some_and(|call_path| {
                     matches!(call_path.as_slice(), ["django", "dispatch", "receiver"])
                 })
         });

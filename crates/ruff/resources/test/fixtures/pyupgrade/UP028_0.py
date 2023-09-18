@@ -72,3 +72,12 @@ def f():
     for x, y in z():
         yield x, y
     x = 1
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7103
+def _serve_method(fn):
+    for h in (
+        TaggedText.from_file(args.input)
+            .markup(highlight=args.region)
+    ):
+        yield h

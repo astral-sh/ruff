@@ -1,0 +1,41 @@
+---
+source: crates/ruff_python_parser/src/context.rs
+expression: parse_ast
+---
+[
+    With(
+        StmtWith {
+            range: 0..17,
+            is_async: false,
+            items: [
+                WithItem {
+                    range: 5..11,
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 5..6,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 10..11,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 13..17,
+                    },
+                ),
+            ],
+        },
+    ),
+]

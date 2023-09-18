@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::{self as ast, Expr, Stmt, StmtIf};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -56,7 +56,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt {
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
             Stmt::Return(_) => self.returns.push(stmt),
@@ -79,7 +79,7 @@ fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
     checker
         .semantic()
         .resolve_call_path(call)
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["", "isinstance" | "issubclass" | "callable"]
@@ -104,7 +104,7 @@ fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
     return checker
         .semantic()
         .resolve_call_path(exc)
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 [
@@ -164,34 +164,18 @@ fn check_body(checker: &mut Checker, body: &[Stmt]) {
     }
 }
 
-/// Search the orelse of an if-condition for raises.
-fn check_orelse(checker: &mut Checker, body: &[Stmt]) {
-    for item in body {
-        if has_control_flow(item) {
-            return;
-        }
-        match item {
-            Stmt::If(ast::StmtIf { test, .. }) => {
-                if !check_type_check_test(checker, test) {
-                    return;
-                }
-            }
-            Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
-                check_raise(checker, exc, item);
-            }
-            _ => {}
-        }
-    }
-}
-
 /// TRY004
 pub(crate) fn type_check_without_type_error(
     checker: &mut Checker,
-    body: &[Stmt],
-    test: &Expr,
-    orelse: &[Stmt],
+    stmt_if: &StmtIf,
     parent: Option<&Stmt>,
 ) {
+    let StmtIf {
+        body,
+        test,
+        elif_else_clauses,
+        ..
+    } = stmt_if;
     if let Some(Stmt::If(ast::StmtIf { test, .. })) = parent {
         if !check_type_check_test(checker, test) {
             return;
@@ -199,8 +183,20 @@ pub(crate) fn type_check_without_type_error(
     }
 
     // Only consider the body when the `if` condition is all type-related
-    if check_type_check_test(checker, test) {
-        check_body(checker, body);
-        check_orelse(checker, orelse);
+    if !check_type_check_test(checker, test) {
+        return;
+    }
+    check_body(checker, body);
+
+    for clause in elif_else_clauses {
+        if let Some(test) = &clause.test {
+            // If there are any `elif`, they must all also be type-related
+            if !check_type_check_test(checker, test) {
+                return;
+            }
+        }
+
+        // The `elif` or `else` body raises the wrong exception
+        check_body(checker, &clause.body);
     }
 }

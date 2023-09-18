@@ -1,0 +1,20 @@
+{
+  "name": "api",
+  "version": "0.0.0",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20230801.0",
+    "miniflare": "^3.20230801.1",
+    "typescript": "^5.1.6",
+    "wrangler": "2.0.27"
+  },
+  "private": true,
+  "scripts": {
+    "start": "wrangler dev",
+    "deploy": "wrangler publish"
+  },
+  "dependencies": {
+    "@miniflare/kv": "^2.14.0",
+    "@miniflare/storage-memory": "^2.14.0",
+    "uuid": "^9.0.0"
+  }
+}

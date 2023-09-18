@@ -1,10 +1,10 @@
-use once_cell::sync::Lazy;
-use regex::Regex;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_whitespace::Line;
+use ruff_python_index::Indexer;
+use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
+
+use crate::noqa::Directive;
 
 /// ## What it does
 /// Check for `noqa` annotations that suppress all diagnostics, as opposed to
@@ -28,7 +28,7 @@ use ruff_python_whitespace::Line;
 /// ```
 ///
 /// ## References
-/// - [Ruff documentation](https://beta.ruff.rs/docs/configuration/#error-suppression)
+/// - [Ruff documentation](https://docs.astral.sh/ruff/configuration/#error-suppression)
 #[violation]
 pub struct BlanketNOQA;
 
@@ -39,18 +39,16 @@ impl Violation for BlanketNOQA {
     }
 }
 
-static BLANKET_NOQA_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)# noqa($|\s|:[^ ])").unwrap());
-
 /// PGH004
-pub(crate) fn blanket_noqa(diagnostics: &mut Vec<Diagnostic>, line: &Line) {
-    if let Some(match_) = BLANKET_NOQA_REGEX.find(line.as_str()) {
-        diagnostics.push(Diagnostic::new(
-            BlanketNOQA,
-            TextRange::at(
-                line.start() + TextSize::try_from(match_.start()).unwrap(),
-                match_.as_str().text_len(),
-            ),
-        ));
+pub(crate) fn blanket_noqa(
+    diagnostics: &mut Vec<Diagnostic>,
+    indexer: &Indexer,
+    locator: &Locator,
+) {
+    for range in indexer.comment_ranges() {
+        let line = locator.slice(*range);
+        if let Ok(Some(Directive::All(all))) = Directive::try_extract(line, range.start()) {
+            diagnostics.push(Diagnostic::new(BlanketNOQA, all.range()));
+        }
     }
 }

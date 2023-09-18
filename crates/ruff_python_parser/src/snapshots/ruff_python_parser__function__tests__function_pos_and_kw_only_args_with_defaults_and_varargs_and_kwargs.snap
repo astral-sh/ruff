@@ -1,0 +1,146 @@
+---
+source: crates/ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        FunctionDef(
+            StmtFunctionDef {
+                range: 0..52,
+                is_async: false,
+                decorator_list: [],
+                name: Identifier {
+                    id: "f",
+                    range: 4..5,
+                },
+                type_params: None,
+                parameters: Parameters {
+                    range: 5..46,
+                    posonlyargs: [],
+                    args: [
+                        ParameterWithDefault {
+                            range: 6..7,
+                            parameter: Parameter {
+                                range: 6..7,
+                                name: Identifier {
+                                    id: "a",
+                                    range: 6..7,
+                                },
+                                annotation: None,
+                            },
+                            default: None,
+                        },
+                        ParameterWithDefault {
+                            range: 9..10,
+                            parameter: Parameter {
+                                range: 9..10,
+                                name: Identifier {
+                                    id: "b",
+                                    range: 9..10,
+                                },
+                                annotation: None,
+                            },
+                            default: None,
+                        },
+                        ParameterWithDefault {
+                            range: 12..13,
+                            parameter: Parameter {
+                                range: 12..13,
+                                name: Identifier {
+                                    id: "c",
+                                    range: 12..13,
+                                },
+                                annotation: None,
+                            },
+                            default: None,
+                        },
+                    ],
+                    vararg: Some(
+                        Parameter {
+                            range: 16..20,
+                            name: Identifier {
+                                id: "args",
+                                range: 16..20,
+                            },
+                            annotation: None,
+                        },
+                    ),
+                    kwonlyargs: [
+                        ParameterWithDefault {
+                            range: 22..23,
+                            parameter: Parameter {
+                                range: 22..23,
+                                name: Identifier {
+                                    id: "d",
+                                    range: 22..23,
+                                },
+                                annotation: None,
+                            },
+                            default: None,
+                        },
+                        ParameterWithDefault {
+                            range: 25..29,
+                            parameter: Parameter {
+                                range: 25..26,
+                                name: Identifier {
+                                    id: "e",
+                                    range: 25..26,
+                                },
+                                annotation: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 27..29,
+                                        value: Int(
+                                            20,
+                                        ),
+                                    },
+                                ),
+                            ),
+                        },
+                        ParameterWithDefault {
+                            range: 31..35,
+                            parameter: Parameter {
+                                range: 31..32,
+                                name: Identifier {
+                                    id: "f",
+                                    range: 31..32,
+                                },
+                                annotation: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 33..35,
+                                        value: Int(
+                                            30,
+                                        ),
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    kwarg: Some(
+                        Parameter {
+                            range: 39..45,
+                            name: Identifier {
+                                id: "kwargs",
+                                range: 39..45,
+                            },
+                            annotation: None,
+                        },
+                    ),
+                },
+                returns: None,
+                body: [
+                    Pass(
+                        StmtPass {
+                            range: 48..52,
+                        },
+                    ),
+                ],
+            },
+        ),
+    ],
+)

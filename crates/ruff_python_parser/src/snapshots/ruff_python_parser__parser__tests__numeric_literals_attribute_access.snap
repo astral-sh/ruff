@@ -1,0 +1,664 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: "parse_suite(source, \"<test>\").unwrap()"
+---
+[
+    Assign(
+        StmtAssign {
+            range: 0..19,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 0..1,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Call(
+                ExprCall {
+                    range: 4..19,
+                    func: Attribute(
+                        ExprAttribute {
+                            range: 4..17,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 4..6,
+                                    value: Float(
+                                        0.1,
+                                    ),
+                                },
+                            ),
+                            attr: Identifier {
+                                id: "is_integer",
+                                range: 7..17,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 17..19,
+                        args: [],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 20..32,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 20..21,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Attribute(
+                ExprAttribute {
+                    range: 24..32,
+                    value: Constant(
+                        ExprConstant {
+                            range: 24..26,
+                            value: Float(
+                                1.0,
+                            ),
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "imag",
+                        range: 28..32,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 33..46,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 33..34,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Attribute(
+                ExprAttribute {
+                    range: 37..46,
+                    value: Constant(
+                        ExprConstant {
+                            range: 37..41,
+                            value: Float(
+                                10.0,
+                            ),
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "imag",
+                        range: 42..46,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 47..60,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 47..48,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Attribute(
+                ExprAttribute {
+                    range: 51..60,
+                    value: Constant(
+                        ExprConstant {
+                            range: 51..55,
+                            value: Float(
+                                0.1,
+                            ),
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "real",
+                        range: 56..60,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 61..90,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 61..62,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Call(
+                ExprCall {
+                    range: 65..90,
+                    func: Attribute(
+                        ExprAttribute {
+                            range: 65..88,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 65..84,
+                                    value: Float(
+                                        123456789.12345679,
+                                    ),
+                                },
+                            ),
+                            attr: Identifier {
+                                id: "hex",
+                                range: 85..88,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 88..90,
+                        args: [],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 91..130,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 91..92,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Attribute(
+                ExprAttribute {
+                    range: 95..130,
+                    value: Constant(
+                        ExprConstant {
+                            range: 95..124,
+                            value: Float(
+                                inf,
+                            ),
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "real",
+                        range: 126..130,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 131..167,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 131..132,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Call(
+                ExprCall {
+                    range: 135..167,
+                    func: Attribute(
+                        ExprAttribute {
+                            range: 135..165,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 135..154,
+                                    value: Float(
+                                        inf,
+                                    ),
+                                },
+                            ),
+                            attr: Identifier {
+                                id: "conjugate",
+                                range: 156..165,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 165..167,
+                        args: [],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 168..187,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 168..169,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Attribute(
+                ExprAttribute {
+                    range: 172..187,
+                    value: Constant(
+                        ExprConstant {
+                            range: 172..182,
+                            value: Complex {
+                                real: 0.0,
+                                imag: 123456789.0,
+                            },
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "real",
+                        range: 183..187,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 188..241,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 188..189,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Call(
+                ExprCall {
+                    range: 192..241,
+                    func: Attribute(
+                        ExprAttribute {
+                            range: 192..220,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 192..212,
+                                    value: Complex {
+                                        real: 0.0,
+                                        imag: 123456789.12345679,
+                                    },
+                                },
+                            ),
+                            attr: Identifier {
+                                id: "__add__",
+                                range: 213..220,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 220..241,
+                        args: [
+                            Call(
+                                ExprCall {
+                                    range: 221..240,
+                                    func: Attribute(
+                                        ExprAttribute {
+                                            range: 221..238,
+                                            value: Constant(
+                                                ExprConstant {
+                                                    range: 221..227,
+                                                    value: Int(
+                                                        11,
+                                                    ),
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: "bit_length",
+                                                range: 228..238,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 238..240,
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 242..265,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 242..243,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Call(
+                ExprCall {
+                    range: 246..265,
+                    func: Attribute(
+                        ExprAttribute {
+                            range: 246..263,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 246..253,
+                                    value: Int(
+                                        727756,
+                                    ),
+                                },
+                            ),
+                            attr: Identifier {
+                                id: "conjugate",
+                                range: 254..263,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 263..265,
+                        args: [],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 266..289,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 266..267,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Call(
+                ExprCall {
+                    range: 270..289,
+                    func: Attribute(
+                        ExprAttribute {
+                            range: 270..287,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 270..276,
+                                    value: Int(
+                                        11,
+                                    ),
+                                },
+                            ),
+                            attr: Identifier {
+                                id: "conjugate",
+                                range: 278..287,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 287..289,
+                        args: [],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 290..305,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 290..291,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Attribute(
+                ExprAttribute {
+                    range: 294..305,
+                    value: Constant(
+                        ExprConstant {
+                            range: 294..299,
+                            value: Int(
+                                511,
+                            ),
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "real",
+                        range: 301..305,
+                    },
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 306..329,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 306..307,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Call(
+                ExprCall {
+                    range: 310..329,
+                    func: Attribute(
+                        ExprAttribute {
+                            range: 310..327,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 310..321,
+                                    value: Float(
+                                        6e-9,
+                                    ),
+                                },
+                            ),
+                            attr: Identifier {
+                                id: "hex",
+                                range: 324..327,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 327..329,
+                        args: [],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 330..344,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 330..331,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: UnaryOp(
+                ExprUnaryOp {
+                    range: 334..344,
+                    op: USub,
+                    operand: Constant(
+                        ExprConstant {
+                            range: 335..344,
+                            value: Complex {
+                                real: 0.0,
+                                imag: 100.0,
+                            },
+                        },
+                    ),
+                },
+            ),
+        },
+    ),
+    If(
+        StmtIf {
+            range: 346..366,
+            test: Attribute(
+                ExprAttribute {
+                    range: 349..357,
+                    value: Constant(
+                        ExprConstant {
+                            range: 349..351,
+                            value: Int(
+                                10,
+                            ),
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "real",
+                        range: 353..357,
+                    },
+                    ctx: Load,
+                },
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 363..366,
+                        value: Constant(
+                            ExprConstant {
+                                range: 363..366,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+            elif_else_clauses: [],
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 368..379,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 368..369,
+                        id: "y",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Subscript(
+                ExprSubscript {
+                    range: 372..379,
+                    value: Constant(
+                        ExprConstant {
+                            range: 372..375,
+                            value: Int(
+                                100,
+                            ),
+                        },
+                    ),
+                    slice: Name(
+                        ExprName {
+                            range: 376..378,
+                            id: "no",
+                            ctx: Load,
+                        },
+                    ),
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 380..391,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 380..381,
+                        id: "y",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Call(
+                ExprCall {
+                    range: 384..391,
+                    func: Constant(
+                        ExprConstant {
+                            range: 384..387,
+                            value: Int(
+                                100,
+                            ),
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 387..391,
+                        args: [
+                            Name(
+                                ExprName {
+                                    range: 388..390,
+                                    id: "no",
+                                    ctx: Load,
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
+                },
+            ),
+        },
+    ),
+]

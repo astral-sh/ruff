@@ -1,27 +1,29 @@
 use anyhow::{bail, Result};
 use libcst_native::{CompoundStatement, Statement, Suite, With};
-use rustpython_parser::ast::Ranged;
+
+use ruff_diagnostics::Edit;
+use ruff_python_ast as ast;
+use ruff_python_ast::whitespace;
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
-use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::whitespace;
-
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement, match_with};
 
 /// (SIM117) Convert `with a: with b:` to `with a, b:`.
 pub(crate) fn fix_multiple_with_statements(
     locator: &Locator,
     stylist: &Stylist,
-    stmt: &rustpython_parser::ast::Stmt,
+    with_stmt: &ast::StmtWith,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, stmt) else {
+    let Some(outer_indent) = whitespace::indentation(locator, with_stmt) else {
         bail!("Unable to fix multiline statement");
     };
 
     // Extract the module text.
-    let contents = locator.lines(stmt.range());
+    let contents = locator.lines(with_stmt.range());
 
     // If the block is indented, "embed" it in a function definition, to preserve
     // indentation while retaining valid source code. (We'll strip the prefix later
@@ -81,7 +83,7 @@ pub(crate) fn fix_multiple_with_statements(
             .to_string()
     };
 
-    let range = locator.lines_range(stmt.range());
+    let range = locator.lines_range(with_stmt.range());
 
     Ok(Edit::range_replacement(contents, range))
 }

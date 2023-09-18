@@ -1,9 +1,10 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Expr, Keyword};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -69,26 +70,31 @@ pub(crate) fn unnecessary_comprehension_any_all(
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
-    if (matches!(id.as_str(), "all" | "any")) && args.len() == 1 {
-        let (Expr::ListComp(ast::ExprListComp { elt, .. })
-        | Expr::SetComp(ast::ExprSetComp { elt, .. })) = &args[0]
-        else {
-            return;
-        };
-        if contains_await(elt) {
-            return;
-        }
-        if !checker.semantic().is_builtin(id) {
-            return;
-        }
-        let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, args[0].range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_comprehension_any_all(checker.locator, checker.stylist, expr)
-            });
-        }
-        checker.diagnostics.push(diagnostic);
+    if !matches!(id.as_str(), "all" | "any") {
+        return;
     }
+    let [arg] = args else {
+        return;
+    };
+    let (Expr::ListComp(ast::ExprListComp { elt, .. })
+    | Expr::SetComp(ast::ExprSetComp { elt, .. })) = arg
+    else {
+        return;
+    };
+    if contains_await(elt) {
+        return;
+    }
+    if !checker.semantic().is_builtin(id) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, arg.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_comprehension_any_all(expr, checker.locator(), checker.stylist())
+        });
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 /// Return `true` if the [`Expr`] contains an `await` expression.

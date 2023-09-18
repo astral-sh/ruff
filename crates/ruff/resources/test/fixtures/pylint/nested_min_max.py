@@ -36,3 +36,6 @@ tuples_list = [
 
 min(min(tuples_list))
 max(max(tuples_list))
+
+# Starred argument should be copied as it is.
+max(1, max(*a))

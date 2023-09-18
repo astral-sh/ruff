@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{Arg, Ranged};
+use ruff_python_ast::Parameter;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -62,16 +63,16 @@ impl Violation for BuiltinArgumentShadowing {
 }
 
 /// A002
-pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, argument: &Arg) {
+pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Parameter) {
     if shadows_builtin(
-        argument.arg.as_str(),
+        parameter.name.as_str(),
         &checker.settings.flake8_builtins.builtins_ignorelist,
     ) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinArgumentShadowing {
-                name: argument.arg.to_string(),
+                name: parameter.name.to_string(),
             },
-            argument.range(),
+            parameter.range(),
         ));
     }
 }

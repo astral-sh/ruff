@@ -1,8 +1,9 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Alias, Ranged, Stmt};
+use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -122,21 +123,22 @@ pub(crate) fn unnecessary_builtin_import(
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let stmt = checker.semantic().stmt();
-            let parent = checker.semantic().stmt_parent();
-            let unused_imports: Vec<String> = unused_imports
-                .iter()
-                .map(|alias| format!("{module}.{}", alias.name))
-                .collect();
+            let statement = checker.semantic().current_statement();
+            let parent = checker.semantic().current_statement_parent();
             let edit = autofix::edits::remove_unused_imports(
-                unused_imports.iter().map(String::as_str),
-                stmt,
+                unused_imports
+                    .iter()
+                    .map(|alias| &alias.name)
+                    .map(ruff_python_ast::Identifier::as_str),
+                statement,
                 parent,
-                checker.locator,
-                checker.stylist,
-                checker.indexer,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
             )?;
-            Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
+            Ok(Fix::suggested(edit).isolate(Checker::isolation(
+                checker.semantic().current_statement_parent_id(),
+            )))
         });
     }
     checker.diagnostics.push(diagnostic);

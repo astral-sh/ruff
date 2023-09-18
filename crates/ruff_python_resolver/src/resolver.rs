@@ -292,7 +292,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
                     && typings_import
                         .resolved_paths
                         .last()
-                        .map_or(false, |path| path.as_os_str().is_empty())
+                        .is_some_and(|path| path.as_os_str().is_empty())
                 {
                     if typings_import
                         .implicit_imports
@@ -381,9 +381,10 @@ fn resolve_best_absolute_import<Host: host::Host>(
             typeshed_root.display()
         );
         if typeshed_root != execution_environment.root {
-            if best_result_so_far.as_ref().map_or(false, |result| {
-                result.py_typed_info.is_some() && !result.is_partly_resolved
-            }) {
+            if best_result_so_far
+                .as_ref()
+                .is_some_and(|result| result.py_typed_info.is_some() && !result.is_partly_resolved)
+            {
                 return best_result_so_far;
             }
         }
@@ -715,37 +716,28 @@ pub(crate) fn resolve_import<Host: host::Host>(
     // importing file's directory, then the parent directory, and so on, until the
     // import root is reached.
     let root = execution_environment.root.as_path();
-    if source_file.starts_with(root) {
-        let mut current = source_file;
-        while let Some(parent) = current.parent() {
-            if parent == root {
-                break;
-            }
-
-            debug!("Resolving absolute import in parent: {}", parent.display());
-
-            let mut result = resolve_absolute_import(
-                parent,
-                module_descriptor,
-                false,
-                false,
-                false,
-                true,
-                false,
-            );
-
-            if result.is_import_found {
-                if let Some(implicit_imports) = result
-                    .implicit_imports
-                    .filter(&module_descriptor.imported_symbols)
-                {
-                    result.implicit_imports = implicit_imports;
-                }
-                return result;
-            }
-
-            current = parent;
+    let mut current = source_file;
+    while let Some(parent) = current.parent() {
+        if !parent.starts_with(root) {
+            break;
         }
+
+        debug!("Resolving absolute import in parent: {}", parent.display());
+
+        let mut result =
+            resolve_absolute_import(parent, module_descriptor, false, false, false, true, false);
+
+        if result.is_import_found {
+            if let Some(implicit_imports) = result
+                .implicit_imports
+                .filter(&module_descriptor.imported_symbols)
+            {
+                result.implicit_imports = implicit_imports;
+            }
+            return result;
+        }
+
+        current = parent;
     }
 
     ImportResult::not_found()

@@ -1,3 +1,5 @@
+#! /usr/bin/python
+
 """See Docs.md"""
 
 # %%
@@ -52,13 +54,14 @@ groups = {
     "expr": "expression",
     "stmt": "statement",
     "pattern": "pattern",
+    "type_param": "type_param",
     "other": "other",
 }
 
 
 def group_for_node(node: str) -> str:
     for group in groups:
-        if node.startswith(group.title()):
+        if node.startswith(group.title().replace("_", "")):
             return group
     else:
         return "other"
@@ -86,16 +89,17 @@ for group, group_nodes in nodes_grouped.items():
             continue
 
         code = f"""
-            use crate::{{verbatim_text, FormatNodeRule, PyFormatter}};
-            use ruff_formatter::{{write, Buffer, FormatResult}};
-            use rustpython_parser::ast::{node};
+            use ruff_formatter::write;
+            use ruff_python_ast::{node};
+            use crate::verbatim_text;
+            use crate::prelude::*;
 
             #[derive(Default)]
             pub struct Format{node};
 
             impl FormatNodeRule<{node}> for Format{node} {{
                 fn fmt_fields(&self, item: &{node}, f: &mut PyFormatter) -> FormatResult<()> {{
-                    write!(f, [verbatim_text(item.range)])
+                    write!(f, [verbatim_text(item)])
                 }}
             }}
             """.strip()  # noqa: E501
@@ -105,12 +109,14 @@ for group, group_nodes in nodes_grouped.items():
 # %%
 # Generate `FormatRule`, `AsFormat` and `IntoFormat`
 
-generated = """//! This is a generated file. Don't modify it by hand! Run `scripts/generate.py` to re-generate the file.
+generated = """//! This is a generated file. Don't modify it by hand! Run `crates/ruff_python_formatter/generate.py` to re-generate the file.
+#![allow(unknown_lints, clippy::default_constructed_unit_structs)]
+
 use crate::context::PyFormatContext;
-use crate::{AsFormat, FormatNodeRule, IntoFormat};
-use ruff_formatter::formatter::Formatter;
+use crate::{AsFormat, FormatNodeRule, IntoFormat, PyFormatter};
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
-use rustpython_parser::ast;
+use ruff_python_ast as ast;
+
 """  # noqa: E501
 for node in nodes:
     text = f"""
@@ -121,7 +127,7 @@ for node in nodes:
             fn fmt(
                 &self,
                 node: &ast::{node},
-                f: &mut Formatter<PyFormatContext<'_>>,
+                f: &mut PyFormatter,
             ) -> FormatResult<()> {{
                 FormatNodeRule::<ast::{node}>::fmt(self, node, f)
             }}
@@ -136,7 +142,7 @@ for node in nodes:
             fn format(&self) -> Self::Format<'_> {{
                 FormatRefWithRule::new(
                     self,
-                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
+                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
                 )
             }}
         }}
@@ -149,7 +155,7 @@ for node in nodes:
             fn into_format(self) -> Self::Format {{
                 FormatOwnedWithRule::new(
                     self,
-                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
+                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
                 )
             }}
         }}

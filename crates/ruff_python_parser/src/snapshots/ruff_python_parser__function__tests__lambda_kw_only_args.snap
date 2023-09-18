@@ -1,0 +1,73 @@
+---
+source: crates/ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        Expr(
+            StmtExpr {
+                range: 0..20,
+                value: Lambda(
+                    ExprLambda {
+                        range: 0..20,
+                        parameters: Some(
+                            Parameters {
+                                range: 7..17,
+                                posonlyargs: [],
+                                args: [],
+                                vararg: None,
+                                kwonlyargs: [
+                                    ParameterWithDefault {
+                                        range: 10..11,
+                                        parameter: Parameter {
+                                            range: 10..11,
+                                            name: Identifier {
+                                                id: "a",
+                                                range: 10..11,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: None,
+                                    },
+                                    ParameterWithDefault {
+                                        range: 13..14,
+                                        parameter: Parameter {
+                                            range: 13..14,
+                                            name: Identifier {
+                                                id: "b",
+                                                range: 13..14,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: None,
+                                    },
+                                    ParameterWithDefault {
+                                        range: 16..17,
+                                        parameter: Parameter {
+                                            range: 16..17,
+                                            name: Identifier {
+                                                id: "c",
+                                                range: 16..17,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: None,
+                                    },
+                                ],
+                                kwarg: None,
+                            },
+                        ),
+                        body: Constant(
+                            ExprConstant {
+                                range: 19..20,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+)

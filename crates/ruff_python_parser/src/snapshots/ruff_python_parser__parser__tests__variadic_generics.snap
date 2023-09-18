@@ -1,0 +1,90 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+[
+    FunctionDef(
+        StmtFunctionDef {
+            range: 1..49,
+            is_async: false,
+            decorator_list: [],
+            name: Identifier {
+                id: "args_to_tuple",
+                range: 5..18,
+            },
+            type_params: None,
+            parameters: Parameters {
+                range: 18..30,
+                posonlyargs: [],
+                args: [],
+                vararg: Some(
+                    Parameter {
+                        range: 20..29,
+                        name: Identifier {
+                            id: "args",
+                            range: 20..24,
+                        },
+                        annotation: Some(
+                            Starred(
+                                ExprStarred {
+                                    range: 26..29,
+                                    value: Name(
+                                        ExprName {
+                                            range: 27..29,
+                                            id: "Ts",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                kwonlyargs: [],
+                kwarg: None,
+            },
+            returns: Some(
+                Subscript(
+                    ExprSubscript {
+                        range: 34..44,
+                        value: Name(
+                            ExprName {
+                                range: 34..39,
+                                id: "Tuple",
+                                ctx: Load,
+                            },
+                        ),
+                        slice: Starred(
+                            ExprStarred {
+                                range: 40..43,
+                                value: Name(
+                                    ExprName {
+                                        range: 41..43,
+                                        id: "Ts",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                        ctx: Load,
+                    },
+                ),
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 46..49,
+                        value: Constant(
+                            ExprConstant {
+                                range: 46..49,
+                                value: Ellipsis,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+]

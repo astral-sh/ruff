@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -126,18 +127,6 @@ impl Violation for PandasUseOfDotPivotOrUnstack {
     }
 }
 
-// TODO(tjkuson): Add documentation for this rule once clarified.
-// https://github.com/astral-sh/ruff/issues/5628
-#[violation]
-pub struct PandasUseOfDotReadTable;
-
-impl Violation for PandasUseOfDotReadTable {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.read_csv` is preferred to `.read_table`; provides same functionality")
-    }
-}
-
 /// ## What it does
 /// Checks for uses of `.stack` on Pandas objects.
 ///
@@ -192,14 +181,6 @@ pub(crate) fn call(checker: &mut Checker, func: &Expr) {
                 .enabled(Rule::PandasUseOfDotPivotOrUnstack) =>
         {
             PandasUseOfDotPivotOrUnstack.into()
-        }
-        "read_table"
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::PandasUseOfDotReadTable) =>
-        {
-            PandasUseOfDotReadTable.into()
         }
         "stack" if checker.settings.rules.enabled(Rule::PandasUseOfDotStack) => {
             PandasUseOfDotStack.into()

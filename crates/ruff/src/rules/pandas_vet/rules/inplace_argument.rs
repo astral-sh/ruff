@@ -1,13 +1,13 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::source_code::Locator;
-use ruff_python_semantic::{BindingKind, Import};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{self as ast, Keyword, Stmt};
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -52,33 +52,18 @@ impl Violation for PandasUseOfInplaceArgument {
 }
 
 /// PD002
-pub(crate) fn inplace_argument(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
     // If the function was imported from another module, and it's _not_ Pandas, abort.
-    if let Some(call_path) = checker.semantic().resolve_call_path(func) {
-        if !call_path
-            .first()
-            .and_then(|module| checker.semantic().find_binding(module))
-            .map_or(false, |binding| {
-                matches!(
-                    binding.kind,
-                    BindingKind::Import(Import {
-                        qualified_name: "pandas"
-                    })
-                )
-            })
-        {
-            return;
-        }
+    if checker
+        .semantic()
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| !matches!(call_path.as_slice(), ["pandas", ..]))
+    {
+        return;
     }
 
     let mut seen_star = false;
-    for keyword in keywords.iter().rev() {
+    for keyword in call.arguments.keywords.iter().rev() {
         let Some(arg) = &keyword.arg else {
             seen_star = true;
             continue;
@@ -92,21 +77,17 @@ pub(crate) fn inplace_argument(
                     //    the star argument _doesn't_ contain an override).
                     // 2. The call is part of a larger expression (we're converting an expression to a
                     //    statement, and expressions can't contain statements).
-                    // 3. The call is in a lambda (we can't assign to a variable in a lambda). This
-                    //    should be unnecessary, as lambdas are expressions, and so (2) should apply,
-                    //    but we don't currently restore expression stacks when parsing deferred nodes,
-                    //    and so the parent is lost.
+                    let statement = checker.semantic().current_statement();
                     if !seen_star
-                        && checker.semantic().stmt().is_expr_stmt()
-                        && checker.semantic().expr_parent().is_none()
-                        && !checker.semantic().scope().kind.is_lambda()
+                        && checker.semantic().current_expression_parent().is_none()
+                        && statement.is_expr_stmt()
                     {
                         if let Some(fix) = convert_inplace_argument_to_assignment(
-                            checker.locator,
-                            expr,
-                            keyword.range(),
-                            args,
-                            keywords,
+                            call,
+                            keyword,
+                            statement,
+                            checker.indexer().comment_ranges(),
+                            checker.locator(),
                         ) {
                             diagnostic.set_fix(fix);
                         }
@@ -125,23 +106,34 @@ pub(crate) fn inplace_argument(
 /// Remove the `inplace` argument from a function call and replace it with an
 /// assignment.
 fn convert_inplace_argument_to_assignment(
+    call: &ast::ExprCall,
+    keyword: &Keyword,
+    statement: &Stmt,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
-    expr: &Expr,
-    expr_range: TextRange,
-    args: &[Expr],
-    keywords: &[Keyword],
 ) -> Option<Fix> {
     // Add the assignment.
-    let call = expr.as_call_expr()?;
     let attr = call.func.as_attribute_expr()?;
     let insert_assignment = Edit::insertion(
         format!("{name} = ", name = locator.slice(attr.value.range())),
-        expr.start(),
+        parenthesized_range(
+            call.into(),
+            statement.into(),
+            comment_ranges,
+            locator.contents(),
+        )
+        .unwrap_or(call.range())
+        .start(),
     );
 
     // Remove the `inplace` argument.
-    let remove_argument =
-        remove_argument(locator, call.func.end(), expr_range, args, keywords, false).ok()?;
+    let remove_argument = remove_argument(
+        keyword,
+        &call.arguments,
+        Parentheses::Preserve,
+        locator.contents(),
+    )
+    .ok()?;
 
     Some(Fix::suggested_edits(insert_assignment, [remove_argument]))
 }

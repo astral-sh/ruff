@@ -7,10 +7,9 @@ use anyhow::{bail, Result};
 use pretty_assertions::StrComparison;
 use schemars::schema_for;
 
-use ruff::settings::options::Options;
-
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;
+use ruff_workspace::options::Options;
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -61,7 +60,7 @@ mod tests {
 
     use super::{main, Args};
 
-    #[cfg_attr(not(feature = "unreachable-code"), test)]
+    #[test]
     fn test_generate_json_schema() -> Result<()> {
         let mode = if env::var("RUFF_UPDATE_SCHEMA").as_deref() == Ok("1") {
             Mode::Write

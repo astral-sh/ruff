@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Decorator, Expr, Ranged};
+use ruff_python_ast::{self as ast, Decorator, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -70,14 +71,14 @@ impl Violation for CachedInstanceMethod {
 }
 
 fn is_cache_func(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).map_or(false, |call_path| {
+    semantic.resolve_call_path(expr).is_some_and(|call_path| {
         matches!(call_path.as_slice(), ["functools", "lru_cache" | "cache"])
     })
 }
 
 /// B019
 pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Decorator]) {
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     }
     for decorator in decorator_list {

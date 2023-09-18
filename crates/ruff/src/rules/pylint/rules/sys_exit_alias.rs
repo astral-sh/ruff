@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -78,7 +79,7 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer.get_or_import_symbol(
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("sys", "exit"),
                 func.start(),
                 checker.semantic(),

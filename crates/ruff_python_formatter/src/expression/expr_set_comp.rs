@@ -1,21 +1,54 @@
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprSetComp;
+use ruff_python_ast::ExprSetComp;
+
+use crate::comments::SourceComment;
+
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprSetComp;
 
 impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
-    fn fmt_fields(&self, _item: &ExprSetComp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: &ExprSetComp, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprSetComp {
+            range: _,
+            elt,
+            generators,
+        } = item;
+
+        let joined = format_with(|f| {
+            f.join_with(soft_line_break_or_space())
+                .entries(generators.iter().formatted())
+                .finish()
+        });
+
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
         write!(
             f,
-            [not_yet_implemented_custom_text(
-                "{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}"
-            )]
+            [parenthesized(
+                "{",
+                &group(&format_args!(
+                    group(&elt.format()),
+                    soft_line_break_or_space(),
+                    joined
+                )),
+                "}"
+            )
+            .with_dangling_comments(dangling)]
         )
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
+        Ok(())
     }
 }
 

@@ -1,13 +1,12 @@
-use rustpython_parser::ast::{self, Comprehension, Expr, Ranged};
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::{self as ast, Comprehension, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
-
-use super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary `dict`, `list`, and `set` comprehension.
@@ -66,9 +65,9 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.try_set_fix_from_edit(|| {
-            fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr)
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
+                .map(Fix::suggested)
         });
     }
     checker.diagnostics.push(diagnostic);
@@ -88,28 +87,16 @@ pub(crate) fn unnecessary_dict_comprehension(
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
-    let Some(key_id) = helpers::expr_name(key) else {
-        return;
-    };
-    let Some(value_id) = helpers::expr_name(value) else {
-        return;
-    };
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
         return;
     };
-    if elts.len() != 2 {
-        return;
-    }
-    let Some(target_key_id) = helpers::expr_name(&elts[0]) else {
+    let [target_key, target_value] = elts.as_slice() else {
         return;
     };
-    if target_key_id != key_id {
+    if ComparableExpr::from(key) != ComparableExpr::from(target_key) {
         return;
     }
-    let Some(target_value_id) = helpers::expr_name(&elts[1]) else {
-        return;
-    };
-    if target_value_id != value_id {
+    if ComparableExpr::from(value) != ComparableExpr::from(target_value) {
         return;
     }
     add_diagnostic(checker, expr);
@@ -128,13 +115,7 @@ pub(crate) fn unnecessary_list_set_comprehension(
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
-    let Some(elt_id) = helpers::expr_name(elt) else {
-        return;
-    };
-    let Some(target_id) = helpers::expr_name(&generator.target) else {
-        return;
-    };
-    if elt_id != target_id {
+    if ComparableExpr::from(elt) != ComparableExpr::from(&generator.target) {
         return;
     }
     add_diagnostic(checker, expr);

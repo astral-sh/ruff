@@ -4,7 +4,7 @@ use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 /// ## What it does
 /// Checks for strings that contain the control character `BS`.

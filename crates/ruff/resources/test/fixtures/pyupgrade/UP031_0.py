@@ -106,3 +106,7 @@ print('Hello %(arg)s' % bar['bop'])
     """
     % (x,)
 )
+
+"%s" % (
+    x,  # comment
+)

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rustpython_parser::ast::{self, Decorator, Stmt};
+use ruff_python_ast::{self as ast, Decorator};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
@@ -18,9 +18,7 @@ pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["", "staticmethod"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "staticmethod"]))
     })
 }
 
@@ -29,9 +27,7 @@ pub fn is_classmethod(decorator_list: &[Decorator], semantic: &SemanticModel) ->
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["", "classmethod"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "classmethod"]))
     })
 }
 
@@ -54,7 +50,7 @@ pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     [
@@ -80,7 +76,7 @@ pub fn is_property(
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     ["", "property"] | ["functools", "cached_property"]
@@ -125,7 +121,7 @@ pub fn is_test(name: &str) -> bool {
 
 /// Returns `true` if a module name indicates public visibility.
 fn is_public_module(module_name: &str) -> bool {
-    !module_name.starts_with('_') || (module_name.starts_with("__") && module_name.ends_with("__"))
+    !module_name.starts_with('_') || is_magic(module_name)
 }
 
 /// Returns `true` if a module name indicates private visibility.
@@ -180,67 +176,42 @@ impl ModuleSource<'_> {
     }
 }
 
-pub(crate) fn function_visibility(stmt: &Stmt) -> Visibility {
-    match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
-            if name.starts_with('_') {
-                Visibility::Private
-            } else {
-                Visibility::Public
-            }
-        }
-        _ => panic!("Found non-FunctionDef in function_visibility"),
+pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility {
+    if function.name.starts_with('_') {
+        Visibility::Private
+    } else {
+        Visibility::Public
     }
 }
 
-pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
-    match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            name,
-            decorator_list,
-            ..
+pub fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
+    // Is this a setter or deleter?
+    if function.decorator_list.iter().any(|decorator| {
+        collect_call_path(&decorator.expression).is_some_and(|call_path| {
+            call_path.as_slice() == [function.name.as_str(), "setter"]
+                || call_path.as_slice() == [function.name.as_str(), "deleter"]
         })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            name,
-            decorator_list,
-            ..
-        }) => {
-            // Is this a setter or deleter?
-            if decorator_list.iter().any(|decorator| {
-                collect_call_path(&decorator.expression).map_or(false, |call_path| {
-                    call_path.as_slice() == [name, "setter"]
-                        || call_path.as_slice() == [name, "deleter"]
-                })
-            }) {
-                return Visibility::Private;
-            }
-
-            // Is the method non-private?
-            if !name.starts_with('_') {
-                return Visibility::Public;
-            }
-
-            // Is this a magic method?
-            if name.starts_with("__") && name.ends_with("__") {
-                return Visibility::Public;
-            }
-
-            Visibility::Private
-        }
-        _ => panic!("Found non-FunctionDef in method_visibility"),
+    }) {
+        return Visibility::Private;
     }
+
+    // Is the method non-private?
+    if !function.name.starts_with('_') {
+        return Visibility::Public;
+    }
+
+    // Is this a magic method?
+    if is_magic(&function.name) {
+        return Visibility::Public;
+    }
+
+    Visibility::Private
 }
 
-pub(crate) fn class_visibility(stmt: &Stmt) -> Visibility {
-    match stmt {
-        Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-            if name.starts_with('_') {
-                Visibility::Private
-            } else {
-                Visibility::Public
-            }
-        }
-        _ => panic!("Found non-ClassDef in function_visibility"),
+pub(crate) fn class_visibility(class: &ast::StmtClassDef) -> Visibility {
+    if class.name.starts_with('_') {
+        Visibility::Private
+    } else {
+        Visibility::Public
     }
 }

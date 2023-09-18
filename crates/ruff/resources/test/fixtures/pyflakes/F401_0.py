@@ -92,3 +92,31 @@ match *0, 1, *2:
     case 0,:
         import x
         import y
+
+
+# Test: access a sub-importation via an alias.
+import foo.bar as bop
+import foo.bar.baz
+
+print(bop.baz.read_csv("test.csv"))
+
+# Test: isolated deletions.
+if TYPE_CHECKING:
+    import a1
+
+    import a2
+
+
+match *0, 1, *2:
+    case 0,:
+        import b1
+
+        import b2
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7244
+from datameta_client_lib.model_utils import (  # noqa: F401
+noqa )
+
+from datameta_client_lib.model_helpers import (
+noqa )

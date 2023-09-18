@@ -5,6 +5,7 @@ use itertools::Itertools;
 
 use ruff_diagnostics::Edit;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
+use ruff_text_size::Ranged;
 
 pub(crate) struct Renamer;
 
@@ -220,21 +221,21 @@ impl Renamer {
             BindingKind::Import(_) | BindingKind::FromImport(_) => {
                 if binding.is_alias() {
                     // Ex) Rename `import pandas as alias` to `import pandas as pd`.
-                    Some(Edit::range_replacement(target.to_string(), binding.range))
+                    Some(Edit::range_replacement(target.to_string(), binding.range()))
                 } else {
                     // Ex) Rename `import pandas` to `import pandas as pd`.
                     Some(Edit::range_replacement(
                         format!("{name} as {target}"),
-                        binding.range,
+                        binding.range(),
                     ))
                 }
             }
             BindingKind::SubmoduleImport(import) => {
                 // Ex) Rename `import pandas.core` to `import pandas as pd`.
-                let module_name = import.qualified_name.split('.').next().unwrap();
+                let module_name = import.call_path.first().unwrap();
                 Some(Edit::range_replacement(
                     format!("{module_name} as {target}"),
-                    binding.range,
+                    binding.range(),
                 ))
             }
             // Avoid renaming builtins and other "special" bindings.
@@ -242,9 +243,11 @@ impl Renamer {
             // By default, replace the binding's name with the target name.
             BindingKind::Annotation
             | BindingKind::Argument
+            | BindingKind::TypeParam
             | BindingKind::NamedExprAssignment
             | BindingKind::UnpackedAssignment
             | BindingKind::Assignment
+            | BindingKind::BoundException
             | BindingKind::LoopVar
             | BindingKind::Global
             | BindingKind::Nonlocal(_)
@@ -252,7 +255,7 @@ impl Renamer {
             | BindingKind::FunctionDefinition(_)
             | BindingKind::Deletion
             | BindingKind::UnboundException(_) => {
-                Some(Edit::range_replacement(target.to_string(), binding.range))
+                Some(Edit::range_replacement(target.to_string(), binding.range()))
             }
         }
     }

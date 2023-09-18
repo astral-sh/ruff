@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -50,7 +50,7 @@ pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
         return;
     };
-    if !value.is_joined_str_expr() {
+    if !value.is_f_string_expr() {
         return;
     }
     checker

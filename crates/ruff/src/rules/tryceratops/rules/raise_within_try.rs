@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -7,6 +7,7 @@ use ruff_python_ast::{
     helpers::{self, map_callable},
     statement_visitor::{walk_stmt, StatementVisitor},
 };
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -70,7 +71,7 @@ where
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt {
             Stmt::Raise(_) => self.raises.push(stmt),
-            Stmt::Try(_) | Stmt::TryStar(_) => (),
+            Stmt::Try(_) => (),
             _ => walk_stmt(self, stmt),
         }
     }
@@ -114,7 +115,7 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
                 checker
                     .semantic()
                     .resolve_call_path(expr)
-                    .map_or(false, |call_path| {
+                    .is_some_and(|call_path| {
                         matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
                     })
             })

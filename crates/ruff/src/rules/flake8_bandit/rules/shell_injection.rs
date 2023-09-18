@@ -1,16 +1,41 @@
 //! Checks relating to shell injection.
 
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
 
+/// ## What it does
+/// Check for method calls that initiate a subprocess with a shell.
+///
+/// ## Why is this bad?
+/// Starting a subprocess with a shell can allow attackers to execute arbitrary
+/// shell commands. Consider starting the process without a shell call and
+/// sanitize the input to mitigate the risk of shell injection.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// subprocess.run("ls -l", shell=True)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import subprocess
+///
+/// subprocess.run(["ls", "-l"])
+/// ```
+///
+/// ## References
+/// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
+/// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[violation]
 pub struct SubprocessPopenWithShellEqualsTrue {
     seems_safe: bool,
@@ -29,6 +54,30 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
     }
 }
 
+/// ## What it does
+/// Check for method calls that initiate a subprocess without a shell.
+///
+/// ## Why is this bad?
+/// Starting a subprocess without a shell can prevent attackers from executing
+/// arbitrary shell commands; however, it is still error-prone. Consider
+/// validating the input.
+///
+/// ## Known problems
+/// Prone to false positives as it is difficult to determine whether the
+/// passed arguments have been validated ([#4045]).
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// cmd = input("Enter a command: ").split()
+/// subprocess.run(cmd)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
+///
+/// [#4045]: https://github.com/astral-sh/ruff/issues/4045
 #[violation]
 pub struct SubprocessWithoutShellEqualsTrue;
 
@@ -75,6 +124,31 @@ impl Violation for StartProcessWithNoShell {
     }
 }
 
+/// ## What it does
+/// Checks for the starting of a process with a partial executable path.
+///
+/// ## Why is this bad?
+/// Starting a process with a partial executable path can allow attackers to
+/// execute arbitrary executable by adjusting the `PATH` environment variable.
+/// Consider using a full path to the executable instead.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// subprocess.Popen(["ruff", "check", "file.py"])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import subprocess
+///
+/// subprocess.Popen(["/usr/bin/ruff", "check", "file.py"])
+/// ```
+///
+/// ## References
+/// - [Python documentation: `subprocess.Popen()`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
+/// - [Common Weakness Enumeration: CWE-426](https://cwe.mitre.org/data/definitions/426.html)
 #[violation]
 pub struct StartProcessWithPartialPath;
 
@@ -85,6 +159,29 @@ impl Violation for StartProcessWithPartialPath {
     }
 }
 
+/// ## What it does
+/// Checks for possible wildcard injections in calls to `subprocess.Popen()`.
+///
+/// ## Why is this bad?
+/// Wildcard injections can lead to unexpected behavior if unintended files are
+/// matched by the wildcard. Consider using a more specific path instead.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// subprocess.Popen(["chmod", "777", "*.py"])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import subprocess
+///
+/// subprocess.Popen(["chmod", "777", "main.py"])
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[violation]
 pub struct UnixCommandWildcardInjection;
 
@@ -96,17 +193,12 @@ impl Violation for UnixCommandWildcardInjection {
 }
 
 /// S602, S603, S604, S605, S606, S607, S609
-pub(crate) fn shell_injection(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    let call_kind = get_call_kind(func, checker.semantic());
-    let shell_keyword = find_shell_keyword(keywords, checker.semantic());
+pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
+    let call_kind = get_call_kind(&call.func, checker.semantic());
+    let shell_keyword = find_shell_keyword(&call.arguments, checker.semantic());
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
-        if let Some(arg) = args.first() {
+        if let Some(arg) = call.arguments.args.first() {
             match shell_keyword {
                 // S602
                 Some(ShellKeyword {
@@ -161,7 +253,7 @@ pub(crate) fn shell_injection(
     // S605
     if checker.enabled(Rule::StartProcessWithAShell) {
         if matches!(call_kind, Some(CallKind::Shell)) {
-            if let Some(arg) = args.first() {
+            if let Some(arg) = call.arguments.args.first() {
                 checker.diagnostics.push(Diagnostic::new(
                     StartProcessWithAShell {
                         seems_safe: shell_call_seems_safe(arg),
@@ -177,14 +269,14 @@ pub(crate) fn shell_injection(
         if matches!(call_kind, Some(CallKind::NoShell)) {
             checker
                 .diagnostics
-                .push(Diagnostic::new(StartProcessWithNoShell, func.range()));
+                .push(Diagnostic::new(StartProcessWithNoShell, call.func.range()));
         }
     }
 
     // S607
     if checker.enabled(Rule::StartProcessWithPartialPath) {
         if call_kind.is_some() {
-            if let Some(arg) = args.first() {
+            if let Some(arg) = call.arguments.args.first() {
                 if is_partial_path(arg) {
                     checker
                         .diagnostics
@@ -208,11 +300,12 @@ pub(crate) fn shell_injection(
                 )
             )
         {
-            if let Some(arg) = args.first() {
+            if let Some(arg) = call.arguments.args.first() {
                 if is_wildcard_command(arg) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(UnixCommandWildcardInjection, func.range()));
+                    checker.diagnostics.push(Diagnostic::new(
+                        UnixCommandWildcardInjection,
+                        call.func.range(),
+                    ));
                 }
             }
         }
@@ -269,16 +362,13 @@ struct ShellKeyword<'a> {
 
 /// Return the `shell` keyword argument to the given function call, if any.
 fn find_shell_keyword<'a>(
-    keywords: &'a [Keyword],
+    arguments: &'a Arguments,
     semantic: &SemanticModel,
 ) -> Option<ShellKeyword<'a>> {
-    keywords
-        .iter()
-        .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "shell"))
-        .map(|keyword| ShellKeyword {
-            truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.is_builtin(id)),
-            keyword,
-        })
+    arguments.find_keyword("shell").map(|keyword| ShellKeyword {
+        truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.is_builtin(id)),
+        keyword,
+    })
 }
 
 /// Return `true` if the value provided to the `shell` call seems safe. This is based on Bandit's
@@ -334,7 +424,7 @@ fn is_partial_path(expr: &Expr) -> bool {
         Expr::List(ast::ExprList { elts, .. }) => elts.first().and_then(string_literal),
         _ => string_literal(expr),
     };
-    string_literal.map_or(false, |text| !is_full_path(text))
+    string_literal.is_some_and(|text| !is_full_path(text))
 }
 
 /// Return `true` if the [`Expr`] is a wildcard command.
@@ -365,7 +455,7 @@ fn is_wildcard_command(expr: &Expr) -> bool {
         has_star && has_command
     } else {
         let string_literal = string_literal(expr);
-        string_literal.map_or(false, |text| {
+        string_literal.is_some_and(|text| {
             text.contains('*')
                 && (text.contains("chown")
                     || text.contains("chmod")

@@ -125,4 +125,20 @@ FLY002.py:10:7: FLY002 [*] Consider `f"{secrets.token_urlsafe()}a{secrets.token_
 12 12 | nok1 = "x".join({"4", "5", "yee"})  # Not OK (set)
 13 13 | nok2 = a.join(["1", "2", "3"])  # Not OK (not a static joiner)
 
+FLY002.py:23:11: FLY002 [*] Consider `f"{url}{filename}"` instead of string join
+   |
+21 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+22 | def create_file_public_url(url, filename):
+23 |     return''.join([url, filename])
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^ FLY002
+   |
+   = help: Replace with `f"{url}{filename}"`
+
+ℹ Suggested fix
+20 20 | 
+21 21 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+22 22 | def create_file_public_url(url, filename):
+23    |-    return''.join([url, filename])
+   23 |+    return f"{url}{filename}"
+
 

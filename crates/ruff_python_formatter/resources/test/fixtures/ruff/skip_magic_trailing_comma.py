@@ -20,3 +20,14 @@
     "seventh entry",
     "eighth entry",
 )
+
+# Regression test: Respect setting in Arguments formatting
+def f(a): pass
+def g(a,): pass
+
+x1 = lambda y: 1
+x2 = lambda y,: 1
+
+# Ignore trailing comma.
+with (a,):  # magic trailing comma
+    ...

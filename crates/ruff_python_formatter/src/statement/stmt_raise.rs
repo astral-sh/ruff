@@ -1,10 +1,10 @@
-use crate::expression::parentheses::Parenthesize;
-use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{space, text};
-use ruff_formatter::{write, Buffer, Format, FormatResult};
+use ruff_formatter::write;
+use ruff_python_ast::StmtRaise;
 
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
-use rustpython_parser::ast::StmtRaise;
+use crate::expression::parentheses::Parenthesize;
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatStmtRaise;
@@ -17,7 +17,7 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
             cause,
         } = item;
 
-        text("raise").fmt(f)?;
+        token("raise").fmt(f)?;
 
         if let Some(value) = exc {
             write!(
@@ -34,12 +34,20 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
                 f,
                 [
                     space(),
-                    text("from"),
+                    token("from"),
                     space(),
                     maybe_parenthesize_expression(value, item, Parenthesize::Optional)
                 ]
             )?;
         }
         Ok(())
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }

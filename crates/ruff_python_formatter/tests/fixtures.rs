@@ -17,7 +17,7 @@ fn black_compatibility() {
             let reader = BufReader::new(options_file);
             serde_json::from_reader(reader).expect("Options to be a valid Json file")
         } else {
-            PyFormatOptions::default()
+            PyFormatOptions::from_extension(input_path)
         };
 
         let printed = format_module(&content, options.clone()).unwrap_or_else(|err| {
@@ -106,11 +106,11 @@ fn format() {
     let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
-        let options = PyFormatOptions::default();
+        let options = PyFormatOptions::from_extension(input_path);
         let printed = format_module(&content, options.clone()).expect("Formatting to succeed");
         let formatted_code = printed.as_code();
 
-        ensure_stability_when_formatting_twice(formatted_code, options, input_path);
+        ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
 
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("py", &content));
 
@@ -139,7 +139,6 @@ fn format() {
                 .unwrap();
             }
         } else {
-            let options = PyFormatOptions::default();
             let printed = format_module(&content, options.clone()).expect("Formatting to succeed");
             let formatted_code = printed.as_code();
 
@@ -162,7 +161,11 @@ fn format() {
         });
     };
 
-    insta::glob!("../resources", "test/fixtures/ruff/**/*.py", test_file);
+    insta::glob!(
+        "../resources",
+        "test/fixtures/ruff/**/*.{py,pyi}",
+        test_file
+    );
 }
 
 /// Format another time and make sure that there are no changes anymore
@@ -250,9 +253,11 @@ impl fmt::Display for DisplayPyOptions<'_> {
             f,
             r#"indent-style            = {indent_style}
 line-width              = {line_width}
+indent-width            = {indent_width}
 quote-style             = {quote_style:?}
 magic-trailing-comma    = {magic_trailing_comma:?}"#,
             indent_style = self.0.indent_style(),
+            indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
             quote_style = self.0.quote_style(),
             magic_trailing_comma = self.0.magic_trailing_comma()

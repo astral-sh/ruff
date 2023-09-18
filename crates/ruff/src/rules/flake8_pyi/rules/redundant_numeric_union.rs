@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{Arguments, Expr, Ranged};
+use ruff_python_ast::{Expr, Parameters};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pyi::helpers::traverse_union;
@@ -53,13 +54,13 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &mut Checker, args: &Arguments) {
-    for annotation in args
+pub(crate) fn redundant_numeric_union(checker: &mut Checker, parameters: &Parameters) {
+    for annotation in parameters
         .args
         .iter()
-        .chain(args.posonlyargs.iter())
-        .chain(args.kwonlyargs.iter())
-        .filter_map(|arg| arg.def.annotation.as_ref())
+        .chain(parameters.posonlyargs.iter())
+        .chain(parameters.kwonlyargs.iter())
+        .filter_map(|arg| arg.parameter.annotation.as_ref())
     {
         check_annotation(checker, annotation);
     }
@@ -67,10 +68,10 @@ pub(crate) fn redundant_numeric_union(checker: &mut Checker, args: &Arguments) {
     // If annotations on `args` or `kwargs` are flagged by this rule, the annotations themselves
     // are not accurate, but check them anyway. It's possible that flagging them will help the user
     // realize they're incorrect.
-    for annotation in args
+    for annotation in parameters
         .vararg
         .iter()
-        .chain(args.kwarg.iter())
+        .chain(parameters.kwarg.iter())
         .filter_map(|arg| arg.annotation.as_ref())
     {
         check_annotation(checker, annotation);

@@ -47,3 +47,17 @@ def not_ok1():
             pass
         else:
             pass
+
+
+# Regression test for https://github.com/apache/airflow/blob/f1e1cdcc3b2826e68ba133f350300b5065bbca33/airflow/models/dag.py#L1737
+def not_ok2():
+    if True:
+        print(1)
+    elif True:
+        print(2)
+    else:
+        if True:
+            print(3)
+        else:
+            print(4)
+

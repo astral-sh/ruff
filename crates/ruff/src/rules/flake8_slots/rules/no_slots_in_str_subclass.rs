@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Stmt, StmtClassDef};
+use ruff_python_ast::{Arguments, Expr, Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,7 +51,11 @@ impl Violation for NoSlotsInStrSubclass {
 
 /// SLOT000
 pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
-    if is_str_subclass(&class.bases, checker.semantic()) {
+    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+        return;
+    };
+
+    if is_str_subclass(bases, checker.semantic()) {
         if !has_slots(&class.body) {
             checker
                 .diagnostics
@@ -62,10 +66,10 @@ pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class
 
 /// Return `true` if the class is a subclass of `str`, but _not_ a subclass of `enum.Enum`,
 /// `enum.IntEnum`, etc.
-fn is_str_subclass(bases: &[Expr], model: &SemanticModel) -> bool {
+fn is_str_subclass(bases: &[Expr], semantic: &SemanticModel) -> bool {
     let mut is_str_subclass = false;
     for base in bases {
-        if let Some(call_path) = model.resolve_call_path(base) {
+        if let Some(call_path) = semantic.resolve_call_path(base) {
             match call_path.as_slice() {
                 ["" | "builtins", "str"] => {
                     is_str_subclass = true;

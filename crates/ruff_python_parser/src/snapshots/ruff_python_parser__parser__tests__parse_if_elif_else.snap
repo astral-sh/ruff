@@ -1,0 +1,83 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+[
+    If(
+        StmtIf {
+            range: 0..28,
+            test: Constant(
+                ExprConstant {
+                    range: 3..4,
+                    value: Int(
+                        1,
+                    ),
+                },
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 6..8,
+                        value: Constant(
+                            ExprConstant {
+                                range: 6..8,
+                                value: Int(
+                                    10,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+            elif_else_clauses: [
+                ElifElseClause {
+                    range: 9..19,
+                    test: Some(
+                        Constant(
+                            ExprConstant {
+                                range: 14..15,
+                                value: Int(
+                                    2,
+                                ),
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 17..19,
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 17..19,
+                                        value: Int(
+                                            20,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+                ElifElseClause {
+                    range: 20..28,
+                    test: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 26..28,
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 26..28,
+                                        value: Int(
+                                            30,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+]

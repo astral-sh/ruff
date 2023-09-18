@@ -1,10 +1,10 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
@@ -66,37 +66,22 @@ impl Violation for TypeNameIncorrectVariance {
 /// PLC0105
 pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) {
     let Expr::Call(ast::ExprCall {
-        func,
-        args,
-        keywords,
-        ..
+        func, arguments, ..
     }) = value
     else {
         return;
     };
 
-    let Some(param_name) = type_param_name(args, keywords) else {
+    let Some(param_name) = type_param_name(arguments) else {
         return;
     };
 
-    let covariant = keywords
-        .iter()
-        .find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |keyword| keyword.as_str() == "covariant")
-        })
+    let covariant = arguments
+        .find_keyword("covariant")
         .map(|keyword| &keyword.value);
 
-    let contravariant = keywords
-        .iter()
-        .find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |keyword| keyword.as_str() == "contravariant")
-        })
+    let contravariant = arguments
+        .find_keyword("contravariant")
         .map(|keyword| &keyword.value);
 
     if !mismatch(param_name, covariant, contravariant) {
@@ -130,7 +115,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
         .trim_end_matches("_co")
         .trim_end_matches("_contra");
     let replacement_name: String = match variance {
-        VarVariance::Bivariance => return, // Bivariate type are invalid, so ignore them for this rule.
+        VarVariance::Bivariance => return, // Bivariate types are invalid, so ignore them for this rule.
         VarVariance::Covariance => format!("{name_root}_co"),
         VarVariance::Contravariance => format!("{name_root}_contra"),
         VarVariance::Invariance => name_root.to_string(),
@@ -154,7 +139,7 @@ fn mismatch(param_name: &str, covariant: Option<&Expr>, contravariant: Option<&E
     } else if param_name.ends_with("_contra") {
         contravariant.map_or(true, |contravariant| !is_const_true(contravariant))
     } else {
-        covariant.map_or(false, is_const_true) || contravariant.map_or(false, is_const_true)
+        covariant.is_some_and(is_const_true) || contravariant.is_some_and(is_const_true)
     }
 }
 

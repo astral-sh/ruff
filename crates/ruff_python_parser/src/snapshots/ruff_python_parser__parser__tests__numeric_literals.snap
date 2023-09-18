@@ -1,0 +1,404 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: "parse_suite(source, \"<test>\").unwrap()"
+---
+[
+    Assign(
+        StmtAssign {
+            range: 0..13,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 0..1,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 4..13,
+                    value: Int(
+                        123456789,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 14..24,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 14..15,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 18..24,
+                    value: Int(
+                        123456,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 25..31,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 25..26,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 29..31,
+                    value: Float(
+                        0.1,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 32..38,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 32..33,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 36..38,
+                    value: Float(
+                        1.0,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 39..47,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 39..40,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 43..47,
+                    value: Float(
+                        10.0,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 48..56,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 48..49,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 52..56,
+                    value: Float(
+                        0.1,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 57..73,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 57..58,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 61..73,
+                    value: Float(
+                        1.00000001,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 74..97,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 74..75,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 78..97,
+                    value: Float(
+                        123456789.12345679,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 98..131,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 98..99,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 102..131,
+                    value: Float(
+                        inf,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 132..155,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 132..133,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 136..155,
+                    value: Float(
+                        inf,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 156..170,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 156..157,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 160..170,
+                    value: Complex {
+                        real: 0.0,
+                        imag: 123456789.0,
+                    },
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 171..195,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 171..172,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 175..195,
+                    value: Complex {
+                        real: 0.0,
+                        imag: 123456789.12345679,
+                    },
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 196..207,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 196..197,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 200..207,
+                    value: Int(
+                        727756,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 208..218,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 208..209,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 212..218,
+                    value: Int(
+                        11,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 219..228,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 219..220,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 223..228,
+                    value: Int(
+                        511,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 229..244,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 229..230,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 233..244,
+                    value: Float(
+                        6e-9,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 245..254,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 245..246,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 249..254,
+                    value: Int(
+                        10000,
+                    ),
+                },
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 255..265,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 255..256,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Constant(
+                ExprConstant {
+                    range: 259..265,
+                    value: Int(
+                        133333,
+                    ),
+                },
+            ),
+        },
+    ),
+]

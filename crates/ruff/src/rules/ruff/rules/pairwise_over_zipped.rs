@@ -1,8 +1,9 @@
 use num_traits::ToPrimitive;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, UnaryOp};
+use ruff_python_ast::{self as ast, Constant, Expr, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 

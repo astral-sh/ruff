@@ -7,14 +7,15 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
-use ruff_textwrap::indent;
+use ruff_python_trivia::textwrap::indent;
+use ruff_source_file::Locator;
 
 use crate::autofix;
 use crate::autofix::codemods::CodegenStylist;
@@ -86,13 +87,13 @@ impl<'a> Importer<'a> {
     /// import statement.
     pub(crate) fn runtime_import_edit(
         &self,
-        import: &StmtImports,
+        import: &ImportedMembers,
         at: TextSize,
     ) -> Result<RuntimeImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
-            &import.qualified_names,
-            import.stmt,
+            &import.names,
+            import.statement,
             self.locator,
             self.stylist,
         )?;
@@ -117,14 +118,15 @@ impl<'a> Importer<'a> {
     /// `TYPE_CHECKING` block.
     pub(crate) fn typing_import_edit(
         &self,
-        import: &StmtImports,
+        import: &ImportedMembers,
         at: TextSize,
         semantic: &SemanticModel,
+        source_type: PySourceType,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
-            &import.qualified_names,
-            import.stmt,
+            &import.names,
+            import.statement,
             self.locator,
             self.stylist,
         )?;
@@ -139,7 +141,7 @@ impl<'a> Importer<'a> {
         // Add the import to a `TYPE_CHECKING` block.
         let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
             // Add the import to the `TYPE_CHECKING` block.
-            self.add_to_type_checking_block(&content, block.start())
+            self.add_to_type_checking_block(&content, block.start(), source_type)
         } else {
             // Add the import to a new `TYPE_CHECKING` block.
             self.add_type_checking_block(
@@ -169,10 +171,8 @@ impl<'a> Importer<'a> {
         at: TextSize,
         semantic: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
-        match self.get_symbol(symbol, at, semantic) {
-            Some(result) => result,
-            None => self.import_symbol(symbol, at, semantic),
-        }
+        self.get_symbol(symbol, at, semantic)?
+            .map_or_else(|| self.import_symbol(symbol, at, semantic), Ok)
     }
 
     /// Return an [`Edit`] to reference an existing symbol, if it's present in the given [`SemanticModel`].
@@ -181,9 +181,13 @@ impl<'a> Importer<'a> {
         symbol: &ImportRequest,
         at: TextSize,
         semantic: &SemanticModel,
-    ) -> Option<Result<(Edit, String), ResolutionError>> {
+    ) -> Result<Option<(Edit, String)>, ResolutionError> {
         // If the symbol is already available in the current scope, use it.
-        let imported_name = semantic.resolve_qualified_import_name(symbol.module, symbol.member)?;
+        let Some(imported_name) =
+            semantic.resolve_qualified_import_name(symbol.module, symbol.member)
+        else {
+            return Ok(None);
+        };
 
         // If the symbol source (i.e., the import statement) comes after the current location,
         // abort. For example, we could be generating an edit within a function, and the import
@@ -192,14 +196,14 @@ impl<'a> Importer<'a> {
         // import and the current location, and thus the symbol would not be available). It's also
         // unclear whether should add an import statement at the start of the file, since it could
         // be shadowed between the import and the current location.
-        if imported_name.range().start() > at {
-            return Some(Err(ResolutionError::ImportAfterUsage));
+        if imported_name.start() > at {
+            return Err(ResolutionError::ImportAfterUsage);
         }
 
         // If the symbol source (i.e., the import statement) is in a typing-only context, but we're
         // in a runtime context, abort.
         if imported_name.context().is_typing() && semantic.execution_context().is_runtime() {
-            return Some(Err(ResolutionError::IncompatibleContext));
+            return Err(ResolutionError::IncompatibleContext);
         }
 
         // We also add a no-op edit to force conflicts with any other fixes that might try to
@@ -222,7 +226,7 @@ impl<'a> Importer<'a> {
             self.locator.slice(imported_name.range()).to_string(),
             imported_name.range(),
         );
-        Some(Ok((import_edit, imported_name.into_name())))
+        Ok(Some((import_edit, imported_name.into_name())))
     }
 
     /// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make
@@ -299,12 +303,14 @@ impl<'a> Importer<'a> {
             }
             if let Stmt::ImportFrom(ast::StmtImportFrom {
                 module: name,
+                names,
                 level,
-                ..
+                range: _,
             }) = stmt
             {
                 if level.map_or(true, |level| level.to_u32() == 0)
-                    && name.as_ref().map_or(false, |name| name == module)
+                    && name.as_ref().is_some_and(|name| name == module)
+                    && names.iter().all(|alias| alias.name.as_str() != "*")
                 {
                     import_from = Some(*stmt);
                 }
@@ -315,7 +321,7 @@ impl<'a> Importer<'a> {
 
     /// Add the given member to an existing `Stmt::ImportFrom` statement.
     fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
-        let mut statement = match_statement(self.locator.slice(stmt.range()))?;
+        let mut statement = match_statement(self.locator.slice(stmt))?;
         let import_from = match_import_from(&mut statement)?;
         let aliases = match_aliases(import_from)?;
         aliases.push(ImportAlias {
@@ -352,8 +358,13 @@ impl<'a> Importer<'a> {
     }
 
     /// Add an import statement to an existing `TYPE_CHECKING` block.
-    fn add_to_type_checking_block(&self, content: &str, at: TextSize) -> Edit {
-        Insertion::start_of_block(at, self.locator, self.stylist).into_edit(content)
+    fn add_to_type_checking_block(
+        &self,
+        content: &str,
+        at: TextSize,
+        source_type: PySourceType,
+    ) -> Edit {
+        Insertion::start_of_block(at, self.locator, self.stylist, source_type).into_edit(content)
     }
 
     /// Return the import statement that precedes the given position, if any.
@@ -445,11 +456,11 @@ impl<'a> ImportRequest<'a> {
 }
 
 /// An existing list of module or member imports, located within an import statement.
-pub(crate) struct StmtImports<'a> {
+pub(crate) struct ImportedMembers<'a> {
     /// The import statement.
-    pub(crate) stmt: &'a Stmt,
-    /// The "qualified names" of the imported modules or members.
-    pub(crate) qualified_names: Vec<&'a str>,
+    pub(crate) statement: &'a Stmt,
+    /// The "names" of the imported members.
+    pub(crate) names: Vec<&'a str>,
 }
 
 /// The result of an [`Importer::get_or_import_symbol`] call.

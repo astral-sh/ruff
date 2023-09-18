@@ -1,6 +1,7 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
+use ruff_text_size::{Ranged, TextRange};
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
@@ -35,8 +36,8 @@ use crate::registry::AsRule;
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[violation]
 pub struct UncapitalizedEnvironmentVariables {
-    expected: String,
-    original: String,
+    expected: SourceCodeSnippet,
+    actual: SourceCodeSnippet,
 }
 
 impl Violation for UncapitalizedEnvironmentVariables {
@@ -44,13 +45,21 @@ impl Violation for UncapitalizedEnvironmentVariables {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UncapitalizedEnvironmentVariables { expected, original } = self;
-        format!("Use capitalized environment variable `{expected}` instead of `{original}`")
+        let UncapitalizedEnvironmentVariables { expected, actual } = self;
+        if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
+            format!("Use capitalized environment variable `{expected}` instead of `{actual}`")
+        } else {
+            format!("Use capitalized environment variable")
+        }
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let UncapitalizedEnvironmentVariables { expected, original } = self;
-        Some(format!("Replace `{original}` with `{expected}`"))
+        let UncapitalizedEnvironmentVariables { expected, actual } = self;
+        if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
+            Some(format!("Replace `{actual}` with `{expected}`"))
+        } else {
+            Some("Capitalize environment variable".to_string())
+        }
     }
 }
 
@@ -77,20 +86,28 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[violation]
 pub struct DictGetWithNoneDefault {
-    expected: String,
-    original: String,
+    expected: SourceCodeSnippet,
+    actual: SourceCodeSnippet,
 }
 
 impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DictGetWithNoneDefault { expected, original } = self;
-        format!("Use `{expected}` instead of `{original}`")
+        let DictGetWithNoneDefault { expected, actual } = self;
+        if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
+            format!("Use `{expected}` instead of `{actual}`")
+        } else {
+            format!("Use `dict.get()` without default value")
+        }
     }
 
     fn autofix_title(&self) -> String {
-        let DictGetWithNoneDefault { expected, original } = self;
-        format!("Replace `{original}` with `{expected}`")
+        let DictGetWithNoneDefault { expected, actual } = self;
+        if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
+            format!("Replace `{actual}` with `{expected}`")
+        } else {
+            "Remove default value".to_string()
+        }
     }
 }
 
@@ -103,14 +120,19 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     }
 
     // Ex) `os.environ.get('foo')`, `os.getenv('foo')`
-    let Expr::Call(ast::ExprCall { func, args, .. }) = expr else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: Arguments { args, .. },
+        ..
+    }) = expr
+    else {
         return;
     };
     let Some(arg) = args.get(0) else {
         return;
     };
     let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(env_var),
+        value: Constant::Str(ast::StringConstant { value: env_var, .. }),
         ..
     }) = arg
     else {
@@ -119,7 +141,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     if !checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["os", "environ", "get"] | ["os", "getenv"]
@@ -136,8 +158,8 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
 
     checker.diagnostics.push(Diagnostic::new(
         UncapitalizedEnvironmentVariables {
-            expected: capital_env_var,
-            original: env_var.clone(),
+            expected: SourceCodeSnippet::new(capital_env_var),
+            actual: SourceCodeSnippet::new(env_var.clone()),
         },
         arg.range(),
     ));
@@ -162,8 +184,12 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         return;
     }
     let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(env_var),
-        kind,
+        value:
+            Constant::Str(ast::StringConstant {
+                value: env_var,
+                unicode,
+                ..
+            }),
         range: _,
     }) = slice.as_ref()
     else {
@@ -176,15 +202,18 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 
     let mut diagnostic = Diagnostic::new(
         UncapitalizedEnvironmentVariables {
-            expected: capital_env_var.clone(),
-            original: env_var.clone(),
+            expected: SourceCodeSnippet::new(capital_env_var.clone()),
+            actual: SourceCodeSnippet::new(env_var.clone()),
         },
         slice.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         let node = ast::ExprConstant {
-            value: capital_env_var.into(),
-            kind: kind.clone(),
+            value: ast::Constant::Str(ast::StringConstant {
+                value: capital_env_var,
+                unicode: *unicode,
+                implicit_concatenated: false,
+            }),
             range: TextRange::default(),
         };
         let new_env_var = node.into();
@@ -200,8 +229,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments: Arguments { args, keywords, .. },
         range: _,
     }) = expr
     else {
@@ -234,15 +262,15 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
 
     let expected = format!(
         "{}({})",
-        checker.locator.slice(func.range()),
-        checker.locator.slice(key.range())
+        checker.locator().slice(func.as_ref()),
+        checker.locator().slice(key)
     );
-    let original = checker.locator.slice(expr.range()).to_string();
+    let actual = checker.locator().slice(expr);
 
     let mut diagnostic = Diagnostic::new(
         DictGetWithNoneDefault {
-            expected: expected.clone(),
-            original,
+            expected: SourceCodeSnippet::new(expected.clone()),
+            actual: SourceCodeSnippet::from_str(actual),
         },
         expr.range(),
     );

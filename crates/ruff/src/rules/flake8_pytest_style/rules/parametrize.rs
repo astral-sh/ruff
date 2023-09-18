@@ -1,10 +1,17 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Decorator, Expr, ExprContext, Ranged};
-use rustpython_parser::{lexer, Mode, Tok};
+use std::hash::BuildHasherDefault;
+
+use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Generator, Locator};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::node::AstNode;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext};
+use ruff_python_codegen::Generator;
+use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -12,9 +19,61 @@ use crate::registry::{AsRule, Rule};
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
 
+/// ## What it does
+/// Checks for the type of parameter names passed to `pytest.mark.parametrize`.
+///
+/// ## Why is this bad?
+/// The `argnames` argument of `pytest.mark.parametrize` takes a string or
+/// a sequence of strings. For a single parameter, it's preferable to use a
+/// string. For multiple parameters, it's preferable to use the style
+/// configured via the [`flake8-pytest-style.parametrize-names-type`] setting.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// # single parameter, always expecting string
+/// @pytest.mark.parametrize(("param",), [1, 2, 3])
+/// def test_foo(param):
+///     ...
+///
+///
+/// # multiple parameters, expecting tuple
+/// @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
+/// def test_bar(param1, param2):
+///     ...
+///
+///
+/// # multiple parameters, expecting tuple
+/// @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
+/// def test_baz(param1, param2):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.parametrize("param", [1, 2, 3])
+/// def test_foo(param):
+///     ...
+///
+///
+/// @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+/// def test_bar(param1, param2):
+///     ...
+/// ```
+///
+/// ## Options
+/// - `flake8-pytest-style.parametrize-names-type`
+///
+/// ## References
+/// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestParametrizeNamesWrongType {
-    pub expected: types::ParametrizeNameType,
+    expected: types::ParametrizeNameType,
 }
 
 impl Violation for PytestParametrizeNamesWrongType {
@@ -32,10 +91,94 @@ impl Violation for PytestParametrizeNamesWrongType {
     }
 }
 
+/// ## What it does
+/// Checks for the type of parameter values passed to `pytest.mark.parametrize`.
+///
+/// ## Why is this bad?
+/// The `argvalues` argument of `pytest.mark.parametrize` takes an iterator of
+/// parameter values, which can be provided as lists or tuples.
+///
+/// To aid in readability, it's recommended to use a consistent style for the
+/// list of values rows, and, in the case of multiple parameters, for each row
+/// of values.
+///
+/// The style for the list of values rows can be configured via the
+/// the [`flake8-pytest-style.parametrize-values-type`] setting, while the
+/// style for each row of values can be configured via the
+/// the [`flake8-pytest-style.parametrize-values-row-type`] setting.
+///
+/// For example, [`flake8-pytest-style.parametrize-values-type`] will lead to
+/// the following expectations:
+///
+/// - `tuple`: `@pytest.mark.parametrize("value", ("a", "b", "c"))`
+/// - `list`: `@pytest.mark.parametrize("value", ["a", "b", "c"])`
+///
+/// Similarly, [`flake8-pytest-style.parametrize-values-row-type`] will lead to
+/// the following expectations:
+///
+/// - `tuple`: `@pytest.mark.parametrize(("key", "value"), [("a", "b"), ("c", "d")])`
+/// - `list`: `@pytest.mark.parametrize(("key", "value"), [["a", "b"], ["c", "d"]])`
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// # expected list, got tuple
+/// @pytest.mark.parametrize("param", (1, 2))
+/// def test_foo(param):
+///     ...
+///
+///
+/// # expected top-level list, got tuple
+/// @pytest.mark.parametrize(
+///     ("param1", "param2"),
+///     (
+///         (1, 2),
+///         (3, 4),
+///     ),
+/// )
+/// def test_bar(param1, param2):
+///     ...
+///
+///
+/// # expected individual rows to be tuples, got lists
+/// @pytest.mark.parametrize(
+///     ("param1", "param2"),
+///     [
+///         [1, 2],
+///         [3, 4],
+///     ],
+/// )
+/// def test_baz(param1, param2):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.parametrize("param", [1, 2, 3])
+/// def test_foo(param):
+///     ...
+///
+///
+/// @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+/// def test_bar(param1, param2):
+///     ...
+/// ```
+///
+/// ## Options
+/// - `flake8-pytest-style.parametrize-values-type`
+/// - `flake8-pytest-style.parametrize-values-row-type`
+///
+/// ## References
+/// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestParametrizeValuesWrongType {
-    pub values: types::ParametrizeValuesType,
-    pub row: types::ParametrizeValuesRowType,
+    values: types::ParametrizeValuesType,
+    row: types::ParametrizeValuesRowType,
 }
 
 impl Violation for PytestParametrizeValuesWrongType {
@@ -46,10 +189,68 @@ impl Violation for PytestParametrizeValuesWrongType {
     }
 }
 
+/// ## What it does
+/// Checks for duplicate test cases in `pytest.mark.parametrize`.
+///
+/// ## Why is this bad?
+/// Duplicate test cases are redundant and should be removed.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.parametrize(
+///     ("param1", "param2"),
+///     [
+///         (1, 2),
+///         (1, 2),
+///     ],
+/// )
+/// def test_foo(param1, param2):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.parametrize(
+///     ("param1", "param2"),
+///     [
+///         (1, 2),
+///     ],
+/// )
+/// def test_foo(param1, param2):
+///     ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
+#[violation]
+pub struct PytestDuplicateParametrizeTestCases {
+    index: usize,
+}
+
+impl Violation for PytestDuplicateParametrizeTestCases {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PytestDuplicateParametrizeTestCases { index } = self;
+        format!("Duplicate of test case at index {index} in `@pytest_mark.parametrize`")
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        Some("Remove duplicate test case".to_string())
+    }
+}
+
 fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
-    let all_literals = elts.iter().all(|e| {
+    let all_literals = elts.iter().all(|expr| {
         matches!(
-            e,
+            expr,
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(_),
                 ..
@@ -62,20 +263,22 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
     }
 
     let node = Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(ref s),
-                ..
-            }) = elt
-            {
-                if !acc.is_empty() {
-                    acc.push(',');
+        value: elts
+            .iter()
+            .fold(String::new(), |mut acc, elt| {
+                if let Expr::Constant(ast::ExprConstant {
+                    value: Constant::Str(ast::StringConstant { value, .. }),
+                    ..
+                }) = elt
+                {
+                    if !acc.is_empty() {
+                        acc.push(',');
+                    }
+                    acc.push_str(value.as_str());
                 }
-                acc.push_str(s);
-            }
-            acc
-        })),
-        kind: None,
+                acc
+            })
+            .into(),
         range: TextRange::default(),
     });
     Some(generator.expr(&node))
@@ -83,48 +286,30 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
 
 /// Returns the range of the `name` argument of `@pytest.mark.parametrize`.
 ///
-/// This accounts for implicit string concatenation with parenthesis.
-/// For example, the following code will return the range marked with `^`:
+/// This accounts for parenthesized expressions. For example, the following code
+/// will return the range marked with `^`:
 /// ```python
-/// @pytest.mark.parametrize(("a, " "b"), [(1, 2)])
-/// #                        ^^^^^^^^^^^
-/// #                        implicit string concatenation with parenthesis
+/// @pytest.mark.parametrize(("x"), [(1, 2)])
+/// #                        ^^^^^
 /// def test(a, b):
 ///     ...
 /// ```
 ///
 /// This method assumes that the first argument is a string.
-fn get_parametrize_name_range(decorator: &Decorator, expr: &Expr, locator: &Locator) -> TextRange {
-    let mut locations = Vec::new();
-    let mut implicit_concat = None;
-
-    // The parenthesis are not part of the AST, so we need to tokenize the
-    // decorator to find them.
-    for (tok, range) in lexer::lex_starts_at(
-        locator.slice(decorator.range()),
-        Mode::Module,
-        decorator.start(),
-    )
-    .flatten()
-    {
-        match tok {
-            Tok::Lpar => locations.push(range.start()),
-            Tok::Rpar => {
-                if let Some(start) = locations.pop() {
-                    implicit_concat = Some(TextRange::new(start, range.end()));
-                }
-            }
-            // Stop after the first argument.
-            Tok::Comma => break,
-            _ => (),
-        }
-    }
-
-    if let Some(range) = implicit_concat {
-        range
-    } else {
-        expr.range()
-    }
+fn get_parametrize_name_range(
+    decorator: &Decorator,
+    expr: &Expr,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> Option<TextRange> {
+    decorator.expression.as_call_expr().and_then(|call| {
+        parenthesized_range(
+            expr.into(),
+            call.arguments.as_any_node_ref(),
+            comment_ranges,
+            source,
+        )
+    })
 }
 
 /// PT006
@@ -140,8 +325,13 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
-                        let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator);
+                        let name_range = get_parametrize_name_range(
+                            decorator,
+                            expr,
+                            checker.indexer().comment_ranges(),
+                            checker.locator().contents(),
+                        )
+                        .unwrap_or(expr.range());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -154,8 +344,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                     .iter()
                                     .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
-                                            value: Constant::Str((*name).to_string()),
-                                            kind: None,
+                                            value: (*name).to_string().into(),
                                             range: TextRange::default(),
                                         })
                                     })
@@ -171,8 +360,13 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
-                        let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator);
+                        let name_range = get_parametrize_name_range(
+                            decorator,
+                            expr,
+                            checker.indexer().comment_ranges(),
+                            checker.locator().contents(),
+                        )
+                        .unwrap_or(expr.range());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -185,8 +379,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                     .iter()
                                     .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
-                                            value: Constant::Str((*name).to_string()),
-                                            kind: None,
+                                            value: (*name).to_string().into(),
                                             range: TextRange::default(),
                                         })
                                     })
@@ -335,6 +528,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                     values.range(),
                 ));
             }
+
             if is_multi_named {
                 handle_value_rows(checker, elts, values_type, values_row_type);
             }
@@ -354,6 +548,65 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
             }
         }
         _ => {}
+    }
+}
+
+/// Given an element in a list, return the comma that follows it:
+/// ```python
+/// @pytest.mark.parametrize(
+///     "x",
+///     [.., (elt), ..],
+///              ^^^^^
+///              Tokenize this range to locate the comma.
+/// )
+/// ```
+fn trailing_comma(element: &Expr, source: &str) -> Option<TextSize> {
+    SimpleTokenizer::starts_at(element.end(), source)
+        .find(|token| token.kind == SimpleTokenKind::Comma)
+        .map(|token| token.start())
+}
+
+/// PT014
+fn check_duplicates(checker: &mut Checker, values: &Expr) {
+    let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
+        values
+    else {
+        return;
+    };
+
+    let mut seen: FxHashMap<ComparableExpr, usize> =
+        FxHashMap::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
+    let mut prev = None;
+    for (index, element) in elts.iter().enumerate() {
+        let expr = ComparableExpr::from(element);
+        seen.entry(expr)
+            .and_modify(|index| {
+                let mut diagnostic = Diagnostic::new(
+                    PytestDuplicateParametrizeTestCases { index: *index },
+                    element.range(),
+                );
+                if checker.patch(diagnostic.kind.rule()) {
+                    if let Some(prev) = prev {
+                        let values_end = values.range().end() - TextSize::new(1);
+                        let previous_end = trailing_comma(prev, checker.locator().contents())
+                            .unwrap_or(values_end);
+                        let element_end = trailing_comma(element, checker.locator().contents())
+                            .unwrap_or(values_end);
+                        let deletion_range = TextRange::new(previous_end, element_end);
+                        if !checker
+                            .indexer()
+                            .comment_ranges()
+                            .intersects(deletion_range)
+                        {
+                            diagnostic
+                                .set_fix(Fix::suggested(Edit::range_deletion(deletion_range)));
+                        }
+                    }
+                }
+                checker.diagnostics.push(diagnostic);
+            })
+            .or_insert(index);
+        prev = Some(element);
     }
 }
 
@@ -413,17 +666,24 @@ fn handle_value_rows(
 pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
     for decorator in decorators {
         if is_pytest_parametrize(decorator, checker.semantic()) {
-            if let Expr::Call(ast::ExprCall { args, .. }) = &decorator.expression {
+            if let Expr::Call(ast::ExprCall {
+                arguments: Arguments { args, .. },
+                ..
+            }) = &decorator.expression
+            {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-                    if let Some(names) = args.get(0) {
+                    if let [names, ..] = args.as_slice() {
                         check_names(checker, decorator, names);
                     }
                 }
                 if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-                    if let Some(names) = args.get(0) {
-                        if let Some(values) = args.get(1) {
-                            check_values(checker, names, values);
-                        }
+                    if let [names, values, ..] = args.as_slice() {
+                        check_values(checker, names, values);
+                    }
+                }
+                if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
+                    if let [_, values, ..] = args.as_slice() {
+                        check_duplicates(checker, values);
                     }
                 }
             }

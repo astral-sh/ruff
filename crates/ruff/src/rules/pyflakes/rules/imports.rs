@@ -1,8 +1,6 @@
-use itertools::Itertools;
-
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::OneIndexed;
+use ruff_source_file::OneIndexed;
 
 /// ## What it does
 /// Checks for import bindings that are shadowed by loop variables.
@@ -157,18 +155,13 @@ impl Violation for LateFutureImport {
 #[violation]
 pub struct UndefinedLocalWithImportStarUsage {
     pub(crate) name: String,
-    pub(crate) sources: Vec<String>,
 }
 
 impl Violation for UndefinedLocalWithImportStarUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithImportStarUsage { name, sources } = self;
-        let sources = sources
-            .iter()
-            .map(|source| format!("`{source}`"))
-            .join(", ");
-        format!("`{name}` may be undefined, or defined from star imports: {sources}")
+        let UndefinedLocalWithImportStarUsage { name } = self;
+        format!("`{name}` may be undefined, or defined from star imports")
     }
 }
 

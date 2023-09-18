@@ -2,17 +2,18 @@ use std::borrow::Cow;
 
 use anyhow::{bail, Result};
 use libcst_native::{
-    BooleanOp, BooleanOperation, CompoundStatement, Expression, If, LeftParen,
-    ParenthesizableWhitespace, ParenthesizedNode, RightParen, SimpleWhitespace, Statement, Suite,
+    BooleanOp, BooleanOperation, CompoundStatement, Expression, If, LeftParen, ParenthesizedNode,
+    RightParen, Statement, Suite,
 };
-use rustpython_parser::ast::Ranged;
+
+use ruff_diagnostics::Edit;
+use ruff_python_ast::whitespace;
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 use crate::autofix::codemods::CodegenStylist;
-use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::whitespace;
-use ruff_python_whitespace::PythonWhitespace;
-
+use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 
 fn parenthesize_and_operand(expr: Expression) -> Expression {
@@ -34,18 +35,16 @@ fn parenthesize_and_operand(expr: Expression) -> Expression {
 pub(crate) fn fix_nested_if_statements(
     locator: &Locator,
     stylist: &Stylist,
-    stmt: &rustpython_parser::ast::Stmt,
+    range: TextRange,
+    is_elif: bool,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, stmt) else {
+    let Some(outer_indent) = whitespace::indentation(locator, &range) else {
         bail!("Unable to fix multiline statement");
     };
 
     // Extract the module text.
-    let contents = locator.lines(stmt.range());
-
-    // Handle `elif` blocks differently; detect them upfront.
-    let is_elif = contents.trim_whitespace_start().starts_with("elif");
+    let contents = locator.lines(range);
 
     // If this is an `elif`, we have to remove the `elif` keyword for now. (We'll
     // restore the `el` later on.)
@@ -104,8 +103,8 @@ pub(crate) fn fix_nested_if_statements(
     outer_if.test = Expression::BooleanOperation(Box::new(BooleanOperation {
         left: Box::new(parenthesize_and_operand(outer_if.test.clone())),
         operator: BooleanOp::And {
-            whitespace_before: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
-            whitespace_after: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
+            whitespace_before: space(),
+            whitespace_after: space(),
         },
         right: Box::new(parenthesize_and_operand(inner_if.test.clone())),
         lpar: vec![],
@@ -128,6 +127,6 @@ pub(crate) fn fix_nested_if_statements(
         Cow::Borrowed(module_text)
     };
 
-    let range = locator.lines_range(stmt.range());
+    let range = locator.lines_range(range);
     Ok(Edit::range_replacement(contents.to_string(), range))
 }

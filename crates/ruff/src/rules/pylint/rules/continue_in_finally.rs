@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -54,17 +55,24 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
         }
 
         match stmt {
-            Stmt::If(ast::StmtIf { body, orelse, .. })
-            | Stmt::Try(ast::StmtTry { body, orelse, .. })
-            | Stmt::TryStar(ast::StmtTryStar { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                traverse_body(checker, body);
+                for clause in elif_else_clauses {
+                    traverse_body(checker, &clause.body);
+                }
+            }
+            Stmt::Try(ast::StmtTry { body, orelse, .. }) => {
                 traverse_body(checker, body);
                 traverse_body(checker, orelse);
             }
-            Stmt::For(ast::StmtFor { orelse, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-            | Stmt::While(ast::StmtWhile { orelse, .. }) => traverse_body(checker, orelse),
-            Stmt::With(ast::StmtWith { body, .. })
-            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+                traverse_body(checker, orelse);
+            }
+            Stmt::With(ast::StmtWith { body, .. }) => {
                 traverse_body(checker, body);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {

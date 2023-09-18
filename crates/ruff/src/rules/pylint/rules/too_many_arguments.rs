@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Stmt};
+use ruff_python_ast::{Parameters, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Checks for function definitions that include too many arguments.
 ///
 /// By default, this rule allows up to five arguments, as configured by the
-/// `pylint.max-args` option.
+/// [`pylint.max-args`] option.
 ///
 /// ## Why is this bad?
 /// Functions with many arguments are harder to understand, maintain, and call.
@@ -58,13 +58,18 @@ impl Violation for TooManyArguments {
 }
 
 /// PLR0913
-pub(crate) fn too_many_arguments(checker: &mut Checker, arguments: &Arguments, stmt: &Stmt) {
-    let num_arguments = arguments
+pub(crate) fn too_many_arguments(checker: &mut Checker, parameters: &Parameters, stmt: &Stmt) {
+    let num_arguments = parameters
         .args
         .iter()
-        .chain(&arguments.kwonlyargs)
-        .chain(&arguments.posonlyargs)
-        .filter(|arg| !checker.settings.dummy_variable_rgx.is_match(&arg.def.arg))
+        .chain(&parameters.kwonlyargs)
+        .chain(&parameters.posonlyargs)
+        .filter(|arg| {
+            !checker
+                .settings
+                .dummy_variable_rgx
+                .is_match(&arg.parameter.name)
+        })
         .count();
     if num_arguments > checker.settings.pylint.max_args {
         checker.diagnostics.push(Diagnostic::new(

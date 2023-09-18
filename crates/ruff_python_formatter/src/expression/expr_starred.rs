@@ -1,12 +1,11 @@
-use rustpython_parser::ast::ExprStarred;
-
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprStarred;
 
-use crate::context::PyFormatContext;
+use crate::comments::{dangling_comments, SourceComment};
+
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprStarred;
@@ -19,12 +18,17 @@ impl FormatNodeRule<ExprStarred> for FormatExprStarred {
             ctx: _,
         } = item;
 
-        write!(f, [text("*"), value.format()])
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
+        write!(f, [token("*"), dangling_comments(dangling), value.format()])
     }
 
-    fn fmt_dangling_comments(&self, node: &ExprStarred, f: &mut PyFormatter) -> FormatResult<()> {
-        debug_assert_eq!(f.context().comments().dangling_comments(node), []);
-
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         Ok(())
     }
 }

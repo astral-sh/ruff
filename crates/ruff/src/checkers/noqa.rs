@@ -1,11 +1,13 @@
 //! `NoQA` enforcement and validation.
 
+use std::path::Path;
+
 use itertools::Itertools;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_ast::source_code::Locator;
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::Locator;
 
 use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
@@ -16,17 +18,18 @@ use crate::settings::Settings;
 
 pub(crate) fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
+    path: &Path,
     locator: &Locator,
-    comment_ranges: &[TextRange],
+    comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
     settings: &Settings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, locator);
+    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, path, locator);
 
     // Extract all `noqa` directives.
-    let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, locator);
+    let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
@@ -91,8 +94,15 @@ pub(crate) fn check_noqa(
         }
     }
 
-    // Enforce that the noqa directive was actually used (RUF100).
-    if analyze_directives && settings.rules.enabled(Rule::UnusedNOQA) {
+    // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
+    // suppressed.
+    if settings.rules.enabled(Rule::UnusedNOQA)
+        && analyze_directives
+        && !exemption.is_some_and(|exemption| match exemption {
+            FileExemption::All => true,
+            FileExemption::Codes(codes) => codes.contains(&Rule::UnusedNOQA.noqa_code()),
+        })
+    {
         for line in noqa_directives.lines() {
             match &line.directive {
                 Directive::All(directive) => {
@@ -100,8 +110,8 @@ pub(crate) fn check_noqa(
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
                         if settings.rules.should_fix(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix_from_edit(delete_noqa(directive.range(), locator));
+                            diagnostic
+                                .set_fix(Fix::suggested(delete_noqa(directive.range(), locator)));
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -165,12 +175,12 @@ pub(crate) fn check_noqa(
                         );
                         if settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
-                                #[allow(deprecated)]
-                                diagnostic
-                                    .set_fix_from_edit(delete_noqa(directive.range(), locator));
+                                diagnostic.set_fix(Fix::suggested(delete_noqa(
+                                    directive.range(),
+                                    locator,
+                                )));
                             } else {
-                                #[allow(deprecated)]
-                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
                                     directive.range(),
                                 )));

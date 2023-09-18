@@ -1,9 +1,10 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast as ast;
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -68,7 +69,7 @@ pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
                 .semantic()
                 .resolve_call_path(func)
                 .as_ref()
-                .map_or(false, is_blocking_http_call)
+                .is_some_and(is_blocking_http_call)
             {
                 checker.diagnostics.push(Diagnostic::new(
                     BlockingHttpCallInAsyncFunction,

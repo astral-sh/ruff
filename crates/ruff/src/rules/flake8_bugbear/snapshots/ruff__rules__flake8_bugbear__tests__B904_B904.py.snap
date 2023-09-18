@@ -27,33 +27,43 @@ B904.py:16:5: B904 Within an `except` clause, raise exceptions with `raise ... f
 15 |     assert err
 16 |     raise Exception("No cause here...")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
-17 | except BaseException as base_err:
-18 |     # Might use this instead of bare raise with the `.with_traceback()` method
+17 | except BaseException as err:
+18 |     raise err
    |
 
-B904.py:62:9: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+B904.py:20:5: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
-60 | except Exception as e:
-61 |     if ...:
-62 |         raise RuntimeError("boom!")
+18 |     raise err
+19 | except BaseException as err:
+20 |     raise some_other_err
+   |     ^^^^^^^^^^^^^^^^^^^^ B904
+21 | finally:
+22 |     raise Exception("Nothing to chain from, so no warning here")
+   |
+
+B904.py:63:9: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   |
+61 | except Exception as e:
+62 |     if ...:
+63 |         raise RuntimeError("boom!")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
-63 |     else:
-64 |         raise RuntimeError("bang!")
+64 |     else:
+65 |         raise RuntimeError("bang!")
    |
 
-B904.py:64:9: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+B904.py:65:9: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
-62 |         raise RuntimeError("boom!")
-63 |     else:
-64 |         raise RuntimeError("bang!")
+63 |         raise RuntimeError("boom!")
+64 |     else:
+65 |         raise RuntimeError("bang!")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
    |
 
-B904.py:72:13: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+B904.py:73:13: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
-70 |     match 0:
-71 |         case 0:
-72 |             raise RuntimeError("boom!")
+71 |     match 0:
+72 |         case 0:
+73 |             raise RuntimeError("boom!")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
    |
 

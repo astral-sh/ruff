@@ -4,11 +4,13 @@
 #![no_main]
 
 use libfuzzer_sys::{fuzz_target, Corpus};
-use ruff_python_ast::source_code::round_trip;
+use ruff_python_codegen::round_trip;
 use similar::TextDiff;
 
 fn do_fuzz(case: &[u8]) -> Corpus {
-    let Ok(code) = std::str::from_utf8(case) else { return Corpus::Reject; };
+    let Ok(code) = std::str::from_utf8(case) else {
+        return Corpus::Reject;
+    };
 
     // round trip it once to get a formatted version
     if let Ok(first) = round_trip(code, "fuzzed-source.py") {

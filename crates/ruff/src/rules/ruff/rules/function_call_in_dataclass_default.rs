@@ -1,10 +1,11 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_semantic::analyze::typing::is_immutable_func;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{

@@ -1,20 +1,18 @@
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, ArgWithDefault, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::cast;
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_semantic::{Definition, Member, MemberKind};
-use ruff_python_whitespace::{NewlineWithTrailingNewline, PythonWhitespace};
-use ruff_textwrap::dedent;
+use ruff_python_trivia::{textwrap::dedent, PythonWhitespace};
+use ruff_source_file::NewlineWithTrailingNewline;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
@@ -117,8 +115,8 @@ impl AlwaysAutofixableViolation for SectionNotOverIndented {
 /// Avoid over-indenting the section underlines, as this can cause syntax
 /// errors in reStructuredText.
 ///
-/// By default, this rule is enabled when using the `numpy` convention, and
-/// disabled when using the `google` or `pep257` conventions.
+/// This rule is enabled when using the `numpy` convention, and disabled when
+/// using the `google` or `pep257` conventions.
 ///
 /// ## Example
 /// ```python
@@ -870,11 +868,12 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body.
 ///
-/// The last section in a docstring should be separated by a blank line, for
-/// consistency and compatibility with documentation tooling.
+/// In some projects, the last section of a docstring is followed by a blank line,
+/// for consistency and compatibility.
 ///
-/// This rule is enabled when using the `numpy` convention, and disabled when
-/// using the `pep257` and `google` conventions.
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is disabled when using the `google`,
+/// `numpy`, and `pep257` conventions.
 ///
 /// ## Example
 /// ```python
@@ -894,7 +893,8 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 ///     Raises
 ///     ------
 ///     FasterThanLightError
-///         If speed is greater than the speed of light."""
+///         If speed is greater than the speed of light.
+///     """
 ///     try:
 ///         return distance / time
 ///     except ZeroDivisionError as exc:
@@ -922,6 +922,7 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 ///     ------
 ///     FasterThanLightError
 ///         If speed is greater than the speed of light.
+///
 ///     """
 ///     try:
 ///         return distance / time
@@ -1187,19 +1188,22 @@ impl AlwaysAutofixableViolation for SectionNameEndsInColon {
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedParam {
-    pub names: Vec<String>,
+    /// The name of the function being documented.
+    definition: String,
+    /// The names of the undocumented parameters.
+    names: Vec<String>,
 }
 
 impl Violation for UndocumentedParam {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndocumentedParam { names } = self;
+        let UndocumentedParam { definition, names } = self;
         if names.len() == 1 {
             let name = &names[0];
-            format!("Missing argument description in the docstring: `{name}`")
+            format!("Missing argument description in the docstring for `{definition}`: `{name}`")
         } else {
             let names = names.iter().map(|name| format!("`{name}`")).join(", ");
-            format!("Missing argument descriptions in the docstring: {names}")
+            format!("Missing argument descriptions in the docstring for `{definition}`: {names}")
         }
     }
 }
@@ -1373,9 +1377,7 @@ fn blanks_and_section_underline(
     }
 
     if let Some(non_blank_line) = following_lines.next() {
-        let dash_line_found = non_blank_line
-            .chars()
-            .all(|char| char.is_whitespace() || char == '-');
+        let dash_line_found = is_dashed_underline(&non_blank_line);
 
         if dash_line_found {
             if blank_lines_after_header > 0 {
@@ -1416,7 +1418,7 @@ fn blanks_and_section_underline(
                             "{}{}{}",
                             clean_space(docstring.indentation),
                             "-".repeat(context.section_name().len()),
-                            checker.stylist.line_ending().as_str()
+                            checker.stylist().line_ending().as_str()
                         );
                         diagnostic.set_fix(Fix::automatic(Edit::replacement(
                             content,
@@ -1517,7 +1519,7 @@ fn blanks_and_section_underline(
                     // Add a dashed line (of the appropriate length) under the section header.
                     let content = format!(
                         "{}{}{}",
-                        checker.stylist.line_ending().as_str(),
+                        checker.stylist().line_ending().as_str(),
                         clean_space(docstring.indentation),
                         "-".repeat(context.section_name().len()),
                     );
@@ -1573,7 +1575,7 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}{}",
-                    checker.stylist.line_ending().as_str(),
+                    checker.stylist().line_ending().as_str(),
                     clean_space(docstring.indentation),
                     "-".repeat(context.section_name().len()),
                 );
@@ -1636,7 +1638,7 @@ fn common_section(
             if checker.patch(diagnostic.kind.rule()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
                 let content = clean_space(docstring.indentation);
-                let fix_range = TextRange::at(context.range().start(), leading_space.text_len());
+                let fix_range = TextRange::at(context.start(), leading_space.text_len());
 
                 diagnostic.set_fix(Fix::automatic(if content.is_empty() {
                     Edit::range_deletion(fix_range)
@@ -1648,7 +1650,7 @@ fn common_section(
         }
     }
 
-    let line_end = checker.stylist.line_ending().as_str();
+    let line_end = checker.stylist().line_ending().as_str();
     let last_line = context.following_lines().last();
     if last_line.map_or(true, |line| !line.trim().is_empty()) {
         if let Some(next) = next {
@@ -1663,7 +1665,7 @@ fn common_section(
                     // Add a newline at the beginning of the next section.
                     diagnostic.set_fix(Fix::automatic(Edit::insertion(
                         line_end.to_string(),
-                        next.range().start(),
+                        next.start(),
                     )));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -1680,7 +1682,7 @@ fn common_section(
                     // Add a newline after the section.
                     diagnostic.set_fix(Fix::automatic(Edit::insertion(
                         format!("{}{}", line_end, docstring.indentation),
-                        context.range().end(),
+                        context.end(),
                     )));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -1689,7 +1691,10 @@ fn common_section(
     }
 
     if checker.enabled(Rule::NoBlankLineBeforeSection) {
-        if !context.previous_line().map_or(false, str::is_empty) {
+        if !context
+            .previous_line()
+            .is_some_and(|line| line.trim().is_empty())
+        {
             let mut diagnostic = Diagnostic::new(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),
@@ -1700,7 +1705,7 @@ fn common_section(
                 // Add a blank line before the section.
                 diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     line_end.to_string(),
-                    context.range().start(),
+                    context.start(),
                 )));
             }
             checker.diagnostics.push(diagnostic);
@@ -1711,45 +1716,31 @@ fn common_section(
 }
 
 fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
-    let Definition::Member(Member {
-        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-        stmt,
-        ..
-    }) = docstring.definition
-    else {
-        return;
-    };
-
-    let (Stmt::FunctionDef(ast::StmtFunctionDef {
-        args: arguments, ..
-    })
-    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-        args: arguments, ..
-    })) = stmt
-    else {
+    let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
-    for ArgWithDefault {
-        def,
+    for ParameterWithDefault {
+        parameter,
         default: _,
         range: _,
-    } in arguments
+    } in function
+        .parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&function.parameters.args)
+        .chain(&function.parameters.kwonlyargs)
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 docstring.definition.is_method()
-                    && !is_staticmethod(cast::decorator_list(stmt), checker.semantic()),
+                    && !is_staticmethod(&function.decorator_list, checker.semantic()),
             ),
         )
     {
-        let arg_name = def.arg.as_str();
+        let arg_name = parameter.name.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -1757,8 +1748,8 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if let Some(arg) = &arguments.vararg {
-        let arg_name = arg.arg.as_str();
+    if let Some(arg) = function.parameters.vararg.as_ref() {
+        let arg_name = arg.name.as_str();
         let starred_arg_name = format!("*{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)
@@ -1767,8 +1758,8 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             missing_arg_names.insert(starred_arg_name);
         }
     }
-    if let Some(arg) = &arguments.kwarg {
-        let arg_name = arg.arg.as_str();
+    if let Some(arg) = function.parameters.kwarg.as_ref() {
+        let arg_name = arg.name.as_str();
         let starred_arg_name = format!("**{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)
@@ -1779,11 +1770,16 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     }
 
     if !missing_arg_names.is_empty() {
-        let names = missing_arg_names.into_iter().sorted().collect();
-        checker.diagnostics.push(Diagnostic::new(
-            UndocumentedParam { names },
-            stmt.identifier(),
-        ));
+        if let Some(definition) = docstring.definition.name() {
+            let names = missing_arg_names.into_iter().sorted().collect();
+            checker.diagnostics.push(Diagnostic::new(
+                UndocumentedParam {
+                    definition: definition.to_string(),
+                    names,
+                },
+                function.identifier(),
+            ));
+        }
     }
 }
 
@@ -1803,7 +1799,9 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     let relevant_lines = std::iter::once(first_line)
         .chain(following_lines)
         .map(|l| l.as_str())
-        .filter(|line| line.starts_with(leading_space) || line.is_empty())
+        .filter(|line| {
+            line.is_empty() || (line.starts_with(leading_space) && !is_dashed_underline(line))
+        })
         .join("\n");
     let args_content = dedent(&relevant_lines);
 
@@ -1993,4 +1991,9 @@ fn parse_google_sections(
             missing_args(checker, docstring, &documented_args);
         }
     }
+}
+
+fn is_dashed_underline(line: &str) -> bool {
+    let trimmed_line = line.trim();
+    !trimmed_line.is_empty() && trimmed_line.chars().all(|char| char == '-')
 }

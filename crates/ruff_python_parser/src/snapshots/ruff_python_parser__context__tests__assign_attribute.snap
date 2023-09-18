@@ -1,0 +1,62 @@
+---
+source: crates/ruff_python_parser/src/context.rs
+expression: parse_ast
+---
+[
+    Assign(
+        StmtAssign {
+            range: 0..15,
+            targets: [
+                Attribute(
+                    ExprAttribute {
+                        range: 0..3,
+                        value: Name(
+                            ExprName {
+                                range: 0..1,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                        attr: Identifier {
+                            id: "y",
+                            range: 2..3,
+                        },
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Tuple(
+                ExprTuple {
+                    range: 6..15,
+                    elts: [
+                        Constant(
+                            ExprConstant {
+                                range: 7..8,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 10..11,
+                                value: Int(
+                                    2,
+                                ),
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 13..14,
+                                value: Int(
+                                    3,
+                                ),
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+]

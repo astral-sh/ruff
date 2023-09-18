@@ -1,16 +1,13 @@
-use anyhow::{bail, Result};
-use log::debug;
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{
-    self, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
-};
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::source_code::Generator;
+use ruff_python_ast::{
+    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Stmt,
+};
+use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -64,21 +61,58 @@ impl Violation for ConvertTypedDictFunctionalToClass {
     }
 }
 
+/// UP013
+pub(crate) fn convert_typed_dict_functional_to_class(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    targets: &[Expr],
+    value: &Expr,
+) {
+    let Some((class_name, arguments, base_class)) =
+        match_typed_dict_assign(targets, value, checker.semantic())
+    else {
+        return;
+    };
+
+    let Some((body, total_keyword)) = match_fields_and_total(arguments) else {
+        return;
+    };
+
+    let mut diagnostic = Diagnostic::new(
+        ConvertTypedDictFunctionalToClass {
+            name: class_name.to_string(),
+        },
+        stmt.range(),
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+        if checker.locator().is_at_start_of_line(stmt.start()) {
+            diagnostic.set_fix(convert_to_class(
+                stmt,
+                class_name,
+                body,
+                total_keyword,
+                base_class,
+                checker.generator(),
+            ));
+        }
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
 /// assignment.
 fn match_typed_dict_assign<'a>(
     targets: &'a [Expr],
     value: &'a Expr,
     semantic: &SemanticModel,
-) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
-    let target = targets.get(0)?;
-    let Expr::Name(ast::ExprName { id: class_name, .. }) = target else {
+) -> Option<(&'a str, &'a Arguments, &'a Expr)> {
+    let [Expr::Name(ast::ExprName { id: class_name, .. })] = targets else {
         return None;
     };
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments,
         range: _,
     }) = value
     else {
@@ -87,16 +121,15 @@ fn match_typed_dict_assign<'a>(
     if !semantic.match_typing_expr(func, "TypedDict") {
         return None;
     }
-    Some((class_name, args, keywords, func))
+    Some((class_name, arguments, func))
 }
 
-/// Generate a `Stmt::AnnAssign` representing the provided property
-/// definition.
-fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
+/// Generate a [`Stmt::AnnAssign`] representing the provided field definition.
+fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
     ast::StmtAnnAssign {
         target: Box::new(
             ast::ExprName {
-                id: property.into(),
+                id: field.into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             }
@@ -110,137 +143,126 @@ fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
     .into()
 }
 
-/// Generate a `StmtKind:ClassDef` statement based on the provided body,
-/// keywords and base class.
+/// Generate a `StmtKind:ClassDef` statement based on the provided body, keywords, and base class.
 fn create_class_def_stmt(
     class_name: &str,
     body: Vec<Stmt>,
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
 ) -> Stmt {
-    let keywords = match total_keyword {
-        Some(keyword) => vec![keyword.clone()],
-        None => vec![],
-    };
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
-        bases: vec![base_class.clone()],
-        keywords,
+        arguments: Some(Box::new(Arguments {
+            args: vec![base_class.clone()],
+            keywords: match total_keyword {
+                Some(keyword) => vec![keyword.clone()],
+                None => vec![],
+            },
+            range: TextRange::default(),
+        })),
         body,
+        type_params: None,
         decorator_list: vec![],
         range: TextRange::default(),
     }
     .into()
 }
 
-fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
+fn fields_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Option<Vec<Stmt>> {
     if keys.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
-        return Ok(vec![node]);
+        Some(vec![node])
+    } else {
+        keys.iter()
+            .zip(values.iter())
+            .map(|(key, value)| match key {
+                Some(Expr::Constant(ast::ExprConstant {
+                    value: Constant::Str(ast::StringConstant { value: field, .. }),
+                    ..
+                })) => {
+                    if !is_identifier(field) {
+                        return None;
+                    }
+                    if is_dunder(field) {
+                        return None;
+                    }
+                    Some(create_field_assignment_stmt(field, value))
+                }
+                _ => None,
+            })
+            .collect()
     }
-
-    keys.iter()
-        .zip(values.iter())
-        .map(|(key, value)| match key {
-            Some(Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(property),
-                ..
-            })) => {
-                if !is_identifier(property) {
-                    bail!("Invalid property name: {}", property)
-                }
-                if is_dunder(property) {
-                    bail!("Cannot use dunder property name: {}", property)
-                }
-                Ok(create_property_assignment_stmt(property, value))
-            }
-            _ => bail!("Expected `key` to be `Constant::Str`"),
-        })
-        .collect()
 }
 
-fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<Stmt>> {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
-        bail!("Expected `func` to be `Expr::Name`")
-    };
+fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Vec<Stmt>> {
+    let ast::ExprName { id, .. } = func.as_name_expr()?;
     if id != "dict" {
-        bail!("Expected `id` to be `\"dict\"`")
+        return None;
     }
+
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
-        return Ok(vec![node]);
+        Some(vec![node])
+    } else {
+        fields_from_keywords(keywords)
     }
-
-    properties_from_keywords(keywords)
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
-fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
+fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
-        return Ok(vec![node]);
+        return Some(vec![node]);
     }
 
     keywords
         .iter()
         .map(|keyword| {
-            if let Some(property) = &keyword.arg {
-                Ok(create_property_assignment_stmt(property, &keyword.value))
-            } else {
-                bail!("Expected `arg` to be `Some`")
-            }
+            keyword
+                .arg
+                .as_ref()
+                .map(|field| create_field_assignment_stmt(field, &keyword.value))
         })
         .collect()
 }
 
-// The only way to have the `total` keyword is to use the args version, like:
-// ```
-// TypedDict('name', {'a': int}, total=True)
-// ```
-fn match_total_from_only_keyword(keywords: &[Keyword]) -> Option<&Keyword> {
-    keywords.iter().find(|keyword| {
-        let Some(arg) = &keyword.arg else {
-            return false;
-        };
-        arg.as_str() == "total"
-    })
-}
-
-fn match_properties_and_total<'a>(
-    args: &'a [Expr],
-    keywords: &'a [Keyword],
-) -> Result<(Vec<Stmt>, Option<&'a Keyword>)> {
-    // We don't have to manage the hybrid case because it's not possible to have a
-    // dict and keywords. For example, the following is illegal:
-    // ```
-    // MyType = TypedDict('MyType', {'a': int, 'b': str}, a=int, b=str)
-    // ```
-    if let Some(dict) = args.get(1) {
-        let total = match_total_from_only_keyword(keywords);
-        match dict {
-            Expr::Dict(ast::ExprDict {
-                keys,
-                values,
-                range: _,
-            }) => Ok((properties_from_dict_literal(keys, values)?, total)),
-            Expr::Call(ast::ExprCall { func, keywords, .. }) => {
-                Ok((properties_from_dict_call(func, keywords)?, total))
+/// Match the fields and `total` keyword from a `TypedDict` call.
+fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&Keyword>)> {
+    match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+        // Ex) `TypedDict("MyType", {"a": int, "b": str})`
+        ([_typename, fields], [..]) => {
+            let total = arguments.find_keyword("total");
+            match fields {
+                Expr::Dict(ast::ExprDict {
+                    keys,
+                    values,
+                    range: _,
+                }) => Some((fields_from_dict_literal(keys, values)?, total)),
+                Expr::Call(ast::ExprCall {
+                    func,
+                    arguments: Arguments { keywords, .. },
+                    range: _,
+                }) => Some((fields_from_dict_call(func, keywords)?, total)),
+                _ => None,
             }
-            _ => bail!("Expected `arg` to be `Expr::Dict` or `Expr::Call`"),
         }
-    } else if !keywords.is_empty() {
-        Ok((properties_from_keywords(keywords)?, None))
-    } else {
-        let node = Stmt::Pass(ast::StmtPass {
-            range: TextRange::default(),
-        });
-        Ok((vec![node], None))
+        // Ex) `TypedDict("MyType")`
+        ([_typename], []) => {
+            let node = Stmt::Pass(ast::StmtPass {
+                range: TextRange::default(),
+            });
+            Some((vec![node], None))
+        }
+        // Ex) `TypedDict("MyType", a=int, b=str)`
+        ([_typename], fields) => Some((fields_from_keywords(fields)?, None)),
+        // Ex) `TypedDict()`
+        _ => None,
     }
 }
 
@@ -262,47 +284,4 @@ fn convert_to_class(
         )),
         stmt.range(),
     ))
-}
-
-/// UP013
-pub(crate) fn convert_typed_dict_functional_to_class(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    targets: &[Expr],
-    value: &Expr,
-) {
-    let Some((class_name, args, keywords, base_class)) =
-        match_typed_dict_assign(targets, value, checker.semantic())
-    else {
-        return;
-    };
-
-    let (body, total_keyword) = match match_properties_and_total(args, keywords) {
-        Ok((body, total_keyword)) => (body, total_keyword),
-        Err(err) => {
-            debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}");
-            return;
-        }
-    };
-
-    let mut diagnostic = Diagnostic::new(
-        ConvertTypedDictFunctionalToClass {
-            name: class_name.to_string(),
-        },
-        stmt.range(),
-    );
-    if checker.patch(diagnostic.kind.rule()) {
-        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-        if checker.locator.is_at_start_of_line(stmt.start()) {
-            diagnostic.set_fix(convert_to_class(
-                stmt,
-                class_name,
-                body,
-                total_keyword,
-                base_class,
-                checker.generator(),
-            ));
-        }
-    }
-    checker.diagnostics.push(diagnostic);
 }

@@ -1,8 +1,9 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -16,8 +17,8 @@ use crate::checkers::ast::Checker;
 /// contains multiple characters, the reader may be misled into thinking that
 /// a prefix or suffix is being removed, rather than a set of characters.
 ///
-/// In Python 3.9 and later, you can use `str#removeprefix` and
-/// `str#removesuffix` to remove an exact prefix or suffix from a string,
+/// In Python 3.9 and later, you can use `str.removeprefix` and
+/// `str.removesuffix` to remove an exact prefix or suffix from a string,
 /// respectively, which should be preferred when possible.
 ///
 /// ## Example

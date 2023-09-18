@@ -1,25 +1,31 @@
 use std::borrow::Cow;
 
-use anyhow::bail;
 use anyhow::Result;
+use anyhow::{bail, Context};
 use libcst_native::{
-    self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace,
-    ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
-    TrailingWhitespace, UnaryOperation,
+    self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizedNode, SimpleStatementLine,
+    SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace,
 };
-use rustpython_parser::ast::{self, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_comments_in, Truthiness};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::helpers::Truthiness;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{
+    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
+};
 use ruff_python_ast::{visitor, whitespace};
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
+use crate::cst::helpers::negate;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 use super::unittest_assert::UnittestAssert;
@@ -68,6 +74,37 @@ impl Violation for PytestCompositeAssertion {
     }
 }
 
+/// ## What it does
+/// Checks for `assert` statements in `except` clauses.
+///
+/// ## Why is this bad?
+/// When testing for exceptions, `pytest.raises()` should be used instead of
+/// `assert` statements in `except` clauses, as it's more explicit and
+/// idiomatic. Further, `pytest.raises()` will fail if the exception is _not_
+/// raised, unlike the `assert` statement.
+///
+/// ## Example
+/// ```python
+/// def test_foo():
+///     try:
+///         1 / 0
+///     except ZeroDivisionError as e:
+///         assert e.args
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(ZeroDivisionError) as exc_info:
+///         1 / 0
+///     assert exc_info.value.args
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[violation]
 pub struct PytestAssertInExcept {
     name: String,
@@ -83,6 +120,32 @@ impl Violation for PytestAssertInExcept {
     }
 }
 
+/// ## What it does
+/// Checks for `assert` statements whose test expression is a falsy value.
+///
+/// ## Why is this bad?
+/// `pytest.fail` conveys the intent more clearly than `assert falsy_value`.
+///
+/// ## Example
+/// ```python
+/// def test_foo():
+///     if some_condition:
+///         assert False, "some_condition was True"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     if some_condition:
+///         pytest.fail("some_condition was True")
+///     ...
+/// ```
+///
+/// References
+/// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[violation]
 pub struct PytestAssertAlwaysFalse;
 
@@ -92,6 +155,36 @@ impl Violation for PytestAssertAlwaysFalse {
         format!("Assertion always fails, replace with `pytest.fail()`")
     }
 }
+
+/// ## What it does
+/// Checks for uses of assertion methods from the `unittest` module.
+///
+/// ## Why is this bad?
+/// To make use of `pytest`'s assertion rewriting, a regular `assert` statement
+/// is preferred over `unittest`'s assertion methods.
+///
+/// ## Example
+/// ```python
+/// import unittest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         self.assertEqual(a, b)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import unittest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         assert a == b
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
 
 #[violation]
 pub struct PytestUnittestAssertion {
@@ -194,15 +287,20 @@ pub(crate) fn unittest_assertion(
                 if checker.patch(diagnostic.kind.rule()) {
                     // We're converting an expression to a statement, so avoid applying the fix if
                     // the assertion is part of a larger expression.
-                    if checker.semantic().stmt().is_expr_stmt()
-                        && checker.semantic().expr_parent().is_none()
-                        && !checker.semantic().scope().kind.is_lambda()
-                        && !has_comments_in(expr.range(), checker.locator)
+                    if checker.semantic().current_statement().is_expr_stmt()
+                        && checker.semantic().current_expression_parent().is_none()
+                        && !checker.indexer().comment_ranges().intersects(expr.range())
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 checker.generator().stmt(&stmt),
-                                expr.range(),
+                                parenthesized_range(
+                                    expr.into(),
+                                    checker.semantic().current_statement().into(),
+                                    checker.indexer().comment_ranges(),
+                                    checker.locator().contents(),
+                                )
+                                .unwrap_or(expr.range()),
                             )));
                         }
                     }
@@ -214,6 +312,186 @@ pub(crate) fn unittest_assertion(
         }
         _ => None,
     }
+}
+
+/// ## What it does
+/// Checks for uses of exception-related assertion methods from the `unittest`
+/// module.
+///
+/// ## Why is this bad?
+/// To enforce the assertion style recommended by `pytest`, `pytest.raises` is
+/// preferred over the exception-related assertion methods in `unittest`, like
+/// `assertRaises`.
+///
+/// ## Example
+/// ```python
+/// import unittest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         with self.assertRaises(ValueError):
+///             raise ValueError("foo")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import unittest
+/// import pytest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         with pytest.raises(ValueError):
+///             raise ValueError("foo")
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Assertions about expected exceptions](https://docs.pytest.org/en/latest/how-to/assert.html#assertions-about-expected-exceptions)
+#[violation]
+pub struct PytestUnittestRaisesAssertion {
+    assertion: String,
+}
+
+impl Violation for PytestUnittestRaisesAssertion {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PytestUnittestRaisesAssertion { assertion } = self;
+        format!("Use `pytest.raises` instead of unittest-style `{assertion}`")
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        let PytestUnittestRaisesAssertion { assertion } = self;
+        Some(format!("Replace `{assertion}` with `pytest.raises`"))
+    }
+}
+
+/// PT027
+pub(crate) fn unittest_raises_assertion(
+    checker: &Checker,
+    call: &ast::ExprCall,
+) -> Option<Diagnostic> {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
+        return None;
+    };
+
+    if !matches!(
+        attr.as_str(),
+        "assertRaises" | "failUnlessRaises" | "assertRaisesRegex" | "assertRaisesRegexp"
+    ) {
+        return None;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        PytestUnittestRaisesAssertion {
+            assertion: attr.to_string(),
+        },
+        call.func.range(),
+    );
+    if checker.patch(diagnostic.kind.rule())
+        && !checker.indexer().has_comments(call, checker.locator())
+    {
+        if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import("pytest", "raises"),
+                    call.func.start(),
+                    checker.semantic(),
+                )?;
+                let edit = Edit::range_replacement(format!("{binding}({args})"), call.range());
+                Ok(Fix::suggested_edits(import_edit, [edit]))
+            });
+        }
+    }
+
+    Some(diagnostic)
+}
+
+fn to_pytest_raises_args<'a>(
+    checker: &Checker<'a>,
+    attr: &str,
+    arguments: &Arguments,
+) -> Option<Cow<'a, str>> {
+    let args = match attr {
+        "assertRaises" | "failUnlessRaises" => {
+            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+                // Ex) `assertRaises(Exception)`
+                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg)),
+                // Ex) `assertRaises(expected_exception=Exception)`
+                ([], [kwarg])
+                    if kwarg
+                        .arg
+                        .as_ref()
+                        .is_some_and(|id| id.as_str() == "expected_exception") =>
+                {
+                    Cow::Borrowed(checker.locator().slice(kwarg.value.range()))
+                }
+                _ => return None,
+            }
+        }
+        "assertRaisesRegex" | "assertRaisesRegexp" => {
+            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+                // Ex) `assertRaisesRegex(Exception, regex)`
+                ([arg1, arg2], []) => Cow::Owned(format!(
+                    "{}, match={}",
+                    checker.locator().slice(arg1),
+                    checker.locator().slice(arg2)
+                )),
+                // Ex) `assertRaisesRegex(Exception, expected_regex=regex)`
+                ([arg], [kwarg])
+                    if kwarg
+                        .arg
+                        .as_ref()
+                        .is_some_and(|arg| arg.as_str() == "expected_regex") =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(arg),
+                        checker.locator().slice(kwarg.value.range())
+                    ))
+                }
+                // Ex) `assertRaisesRegex(expected_exception=Exception, expected_regex=regex)`
+                ([], [kwarg1, kwarg2])
+                    if kwarg1
+                        .arg
+                        .as_ref()
+                        .is_some_and(|id| id.as_str() == "expected_exception")
+                        && kwarg2
+                            .arg
+                            .as_ref()
+                            .is_some_and(|id| id.as_str() == "expected_regex") =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(kwarg1.value.range()),
+                        checker.locator().slice(kwarg2.value.range())
+                    ))
+                }
+                // Ex) `assertRaisesRegex(expected_regex=regex, expected_exception=Exception)`
+                ([], [kwarg1, kwarg2])
+                    if kwarg1
+                        .arg
+                        .as_ref()
+                        .is_some_and(|id| id.as_str() == "expected_regex")
+                        && kwarg2
+                            .arg
+                            .as_ref()
+                            .is_some_and(|id| id.as_str() == "expected_exception") =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(kwarg2.value.range()),
+                        checker.locator().slice(kwarg1.value.range())
+                    ))
+                }
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    Some(args)
 }
 
 /// PT015
@@ -296,23 +574,6 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
     CompositionKind::None
 }
 
-/// Negate a condition, i.e., `a` => `not a` and `not a` => `a`.
-fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
-    if let Expression::UnaryOperation(ref expression) = expression {
-        if matches!(expression.operator, libcst_native::UnaryOp::Not { .. }) {
-            return *expression.expression.clone();
-        }
-    }
-    Expression::UnaryOperation(Box::new(UnaryOperation {
-        operator: libcst_native::UnaryOp::Not {
-            whitespace_after: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
-        },
-        expression: Box::new(expression.clone()),
-        lpar: vec![],
-        rpar: vec![],
-    }))
-}
-
 /// Propagate parentheses from a parent to a child expression, if necessary.
 ///
 /// For example, when splitting:
@@ -327,7 +588,7 @@ fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
 /// assert (b ==
 ///     "")
 /// ```
-fn parenthesize<'a>(expression: Expression<'a>, parent: &Expression<'a>) -> Expression<'a> {
+fn parenthesize<'a>(expression: &Expression<'a>, parent: &Expression<'a>) -> Expression<'a> {
     if matches!(
         expression,
         Expression::Comparison(_)
@@ -355,19 +616,18 @@ fn parenthesize<'a>(expression: Expression<'a>, parent: &Expression<'a>) -> Expr
             | Expression::NamedExpr(_)
     ) {
         if let (Some(left), Some(right)) = (parent.lpar().first(), parent.rpar().first()) {
-            return expression.with_parens(left.clone(), right.clone());
+            return expression.clone().with_parens(left.clone(), right.clone());
         }
     }
-    expression
+    expression.clone()
 }
 
 /// Replace composite condition `assert a == "hello" and b == "world"` with two statements
 /// `assert a == "hello"` and `assert b == "world"`.
 fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, stmt) else {
-        bail!("Unable to fix multiline statement");
-    };
+    let outer_indent =
+        whitespace::indentation(locator, stmt).context("Unable to fix multiline statement")?;
 
     // Extract the module text.
     let contents = locator.lines(stmt.range());
@@ -402,11 +662,11 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         &mut indented_block.body
     };
 
-    let [Statement::Simple(simple_statement_line)] = &statements[..] else {
+    let [Statement::Simple(simple_statement_line)] = statements.as_slice() else {
         bail!("Expected one simple statement")
     };
 
-    let [SmallStatement::Assert(assert_statement)] = &simple_statement_line.body[..] else {
+    let [SmallStatement::Assert(assert_statement)] = simple_statement_line.body.as_slice() else {
         bail!("Expected simple statement to be an assert")
     };
 
@@ -415,10 +675,16 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     match &assert_statement.test {
         Expression::UnaryOperation(op) => {
             if matches!(op.operator, libcst_native::UnaryOp::Not { .. }) {
-                if let Expression::BooleanOperation(op) = &*op.expression {
-                    if matches!(op.operator, BooleanOp::Or { .. }) {
-                        conditions.push(parenthesize(negate(&op.left), &assert_statement.test));
-                        conditions.push(parenthesize(negate(&op.right), &assert_statement.test));
+                if let Expression::BooleanOperation(boolean_operation) = &*op.expression {
+                    if matches!(boolean_operation.operator, BooleanOp::Or { .. }) {
+                        conditions.push(negate(&parenthesize(
+                            &boolean_operation.left,
+                            &op.expression,
+                        )));
+                        conditions.push(negate(&parenthesize(
+                            &boolean_operation.right,
+                            &op.expression,
+                        )));
                     } else {
                         bail!("Expected assert statement to be a composite condition");
                     }
@@ -429,8 +695,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         }
         Expression::BooleanOperation(op) => {
             if matches!(op.operator, BooleanOp::And { .. }) {
-                conditions.push(parenthesize(*op.left.clone(), &assert_statement.test));
-                conditions.push(parenthesize(*op.right.clone(), &assert_statement.test));
+                conditions.push(parenthesize(&op.left, &assert_statement.test));
+                conditions.push(parenthesize(&op.right, &assert_statement.test));
             } else {
                 bail!("Expected assert statement to be a composite condition");
             }
@@ -483,11 +749,14 @@ pub(crate) fn composite_condition(
         if checker.patch(diagnostic.kind.rule()) {
             if matches!(composite, CompositionKind::Simple)
                 && msg.is_none()
-                && !has_comments_in(stmt.range(), checker.locator)
+                && !checker.indexer().comment_ranges().intersects(stmt.range())
+                && !checker
+                    .indexer()
+                    .in_multi_statement_line(stmt, checker.locator())
             {
-                #[allow(deprecated)]
-                diagnostic.try_set_fix_from_edit(|| {
-                    fix_composite_condition(stmt, checker.locator, checker.stylist)
+                diagnostic.try_set_fix(|| {
+                    fix_composite_condition(stmt, checker.locator(), checker.stylist())
+                        .map(Fix::suggested)
                 });
             }
         }

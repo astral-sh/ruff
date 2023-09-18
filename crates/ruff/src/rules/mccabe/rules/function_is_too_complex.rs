@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -68,19 +68,26 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
     let mut complexity = 0;
     for stmt in stmts {
         match stmt {
-            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                complexity += 1;
+                complexity += get_complexity_number(body);
+                for clause in elif_else_clauses {
+                    if clause.test.is_some() {
+                        complexity += 1;
+                    }
+                    complexity += get_complexity_number(&clause.body);
+                }
+            }
+            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
-                complexity += 1;
-                complexity += get_complexity_number(body);
-                complexity += get_complexity_number(orelse);
-            }
-            Stmt::With(ast::StmtWith { body, .. })
-            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            Stmt::With(ast::StmtWith { body, .. }) => {
                 complexity += get_complexity_number(body);
             }
             Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
@@ -99,14 +106,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 complexity += get_complexity_number(body);
                 if !orelse.is_empty() {
@@ -122,8 +122,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += get_complexity_number(body);
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
             }
@@ -160,8 +159,8 @@ pub(crate) fn function_is_too_complex(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::ast::Suite;
-    use rustpython_parser::Parse;
+
+    use ruff_python_parser::parse_suite;
 
     use super::get_complexity_number;
 
@@ -171,7 +170,7 @@ mod tests {
 def trivial():
     pass
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -182,7 +181,7 @@ def trivial():
 def expr_as_statement():
     0xF00D
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -195,7 +194,7 @@ def sequential(n):
     s = k + n
     return s
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -211,7 +210,7 @@ def if_elif_else_dead_path(n):
     else:
         return "smaller than or equal to three"
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
@@ -228,7 +227,7 @@ def nested_ifs():
     else:
         return "smaller than or equal to three"
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
@@ -240,7 +239,7 @@ def for_loop():
     for i in range(10):
         print(i)
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -254,7 +253,7 @@ def for_else(mylist):
     else:
         print(None)
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -268,7 +267,7 @@ def recursive(n):
     else:
         return n
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -285,7 +284,7 @@ def nested_functions():
 
     a()
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
@@ -303,7 +302,7 @@ def try_else():
     else:
         print(4)
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 4);
         Ok(())
     }
@@ -320,7 +319,7 @@ def nested_try_finally():
     finally:
         print(3)
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -337,7 +336,7 @@ async def foobar(a, b, c):
     async for x in a:
         pass
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
@@ -348,7 +347,7 @@ async def foobar(a, b, c):
 def annotated_assign():
     x: Any = None
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -384,7 +383,7 @@ class Class:
 
         return ServiceProvider(Logger())
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 9);
         Ok(())
     }
@@ -398,7 +397,7 @@ def process_detect_lines():
     finally:
         pass
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -413,7 +412,7 @@ def process_detect_lines():
         if res:
             errors.append(f"Non-zero exit code {res}")
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -426,7 +425,7 @@ def with_lock():
         if foo:
             print('bar')
 "#;
-        let stmts = Suite::parse(source, "<filename>")?;
+        let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }

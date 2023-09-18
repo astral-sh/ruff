@@ -1,7 +1,8 @@
-use ruff_text_size::TextRange;
+use ruff_python_ast::Identifier;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 
@@ -35,14 +36,11 @@ impl Violation for AmbiguousFunctionName {
 }
 
 /// E743
-pub(crate) fn ambiguous_function_name<F>(name: &str, locate: F) -> Option<Diagnostic>
-where
-    F: FnOnce() -> TextRange,
-{
+pub(crate) fn ambiguous_function_name(name: &Identifier) -> Option<Diagnostic> {
     if is_ambiguous_name(name) {
         Some(Diagnostic::new(
             AmbiguousFunctionName(name.to_string()),
-            locate(),
+            name.range(),
         ))
     } else {
         None

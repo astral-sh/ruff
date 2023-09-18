@@ -1,4 +1,4 @@
-from os import chmod as xchmod, mkdir as xmkdir
+from os import chmod as xchmod, mkdir as xmkdir, sep as s
 from os import makedirs as xmakedirs, rename as xrename, replace as xreplace
 from os import rmdir as xrmdir, remove as xremove, unlink as xunlink
 from os import getcwd as xgetcwd, readlink as xreadlink, stat as xstat
@@ -9,6 +9,7 @@ from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 from os.path import samefile as xsamefile, splitext as xsplitext
 
 p = "/foo"
+q = "bar"
 
 a = xabspath(p)
 aa = xchmod(p)
@@ -28,7 +29,9 @@ bbbbb = xislink(p)
 xreadlink(p)
 xstat(p)
 xisabs(p)
-xjoin(p)
+xjoin(p, q)
+s.join((p, q))
+s.join([p, q])
 xbasename(p)
 xdirname(p)
 xsamefile(p)

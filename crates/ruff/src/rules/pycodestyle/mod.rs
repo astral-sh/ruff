@@ -6,9 +6,11 @@ pub(crate) mod helpers;
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU8;
     use std::path::Path;
 
     use anyhow::Result;
+
     use test_case::test_case;
 
     use crate::line_width::LineLength;
@@ -70,6 +72,7 @@ mod tests {
     #[test_case(Rule::IndentationWithInvalidMultiple, Path::new("E11.py"))]
     #[test_case(Rule::IndentationWithInvalidMultipleComment, Path::new("E11.py"))]
     #[test_case(Rule::MultipleLeadingHashesForBlockComment, Path::new("E26.py"))]
+    #[test_case(Rule::MultipleSpacesAfterComma, Path::new("E24.py"))]
     #[test_case(Rule::MultipleSpacesAfterKeyword, Path::new("E27.py"))]
     #[test_case(Rule::MultipleSpacesAfterOperator, Path::new("E22.py"))]
     #[test_case(Rule::MultipleSpacesBeforeKeyword, Path::new("E27.py"))]
@@ -80,6 +83,7 @@ mod tests {
     #[test_case(Rule::NoSpaceAfterBlockComment, Path::new("E26.py"))]
     #[test_case(Rule::NoSpaceAfterInlineComment, Path::new("E26.py"))]
     #[test_case(Rule::OverIndented, Path::new("E11.py"))]
+    #[test_case(Rule::TabAfterComma, Path::new("E24.py"))]
     #[test_case(Rule::TabAfterKeyword, Path::new("E27.py"))]
     #[test_case(Rule::TabAfterOperator, Path::new("E22.py"))]
     #[test_case(Rule::TabBeforeKeyword, Path::new("E27.py"))]
@@ -167,7 +171,7 @@ mod tests {
             Path::new("pycodestyle/W505.py"),
             &settings::Settings {
                 pycodestyle: Settings {
-                    max_doc_length: Some(LineLength::from(50)),
+                    max_doc_length: Some(LineLength::try_from(50).unwrap()),
                     ..Settings::default()
                 },
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)
@@ -183,7 +187,7 @@ mod tests {
             Path::new("pycodestyle/W505_utf_8.py"),
             &settings::Settings {
                 pycodestyle: Settings {
-                    max_doc_length: Some(LineLength::from(50)),
+                    max_doc_length: Some(LineLength::try_from(50).unwrap()),
                     ..Settings::default()
                 },
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)
@@ -202,7 +206,8 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pycodestyle/E501_2.py"),
             &settings::Settings {
-                tab_size: tab_size.into(),
+                tab_size: NonZeroU8::new(tab_size).unwrap().into(),
+                line_length: LineLength::try_from(6).unwrap(),
                 ..settings::Settings::for_rule(Rule::LineTooLong)
             },
         )?;

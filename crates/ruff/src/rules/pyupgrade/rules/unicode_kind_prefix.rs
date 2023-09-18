@@ -1,8 +1,7 @@
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Expr, Ranged};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Expr;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -41,8 +40,8 @@ impl AlwaysAutofixableViolation for UnicodeKindPrefix {
 }
 
 /// UP025
-pub(crate) fn unicode_kind_prefix(checker: &mut Checker, expr: &Expr, kind: Option<&str>) {
-    if matches!(kind, Some("u" | "U")) {
+pub(crate) fn unicode_kind_prefix(checker: &mut Checker, expr: &Expr, is_unicode: bool) {
+    if is_unicode {
         let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Fix::automatic(Edit::range_deletion(TextRange::at(

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Decorator, Stmt};
+use ruff_python_ast::{Decorator, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -70,9 +70,12 @@ pub(crate) fn invalid_function_name(
         return None;
     }
 
-    // Ignore any functions that are explicitly `@override`. These are defined elsewhere,
-    // so if they're first-party, we'll flag them at the definition site.
-    if visibility::is_override(decorator_list, semantic) {
+    // Ignore any functions that are explicitly `@override` or `@overload`.
+    // These are defined elsewhere, so if they're first-party,
+    // we'll flag them at the definition site.
+    if visibility::is_override(decorator_list, semantic)
+        || visibility::is_overload(decorator_list, semantic)
+    {
         return None;
     }
 

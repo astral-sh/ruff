@@ -1,0 +1,23 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..12,
+            value: Constant(
+                ExprConstant {
+                    range: 0..12,
+                    value: Str(
+                        StringConstant {
+                            value: "\u{7f}",
+                            unicode: false,
+                            implicit_concatenated: false,
+                        },
+                    ),
+                },
+            ),
+        },
+    ),
+]

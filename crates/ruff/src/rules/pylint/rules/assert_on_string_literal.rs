@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -71,12 +72,12 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
             }
             _ => {}
         },
-        Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, .. }) => {
             checker.diagnostics.push(Diagnostic::new(
                 AssertOnStringLiteral {
                     kind: if values.iter().all(|value| match value {
                         Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                            Constant::Str(value, ..) => value.is_empty(),
+                            Constant::Str(value) => value.is_empty(),
                             Constant::Bytes(value) => value.is_empty(),
                             _ => false,
                         },
@@ -85,7 +86,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                         Kind::Empty
                     } else if values.iter().any(|value| match value {
                         Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                            Constant::Str(value, ..) => !value.is_empty(),
+                            Constant::Str(value) => !value.is_empty(),
                             Constant::Bytes(value) => !value.is_empty(),
                             _ => false,
                         },

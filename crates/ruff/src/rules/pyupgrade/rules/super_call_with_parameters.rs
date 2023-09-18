@@ -1,11 +1,10 @@
-use rustpython_parser::ast::{self, Arg, ArgWithDefault, Expr, Ranged, Stmt};
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::pyupgrade::fixes;
 
 /// ## What it does
 /// Checks for `super` calls that pass redundant arguments.
@@ -59,58 +58,45 @@ impl AlwaysAutofixableViolation for SuperCallWithParameters {
     }
 }
 
-/// Returns `true` if a call is an argumented `super` invocation.
-fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
-    if let Expr::Name(ast::ExprName { id, .. }) = func {
-        id == "super" && !args.is_empty()
-    } else {
-        false
-    }
-}
-
 /// UP008
-pub(crate) fn super_call_with_parameters(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
+pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::ExprCall) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
-    if !is_super_call_with_arguments(func, args) {
+    if !is_super_call_with_arguments(call) {
         return;
     }
-    let scope = checker.semantic().scope();
+    let scope = checker.semantic().current_scope();
 
     // Check: are we in a Function scope?
-    if !scope.kind.is_any_function() {
+    if !scope.kind.is_function() {
         return;
     }
 
-    let mut parents = checker.semantic().parents();
+    let mut parents = checker.semantic().current_statements();
 
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
-    let [first_arg, second_arg] = args else {
+    let [first_arg, second_arg] = call.arguments.args.as_slice() else {
         return;
     };
 
     // Find the enclosing function definition (if any).
     let Some(Stmt::FunctionDef(ast::StmtFunctionDef {
-        args: parent_args, ..
+        parameters: parent_parameters,
+        ..
     })) = parents.find(|stmt| stmt.is_function_def_stmt())
     else {
         return;
     };
 
     // Extract the name of the first argument to the enclosing function.
-    let Some(ArgWithDefault {
-        def: Arg {
-            arg: parent_arg, ..
+    let Some(ParameterWithDefault {
+        parameter: Parameter {
+            name: parent_arg, ..
         },
         ..
-    }) = parent_args.args.first()
+    }) = parent_parameters.args.first()
     else {
         return;
     };
@@ -141,11 +127,21 @@ pub(crate) fn super_call_with_parameters(
 
     drop(parents);
 
-    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, expr.range());
+    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
     if checker.patch(diagnostic.kind.rule()) {
-        if let Some(edit) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
-            diagnostic.set_fix(Fix::suggested(edit));
-        }
+        diagnostic.set_fix(Fix::suggested(Edit::deletion(
+            call.arguments.start() + TextSize::new(1),
+            call.arguments.end() - TextSize::new(1),
+        )));
     }
     checker.diagnostics.push(diagnostic);
+}
+
+/// Returns `true` if a call is an argumented `super` invocation.
+fn is_super_call_with_arguments(call: &ast::ExprCall) -> bool {
+    if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
+        id == "super" && !call.arguments.is_empty()
+    } else {
+        false
+    }
 }

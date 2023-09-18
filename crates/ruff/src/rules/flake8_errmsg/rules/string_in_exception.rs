@@ -1,10 +1,10 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Generator, Stylist};
 use ruff_python_ast::whitespace;
+use ruff_python_codegen::{Generator, Stylist};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -174,7 +174,11 @@ impl Violation for DotFormatInException {
 
 /// EM101, EM102, EM103
 pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
-    if let Expr::Call(ast::ExprCall { args, .. }) = exc {
+    if let Expr::Call(ast::ExprCall {
+        arguments: Arguments { args, .. },
+        ..
+    }) = exc
+    {
         if let Some(first) = args.first() {
             match first {
                 // Check for string literals.
@@ -188,14 +192,14 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                 Diagnostic::new(RawStringInException, first.range());
                             if checker.patch(diagnostic.kind.rule()) {
                                 if let Some(indentation) =
-                                    whitespace::indentation(checker.locator, stmt)
+                                    whitespace::indentation(checker.locator(), stmt)
                                 {
                                     if checker.semantic().is_available("msg") {
                                         diagnostic.set_fix(generate_fix(
                                             stmt,
                                             first,
                                             indentation,
-                                            checker.stylist,
+                                            checker.stylist(),
                                             checker.generator(),
                                         ));
                                     }
@@ -206,19 +210,19 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                     }
                 }
                 // Check for f-strings.
-                Expr::JoinedStr(_) => {
+                Expr::FString(_) => {
                     if checker.enabled(Rule::FStringInException) {
                         let mut diagnostic = Diagnostic::new(FStringInException, first.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(indentation) =
-                                whitespace::indentation(checker.locator, stmt)
+                                whitespace::indentation(checker.locator(), stmt)
                             {
                                 if checker.semantic().is_available("msg") {
                                     diagnostic.set_fix(generate_fix(
                                         stmt,
                                         first,
                                         indentation,
-                                        checker.stylist,
+                                        checker.stylist(),
                                         checker.generator(),
                                     ));
                                 }
@@ -238,14 +242,14 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                     Diagnostic::new(DotFormatInException, first.range());
                                 if checker.patch(diagnostic.kind.rule()) {
                                     if let Some(indentation) =
-                                        whitespace::indentation(checker.locator, stmt)
+                                        whitespace::indentation(checker.locator(), stmt)
                                     {
                                         if checker.semantic().is_available("msg") {
                                             diagnostic.set_fix(generate_fix(
                                                 stmt,
                                                 first,
                                                 indentation,
-                                                checker.stylist,
+                                                checker.stylist(),
                                                 checker.generator(),
                                             ));
                                         }
@@ -286,7 +290,6 @@ fn generate_fix(
             range: TextRange::default(),
         })],
         value: Box::new(exc_arg.clone()),
-        type_comment: None,
         range: TextRange::default(),
     });
 

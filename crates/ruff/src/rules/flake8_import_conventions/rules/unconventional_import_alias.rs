@@ -2,7 +2,8 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::Scope;
+use ruff_python_semantic::{Binding, Imported};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -53,42 +54,42 @@ impl Violation for UnconventionalImportAlias {
 /// ICN001
 pub(crate) fn unconventional_import_alias(
     checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
+    binding: &Binding,
     conventions: &FxHashMap<String, String>,
 ) -> Option<Diagnostic> {
-    for (name, binding_id) in scope.all_bindings() {
-        let binding = checker.semantic().binding(binding_id);
+    let Some(import) = binding.as_any_import() else {
+        return None;
+    };
 
-        let Some(qualified_name) = binding.qualified_name() else {
-            continue;
-        };
+    let qualified_name = import.qualified_name();
 
-        let Some(expected_alias) = conventions.get(qualified_name) else {
-            continue;
-        };
+    let Some(expected_alias) = conventions.get(qualified_name.as_str()) else {
+        return None;
+    };
 
-        if binding.is_alias() && name == expected_alias {
-            continue;
-        }
+    let name = binding.name(checker.locator());
+    if binding.is_alias() && name == expected_alias {
+        return None;
+    }
 
-        let mut diagnostic = Diagnostic::new(
-            UnconventionalImportAlias {
-                name: qualified_name.to_string(),
-                asname: expected_alias.to_string(),
-            },
-            binding.range,
-        );
-        if checker.patch(diagnostic.kind.rule()) {
+    let mut diagnostic = Diagnostic::new(
+        UnconventionalImportAlias {
+            name: qualified_name,
+            asname: expected_alias.to_string(),
+        },
+        binding.range(),
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        if !import.is_submodule_import() {
             if checker.semantic().is_available(expected_alias) {
                 diagnostic.try_set_fix(|| {
+                    let scope = &checker.semantic().scopes[binding.scope];
                     let (edit, rest) =
                         Renamer::rename(name, expected_alias, scope, checker.semantic())?;
                     Ok(Fix::suggested_edits(edit, rest))
                 });
             }
         }
-        diagnostics.push(diagnostic);
     }
-    None
+    Some(diagnostic)
 }

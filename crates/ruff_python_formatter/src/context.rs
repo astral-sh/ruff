@@ -1,8 +1,9 @@
 use crate::comments::Comments;
 use crate::PyFormatOptions;
-use ruff_formatter::{FormatContext, GroupId, SourceCode};
-use ruff_python_ast::source_code::Locator;
+use ruff_formatter::{Buffer, FormatContext, GroupId, SourceCode};
+use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
 pub struct PyFormatContext<'a> {
@@ -83,4 +84,72 @@ pub(crate) enum NodeLevel {
 
     /// Formatting nodes that are enclosed by a parenthesized (any `[]`, `{}` or `()`) expression.
     ParenthesizedExpression,
+}
+
+impl NodeLevel {
+    /// Returns `true` if the expression is in a parenthesized context.
+    pub(crate) const fn is_parenthesized(self) -> bool {
+        matches!(
+            self,
+            NodeLevel::Expression(Some(_)) | NodeLevel::ParenthesizedExpression
+        )
+    }
+}
+
+/// Change the [`NodeLevel`] of the formatter for the lifetime of this struct
+pub(crate) struct WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    buffer: &'buf mut B,
+    saved_level: NodeLevel,
+}
+
+impl<'ast, 'buf, B> WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    pub(crate) fn new(level: NodeLevel, buffer: &'buf mut B) -> Self {
+        let context = buffer.state_mut().context_mut();
+        let saved_level = context.node_level();
+
+        context.set_node_level(level);
+
+        Self {
+            buffer,
+            saved_level,
+        }
+    }
+}
+
+impl<'ast, 'buf, B> Deref for WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    type Target = B;
+
+    fn deref(&self) -> &Self::Target {
+        self.buffer
+    }
+}
+
+impl<'ast, 'buf, B> DerefMut for WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.buffer
+    }
+}
+
+impl<'ast, B> Drop for WithNodeLevel<'ast, '_, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    fn drop(&mut self) {
+        self.buffer
+            .state_mut()
+            .context_mut()
+            .set_node_level(self.saved_level);
+    }
 }

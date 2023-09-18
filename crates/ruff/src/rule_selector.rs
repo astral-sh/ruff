@@ -9,12 +9,14 @@ use crate::codes::RuleCodePrefix;
 use crate::codes::RuleIter;
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
+use crate::settings::types::PreviewMode;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
-    /// Select all stable rules.
+    /// Select all rules (includes rules in preview if enabled)
     All,
-    /// Select all nursery rules.
+    /// Legacy category to select all rules in the "nursery" which predated preview mode
+    #[deprecated(note = "The nursery was replaced with 'preview mode' which has no selector")]
     Nursery,
     /// Legacy category to select both the `mccabe` and `flake8-comprehensions` linters
     /// via a single selector.
@@ -26,6 +28,11 @@ pub enum RuleSelector {
     Linter(Linter),
     /// Select all rules for a given linter with a given prefix.
     Prefix {
+        prefix: RuleCodePrefix,
+        redirected_from: Option<&'static str>,
+    },
+    /// Select an individual rule with a given prefix.
+    Rule {
         prefix: RuleCodePrefix,
         redirected_from: Option<&'static str>,
     },
@@ -43,6 +50,7 @@ impl FromStr for RuleSelector {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "ALL" => Ok(Self::All),
+            #[allow(deprecated)]
             "NURSERY" => Ok(Self::Nursery),
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
@@ -59,14 +67,41 @@ impl FromStr for RuleSelector {
                     return Ok(Self::Linter(linter));
                 }
 
-                Ok(Self::Prefix {
-                    prefix: RuleCodePrefix::parse(&linter, code)
-                        .map_err(|_| ParseError::Unknown(s.to_string()))?,
-                    redirected_from,
-                })
+                // Does the selector select a single rule?
+                let prefix = RuleCodePrefix::parse(&linter, code)
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?;
+
+                if is_single_rule_selector(&prefix) {
+                    Ok(Self::Rule {
+                        prefix,
+                        redirected_from,
+                    })
+                } else {
+                    Ok(Self::Prefix {
+                        prefix,
+                        redirected_from,
+                    })
+                }
             }
         }
     }
+}
+
+/// Returns `true` if the [`RuleCodePrefix`] matches a single rule exactly
+/// (e.g., `E225`, as opposed to `E2`).
+pub(crate) fn is_single_rule_selector(prefix: &RuleCodePrefix) -> bool {
+    let mut rules = prefix.rules();
+
+    // The selector must match a single rule.
+    let Some(rule) = rules.next() else {
+        return false;
+    };
+    if rules.next().is_some() {
+        return false;
+    }
+
+    // The rule must match the selector exactly.
+    rule.noqa_code().suffix() == prefix.short_code()
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -81,10 +116,11 @@ impl RuleSelector {
     pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
             RuleSelector::All => ("", "ALL"),
+            #[allow(deprecated)]
             RuleSelector::Nursery => ("", "NURSERY"),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
-            RuleSelector::Prefix { prefix, .. } => {
+            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
@@ -135,24 +171,13 @@ impl Visitor<'_> for SelectorVisitor {
     }
 }
 
-impl From<RuleCodePrefix> for RuleSelector {
-    fn from(prefix: RuleCodePrefix) -> Self {
-        Self::Prefix {
-            prefix,
-            redirected_from: None,
-        }
-    }
-}
-
-impl IntoIterator for &RuleSelector {
-    type IntoIter = RuleSelectorIter;
-    type Item = Rule;
-
-    fn into_iter(self) -> Self::IntoIter {
+impl RuleSelector {
+    /// Return all matching rules, regardless of whether they're in preview.
+    pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
         match self {
-            RuleSelector::All => {
-                RuleSelectorIter::All(Rule::iter().filter(|rule| !rule.is_nursery()))
-            }
+            RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
+
+            #[allow(deprecated)]
             RuleSelector::Nursery => {
                 RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_nursery))
             }
@@ -167,13 +192,28 @@ impl IntoIterator for &RuleSelector {
                     .chain(Linter::Flake8Print.rules()),
             ),
             RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
-            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.clone().rules()),
+            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
+                RuleSelectorIter::Vec(prefix.clone().rules())
+            }
         }
+    }
+
+    /// Returns rules matching the selector, taking into account whether preview mode is enabled.
+    pub fn rules(&self, preview: PreviewMode) -> impl Iterator<Item = Rule> + '_ {
+        #[allow(deprecated)]
+        self.all_rules().filter(move |rule| {
+            // Always include rules that are not in preview or the nursery
+            !(rule.is_preview() || rule.is_nursery())
+            // Backwards compatibility allows selection of nursery rules by exact code or dedicated group
+            || ((matches!(self, RuleSelector::Rule { .. }) || matches!(self, RuleSelector::Nursery { .. })) && rule.is_nursery())
+            // Enabling preview includes all preview or nursery rules
+            || preview.is_enabled()
+        })
     }
 }
 
 pub enum RuleSelectorIter {
-    All(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
+    All(RuleIter),
     Nursery(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
     Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),
@@ -189,18 +229,6 @@ impl Iterator for RuleSelectorIter {
             RuleSelectorIter::Chain(iter) => iter.next(),
             RuleSelectorIter::Vec(iter) => iter.next(),
         }
-    }
-}
-
-/// A const alternative to the `impl From<RuleCodePrefix> for RuleSelector`
-/// to let us keep the fields of [`RuleSelector`] private.
-// Note that Rust doesn't yet support `impl const From<RuleCodePrefix> for
-// RuleSelector` (see https://github.com/rust-lang/rust/issues/67792).
-// TODO(martin): Remove once RuleSelector is an enum with Linter & Rule variants
-pub(crate) const fn prefix_to_selector(prefix: RuleCodePrefix) -> RuleSelector {
-    RuleSelector::Prefix {
-        prefix,
-        redirected_from: None,
     }
 }
 
@@ -226,8 +254,9 @@ mod schema {
                 instance_type: Some(InstanceType::String.into()),
                 enum_values: Some(
                     [
-                        // Include the non-standard "ALL" selector.
+                        // Include the non-standard "ALL" and "NURSERY" selectors.
                         "ALL".to_string(),
+                        "NURSERY".to_string(),
                         // Include the legacy "C" and "T" selectors.
                         "C".to_string(),
                         "T".to_string(),
@@ -249,6 +278,9 @@ mod schema {
                                 (!prefix.is_empty()).then(|| prefix.to_string())
                             })),
                     )
+                    // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
+                    // off-by-default
+                    .filter(|prefix| prefix != "RUF014")
                     .sorted()
                     .map(Value::String)
                     .collect(),
@@ -260,21 +292,22 @@ mod schema {
 }
 
 impl RuleSelector {
-    pub(crate) fn specificity(&self) -> Specificity {
+    pub fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
+            #[allow(deprecated)]
             RuleSelector::Nursery => Specificity::All,
             RuleSelector::T => Specificity::LinterGroup,
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
+            RuleSelector::Rule { .. } => Specificity::Rule,
             RuleSelector::Prefix { prefix, .. } => {
                 let prefix: &'static str = prefix.short_code();
                 match prefix.len() {
-                    1 => Specificity::Code1Char,
-                    2 => Specificity::Code2Chars,
-                    3 => Specificity::Code3Chars,
-                    4 => Specificity::Code4Chars,
-                    5 => Specificity::Code5Chars,
+                    1 => Specificity::Prefix1Char,
+                    2 => Specificity::Prefix2Chars,
+                    3 => Specificity::Prefix3Chars,
+                    4 => Specificity::Prefix4Chars,
                     _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
                 }
             }
@@ -282,26 +315,35 @@ impl RuleSelector {
     }
 }
 
-#[derive(EnumIter, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
-pub(crate) enum Specificity {
+#[derive(EnumIter, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
+pub enum Specificity {
+    /// The specificity when selecting all rules (e.g., `--select ALL`).
     All,
+    /// The specificity when selecting a legacy linter group (e.g., `--select C` or `--select T`).
     LinterGroup,
+    /// The specificity when selecting a linter (e.g., `--select PLE` or `--select UP`).
     Linter,
-    Code1Char,
-    Code2Chars,
-    Code3Chars,
-    Code4Chars,
-    Code5Chars,
+    /// The specificity when selecting via a rule prefix with a one-character code (e.g., `--select PLE1`).
+    Prefix1Char,
+    /// The specificity when selecting via a rule prefix with a two-character code (e.g., `--select PLE12`).
+    Prefix2Chars,
+    /// The specificity when selecting via a rule prefix with a three-character code (e.g., `--select PLE123`).
+    Prefix3Chars,
+    /// The specificity when selecting via a rule prefix with a four-character code (e.g., `--select PLE1234`).
+    Prefix4Chars,
+    /// The specificity when selecting an individual rule (e.g., `--select PLE1205`).
+    Rule,
 }
 
 #[cfg(feature = "clap")]
-mod clap_completion {
+pub mod clap_completion {
     use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
     use strum::IntoEnumIterator;
 
     use crate::{
         codes::RuleCodePrefix,
         registry::{Linter, RuleNamespace},
+        rule_selector::is_single_rule_selector,
         RuleSelector,
     };
 
@@ -321,17 +363,29 @@ mod clap_completion {
 
         fn parse_ref(
             &self,
-            _cmd: &clap::Command,
-            _arg: Option<&clap::Arg>,
+            cmd: &clap::Command,
+            arg: Option<&clap::Arg>,
             value: &std::ffi::OsStr,
         ) -> Result<Self::Value, clap::Error> {
             let value = value
                 .to_str()
                 .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-            value
-                .parse()
-                .map_err(|e| clap::Error::raw(clap::error::ErrorKind::InvalidValue, e))
+            value.parse().map_err(|_| {
+                let mut error =
+                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                if let Some(arg) = arg {
+                    error.insert(
+                        clap::error::ContextKind::InvalidArg,
+                        clap::error::ContextValue::String(arg.to_string()),
+                    );
+                }
+                error.insert(
+                    clap::error::ContextKind::InvalidValue,
+                    clap::error::ContextValue::String(value.to_string()),
+                );
+                error
+            })
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
@@ -342,24 +396,40 @@ mod clap_completion {
                             let prefix = l.common_prefix();
                             (!prefix.is_empty()).then(|| PossibleValue::new(prefix).help(l.name()))
                         })
-                        .chain(RuleCodePrefix::iter().map(|p| {
-                            let prefix = p.linter().common_prefix();
-                            let code = p.short_code();
+                        .chain(
+                            RuleCodePrefix::iter()
+                                // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
+                                // off-by-default
+                                .filter(|prefix| {
+                                    format!(
+                                        "{}{}",
+                                        prefix.linter().common_prefix(),
+                                        prefix.short_code()
+                                    ) != "RUF014"
+                                })
+                                .filter_map(|prefix| {
+                                    // Ex) `UP`
+                                    if prefix.short_code().is_empty() {
+                                        let code = prefix.linter().common_prefix();
+                                        let name = prefix.linter().name();
+                                        return Some(PossibleValue::new(code).help(name));
+                                    }
 
-                            let mut rules_iter = p.rules();
-                            let rule1 = rules_iter.next();
-                            let rule2 = rules_iter.next();
+                                    // Ex) `UP004`
+                                    if is_single_rule_selector(&prefix) {
+                                        let rule = prefix.rules().next()?;
+                                        let code = format!(
+                                            "{}{}",
+                                            prefix.linter().common_prefix(),
+                                            prefix.short_code()
+                                        );
+                                        let name: &'static str = rule.into();
+                                        return Some(PossibleValue::new(code).help(name));
+                                    }
 
-                            let value = PossibleValue::new(format!("{prefix}{code}"));
-
-                            if rule2.is_none() {
-                                let rule1 = rule1.unwrap();
-                                let name: &'static str = rule1.into();
-                                value.help(name)
-                            } else {
-                                value
-                            }
-                        })),
+                                    None
+                                }),
+                        ),
                 ),
             ))
         }

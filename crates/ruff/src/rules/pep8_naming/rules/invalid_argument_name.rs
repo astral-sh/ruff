@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{Arg, Ranged};
+use ruff_python_ast::Parameter;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::str;
+use ruff_text_size::Ranged;
 
 use crate::settings::types::IdentifierPattern;
 
@@ -50,7 +51,7 @@ impl Violation for InvalidArgumentName {
 /// N803
 pub(crate) fn invalid_argument_name(
     name: &str,
-    arg: &Arg,
+    parameter: &Parameter,
     ignore_names: &[IdentifierPattern],
 ) -> Option<Diagnostic> {
     if ignore_names
@@ -64,7 +65,7 @@ pub(crate) fn invalid_argument_name(
             InvalidArgumentName {
                 name: name.to_string(),
             },
-            arg.range(),
+            parameter.range(),
         ));
     }
     None

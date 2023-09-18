@@ -102,4 +102,20 @@ E713.py:14:9: E713 [*] Test for membership should be `not in`
 16 16 | 
 17 17 | #: Okay
 
+E713.py:40:12: E713 [*] Test for membership should be `not in`
+   |
+38 | assert [42, not foo] in bar
+39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
+40 | assert not('name' in request)or not request['name']
+   |            ^^^^^^^^^^^^^^^^^ E713
+   |
+   = help: Convert to `not in`
+
+ℹ Fix
+37 37 | assert {"x": not foo} in bar
+38 38 | assert [42, not foo] in bar
+39 39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
+40    |-assert not('name' in request)or not request['name']
+   40 |+assert 'name' not in request or not request['name']
+
 

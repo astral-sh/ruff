@@ -4,7 +4,7 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: Arguments,
+        kind: Parameters,
         range: 9..166,
         source: `(⏎`,
     }: {
@@ -24,7 +24,7 @@ expression: comments.debug(test_case.source_code)
         "trailing": [],
     },
     Node {
-        kind: ArgWithDefault,
+        kind: ParameterWithDefault,
         range: 15..16,
         source: `a`,
     }: {

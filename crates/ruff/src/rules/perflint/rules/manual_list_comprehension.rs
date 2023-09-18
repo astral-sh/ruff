@@ -1,8 +1,11 @@
-use rustpython_parser::ast::{self, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_semantic::analyze::typing::is_list;
+use ruff_python_semantic::Binding;
 
 use crate::checkers::ast::Checker;
 
@@ -64,9 +67,12 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         //         filtered.append(x)
         // ```
         [Stmt::If(ast::StmtIf {
-            body, orelse, test, ..
+            body,
+            elif_else_clauses,
+            test,
+            ..
         })] => {
-            if !orelse.is_empty() {
+            if !elif_else_clauses.is_empty() {
                 return;
             }
             let [stmt] = body.as_slice() else {
@@ -88,9 +94,13 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
 
     let Expr::Call(ast::ExprCall {
         func,
+        arguments:
+            Arguments {
+                args,
+                keywords,
+                range: _,
+            },
         range,
-        args,
-        keywords,
     }) = value.as_ref()
     else {
         return;
@@ -104,13 +114,6 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     };
 
-    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if if_test.is_none() {
-        if arg.as_name_expr().map_or(false, |arg| arg.id == *id) {
-            return;
-        }
-    }
-
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
@@ -119,10 +122,43 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     }
 
+    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`).
+    if if_test.is_none() {
+        if arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
+            return;
+        }
+    }
+
     // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
     if any_over_expr(value, &|expr| {
-        expr.as_name_expr().map_or(false, |expr| expr.id == *id)
+        expr.as_name_expr().is_some_and(|expr| expr.id == *id)
     }) {
+        return;
+    }
+
+    // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
+    if any_over_expr(arg, &|expr| {
+        ComparableExpr::from(expr) == ComparableExpr::from(value)
+    }) {
+        return;
+    }
+
+    // Avoid non-list values.
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+        return;
+    };
+    let bindings: Vec<&Binding> = checker
+        .semantic()
+        .current_scope()
+        .get_all(id)
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .collect();
+
+    let [binding] = bindings.as_slice() else {
+        return;
+    };
+
+    if !is_list(binding, checker.semantic()) {
         return;
     }
 
@@ -141,10 +177,10 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     // filtered = [x for x in y if x in filtered]
     // ```
     if let Some(value_name) = value.as_name_expr() {
-        if if_test.map_or(false, |test| {
+        if if_test.is_some_and(|test| {
             any_over_expr(test, &|expr| {
                 expr.as_name_expr()
-                    .map_or(false, |expr| expr.id == value_name.id)
+                    .is_some_and(|expr| expr.id == value_name.id)
             })
         }) {
             return;

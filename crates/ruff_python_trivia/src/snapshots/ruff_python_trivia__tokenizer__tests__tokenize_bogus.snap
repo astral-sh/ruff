@@ -1,0 +1,126 @@
+---
+source: crates/ruff_python_trivia/src/tokenizer.rs
+expression: test_case.tokens()
+---
+[
+    SimpleToken {
+        kind: Comment,
+        range: 0..17,
+    },
+    SimpleToken {
+        kind: Newline,
+        range: 17..18,
+    },
+    SimpleToken {
+        kind: Whitespace,
+        range: 18..26,
+    },
+    SimpleToken {
+        kind: Other,
+        range: 26..27,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 27..28,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 28..29,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 29..30,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 30..31,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 31..32,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 32..33,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 33..34,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 34..35,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 35..36,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 36..37,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 37..38,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 38..39,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 39..40,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 40..41,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 41..42,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 42..43,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 43..44,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 44..45,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 45..46,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 46..47,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 47..48,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 48..49,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 49..50,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 50..51,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 51..52,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 52..53,
+    },
+]

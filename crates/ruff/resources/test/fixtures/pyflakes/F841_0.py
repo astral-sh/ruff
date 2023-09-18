@@ -145,3 +145,9 @@ def f() -> None:
     obj = Foo()
     obj.do_thing()
 
+
+def f():
+    try:
+        pass
+    except Exception as _:
+        pass

@@ -1,14 +1,28 @@
-use ruff_text_size::TextSize;
-
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::token_kind::TokenKind;
+use ruff_python_parser::TokenKind;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 
 use super::LogicalLine;
 
+/// ## What it does
+/// Checks for missing whitespace after `,`, `;`, and `:`.
+///
+/// ## Why is this bad?
+/// Missing whitespace after `,`, `;`, and `:` makes the code harder to read.
+///
+/// ## Example
+/// ```python
+/// a = (1,2)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = (1, 2)
+/// ```
 #[violation]
 pub struct MissingWhitespace {
     token: TokenKind,
@@ -66,10 +80,10 @@ pub(crate) fn missing_whitespace(
             TokenKind::Comma | TokenKind::Semi | TokenKind::Colon => {
                 let after = line.text_after(token);
 
-                if !after
+                if after
                     .chars()
                     .next()
-                    .map_or(false, |c| char::is_whitespace(c) || c == '\\')
+                    .is_some_and(|c| !(char::is_whitespace(c) || c == '\\'))
                 {
                     if let Some(next_token) = iter.peek() {
                         match (kind, next_token.kind()) {

@@ -1,6 +1,7 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, ExceptHandler, Expr, ExprContext, Ranged};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
+use ruff_text_size::{Ranged, TextRange};
 
+use crate::autofix::edits::pad;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
@@ -36,7 +37,7 @@ use crate::registry::AsRule;
 /// - [Python documentation: `OSError`](https://docs.python.org/3/library/exceptions.html#OSError)
 #[violation]
 pub struct OSErrorAlias {
-    pub name: Option<String>,
+    name: Option<String>,
 }
 
 impl AlwaysAutofixableViolation for OSErrorAlias {
@@ -56,7 +57,7 @@ impl AlwaysAutofixableViolation for OSErrorAlias {
 
 /// Return `true` if an [`Expr`] is an alias of `OSError`.
 fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).map_or(false, |call_path| {
+    semantic.resolve_call_path(expr).is_some_and(|call_path| {
         matches!(
             call_path.as_slice(),
             ["", "EnvironmentError" | "IOError" | "WindowsError"]
@@ -67,9 +68,9 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if an [`Expr`] is `OSError`.
 fn is_os_error(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["", "OSError"])
-    })
+    semantic
+        .resolve_call_path(expr)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "OSError"]))
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
@@ -122,22 +123,21 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
                 remaining.insert(0, node.into());
             }
 
-            if remaining.len() == 1 {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    "OSError".to_string(),
-                    target.range(),
-                )));
+            let content = if remaining.len() == 1 {
+                "OSError".to_string()
             } else {
                 let node = ast::ExprTuple {
                     elts: remaining,
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    format!("({})", checker.generator().expr(&node.into())),
-                    target.range(),
-                )));
-            }
+                format!("({})", checker.generator().expr(&node.into()))
+            };
+
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                pad(content, target.range(), checker.locator()),
+                target.range(),
+            )));
         }
     }
     checker.diagnostics.push(diagnostic);

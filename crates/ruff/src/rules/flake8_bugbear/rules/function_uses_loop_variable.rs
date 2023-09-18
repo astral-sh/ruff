@@ -1,11 +1,10 @@
-use rustpython_parser::ast::{self, Comprehension, Expr, ExprContext, Ranged, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::includes_arg_name;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprContext, Stmt};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -86,8 +85,9 @@ struct SuspiciousVariablesVisitor<'a> {
 impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { args, body, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { args, body, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                parameters, body, ..
+            }) => {
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);
@@ -99,7 +99,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                             return false;
                         }
 
-                        if includes_arg_name(&loaded.id, args) {
+                        if parameters.includes(&loaded.id) {
                             return false;
                         }
 
@@ -126,8 +126,12 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
         match expr {
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments:
+                    Arguments {
+                        args,
+                        keywords,
+                        range: _,
+                    },
                 range: _,
             }) => {
                 match func.as_ref() {
@@ -157,7 +161,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 }
 
                 for keyword in keywords {
-                    if keyword.arg.as_ref().map_or(false, |arg| arg == "key")
+                    if keyword.arg.as_ref().is_some_and(|arg| arg == "key")
                         && keyword.value.is_lambda_expr()
                     {
                         self.safe_functions.push(&keyword.value);
@@ -165,7 +169,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 }
             }
             Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
                 range: _,
             }) => {
@@ -181,7 +185,10 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                 return false;
                             }
 
-                            if includes_arg_name(&loaded.id, args) {
+                            if parameters
+                                .as_ref()
+                                .is_some_and(|parameters| parameters.includes(&loaded.id))
+                            {
                                 return false;
                             }
 
@@ -230,7 +237,7 @@ struct AssignedNamesVisitor<'a> {
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        if matches!(stmt, Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_)) {
+        if stmt.is_function_def_stmt() {
             // Don't recurse.
             return;
         }
@@ -245,8 +252,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
             }
             Stmt::AugAssign(ast::StmtAugAssign { target, .. })
             | Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
-            | Stmt::For(ast::StmtFor { target, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { target, .. }) => {
+            | Stmt::For(ast::StmtFor { target, .. }) => {
                 let mut visitor = NamesFromAssignmentsVisitor::default();
                 visitor.visit_expr(target);
                 self.names.extend(visitor.names);
@@ -276,7 +282,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
 }
 
 /// B023
-pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &Node<'a>) {
+pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
     let suspicious_variables = {
@@ -303,8 +309,8 @@ pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &
         // loop, flag it.
         for name in suspicious_variables {
             if reassigned_in_loop.contains(&name.id.as_str()) {
-                if !checker.flake8_bugbear_seen.contains(&name) {
-                    checker.flake8_bugbear_seen.push(name);
+                if !checker.flake8_bugbear_seen.contains(&name.range()) {
+                    checker.flake8_bugbear_seen.push(name.range());
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionUsesLoopVariable {
                             name: name.id.to_string(),

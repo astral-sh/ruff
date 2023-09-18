@@ -1,12 +1,12 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Definition, Member, MemberKind};
-use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator, UniversalNewlines};
+use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_text_size::Ranged;
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -103,21 +103,16 @@ static INNER_FUNCTION_OR_CLASS_REGEX: Lazy<Regex> =
 
 /// D201, D202
 pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
-    let Definition::Member(Member {
-        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-        stmt,
-        ..
-    }) = docstring.definition
-    else {
+    let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 
     if checker.enabled(Rule::NoBlankLineBeforeFunction) {
         let before = checker
-            .locator
-            .slice(TextRange::new(stmt.start(), docstring.start()));
+            .locator()
+            .slice(TextRange::new(function.start(), docstring.start()));
 
-        let mut lines = UniversalNewlineIterator::with_offset(before, stmt.start()).rev();
+        let mut lines = UniversalNewlineIterator::with_offset(before, function.start()).rev();
         let mut blank_lines_before = 0usize;
         let mut blank_lines_start = lines.next().map(|l| l.end()).unwrap_or_default();
 
@@ -150,8 +145,8 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
 
     if checker.enabled(Rule::NoBlankLineAfterFunction) {
         let after = checker
-            .locator
-            .slice(TextRange::new(docstring.end(), stmt.end()));
+            .locator()
+            .slice(TextRange::new(docstring.end(), function.end()));
 
         // If the docstring is only followed by blank and commented lines, abort.
         let all_blank_after = after.universal_newlines().skip(1).all(|line| {
@@ -181,7 +176,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
         if blank_lines_after == 1
             && lines
                 .find(|line| !line.trim_whitespace_start().starts_with('#'))
-                .map_or(false, |line| INNER_FUNCTION_OR_CLASS_REGEX.is_match(&line))
+                .is_some_and(|line| INNER_FUNCTION_OR_CLASS_REGEX.is_match(&line))
         {
             return;
         }

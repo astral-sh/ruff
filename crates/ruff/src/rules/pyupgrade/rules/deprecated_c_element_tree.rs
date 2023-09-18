@@ -1,7 +1,7 @@
-use rustpython_parser::ast::{self, Ranged, Stmt};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -45,7 +45,7 @@ where
 {
     let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, node.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let contents = checker.locator.slice(node.range());
+        let contents = checker.locator().slice(node);
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents.replacen("cElementTree", "ElementTree", 1),
             node.range(),
@@ -71,7 +71,7 @@ pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
             level,
             range: _,
         }) => {
-            if level.map_or(false, |level| level.to_u32() > 0) {
+            if level.is_some_and(|level| level.to_u32() > 0) {
                 // Ex) `import .xml.etree.cElementTree as ET`
             } else if let Some(module) = module {
                 if module == "xml.etree.cElementTree" {

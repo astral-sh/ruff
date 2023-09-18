@@ -1,9 +1,10 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Expr;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -76,21 +77,15 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            match expr {
-                Expr::Name(_) => {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        replacement.to_string(),
-                        expr.range(),
-                    )));
-                }
-                Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        replacement.to_string(),
-                        attr.range(),
-                    )));
-                }
-                _ => {}
-            }
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import_from("numpy", replacement),
+                    expr.start(),
+                    checker.semantic(),
+                )?;
+                let replacement_edit = Edit::range_replacement(binding, expr.range());
+                Ok(Fix::suggested_edits(import_edit, [replacement_edit]))
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

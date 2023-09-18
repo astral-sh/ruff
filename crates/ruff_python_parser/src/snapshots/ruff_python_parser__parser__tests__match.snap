@@ -1,0 +1,448 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Match(
+        StmtMatch {
+            range: 1..73,
+            subject: Dict(
+                ExprDict {
+                    range: 7..18,
+                    keys: [
+                        Some(
+                            Constant(
+                                ExprConstant {
+                                    range: 8..14,
+                                    value: Str(
+                                        StringConstant {
+                                            value: "test",
+                                            unicode: false,
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ),
+                    ],
+                    values: [
+                        Constant(
+                            ExprConstant {
+                                range: 16..17,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 24..73,
+                    pattern: MatchMapping(
+                        PatternMatchMapping {
+                            range: 29..52,
+                            keys: [],
+                            patterns: [],
+                            rest: Some(
+                                Identifier {
+                                    id: "rest",
+                                    range: 41..45,
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 62..73,
+                                value: Call(
+                                    ExprCall {
+                                        range: 62..73,
+                                        func: Name(
+                                            ExprName {
+                                                range: 62..67,
+                                                id: "print",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 67..73,
+                                            args: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 68..72,
+                                                        id: "rest",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 74..177,
+            subject: Dict(
+                ExprDict {
+                    range: 80..97,
+                    keys: [
+                        Some(
+                            Constant(
+                                ExprConstant {
+                                    range: 81..88,
+                                    value: Str(
+                                        StringConstant {
+                                            value: "label",
+                                            unicode: false,
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ),
+                    ],
+                    values: [
+                        Constant(
+                            ExprConstant {
+                                range: 90..96,
+                                value: Str(
+                                    StringConstant {
+                                        value: "test",
+                                        unicode: false,
+                                        implicit_concatenated: false,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 103..177,
+                    pattern: MatchMapping(
+                        PatternMatchMapping {
+                            range: 108..155,
+                            keys: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 118..125,
+                                        value: Str(
+                                            StringConstant {
+                                                value: "label",
+                                                unicode: false,
+                                                implicit_concatenated: false,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            patterns: [
+                                MatchAs(
+                                    PatternMatchAs {
+                                        range: 127..148,
+                                        pattern: Some(
+                                            MatchOr(
+                                                PatternMatchOr {
+                                                    range: 127..139,
+                                                    patterns: [
+                                                        MatchClass(
+                                                            PatternMatchClass {
+                                                                range: 127..132,
+                                                                cls: Name(
+                                                                    ExprName {
+                                                                        range: 127..130,
+                                                                        id: "str",
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                arguments: PatternArguments {
+                                                                    range: 130..132,
+                                                                    patterns: [],
+                                                                    keywords: [],
+                                                                },
+                                                            },
+                                                        ),
+                                                        MatchSingleton(
+                                                            PatternMatchSingleton {
+                                                                range: 135..139,
+                                                                value: None,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        ),
+                                        name: Some(
+                                            Identifier {
+                                                id: "label",
+                                                range: 143..148,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            rest: None,
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 165..177,
+                                value: Call(
+                                    ExprCall {
+                                        range: 165..177,
+                                        func: Name(
+                                            ExprName {
+                                                range: 165..170,
+                                                id: "print",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 170..177,
+                                            args: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 171..176,
+                                                        id: "label",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 178..218,
+            subject: Name(
+                ExprName {
+                    range: 184..185,
+                    id: "x",
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 191..218,
+                    pattern: MatchSequence(
+                        PatternMatchSequence {
+                            range: 196..203,
+                            patterns: [
+                                MatchValue(
+                                    PatternMatchValue {
+                                        range: 197..198,
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 197..198,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                MatchValue(
+                                    PatternMatchValue {
+                                        range: 200..201,
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 200..201,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Assign(
+                            StmtAssign {
+                                range: 213..218,
+                                targets: [
+                                    Name(
+                                        ExprName {
+                                            range: 213..214,
+                                            id: "y",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 217..218,
+                                        value: Int(
+                                            0,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 219..259,
+            subject: Name(
+                ExprName {
+                    range: 225..226,
+                    id: "x",
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 232..259,
+                    pattern: MatchSequence(
+                        PatternMatchSequence {
+                            range: 237..244,
+                            patterns: [
+                                MatchValue(
+                                    PatternMatchValue {
+                                        range: 238..239,
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 238..239,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                MatchValue(
+                                    PatternMatchValue {
+                                        range: 241..242,
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 241..242,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Assign(
+                            StmtAssign {
+                                range: 254..259,
+                                targets: [
+                                    Name(
+                                        ExprName {
+                                            range: 254..255,
+                                            id: "y",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 258..259,
+                                        value: Int(
+                                            0,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 260..297,
+            subject: Name(
+                ExprName {
+                    range: 266..267,
+                    id: "x",
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 273..297,
+                    pattern: MatchSequence(
+                        PatternMatchSequence {
+                            range: 278..282,
+                            patterns: [
+                                MatchValue(
+                                    PatternMatchValue {
+                                        range: 279..280,
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 279..280,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Assign(
+                            StmtAssign {
+                                range: 292..297,
+                                targets: [
+                                    Name(
+                                        ExprName {
+                                            range: 292..293,
+                                            id: "y",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 296..297,
+                                        value: Int(
+                                            0,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+]

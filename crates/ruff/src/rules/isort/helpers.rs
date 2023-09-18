@@ -1,18 +1,22 @@
-use rustpython_parser::ast::{Ranged, Stmt};
-use rustpython_parser::{lexer, Mode, Tok};
-
-use ruff_python_ast::source_code::Locator;
-use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
+use ruff_python_ast::{PySourceType, Stmt};
+use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::{Locator, UniversalNewlines};
+use ruff_text_size::Ranged;
 
 use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `Stmt::ImportFrom` statement ends with a magic
 /// trailing comma.
-pub(super) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
-    let contents = locator.slice(stmt.range());
+pub(super) fn trailing_comma(
+    stmt: &Stmt,
+    locator: &Locator,
+    source_type: PySourceType,
+) -> TrailingComma {
+    let contents = locator.slice(stmt);
     let mut count = 0u32;
     let mut trailing_comma = TrailingComma::Absent;
-    for (tok, _) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
+    for (tok, _) in lexer::lex_starts_at(contents, source_type.as_mode(), stmt.start()).flatten() {
         if matches!(tok, Tok::Lpar) {
             count = count.saturating_add(1);
         }

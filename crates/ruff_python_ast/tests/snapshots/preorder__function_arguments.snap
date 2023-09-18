@@ -1,0 +1,23 @@
+---
+source: crates/ruff_python_ast/tests/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtFunctionDef
+    - Parameters
+      - Parameter
+      - Parameter
+      - Parameter
+      - Parameter
+      - ExprConstant
+        - Int(20)
+      - Parameter
+      - Parameter
+      - ExprConstant
+        - Int(5)
+      - Parameter
+      - ExprConstant
+        - Int(20)
+      - Parameter
+    - StmtPass
+

@@ -1,11 +1,13 @@
-use crate::comments::{leading_alternate_branch_comments, trailing_comments};
+use ruff_formatter::{format_args, write};
+use ruff_python_ast::node::AstNode;
+use ruff_python_ast::{Stmt, StmtWhile};
+use ruff_text_size::Ranged;
+
+use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::write;
-use ruff_python_ast::node::AstNode;
-use rustpython_parser::ast::{Ranged, Stmt, StmtWhile};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
 
 #[derive(Default)]
 pub struct FormatStmtWhile;
@@ -20,11 +22,11 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item.as_any_node_ref());
 
         let body_start = body.first().map_or(test.end(), Stmt::start);
         let or_else_comments_start =
-            dangling_comments.partition_point(|comment| comment.slice().end() < body_start);
+            dangling_comments.partition_point(|comment| comment.end() < body_start);
 
         let (trailing_condition_comments, or_else_comments) =
             dangling_comments.split_at(or_else_comments_start);
@@ -32,12 +34,16 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
         write!(
             f,
             [
-                text("while"),
-                space(),
-                maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                text(":"),
-                trailing_comments(trailing_condition_comments),
-                block_indent(&body.format())
+                clause_header(
+                    ClauseHeader::While(item),
+                    trailing_condition_comments,
+                    &format_args![
+                        token("while"),
+                        space(),
+                        maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                    ]
+                ),
+                clause_body(body, trailing_condition_comments),
             ]
         )?;
 
@@ -51,10 +57,13 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
             write!(
                 f,
                 [
-                    leading_alternate_branch_comments(leading, body.last()),
-                    text("else:"),
-                    trailing_comments(trailing),
-                    block_indent(&orelse.format())
+                    clause_header(
+                        ClauseHeader::OrElse(ElseClause::While(item)),
+                        trailing,
+                        &token("else")
+                    )
+                    .with_leading_comments(leading, body.last()),
+                    clause_body(orelse, trailing),
                 ]
             )?;
         }
@@ -62,7 +71,11 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
         Ok(())
     }
 
-    fn fmt_dangling_comments(&self, _node: &StmtWhile, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }

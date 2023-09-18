@@ -1,9 +1,12 @@
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use memchr::memchr_iter;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+
+use crate::autofix::edits::pad_start;
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -60,29 +63,26 @@ pub(crate) fn invalid_escape_sequence(
         return;
     }
 
-    let start_offset = range.start() + TextSize::try_from(leading_quote.len()).unwrap();
-
-    let mut chars_iter = body.char_indices().peekable();
-
     let mut contains_valid_escape_sequence = false;
-
     let mut invalid_escape_sequence = Vec::new();
-    while let Some((i, c)) = chars_iter.next() {
-        if c != '\\' {
-            continue;
-        }
 
+    let mut prev = None;
+    let bytes = body.as_bytes();
+    for i in memchr_iter(b'\\', bytes) {
         // If the previous character was also a backslash, skip.
-        if i > 0 && body.as_bytes()[i - 1] == b'\\' {
+        if prev.is_some_and(|prev| prev == i - 1) {
+            prev = None;
             continue;
         }
 
-        // If we're at the end of the file, skip.
-        let Some((_, next_char)) = chars_iter.peek() else {
+        prev = Some(i);
+
+        let Some(next_char) = body[i + 1..].chars().next() else {
+            // If we're at the end of the file, skip.
             continue;
         };
 
-        // If we're at the end of the line, skip
+        // If we're at the end of line, skip.
         if matches!(next_char, '\n' | '\r') {
             continue;
         }
@@ -120,9 +120,9 @@ pub(crate) fn invalid_escape_sequence(
             continue;
         }
 
-        let location = start_offset + TextSize::try_from(i).unwrap();
+        let location = range.start() + leading_quote.text_len() + TextSize::try_from(i).unwrap();
         let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
-        invalid_escape_sequence.push(Diagnostic::new(InvalidEscapeSequence(*next_char), range));
+        invalid_escape_sequence.push(Diagnostic::new(InvalidEscapeSequence(next_char), range));
     }
 
     if autofix {
@@ -131,7 +131,7 @@ pub(crate) fn invalid_escape_sequence(
             for diagnostic in &mut invalid_escape_sequence {
                 diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     r"\".to_string(),
-                    diagnostic.range().start() + TextSize::from(1),
+                    diagnostic.start() + TextSize::from(1),
                 )));
             }
         } else {
@@ -140,18 +140,8 @@ pub(crate) fn invalid_escape_sequence(
                 // If necessary, add a space between any leading keyword (`return`, `yield`,
                 // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
                 // `returnr"foo"` is not.
-                let requires_space = locator
-                    .slice(TextRange::up_to(range.start()))
-                    .chars()
-                    .last()
-                    .map_or(false, |char| char.is_ascii_alphabetic());
-
                 diagnostic.set_fix(Fix::automatic(Edit::insertion(
-                    if requires_space {
-                        " r".to_string()
-                    } else {
-                        "r".to_string()
-                    },
+                    pad_start("r".to_string(), range.start(), locator),
                     range.start(),
                 )));
             }

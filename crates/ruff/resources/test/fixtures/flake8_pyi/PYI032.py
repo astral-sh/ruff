@@ -3,8 +3,8 @@ import typing
 
 
 class Bad:
-    def __eq__(self, other: Any) -> bool: ...  # Fine because not a stub file
-    def __ne__(self, other: typing.Any) -> typing.Any: ...  # Fine because not a stub file
+    def __eq__(self, other: Any) -> bool: ...  # Y032
+    def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
 
 
 class Good:

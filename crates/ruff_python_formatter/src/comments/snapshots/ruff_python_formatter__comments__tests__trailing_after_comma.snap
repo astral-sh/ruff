@@ -4,7 +4,7 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: ArgWithDefault,
+        kind: ParameterWithDefault,
         range: 15..16,
         source: `a`,
     }: {

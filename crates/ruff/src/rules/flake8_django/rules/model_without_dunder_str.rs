@@ -1,9 +1,10 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -54,10 +55,13 @@ impl Violation for DjangoModelWithoutDunderStr {
 pub(crate) fn model_without_dunder_str(
     checker: &mut Checker,
     ast::StmtClassDef {
-        name, bases, body, ..
+        name,
+        arguments,
+        body,
+        ..
     }: &ast::StmtClassDef,
 ) {
-    if !is_non_abstract_model(bases, body, checker.semantic()) {
+    if !is_non_abstract_model(arguments.as_deref(), body, checker.semantic()) {
         return;
     }
     if has_dunder_method(body) {
@@ -80,16 +84,20 @@ fn has_dunder_method(body: &[Stmt]) -> bool {
     })
 }
 
-fn is_non_abstract_model(bases: &[Expr], body: &[Stmt], semantic: &SemanticModel) -> bool {
-    for base in bases {
-        if is_model_abstract(body) {
-            continue;
-        }
-        if helpers::is_model(base, semantic) {
-            return true;
-        }
+fn is_non_abstract_model(
+    arguments: Option<&Arguments>,
+    body: &[Stmt],
+    semantic: &SemanticModel,
+) -> bool {
+    let Some(Arguments { args: bases, .. }) = arguments else {
+        return false;
+    };
+
+    if is_model_abstract(body) {
+        return false;
     }
-    false
+
+    bases.iter().any(|base| helpers::is_model(base, semantic))
 }
 
 /// Check if class is abstract, in terms of Django model inheritance.

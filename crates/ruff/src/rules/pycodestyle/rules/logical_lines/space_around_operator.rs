@@ -1,8 +1,7 @@
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::token_kind::TokenKind;
+use ruff_python_parser::TokenKind;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 
@@ -120,6 +119,57 @@ impl Violation for MultipleSpacesAfterOperator {
     }
 }
 
+/// ## What it does
+/// Checks for extraneous tabs after a comma.
+///
+/// ## Why is this bad?
+/// Commas should be followed by one space, never tabs.
+///
+/// ## Example
+/// ```python
+/// a = 4,\t5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 4, 3
+/// ```
+///
+#[violation]
+pub struct TabAfterComma;
+
+impl Violation for TabAfterComma {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Tab after comma")
+    }
+}
+
+/// ## What it does
+/// Checks for extraneous whitespace after a comma.
+///
+/// ## Why is this bad?
+/// According to the `black` code style, commas should be followed by a single space.
+///
+/// ## Example
+/// ```python
+/// a = 4,    5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 4, 5
+/// ```
+#[violation]
+pub struct MultipleSpacesAfterComma;
+
+impl Violation for MultipleSpacesAfterComma {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Multiple spaces after comma")
+    }
+}
+
 /// E221, E222, E223, E224
 pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut after_operator = false;
@@ -158,6 +208,23 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
         }
 
         after_operator = is_operator;
+    }
+}
+
+/// E241, E242
+pub(crate) fn space_after_comma(line: &LogicalLine, context: &mut LogicalLinesContext) {
+    for token in line.tokens() {
+        if matches!(token.kind(), TokenKind::Comma) {
+            match line.trailing_whitespace(token) {
+                (Whitespace::Tab, len) => {
+                    context.push(TabAfterComma, TextRange::at(token.end(), len));
+                }
+                (Whitespace::Many, len) => {
+                    context.push(MultipleSpacesAfterComma, TextRange::at(token.end(), len));
+                }
+                _ => {}
+            }
+        }
     }
 }
 

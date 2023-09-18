@@ -1,0 +1,59 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..32,
+            value: Call(
+                ExprCall {
+                    range: 0..32,
+                    func: Name(
+                        ExprName {
+                            range: 0..7,
+                            id: "my_func",
+                            ctx: Load,
+                        },
+                    ),
+                    arguments: Arguments {
+                        range: 7..32,
+                        args: [
+                            Constant(
+                                ExprConstant {
+                                    range: 8..20,
+                                    value: Str(
+                                        StringConstant {
+                                            value: "positional",
+                                            unicode: false,
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        keywords: [
+                            Keyword {
+                                range: 22..31,
+                                arg: Some(
+                                    Identifier {
+                                        id: "keyword",
+                                        range: 22..29,
+                                    },
+                                ),
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 30..31,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ],
+                    },
+                },
+            ),
+        },
+    ),
+]

@@ -7,6 +7,7 @@ ruff check .                        # Lint all files in the current directory (a
 ruff check path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories)
 ruff check path/to/code/*.py        # Lint all `.py` files in `/path/to/code`
 ruff check path/to/code/to/file.py  # Lint `file.py`
+ruff check @file_paths.txt          # Lint using an input file and treat its contents as command-line arguments (newline delimiter)
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
@@ -22,7 +23,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.278
+  rev: v0.0.290
   hooks:
     - id: ruff
 ```
@@ -32,7 +33,7 @@ Or, to enable autofix:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.278
+  rev: v0.0.290
   hooks:
     - id: ruff
       args: [ --fix, --exit-non-zero-on-fix ]
@@ -43,7 +44,7 @@ Or, to run the hook on Jupyter Notebooks too:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.278
+  rev: v0.0.290
   hooks:
     - id: ruff
       types_or: [python, pyi, jupyter]

@@ -9,4 +9,20 @@ E402.py:24:1: E402 Module level import not at top of file
    | ^^^^^^^^ E402
    |
 
+E402.py:34:1: E402 Module level import not at top of file
+   |
+32 |     import g
+33 | 
+34 | import h; import i
+   | ^^^^^^^^ E402
+   |
+
+E402.py:34:11: E402 Module level import not at top of file
+   |
+32 |     import g
+33 | 
+34 | import h; import i
+   |           ^^^^^^^^ E402
+   |
+
 

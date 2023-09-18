@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_django::rules::helpers::is_model_form;
@@ -49,15 +50,18 @@ impl Violation for DjangoAllWithModelForm {
 /// DJ007
 pub(crate) fn all_with_model_form(
     checker: &Checker,
-    bases: &[Expr],
+    arguments: Option<&Arguments>,
     body: &[Stmt],
 ) -> Option<Diagnostic> {
-    if !bases
-        .iter()
-        .any(|base| is_model_form(base, checker.semantic()))
-    {
+    if !arguments.is_some_and(|arguments| {
+        arguments
+            .args
+            .iter()
+            .any(|base| is_model_form(base, checker.semantic()))
+    }) {
         return None;
     }
+
     for element in body {
         let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
             continue;
@@ -80,13 +84,13 @@ pub(crate) fn all_with_model_form(
                     continue;
                 };
                 match value {
-                    Constant::Str(s) => {
-                        if s == "__all__" {
+                    Constant::Str(ast::StringConstant { value, .. }) => {
+                        if value == "__all__" {
                             return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
                         }
                     }
-                    Constant::Bytes(b) => {
-                        if b == "__all__".as_bytes() {
+                    Constant::Bytes(ast::BytesConstant { value, .. }) => {
+                        if value == "__all__".as_bytes() {
                             return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
                         }
                     }

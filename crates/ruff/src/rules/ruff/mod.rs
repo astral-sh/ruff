@@ -12,7 +12,7 @@ mod tests {
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
-    use ruff_python_ast::source_code::SourceFileBuilder;
+    use ruff_source_file::SourceFileBuilder;
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
@@ -40,6 +40,7 @@ mod tests {
         feature = "unreachable-code",
         test_case(Rule::UnreachableCode, Path::new("RUF014.py"))
     )]
+    #[test_case(Rule::QuadraticListSummation, Path::new("RUF017.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -60,10 +61,8 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::Settings {
-                target_version: PythonVersion::Py39,
-                ..settings::Settings::for_rule(Rule::ImplicitOptional)
-            },
+            &settings::Settings::for_rule(Rule::ImplicitOptional)
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -157,6 +156,31 @@ mod tests {
     }
 
     #[test]
+    fn ruf100_4() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_4.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruf100_5() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_5.py"),
+            &settings::Settings {
+                ..settings::Settings::for_rules(vec![
+                    Rule::UnusedNOQA,
+                    Rule::LineTooLong,
+                    Rule::CommentedOutCode,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+    #[test]
     fn flake8_noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/flake8_noqa.py"),
@@ -167,9 +191,9 @@ mod tests {
     }
 
     #[test]
-    fn ruff_noqa() -> Result<()> {
+    fn ruff_noqa_all() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("ruff/ruff_noqa.py"),
+            Path::new("ruff/ruff_noqa_all.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_messages!(diagnostics);
@@ -177,9 +201,19 @@ mod tests {
     }
 
     #[test]
-    fn ruff_targeted_noqa() -> Result<()> {
+    fn ruff_noqa_codes() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("ruff/ruff_targeted_noqa.py"),
+            Path::new("ruff/ruff_noqa_codes.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_noqa_invalid() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_noqa_invalid.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_messages!(diagnostics);
@@ -212,7 +246,7 @@ mod tests {
         let messages = lint_pyproject_toml(
             source_file,
             &settings::Settings::for_rule(Rule::InvalidPyprojectToml),
-        )?;
+        );
         assert_messages!(snapshot, messages);
         Ok(())
     }

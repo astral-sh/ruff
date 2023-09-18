@@ -1,8 +1,8 @@
 use std::fmt::{Display, Formatter};
 
-use rustpython_parser::ast::{
-    ArgWithDefault, Arguments, Expr, ExprBinOp, ExprSubscript, ExprTuple, Identifier, Operator,
-    Ranged,
+use ruff_python_ast::{
+    Expr, ExprBinOp, ExprSubscript, ExprTuple, Identifier, Operator, ParameterWithDefault,
+    Parameters,
 };
 use smallvec::SmallVec;
 
@@ -10,6 +10,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -104,7 +105,7 @@ pub(crate) fn bad_exit_annotation(
     checker: &mut Checker,
     is_async: bool,
     name: &Identifier,
-    args: &Arguments,
+    parameters: &Parameters,
 ) {
     let func_kind = match name.as_str() {
         "__exit__" if !is_async => FuncKind::Sync,
@@ -112,41 +113,45 @@ pub(crate) fn bad_exit_annotation(
         _ => return,
     };
 
-    let positional_args = args
+    let positional_args = parameters
         .args
         .iter()
-        .chain(args.posonlyargs.iter())
-        .collect::<SmallVec<[&ArgWithDefault; 4]>>();
+        .chain(parameters.posonlyargs.iter())
+        .collect::<SmallVec<[&ParameterWithDefault; 4]>>();
 
     // If there are less than three positional arguments, at least one of them must be a star-arg,
     // and it must be annotated with `object`.
     if positional_args.len() < 4 {
-        check_short_args_list(checker, args, func_kind);
+        check_short_args_list(checker, parameters, func_kind);
     }
 
     // Every positional argument (beyond the first four) must have a default.
-    for arg_with_default in positional_args
+    for parameter in positional_args
         .iter()
         .skip(4)
-        .filter(|arg_with_default| arg_with_default.default.is_none())
+        .filter(|parameter| parameter.default.is_none())
     {
         checker.diagnostics.push(Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::ArgsAfterFirstFourMustHaveDefault,
             },
-            arg_with_default.range(),
+            parameter.range(),
         ));
     }
 
     // ...as should all keyword-only arguments.
-    for arg_with_default in args.kwonlyargs.iter().filter(|arg| arg.default.is_none()) {
+    for parameter in parameters
+        .kwonlyargs
+        .iter()
+        .filter(|arg| arg.default.is_none())
+    {
         checker.diagnostics.push(Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::AllKwargsMustHaveDefault,
             },
-            arg_with_default.range(),
+            parameter.range(),
         ));
     }
 
@@ -155,8 +160,8 @@ pub(crate) fn bad_exit_annotation(
 
 /// Determine whether a "short" argument list (i.e., an argument list with less than four elements)
 /// contains a star-args argument annotated with `object`. If not, report an error.
-fn check_short_args_list(checker: &mut Checker, args: &Arguments, func_kind: FuncKind) {
-    if let Some(varargs) = &args.vararg {
+fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_kind: FuncKind) {
+    if let Some(varargs) = &parameters.vararg {
         if let Some(annotation) = varargs
             .annotation
             .as_ref()
@@ -187,7 +192,7 @@ fn check_short_args_list(checker: &mut Checker, args: &Arguments, func_kind: Fun
                 func_kind,
                 error_kind: ErrorKind::MissingArgs,
             },
-            args.range(),
+            parameters.range(),
         ));
     }
 }
@@ -196,7 +201,7 @@ fn check_short_args_list(checker: &mut Checker, args: &Arguments, func_kind: Fun
 /// annotated correctly.
 fn check_positional_args(
     checker: &mut Checker,
-    positional_args: &[&ArgWithDefault],
+    positional_args: &[&ParameterWithDefault],
     kind: FuncKind,
 ) {
     // For each argument, define the predicate against which to check the annotation.
@@ -208,13 +213,8 @@ fn check_positional_args(
         (ErrorKind::ThirdArgBadAnnotation, is_traceback_type),
     ];
 
-    for (arg, (error_info, predicate)) in positional_args
-        .iter()
-        .skip(1)
-        .take(3)
-        .zip(validations.into_iter())
-    {
-        let Some(annotation) = arg.def.annotation.as_ref() else {
+    for (arg, (error_info, predicate)) in positional_args.iter().skip(1).take(3).zip(validations) {
+        let Some(annotation) = arg.parameter.annotation.as_ref() else {
             continue;
         };
 
@@ -225,7 +225,7 @@ fn check_positional_args(
         // If there's an annotation that's not `object` or `Unused`, check that the annotated type
         // matches the predicate.
         if non_none_annotation_element(annotation, checker.semantic())
-            .map_or(false, |elem| predicate(elem, checker.semantic()))
+            .is_some_and(|elem| predicate(elem, checker.semantic()))
         {
             continue;
         }
@@ -243,11 +243,11 @@ fn check_positional_args(
 /// Return the non-`None` annotation element of a PEP 604-style union or `Optional` annotation.
 fn non_none_annotation_element<'a>(
     annotation: &'a Expr,
-    model: &SemanticModel,
+    semantic: &SemanticModel,
 ) -> Option<&'a Expr> {
     // E.g., `typing.Union` or `typing.Optional`
     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation {
-        if model.match_typing_expr(value, "Optional") {
+        if semantic.match_typing_expr(value, "Optional") {
             return if is_const_none(slice) {
                 None
             } else {
@@ -255,7 +255,7 @@ fn non_none_annotation_element<'a>(
             };
         }
 
-        if !model.match_typing_expr(value, "Union") {
+        if !semantic.match_typing_expr(value, "Union") {
             return None;
         }
 
@@ -298,11 +298,11 @@ fn non_none_annotation_element<'a>(
 }
 
 /// Return `true` if the [`Expr`] is the `object` builtin or the `_typeshed.Unused` type.
-fn is_object_or_unused(expr: &Expr, model: &SemanticModel) -> bool {
-    model
+fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(expr)
         .as_ref()
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["" | "builtins", "object"] | ["_typeshed", "Unused"]
@@ -311,40 +311,34 @@ fn is_object_or_unused(expr: &Expr, model: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the [`Expr`] is `BaseException`.
-fn is_base_exception(expr: &Expr, model: &SemanticModel) -> bool {
-    model
+fn is_base_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(expr)
         .as_ref()
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["" | "builtins", "BaseException"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "BaseException"]))
 }
 
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
-fn is_traceback_type(expr: &Expr, model: &SemanticModel) -> bool {
-    model
+fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(expr)
         .as_ref()
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["types", "TracebackType"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["types", "TracebackType"]))
 }
 
 /// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]`.
-fn is_base_exception_type(expr: &Expr, model: &SemanticModel) -> bool {
+fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr else {
         return false;
     };
 
-    if model.match_typing_expr(value, "Type")
-        || model
+    if semantic.match_typing_expr(value, "Type")
+        || semantic
             .resolve_call_path(value)
             .as_ref()
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["" | "builtins", "type"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "type"]))
     {
-        is_base_exception(slice, model)
+        is_base_exception(slice, semantic)
     } else {
         false
     }

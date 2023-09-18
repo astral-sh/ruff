@@ -231,6 +231,8 @@ C402.py:18:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension
 17 | 
 18 | print(f'Hello {dict((x,f(x)) for x in "abc")} World')
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
+19 | 
+20 | # Regression test for: https://github.com/astral-sh/ruff/issues/7086
    |
    = help: Rewrite as a `dict` comprehension
 
@@ -240,5 +242,28 @@ C402.py:18:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension
 17 17 | 
 18    |-print(f'Hello {dict((x,f(x)) for x in "abc")} World')
    18 |+print(f'Hello { {x: f(x) for x in "abc"} } World')
+19 19 | 
+20 20 | # Regression test for: https://github.com/astral-sh/ruff/issues/7086
+21 21 | dict((k,v)for k,v in d.iteritems() if k in only_args)
+
+C402.py:21:1: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+   |
+20 | # Regression test for: https://github.com/astral-sh/ruff/issues/7086
+21 | dict((k,v)for k,v in d.iteritems() if k in only_args)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
+22 | 
+23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458940
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+18 18 | print(f'Hello {dict((x,f(x)) for x in "abc")} World')
+19 19 | 
+20 20 | # Regression test for: https://github.com/astral-sh/ruff/issues/7086
+21    |-dict((k,v)for k,v in d.iteritems() if k in only_args)
+   21 |+{k: v for k,v in d.iteritems() if k in only_args}
+22 22 | 
+23 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458940
+24 24 | dict((*v, k) for k, v in enumerate(calendar.month_abbr))
 
 

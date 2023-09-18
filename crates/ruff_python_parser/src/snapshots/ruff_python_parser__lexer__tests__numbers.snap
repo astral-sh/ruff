@@ -1,0 +1,78 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        Int {
+            value: 47,
+        },
+        0..4,
+    ),
+    (
+        Int {
+            value: 10,
+        },
+        5..9,
+    ),
+    (
+        Int {
+            value: 13,
+        },
+        10..16,
+    ),
+    (
+        Int {
+            value: 0,
+        },
+        17..18,
+    ),
+    (
+        Int {
+            value: 123,
+        },
+        19..22,
+    ),
+    (
+        Int {
+            value: 1234567890,
+        },
+        23..36,
+    ),
+    (
+        Float {
+            value: 0.2,
+        },
+        37..40,
+    ),
+    (
+        Float {
+            value: 100.0,
+        },
+        41..45,
+    ),
+    (
+        Float {
+            value: 2100.0,
+        },
+        46..51,
+    ),
+    (
+        Complex {
+            real: 0.0,
+            imag: 2.0,
+        },
+        52..54,
+    ),
+    (
+        Complex {
+            real: 0.0,
+            imag: 2.2,
+        },
+        55..59,
+    ),
+    (
+        Newline,
+        59..59,
+    ),
+]

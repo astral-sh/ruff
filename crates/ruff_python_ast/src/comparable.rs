@@ -1,25 +1,23 @@
 //! An equivalent object hierarchy to the `RustPython` AST hierarchy, but with the
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
+//!
+//! Two [`ComparableExpr`]s are considered equal if the underlying AST nodes have the
+//! same shape, ignoring trivia (e.g., parentheses, comments, and whitespace), the
+//! location in the source code, and other contextual information (e.g., whether they
+//! represent reads or writes, which is typically encoded in the Python AST).
+//!
+//! For example, in `[(a, b) for a, b in c]`, the `(a, b)` and `a, b` expressions are
+//! considered equal, despite the former being parenthesized, and despite the former
+//! being a write ([`ast::ExprContext::Store`]) and the latter being a read
+//! ([`ast::ExprContext::Load`]).
+//!
+//! Similarly, `"a" "b"` and `"ab"` would be considered equal, despite the former being
+//! an implicit concatenation of string literals, as these expressions are considered to
+//! have the same shape in that they evaluate to the same value.
 
 use num_bigint::BigInt;
-use rustpython_parser::ast;
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableExprContext {
-    Load,
-    Store,
-    Del,
-}
-
-impl From<&ast::ExprContext> for ComparableExprContext {
-    fn from(ctx: &ast::ExprContext) -> Self {
-        match ctx {
-            ast::ExprContext::Load => Self::Load,
-            ast::ExprContext::Store => Self::Store,
-            ast::ExprContext::Del => Self::Del,
-        }
-    }
-}
+use crate as ast;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableBoolOp {
@@ -154,6 +152,36 @@ impl<'a> From<&'a ast::WithItem> for ComparableWithItem<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparablePatternArguments<'a> {
+    patterns: Vec<ComparablePattern<'a>>,
+    keywords: Vec<ComparablePatternKeyword<'a>>,
+}
+
+impl<'a> From<&'a ast::PatternArguments> for ComparablePatternArguments<'a> {
+    fn from(parameters: &'a ast::PatternArguments) -> Self {
+        Self {
+            patterns: parameters.patterns.iter().map(Into::into).collect(),
+            keywords: parameters.keywords.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparablePatternKeyword<'a> {
+    attr: &'a str,
+    pattern: ComparablePattern<'a>,
+}
+
+impl<'a> From<&'a ast::PatternKeyword> for ComparablePatternKeyword<'a> {
+    fn from(keyword: &'a ast::PatternKeyword) -> Self {
+        Self {
+            attr: keyword.attr.as_str(),
+            pattern: (&keyword.pattern).into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct PatternMatchValue<'a> {
     value: ComparableExpr<'a>,
 }
@@ -178,9 +206,7 @@ pub struct PatternMatchMapping<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct PatternMatchClass<'a> {
     cls: ComparableExpr<'a>,
-    patterns: Vec<ComparablePattern<'a>>,
-    kwd_attrs: Vec<&'a str>,
-    kwd_patterns: Vec<ComparablePattern<'a>>,
+    arguments: ComparablePatternArguments<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -240,18 +266,12 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
                 patterns: patterns.iter().map(Into::into).collect(),
                 rest: rest.as_deref(),
             }),
-            ast::Pattern::MatchClass(ast::PatternMatchClass {
-                cls,
-                patterns,
-                kwd_attrs,
-                kwd_patterns,
-                ..
-            }) => Self::MatchClass(PatternMatchClass {
-                cls: cls.into(),
-                patterns: patterns.iter().map(Into::into).collect(),
-                kwd_attrs: kwd_attrs.iter().map(ast::Identifier::as_str).collect(),
-                kwd_patterns: kwd_patterns.iter().map(Into::into).collect(),
-            }),
+            ast::Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
+                Self::MatchClass(PatternMatchClass {
+                    cls: cls.into(),
+                    arguments: arguments.into(),
+                })
+            }
             ast::Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
                 Self::MatchStar(PatternMatchStar {
                     name: name.as_deref(),
@@ -274,7 +294,7 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
 
 impl<'a> From<&'a Box<ast::Pattern>> for Box<ComparablePattern<'a>> {
     fn from(pattern: &'a Box<ast::Pattern>) -> Self {
-        Box::new((&**pattern).into())
+        Box::new((pattern.as_ref()).into())
     }
 }
 
@@ -312,7 +332,7 @@ impl<'a> From<&'a ast::Decorator> for ComparableDecorator<'a> {
 pub enum ComparableConstant<'a> {
     None,
     Bool(&'a bool),
-    Str(&'a str),
+    Str { value: &'a str, unicode: bool },
     Bytes(&'a [u8]),
     Int(&'a BigInt),
     Tuple(Vec<ComparableConstant<'a>>),
@@ -326,10 +346,23 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
         match constant {
             ast::Constant::None => Self::None,
             ast::Constant::Bool(value) => Self::Bool(value),
-            ast::Constant::Str(value) => Self::Str(value),
-            ast::Constant::Bytes(value) => Self::Bytes(value),
+            ast::Constant::Str(ast::StringConstant {
+                value,
+                // Compare strings based on resolved value, not representation (i.e., ignore whether
+                // the string was implicitly concatenated).
+                implicit_concatenated: _,
+                unicode,
+            }) => Self::Str {
+                value,
+                unicode: *unicode,
+            },
+            ast::Constant::Bytes(ast::BytesConstant {
+                value,
+                // Compare bytes based on resolved value, not representation (i.e., ignore whether
+                // the bytes were implicitly concatenated).
+                implicit_concatenated: _,
+            }) => Self::Bytes(value),
             ast::Constant::Int(value) => Self::Int(value),
-            ast::Constant::Tuple(value) => Self::Tuple(value.iter().map(Into::into).collect()),
             ast::Constant::Float(value) => Self::Float(value.to_bits()),
             ast::Constant::Complex { real, imag } => Self::Complex {
                 real: real.to_bits(),
@@ -342,64 +375,83 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableArguments<'a> {
-    posonlyargs: Vec<ComparableArgWithDefault<'a>>,
-    args: Vec<ComparableArgWithDefault<'a>>,
-    vararg: Option<ComparableArg<'a>>,
-    kwonlyargs: Vec<ComparableArgWithDefault<'a>>,
-    kwarg: Option<ComparableArg<'a>>,
+    args: Vec<ComparableExpr<'a>>,
+    keywords: Vec<ComparableKeyword<'a>>,
 }
 
 impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
     fn from(arguments: &'a ast::Arguments) -> Self {
         Self {
-            posonlyargs: arguments.posonlyargs.iter().map(Into::into).collect(),
             args: arguments.args.iter().map(Into::into).collect(),
-            vararg: arguments.vararg.as_ref().map(Into::into),
-            kwonlyargs: arguments.kwonlyargs.iter().map(Into::into).collect(),
-            kwarg: arguments.kwarg.as_ref().map(Into::into),
+            keywords: arguments.keywords.iter().map(Into::into).collect(),
         }
     }
 }
 
 impl<'a> From<&'a Box<ast::Arguments>> for ComparableArguments<'a> {
     fn from(arguments: &'a Box<ast::Arguments>) -> Self {
-        (&**arguments).into()
-    }
-}
-
-impl<'a> From<&'a Box<ast::Arg>> for ComparableArg<'a> {
-    fn from(arg: &'a Box<ast::Arg>) -> Self {
-        (&**arg).into()
+        (arguments.as_ref()).into()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableArg<'a> {
-    arg: &'a str,
-    annotation: Option<Box<ComparableExpr<'a>>>,
-    type_comment: Option<&'a str>,
+pub struct ComparableParameters<'a> {
+    posonlyargs: Vec<ComparableParameterWithDefault<'a>>,
+    args: Vec<ComparableParameterWithDefault<'a>>,
+    vararg: Option<ComparableParameter<'a>>,
+    kwonlyargs: Vec<ComparableParameterWithDefault<'a>>,
+    kwarg: Option<ComparableParameter<'a>>,
 }
 
-impl<'a> From<&'a ast::Arg> for ComparableArg<'a> {
-    fn from(arg: &'a ast::Arg) -> Self {
+impl<'a> From<&'a ast::Parameters> for ComparableParameters<'a> {
+    fn from(parameters: &'a ast::Parameters) -> Self {
         Self {
-            arg: arg.arg.as_str(),
+            posonlyargs: parameters.posonlyargs.iter().map(Into::into).collect(),
+            args: parameters.args.iter().map(Into::into).collect(),
+            vararg: parameters.vararg.as_ref().map(Into::into),
+            kwonlyargs: parameters.kwonlyargs.iter().map(Into::into).collect(),
+            kwarg: parameters.kwarg.as_ref().map(Into::into),
+        }
+    }
+}
+
+impl<'a> From<&'a Box<ast::Parameters>> for ComparableParameters<'a> {
+    fn from(parameters: &'a Box<ast::Parameters>) -> Self {
+        (parameters.as_ref()).into()
+    }
+}
+
+impl<'a> From<&'a Box<ast::Parameter>> for ComparableParameter<'a> {
+    fn from(arg: &'a Box<ast::Parameter>) -> Self {
+        (arg.as_ref()).into()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableParameter<'a> {
+    arg: &'a str,
+    annotation: Option<Box<ComparableExpr<'a>>>,
+}
+
+impl<'a> From<&'a ast::Parameter> for ComparableParameter<'a> {
+    fn from(arg: &'a ast::Parameter) -> Self {
+        Self {
+            arg: arg.name.as_str(),
             annotation: arg.annotation.as_ref().map(Into::into),
-            type_comment: arg.type_comment.as_deref(),
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableArgWithDefault<'a> {
-    def: ComparableArg<'a>,
+pub struct ComparableParameterWithDefault<'a> {
+    def: ComparableParameter<'a>,
     default: Option<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::ArgWithDefault> for ComparableArgWithDefault<'a> {
-    fn from(arg: &'a ast::ArgWithDefault) -> Self {
+impl<'a> From<&'a ast::ParameterWithDefault> for ComparableParameterWithDefault<'a> {
+    fn from(arg: &'a ast::ParameterWithDefault) -> Self {
         Self {
-            def: (&arg.def).into(),
+            def: (&arg.parameter).into(),
             default: arg.default.as_ref().map(Into::into),
         }
     }
@@ -468,6 +520,26 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableElifElseClause<'a> {
+    test: Option<ComparableExpr<'a>>,
+    body: Vec<ComparableStmt<'a>>,
+}
+
+impl<'a> From<&'a ast::ElifElseClause> for ComparableElifElseClause<'a> {
+    fn from(elif_else_clause: &'a ast::ElifElseClause) -> Self {
+        let ast::ElifElseClause {
+            range: _,
+            test,
+            body,
+        } = elif_else_clause;
+        Self {
+            test: test.as_ref().map(Into::into),
+            body: body.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprBoolOp<'a> {
     op: ComparableBoolOp,
     values: Vec<ComparableExpr<'a>>,
@@ -494,7 +566,7 @@ pub struct ExprUnaryOp<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprLambda<'a> {
-    args: ComparableArguments<'a>,
+    parameters: Option<ComparableParameters<'a>>,
     body: Box<ComparableExpr<'a>>,
 }
 
@@ -566,64 +638,57 @@ pub struct ExprCompare<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprCall<'a> {
     func: Box<ComparableExpr<'a>>,
-    args: Vec<ComparableExpr<'a>>,
-    keywords: Vec<ComparableKeyword<'a>>,
+    arguments: ComparableArguments<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprFormattedValue<'a> {
     value: Box<ComparableExpr<'a>>,
+    debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
     format_spec: Option<Box<ComparableExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprJoinedStr<'a> {
+pub struct ExprFString<'a> {
     values: Vec<ComparableExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprConstant<'a> {
     value: ComparableConstant<'a>,
-    kind: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprAttribute<'a> {
     value: Box<ComparableExpr<'a>>,
     attr: &'a str,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprSubscript<'a> {
     value: Box<ComparableExpr<'a>>,
     slice: Box<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprStarred<'a> {
     value: Box<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprName<'a> {
     id: &'a str,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprList<'a> {
     elts: Vec<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprTuple<'a> {
     elts: Vec<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -631,6 +696,12 @@ pub struct ExprSlice<'a> {
     lower: Option<Box<ComparableExpr<'a>>>,
     upper: Option<Box<ComparableExpr<'a>>>,
     step: Option<Box<ComparableExpr<'a>>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprIpyEscapeCommand<'a> {
+    kind: ast::IpyEscapeKind,
+    value: &'a str,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -653,7 +724,7 @@ pub enum ComparableExpr<'a> {
     Compare(ExprCompare<'a>),
     Call(ExprCall<'a>),
     FormattedValue(ExprFormattedValue<'a>),
-    JoinedStr(ExprJoinedStr<'a>),
+    FString(ExprFString<'a>),
     Constant(ExprConstant<'a>),
     Attribute(ExprAttribute<'a>),
     Subscript(ExprSubscript<'a>),
@@ -662,17 +733,18 @@ pub enum ComparableExpr<'a> {
     List(ExprList<'a>),
     Tuple(ExprTuple<'a>),
     Slice(ExprSlice<'a>),
+    IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
     fn from(expr: &'a Box<ast::Expr>) -> Self {
-        Box::new((&**expr).into())
+        Box::new((expr.as_ref()).into())
     }
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for ComparableExpr<'a> {
     fn from(expr: &'a Box<ast::Expr>) -> Self {
-        (&**expr).into()
+        (expr.as_ref()).into()
     }
 }
 
@@ -682,7 +754,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 op,
                 values,
-                range: _range,
+                range: _,
             }) => Self::BoolOp(ExprBoolOp {
                 op: (*op).into(),
                 values: values.iter().map(Into::into).collect(),
@@ -690,7 +762,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             ast::Expr::NamedExpr(ast::ExprNamedExpr {
                 target,
                 value,
-                range: _range,
+                range: _,
             }) => Self::NamedExpr(ExprNamedExpr {
                 target: target.into(),
                 value: value.into(),
@@ -699,7 +771,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 left,
                 op,
                 right,
-                range: _range,
+                range: _,
             }) => Self::BinOp(ExprBinOp {
                 left: left.into(),
                 op: (*op).into(),
@@ -708,24 +780,24 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
                 op,
                 operand,
-                range: _range,
+                range: _,
             }) => Self::UnaryOp(ExprUnaryOp {
                 op: (*op).into(),
                 operand: operand.into(),
             }),
             ast::Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
-                range: _range,
+                range: _,
             }) => Self::Lambda(ExprLambda {
-                args: (&**args).into(),
+                parameters: parameters.as_ref().map(Into::into),
                 body: body.into(),
             }),
             ast::Expr::IfExp(ast::ExprIfExp {
                 test,
                 body,
                 orelse,
-                range: _range,
+                range: _,
             }) => Self::IfExp(ExprIfExp {
                 test: test.into(),
                 body: body.into(),
@@ -734,7 +806,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             ast::Expr::Dict(ast::ExprDict {
                 keys,
                 values,
-                range: _range,
+                range: _,
             }) => Self::Dict(ExprDict {
                 keys: keys
                     .iter()
@@ -742,16 +814,13 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                     .collect(),
                 values: values.iter().map(Into::into).collect(),
             }),
-            ast::Expr::Set(ast::ExprSet {
-                elts,
-                range: _range,
-            }) => Self::Set(ExprSet {
+            ast::Expr::Set(ast::ExprSet { elts, range: _ }) => Self::Set(ExprSet {
                 elts: elts.iter().map(Into::into).collect(),
             }),
             ast::Expr::ListComp(ast::ExprListComp {
                 elt,
                 generators,
-                range: _range,
+                range: _,
             }) => Self::ListComp(ExprListComp {
                 elt: elt.into(),
                 generators: generators.iter().map(Into::into).collect(),
@@ -759,7 +828,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             ast::Expr::SetComp(ast::ExprSetComp {
                 elt,
                 generators,
-                range: _range,
+                range: _,
             }) => Self::SetComp(ExprSetComp {
                 elt: elt.into(),
                 generators: generators.iter().map(Into::into).collect(),
@@ -768,7 +837,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 key,
                 value,
                 generators,
-                range: _range,
+                range: _,
             }) => Self::DictComp(ExprDictComp {
                 key: key.into(),
                 value: value.into(),
@@ -777,34 +846,27 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             ast::Expr::GeneratorExp(ast::ExprGeneratorExp {
                 elt,
                 generators,
-                range: _range,
+                range: _,
             }) => Self::GeneratorExp(ExprGeneratorExp {
                 elt: elt.into(),
                 generators: generators.iter().map(Into::into).collect(),
             }),
-            ast::Expr::Await(ast::ExprAwait {
-                value,
-                range: _range,
-            }) => Self::Await(ExprAwait {
+            ast::Expr::Await(ast::ExprAwait { value, range: _ }) => Self::Await(ExprAwait {
                 value: value.into(),
             }),
-            ast::Expr::Yield(ast::ExprYield {
-                value,
-                range: _range,
-            }) => Self::Yield(ExprYield {
+            ast::Expr::Yield(ast::ExprYield { value, range: _ }) => Self::Yield(ExprYield {
                 value: value.as_ref().map(Into::into),
             }),
-            ast::Expr::YieldFrom(ast::ExprYieldFrom {
-                value,
-                range: _range,
-            }) => Self::YieldFrom(ExprYieldFrom {
-                value: value.into(),
-            }),
+            ast::Expr::YieldFrom(ast::ExprYieldFrom { value, range: _ }) => {
+                Self::YieldFrom(ExprYieldFrom {
+                    value: value.into(),
+                })
+            }
             ast::Expr::Compare(ast::ExprCompare {
                 left,
                 ops,
                 comparators,
-                range: _range,
+                range: _,
             }) => Self::Compare(ExprCompare {
                 left: left.into(),
                 ops: ops.iter().copied().map(Into::into).collect(),
@@ -812,99 +874,97 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }),
             ast::Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
-                range: _range,
+                arguments,
+                range: _,
             }) => Self::Call(ExprCall {
                 func: func.into(),
-                args: args.iter().map(Into::into).collect(),
-                keywords: keywords.iter().map(Into::into).collect(),
+                arguments: arguments.into(),
             }),
             ast::Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
                 conversion,
+                debug_text,
                 format_spec,
-                range: _range,
+                range: _,
             }) => Self::FormattedValue(ExprFormattedValue {
                 value: value.into(),
                 conversion: *conversion,
+                debug_text: debug_text.as_ref(),
                 format_spec: format_spec.as_ref().map(Into::into),
             }),
-            ast::Expr::JoinedStr(ast::ExprJoinedStr {
+            ast::Expr::FString(ast::ExprFString {
                 values,
-                range: _range,
-            }) => Self::JoinedStr(ExprJoinedStr {
+                implicit_concatenated: _,
+                range: _,
+            }) => Self::FString(ExprFString {
                 values: values.iter().map(Into::into).collect(),
             }),
-            ast::Expr::Constant(ast::ExprConstant {
-                value,
-                kind,
-                range: _range,
-            }) => Self::Constant(ExprConstant {
-                value: value.into(),
-                kind: kind.as_ref().map(String::as_str),
-            }),
+            ast::Expr::Constant(ast::ExprConstant { value, range: _ }) => {
+                Self::Constant(ExprConstant {
+                    value: value.into(),
+                })
+            }
             ast::Expr::Attribute(ast::ExprAttribute {
                 value,
                 attr,
-                ctx,
-                range: _range,
+                ctx: _,
+                range: _,
             }) => Self::Attribute(ExprAttribute {
                 value: value.into(),
                 attr: attr.as_str(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Subscript(ast::ExprSubscript {
                 value,
                 slice,
-                ctx,
-                range: _range,
+                ctx: _,
+                range: _,
             }) => Self::Subscript(ExprSubscript {
                 value: value.into(),
                 slice: slice.into(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Starred(ast::ExprStarred {
                 value,
-                ctx,
-                range: _range,
+                ctx: _,
+                range: _,
             }) => Self::Starred(ExprStarred {
                 value: value.into(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Name(ast::ExprName {
                 id,
-                ctx,
-                range: _range,
-            }) => Self::Name(ExprName {
-                id: id.as_str(),
-                ctx: ctx.into(),
-            }),
+                ctx: _,
+                range: _,
+            }) => Self::Name(ExprName { id: id.as_str() }),
             ast::Expr::List(ast::ExprList {
                 elts,
-                ctx,
-                range: _range,
+                ctx: _,
+                range: _,
             }) => Self::List(ExprList {
                 elts: elts.iter().map(Into::into).collect(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Tuple(ast::ExprTuple {
                 elts,
-                ctx,
-                range: _range,
+                ctx: _,
+                range: _,
             }) => Self::Tuple(ExprTuple {
                 elts: elts.iter().map(Into::into).collect(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Slice(ast::ExprSlice {
                 lower,
                 upper,
                 step,
-                range: _range,
+                range: _,
             }) => Self::Slice(ExprSlice {
                 lower: lower.as_ref().map(Into::into),
                 upper: upper.as_ref().map(Into::into),
                 step: step.as_ref().map(Into::into),
+            }),
+            ast::Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand {
+                kind,
+                value,
+                range: _,
+            }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand {
+                kind: *kind,
+                value: value.as_str(),
             }),
         }
     }
@@ -912,31 +972,22 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtFunctionDef<'a> {
-    name: &'a str,
-    args: ComparableArguments<'a>,
-    body: Vec<ComparableStmt<'a>>,
+    is_async: bool,
     decorator_list: Vec<ComparableDecorator<'a>>,
-    returns: Option<ComparableExpr<'a>>,
-    type_comment: Option<&'a str>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAsyncFunctionDef<'a> {
     name: &'a str,
-    args: ComparableArguments<'a>,
-    body: Vec<ComparableStmt<'a>>,
-    decorator_list: Vec<ComparableDecorator<'a>>,
+    type_params: Option<ComparableTypeParams<'a>>,
+    parameters: ComparableParameters<'a>,
     returns: Option<ComparableExpr<'a>>,
-    type_comment: Option<&'a str>,
+    body: Vec<ComparableStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtClassDef<'a> {
-    name: &'a str,
-    bases: Vec<ComparableExpr<'a>>,
-    keywords: Vec<ComparableKeyword<'a>>,
-    body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
+    name: &'a str,
+    type_params: Option<ComparableTypeParams<'a>>,
+    arguments: Option<ComparableArguments<'a>>,
+    body: Vec<ComparableStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -950,10 +1001,83 @@ pub struct StmtDelete<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct StmtTypeAlias<'a> {
+    pub name: Box<ComparableExpr<'a>>,
+    pub type_params: Option<ComparableTypeParams<'a>>,
+    pub value: Box<ComparableExpr<'a>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableTypeParams<'a> {
+    pub type_params: Vec<ComparableTypeParam<'a>>,
+}
+
+impl<'a> From<&'a ast::TypeParams> for ComparableTypeParams<'a> {
+    fn from(type_params: &'a ast::TypeParams) -> Self {
+        Self {
+            type_params: type_params.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl<'a> From<&'a Box<ast::TypeParams>> for ComparableTypeParams<'a> {
+    fn from(type_params: &'a Box<ast::TypeParams>) -> Self {
+        type_params.as_ref().into()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ComparableTypeParam<'a> {
+    TypeVar(TypeParamTypeVar<'a>),
+    ParamSpec(TypeParamParamSpec<'a>),
+    TypeVarTuple(TypeParamTypeVarTuple<'a>),
+}
+
+impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
+    fn from(type_param: &'a ast::TypeParam) -> Self {
+        match type_param {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+                name,
+                bound,
+                range: _,
+            }) => Self::TypeVar(TypeParamTypeVar {
+                name: name.as_str(),
+                bound: bound.as_ref().map(Into::into),
+            }),
+            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range: _ }) => {
+                Self::TypeVarTuple(TypeParamTypeVarTuple {
+                    name: name.as_str(),
+                })
+            }
+            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range: _ }) => {
+                Self::ParamSpec(TypeParamParamSpec {
+                    name: name.as_str(),
+                })
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct TypeParamTypeVar<'a> {
+    pub name: &'a str,
+    pub bound: Option<Box<ComparableExpr<'a>>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct TypeParamParamSpec<'a> {
+    pub name: &'a str,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct TypeParamTypeVarTuple<'a> {
+    pub name: &'a str,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtAssign<'a> {
     targets: Vec<ComparableExpr<'a>>,
     value: ComparableExpr<'a>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -973,20 +1097,11 @@ pub struct StmtAnnAssign<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtFor<'a> {
+    is_async: bool,
     target: ComparableExpr<'a>,
     iter: ComparableExpr<'a>,
     body: Vec<ComparableStmt<'a>>,
     orelse: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAsyncFor<'a> {
-    target: ComparableExpr<'a>,
-    iter: ComparableExpr<'a>,
-    body: Vec<ComparableStmt<'a>>,
-    orelse: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1000,21 +1115,14 @@ pub struct StmtWhile<'a> {
 pub struct StmtIf<'a> {
     test: ComparableExpr<'a>,
     body: Vec<ComparableStmt<'a>>,
-    orelse: Vec<ComparableStmt<'a>>,
+    elif_else_clauses: Vec<ComparableElifElseClause<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtWith<'a> {
+    is_async: bool,
     items: Vec<ComparableWithItem<'a>>,
     body: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAsyncWith<'a> {
-    items: Vec<ComparableWithItem<'a>>,
-    body: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1035,14 +1143,7 @@ pub struct StmtTry<'a> {
     handlers: Vec<ComparableExceptHandler<'a>>,
     orelse: Vec<ComparableStmt<'a>>,
     finalbody: Vec<ComparableStmt<'a>>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtTryStar<'a> {
-    body: Vec<ComparableStmt<'a>>,
-    handlers: Vec<ComparableExceptHandler<'a>>,
-    orelse: Vec<ComparableStmt<'a>>,
-    finalbody: Vec<ComparableStmt<'a>>,
+    is_star: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1079,9 +1180,14 @@ pub struct StmtExpr<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct StmtIpyEscapeCommand<'a> {
+    kind: ast::IpyEscapeKind,
+    value: &'a str,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableStmt<'a> {
     FunctionDef(StmtFunctionDef<'a>),
-    AsyncFunctionDef(StmtAsyncFunctionDef<'a>),
     ClassDef(StmtClassDef<'a>),
     Return(StmtReturn<'a>),
     Delete(StmtDelete<'a>),
@@ -1089,20 +1195,19 @@ pub enum ComparableStmt<'a> {
     AugAssign(StmtAugAssign<'a>),
     AnnAssign(StmtAnnAssign<'a>),
     For(StmtFor<'a>),
-    AsyncFor(StmtAsyncFor<'a>),
     While(StmtWhile<'a>),
     If(StmtIf<'a>),
     With(StmtWith<'a>),
-    AsyncWith(StmtAsyncWith<'a>),
     Match(StmtMatch<'a>),
     Raise(StmtRaise<'a>),
     Try(StmtTry<'a>),
-    TryStar(StmtTryStar<'a>),
+    TypeAlias(StmtTypeAlias<'a>),
     Assert(StmtAssert<'a>),
     Import(StmtImport<'a>),
     ImportFrom(StmtImportFrom<'a>),
     Global(StmtGlobal<'a>),
     Nonlocal(StmtNonlocal<'a>),
+    IpyEscapeCommand(StmtIpyEscapeCommand<'a>),
     Expr(StmtExpr<'a>),
     Pass,
     Break,
@@ -1113,78 +1218,66 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
     fn from(stmt: &'a ast::Stmt) -> Self {
         match stmt {
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+                is_async,
                 name,
-                args,
+                parameters,
                 body,
                 decorator_list,
                 returns,
-                type_comment,
-                range: _range,
+                type_params,
+                range: _,
             }) => Self::FunctionDef(StmtFunctionDef {
+                is_async: *is_async,
                 name: name.as_str(),
-                args: args.into(),
+                parameters: parameters.into(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                name,
-                args,
-                body,
-                decorator_list,
-                returns,
-                type_comment,
-                range: _range,
-            }) => Self::AsyncFunctionDef(StmtAsyncFunctionDef {
-                name: name.as_str(),
-                args: args.into(),
-                body: body.iter().map(Into::into).collect(),
-                decorator_list: decorator_list.iter().map(Into::into).collect(),
-                returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(String::as_str),
+                type_params: type_params.as_ref().map(Into::into),
             }),
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
-                bases,
-                keywords,
+                arguments,
                 body,
                 decorator_list,
-                range: _range,
+                type_params,
+                range: _,
             }) => Self::ClassDef(StmtClassDef {
                 name: name.as_str(),
-                bases: bases.iter().map(Into::into).collect(),
-                keywords: keywords.iter().map(Into::into).collect(),
+                arguments: arguments.as_ref().map(Into::into),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
+                type_params: type_params.as_ref().map(Into::into),
             }),
-            ast::Stmt::Return(ast::StmtReturn {
-                value,
-                range: _range,
-            }) => Self::Return(StmtReturn {
+            ast::Stmt::Return(ast::StmtReturn { value, range: _ }) => Self::Return(StmtReturn {
                 value: value.as_ref().map(Into::into),
             }),
-            ast::Stmt::Delete(ast::StmtDelete {
-                targets,
-                range: _range,
-            }) => Self::Delete(StmtDelete {
+            ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => Self::Delete(StmtDelete {
                 targets: targets.iter().map(Into::into).collect(),
+            }),
+            ast::Stmt::TypeAlias(ast::StmtTypeAlias {
+                range: _,
+                name,
+                type_params,
+                value,
+            }) => Self::TypeAlias(StmtTypeAlias {
+                name: name.into(),
+                type_params: type_params.as_ref().map(Into::into),
+                value: value.into(),
             }),
             ast::Stmt::Assign(ast::StmtAssign {
                 targets,
                 value,
-                type_comment,
-                range: _range,
+                range: _,
             }) => Self::Assign(StmtAssign {
                 targets: targets.iter().map(Into::into).collect(),
                 value: value.into(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target,
                 op,
                 value,
-                range: _range,
+                range: _,
             }) => Self::AugAssign(StmtAugAssign {
                 target: target.into(),
                 op: (*op).into(),
@@ -1195,7 +1288,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 annotation,
                 value,
                 simple,
-                range: _range,
+                range: _,
             }) => Self::AnnAssign(StmtAnnAssign {
                 target: target.into(),
                 annotation: annotation.into(),
@@ -1203,38 +1296,24 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 simple: *simple,
             }),
             ast::Stmt::For(ast::StmtFor {
+                is_async,
                 target,
                 iter,
                 body,
                 orelse,
-                type_comment,
-                range: _range,
+                range: _,
             }) => Self::For(StmtFor {
+                is_async: *is_async,
                 target: target.into(),
                 iter: iter.into(),
                 body: body.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::AsyncFor(ast::StmtAsyncFor {
-                target,
-                iter,
-                body,
-                orelse,
-                type_comment,
-                range: _range,
-            }) => Self::AsyncFor(StmtAsyncFor {
-                target: target.into(),
-                iter: iter.into(),
-                body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::While(ast::StmtWhile {
                 test,
                 body,
                 orelse,
-                range: _range,
+                range: _,
             }) => Self::While(StmtWhile {
                 test: test.into(),
                 body: body.iter().map(Into::into).collect(),
@@ -1243,37 +1322,27 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::If(ast::StmtIf {
                 test,
                 body,
-                orelse,
-                range: _range,
+                elif_else_clauses,
+                range: _,
             }) => Self::If(StmtIf {
                 test: test.into(),
                 body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
+                elif_else_clauses: elif_else_clauses.iter().map(Into::into).collect(),
             }),
             ast::Stmt::With(ast::StmtWith {
+                is_async,
                 items,
                 body,
-                type_comment,
-                range: _range,
+                range: _,
             }) => Self::With(StmtWith {
+                is_async: *is_async,
                 items: items.iter().map(Into::into).collect(),
                 body: body.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::AsyncWith(ast::StmtAsyncWith {
-                items,
-                body,
-                type_comment,
-                range: _range,
-            }) => Self::AsyncWith(StmtAsyncWith {
-                items: items.iter().map(Into::into).collect(),
-                body: body.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::Match(ast::StmtMatch {
                 subject,
                 cases,
-                range: _range,
+                range: _,
             }) => Self::Match(StmtMatch {
                 subject: subject.into(),
                 cases: cases.iter().map(Into::into).collect(),
@@ -1281,7 +1350,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::Raise(ast::StmtRaise {
                 exc,
                 cause,
-                range: _range,
+                range: _,
             }) => Self::Raise(StmtRaise {
                 exc: exc.as_ref().map(Into::into),
                 cause: cause.as_ref().map(Into::into),
@@ -1291,65 +1360,53 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 handlers,
                 orelse,
                 finalbody,
-                range: _range,
+                is_star,
+                range: _,
             }) => Self::Try(StmtTry {
                 body: body.iter().map(Into::into).collect(),
                 handlers: handlers.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
                 finalbody: finalbody.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _range,
-            }) => Self::TryStar(StmtTryStar {
-                body: body.iter().map(Into::into).collect(),
-                handlers: handlers.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                finalbody: finalbody.iter().map(Into::into).collect(),
+                is_star: *is_star,
             }),
             ast::Stmt::Assert(ast::StmtAssert {
                 test,
                 msg,
-                range: _range,
+                range: _,
             }) => Self::Assert(StmtAssert {
                 test: test.into(),
                 msg: msg.as_ref().map(Into::into),
             }),
-            ast::Stmt::Import(ast::StmtImport {
-                names,
-                range: _range,
-            }) => Self::Import(StmtImport {
+            ast::Stmt::Import(ast::StmtImport { names, range: _ }) => Self::Import(StmtImport {
                 names: names.iter().map(Into::into).collect(),
             }),
             ast::Stmt::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
-                range: _range,
+                range: _,
             }) => Self::ImportFrom(StmtImportFrom {
                 module: module.as_deref(),
                 names: names.iter().map(Into::into).collect(),
                 level: *level,
             }),
-            ast::Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _range,
-            }) => Self::Global(StmtGlobal {
+            ast::Stmt::Global(ast::StmtGlobal { names, range: _ }) => Self::Global(StmtGlobal {
                 names: names.iter().map(ast::Identifier::as_str).collect(),
             }),
-            ast::Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _range,
-            }) => Self::Nonlocal(StmtNonlocal {
-                names: names.iter().map(ast::Identifier::as_str).collect(),
-            }),
-            ast::Stmt::Expr(ast::StmtExpr {
+            ast::Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+                Self::Nonlocal(StmtNonlocal {
+                    names: names.iter().map(ast::Identifier::as_str).collect(),
+                })
+            }
+            ast::Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand {
+                kind,
                 value,
-                range: _range,
-            }) => Self::Expr(StmtExpr {
+                range: _,
+            }) => Self::IpyEscapeCommand(StmtIpyEscapeCommand {
+                kind: *kind,
+                value: value.as_str(),
+            }),
+            ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) => Self::Expr(StmtExpr {
                 value: value.into(),
             }),
             ast::Stmt::Pass(_) => Self::Pass,

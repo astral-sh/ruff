@@ -1,0 +1,73 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+Dict(
+    ExprDict {
+        range: 0..25,
+        keys: [
+            Some(
+                Constant(
+                    ExprConstant {
+                        range: 1..4,
+                        value: Str(
+                            StringConstant {
+                                value: "a",
+                                unicode: false,
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+            ),
+            None,
+            Some(
+                Constant(
+                    ExprConstant {
+                        range: 16..19,
+                        value: Str(
+                            StringConstant {
+                                value: "d",
+                                unicode: false,
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+            ),
+        ],
+        values: [
+            Constant(
+                ExprConstant {
+                    range: 6..9,
+                    value: Str(
+                        StringConstant {
+                            value: "b",
+                            unicode: false,
+                            implicit_concatenated: false,
+                        },
+                    ),
+                },
+            ),
+            Name(
+                ExprName {
+                    range: 13..14,
+                    id: "c",
+                    ctx: Load,
+                },
+            ),
+            Constant(
+                ExprConstant {
+                    range: 21..24,
+                    value: Str(
+                        StringConstant {
+                            value: "e",
+                            unicode: false,
+                            implicit_concatenated: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)

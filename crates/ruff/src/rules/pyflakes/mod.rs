@@ -11,17 +11,23 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use rustpython_parser::lexer::LexResult;
+    use ruff_python_parser::lexer::LexResult;
+
     use test_case::test_case;
 
-    use ruff_diagnostics::Diagnostic;
-    use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-    use ruff_textwrap::dedent;
+    use ruff_python_ast::PySourceType;
+    use ruff_python_codegen::Stylist;
+    use ruff_python_index::Indexer;
+    use ruff_python_parser::AsMode;
+    use ruff_python_trivia::textwrap::dedent;
+    use ruff_source_file::Locator;
+    use ruff_text_size::Ranged;
 
     use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::{flags, Settings};
+    use crate::source_kind::SourceKind;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, directives};
 
@@ -107,6 +113,8 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_22.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_23.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_24.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_25.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_26.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -123,6 +131,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_13.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_14.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_15.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_16.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_17.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"))]
@@ -498,8 +508,10 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
+        let source_type = PySourceType::default();
+        let source_kind = SourceKind::Python(contents.to_string());
         let settings = Settings::for_rules(Linter::Pyflakes.rules());
-        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer = Indexer::from_tokens(&tokens, &locator);
@@ -522,9 +534,10 @@ mod tests {
             &directives,
             &settings,
             flags::Noqa::Enabled,
-            None,
+            &source_kind,
+            source_type,
         );
-        diagnostics.sort_by_key(Diagnostic::start);
+        diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics
             .iter()
             .map(|diagnostic| diagnostic.kind.rule())
@@ -2410,6 +2423,45 @@ mod tests {
     }
 
     #[test]
+    fn aliased_submodule_import() {
+        flakes(
+            r#"
+        import fu.bar as baz
+        import fu.bar as baz
+        baz
+        "#,
+            &[Rule::RedefinedWhileUnused],
+        );
+
+        flakes(
+            r#"
+        import fu.bar as baz
+        import baz
+        baz
+        "#,
+            &[Rule::RedefinedWhileUnused],
+        );
+
+        flakes(
+            r#"
+        import fu.bar as baz
+        import fu.bar as bop
+        baz, bop
+        "#,
+            &[],
+        );
+
+        flakes(
+            r#"
+        import foo.baz
+        import foo.baz as foo
+        foo
+        "#,
+            &[Rule::RedefinedWhileUnused],
+        );
+    }
+
+    #[test]
     fn used_package_with_submodule_import() {
         // Usage of package marks submodule imports as used.
         flakes(
@@ -3377,7 +3429,7 @@ mod tests {
     }
 
     #[test]
-    fn type_alias_annotations() {
+    fn use_pep695_type_aliass() {
         flakes(
             r#"
         from typing_extensions import TypeAlias

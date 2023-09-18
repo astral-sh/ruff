@@ -1,8 +1,7 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::Expr;
+use ruff_python_ast::Expr;
+use ruff_python_semantic::{BindingKind, Imported, SemanticModel};
 
-use ruff_python_semantic::{BindingKind, Import, SemanticModel};
-
+#[derive(Debug)]
 pub(super) enum Resolution {
     /// The expression resolves to an irrelevant expression type (e.g., a constant).
     IrrelevantExpression,
@@ -26,22 +25,29 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
         | Expr::ListComp(_)
         | Expr::DictComp(_)
         | Expr::GeneratorExp(_) => Resolution::IrrelevantExpression,
-        Expr::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(name) => {
             semantic
-                .find_binding(id)
-                .map_or(Resolution::IrrelevantBinding, |binding| {
-                    match binding.kind {
+                .resolve_name(name)
+                .map_or(Resolution::IrrelevantBinding, |id| {
+                    match &semantic.binding(id).kind {
+                        BindingKind::Argument => {
+                            // Avoid, e.g., `self.values`.
+                            if matches!(name.id.as_str(), "self" | "cls") {
+                                Resolution::IrrelevantBinding
+                            } else {
+                                Resolution::RelevantLocal
+                            }
+                        }
                         BindingKind::Annotation
-                        | BindingKind::Argument
                         | BindingKind::Assignment
                         | BindingKind::NamedExprAssignment
                         | BindingKind::UnpackedAssignment
                         | BindingKind::LoopVar
                         | BindingKind::Global
                         | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
-                        BindingKind::Import(Import {
-                            qualified_name: module,
-                        }) if module == "pandas" => Resolution::PandasModule,
+                        BindingKind::Import(import) if matches!(import.call_path(), ["pandas"]) => {
+                            Resolution::PandasModule
+                        }
                         _ => Resolution::IrrelevantBinding,
                     }
                 })

@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -46,9 +47,7 @@ pub(crate) fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["logging", "warn"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "warn"]))
     {
         checker
             .diagnostics

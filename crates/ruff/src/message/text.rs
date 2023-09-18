@@ -6,17 +6,16 @@ use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
 use colored::Colorize;
-use ruff_text_size::{TextRange, TextSize};
 
-use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
+use ruff_notebook::NotebookIndex;
+use ruff_source_file::{OneIndexed, SourceLocation};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::fs::relativize_path;
-use crate::jupyter::{JupyterIndex, Notebook};
-use crate::line_width::{LineWidth, TabSize};
+use crate::line_width::{LineWidthBuilder, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use crate::source_kind::SourceKind;
 
 bitflags! {
     #[derive(Default)]
@@ -72,17 +71,14 @@ impl Emitter for TextEmitter {
             )?;
 
             let start_location = message.compute_start_location();
-            let jupyter_index = context
-                .source_kind(message.filename())
-                .and_then(SourceKind::notebook)
-                .map(Notebook::index);
+            let notebook_index = context.notebook_index(message.filename());
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-            let diagnostic_location = if let Some(jupyter_index) = jupyter_index {
+            let diagnostic_location = if let Some(notebook_index) = notebook_index {
                 write!(
                     writer,
                     "cell {cell}{sep}",
-                    cell = jupyter_index
+                    cell = notebook_index
                         .cell(start_location.row.get())
                         .unwrap_or_default(),
                     sep = ":".cyan(),
@@ -90,7 +86,7 @@ impl Emitter for TextEmitter {
 
                 SourceLocation {
                     row: OneIndexed::new(
-                        jupyter_index
+                        notebook_index
                             .cell_row(start_location.row.get())
                             .unwrap_or(1) as usize,
                     )
@@ -109,22 +105,22 @@ impl Emitter for TextEmitter {
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
                     message,
-                    show_fix_status: self.flags.contains(EmitterFlags::SHOW_FIX_STATUS)
+                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS)
                 }
             )?;
 
-            if self.flags.contains(EmitterFlags::SHOW_SOURCE) {
+            if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
                 writeln!(
                     writer,
                     "{}",
                     MessageCodeFrame {
                         message,
-                        jupyter_index
+                        notebook_index
                     }
                 )?;
             }
 
-            if self.flags.contains(EmitterFlags::SHOW_FIX_DIFF) {
+            if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
                 if let Some(diff) = Diff::from_message(message) {
                     writeln!(writer, "{diff}")?;
                 }
@@ -165,7 +161,7 @@ impl Display for RuleCodeAndBody<'_> {
 
 pub(super) struct MessageCodeFrame<'a> {
     pub(crate) message: &'a Message,
-    pub(crate) jupyter_index: Option<&'a JupyterIndex>,
+    pub(crate) notebook_index: Option<&'a NotebookIndex>,
 }
 
 impl Display for MessageCodeFrame<'_> {
@@ -190,14 +186,12 @@ impl Display for MessageCodeFrame<'_> {
         let content_start_index = source_code.line_index(range.start());
         let mut start_index = content_start_index.saturating_sub(2);
 
-        // If we're working on a jupyter notebook, skip the lines which are
+        // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
-        if let Some(jupyter_index) = self.jupyter_index {
-            let content_start_cell = jupyter_index
-                .cell(content_start_index.get())
-                .unwrap_or_default();
+        if let Some(index) = self.notebook_index {
+            let content_start_cell = index.cell(content_start_index.get()).unwrap_or_default();
             while start_index < content_start_index {
-                if jupyter_index.cell(start_index.get()).unwrap_or_default() == content_start_cell {
+                if index.cell(start_index.get()).unwrap_or_default() == content_start_cell {
                     break;
                 }
                 start_index = start_index.saturating_add(1);
@@ -217,14 +211,12 @@ impl Display for MessageCodeFrame<'_> {
             .saturating_add(2)
             .min(OneIndexed::from_zero_indexed(source_code.line_count()));
 
-        // If we're working on a jupyter notebook, skip the lines which are
+        // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
-        if let Some(jupyter_index) = self.jupyter_index {
-            let content_end_cell = jupyter_index
-                .cell(content_end_index.get())
-                .unwrap_or_default();
+        if let Some(index) = self.notebook_index {
+            let content_end_cell = index.cell(content_end_index.get()).unwrap_or_default();
             while end_index > content_end_index {
-                if jupyter_index.cell(end_index.get()).unwrap_or_default() == content_end_cell {
+                if index.cell(end_index.get()).unwrap_or_default() == content_end_cell {
                     break;
                 }
                 end_index = end_index.saturating_sub(1);
@@ -260,10 +252,10 @@ impl Display for MessageCodeFrame<'_> {
             title: None,
             slices: vec![Slice {
                 source: &source.text,
-                line_start: self.jupyter_index.map_or_else(
+                line_start: self.notebook_index.map_or_else(
                     || start_index.get(),
-                    |jupyter_index| {
-                        jupyter_index
+                    |notebook_index| {
+                        notebook_index
                             .cell_row(start_index.get())
                             .unwrap_or_default() as usize
                     },
@@ -293,12 +285,10 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
-    static TAB_SIZE: TabSize = TabSize(4); // TODO(jonathan): use `tab-size`
-
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut line_width = LineWidth::new(TAB_SIZE);
+    let mut line_width = LineWidthBuilder::new(TabSize::default());
 
     for (index, c) in source.char_indices() {
         let old_width = line_width.get();

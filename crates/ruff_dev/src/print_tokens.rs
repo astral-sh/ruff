@@ -5,18 +5,26 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use rustpython_parser::{lexer, Mode};
+use ruff_python_parser::{lexer, Mode};
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
     /// Python file for which to generate the AST.
     #[arg(required = true)]
     file: PathBuf,
+    /// Run in Jupyter mode i.e., allow line magics (`%`, `!`, `?`, `/`, `,`, `;`).
+    #[arg(long)]
+    jupyter: bool,
 }
 
 pub(crate) fn main(args: &Args) -> Result<()> {
     let contents = fs::read_to_string(&args.file)?;
-    for (tok, range) in lexer::lex(&contents, Mode::Module).flatten() {
+    let mode = if args.jupyter {
+        Mode::Ipython
+    } else {
+        Mode::Module
+    };
+    for (tok, range) in lexer::lex(&contents, mode).flatten() {
         println!(
             "{start:#?} {tok:#?} {end:#?}",
             start = range.start(),

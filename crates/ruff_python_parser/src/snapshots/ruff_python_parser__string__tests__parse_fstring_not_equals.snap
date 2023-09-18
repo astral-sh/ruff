@@ -1,0 +1,40 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    FormattedValue(
+        ExprFormattedValue {
+            range: 2..10,
+            value: Compare(
+                ExprCompare {
+                    range: 3..9,
+                    left: Constant(
+                        ExprConstant {
+                            range: 3..4,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    ops: [
+                        NotEq,
+                    ],
+                    comparators: [
+                        Constant(
+                            ExprConstant {
+                                range: 8..9,
+                                value: Int(
+                                    2,
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            debug_text: None,
+            conversion: None,
+            format_spec: None,
+        },
+    ),
+]

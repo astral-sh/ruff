@@ -158,4 +158,20 @@ PD002.py:28:38: PD002 `inplace=True` should be avoided; it has inconsistent beha
    |
    = help: Assign to variable; remove `inplace` arg
 
+PD002.py:33:24: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
+   |
+31 | torch.m.ReLU(inplace=True)  # safe because this isn't a pandas call
+32 | 
+33 | (x.drop(["a"], axis=1, inplace=True))
+   |                        ^^^^^^^^^^^^ PD002
+   |
+   = help: Assign to variable; remove `inplace` arg
+
+ℹ Suggested fix
+30 30 | 
+31 31 | torch.m.ReLU(inplace=True)  # safe because this isn't a pandas call
+32 32 | 
+33    |-(x.drop(["a"], axis=1, inplace=True))
+   33 |+x = (x.drop(["a"], axis=1))
+
 

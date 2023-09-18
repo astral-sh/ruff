@@ -1,22 +1,23 @@
-use crate::comments::{leading_alternate_branch_comments, trailing_comments};
+use ruff_formatter::{format_args, write};
+use ruff_python_ast::{Expr, Stmt, StmtFor};
+use ruff_text_size::Ranged;
+
+use crate::comments::SourceComment;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::node::AstNode;
-use rustpython_parser::ast::{Expr, Ranged, Stmt, StmtFor};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
 
 #[derive(Debug)]
 struct ExprTupleWithoutParentheses<'a>(&'a Expr);
 
 impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.0 {
             Expr::Tuple(expr_tuple) => expr_tuple
                 .format()
-                .with_options(TupleParentheses::StripInsideForLoop)
+                .with_options(TupleParentheses::NeverPreserve)
                 .fmt(f),
             other => maybe_parenthesize_expression(other, self.0, Parenthesize::IfBreaks).fmt(f),
         }
@@ -29,19 +30,19 @@ pub struct FormatStmtFor;
 impl FormatNodeRule<StmtFor> for FormatStmtFor {
     fn fmt_fields(&self, item: &StmtFor, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtFor {
-            range: _,
+            is_async,
             target,
             iter,
             body,
             orelse,
-            type_comment: _,
+            range: _,
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item);
         let body_start = body.first().map_or(iter.end(), Stmt::start);
         let or_else_comments_start =
-            dangling_comments.partition_point(|comment| comment.slice().end() < body_start);
+            dangling_comments.partition_point(|comment| comment.end() < body_start);
 
         let (trailing_condition_comments, or_else_comments) =
             dangling_comments.split_at(or_else_comments_start);
@@ -49,16 +50,21 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
         write!(
             f,
             [
-                text("for"),
-                space(),
-                ExprTupleWithoutParentheses(target.as_ref()),
-                space(),
-                text("in"),
-                space(),
-                maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
-                text(":"),
-                trailing_comments(trailing_condition_comments),
-                block_indent(&body.format())
+                clause_header(
+                    ClauseHeader::For(item),
+                    trailing_condition_comments,
+                    &format_args![
+                        is_async.then_some(format_args![token("async"), space()]),
+                        token("for"),
+                        space(),
+                        ExprTupleWithoutParentheses(target),
+                        space(),
+                        token("in"),
+                        space(),
+                        maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
+                    ],
+                ),
+                clause_body(body, trailing_condition_comments),
             ]
         )?;
 
@@ -74,10 +80,13 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
             write!(
                 f,
                 [
-                    leading_alternate_branch_comments(leading, body.last()),
-                    text("else:"),
-                    trailing_comments(trailing),
-                    block_indent(&orelse.format())
+                    clause_header(
+                        ClauseHeader::OrElse(ElseClause::For(item)),
+                        trailing,
+                        &token("else"),
+                    )
+                    .with_leading_comments(leading, body.last()),
+                    clause_body(orelse, trailing),
                 ]
             )?;
         }
@@ -85,7 +94,11 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
         Ok(())
     }
 
-    fn fmt_dangling_comments(&self, _node: &StmtFor, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }

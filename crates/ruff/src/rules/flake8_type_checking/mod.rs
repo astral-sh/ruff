@@ -15,10 +15,13 @@ mod tests {
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
-    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
+    #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TCH005.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_1.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_10.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_11.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_12.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_13.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_14.pyi"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_2.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_3.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_4.py"))]
@@ -27,12 +30,10 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_7.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_10.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_11.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_12.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_13.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_14.pyi"))]
-    #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TCH005.py"))]
+    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
@@ -88,13 +89,20 @@ mod tests {
         Rule::TypingOnlyStandardLibraryImport,
         Path::new("runtime_evaluated_base_classes_3.py")
     )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("runtime_evaluated_base_classes_4.py")
+    )]
     fn runtime_evaluated_base_classes(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::Settings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_evaluated_base_classes: vec!["pydantic.BaseModel".to_string()],
+                    runtime_evaluated_base_classes: vec![
+                        "pydantic.BaseModel".to_string(),
+                        "sqlalchemy.orm.DeclarativeBase".to_string(),
+                    ],
                     ..Default::default()
                 },
                 ..settings::Settings::for_rule(rule_code)

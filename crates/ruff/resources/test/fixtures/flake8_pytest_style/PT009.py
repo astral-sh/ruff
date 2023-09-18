@@ -80,3 +80,21 @@ class Test(unittest.TestCase):
 
     def test_assert_not_regexp_matches(self):
         self.assertNotRegex("abc", r"abc")  # Error
+
+    def test_fail_if(self):
+        self.failIf("abc")  # Error
+
+    def test_fail_unless(self):
+        self.failUnless("abc")  # Error
+
+    def test_fail_unless_equal(self):
+        self.failUnlessEqual(1, 2)  # Error
+
+    def test_fail_if_equal(self):
+        self.failIfEqual(1, 2)  # Error
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459517
+(self.assertTrue(
+    "piAx_piAy_beta[r][x][y] = {17}".format(
+        self.model.piAx_piAy_beta[r][x][y])))

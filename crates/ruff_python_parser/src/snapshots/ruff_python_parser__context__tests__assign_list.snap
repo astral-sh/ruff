@@ -1,0 +1,67 @@
+---
+source: crates/ruff_python_parser/src/context.rs
+expression: parse_ast
+---
+[
+    Assign(
+        StmtAssign {
+            range: 0..18,
+            targets: [
+                List(
+                    ExprList {
+                        range: 0..6,
+                        elts: [
+                            Name(
+                                ExprName {
+                                    range: 1..2,
+                                    id: "x",
+                                    ctx: Store,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    range: 4..5,
+                                    id: "y",
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Tuple(
+                ExprTuple {
+                    range: 9..18,
+                    elts: [
+                        Constant(
+                            ExprConstant {
+                                range: 10..11,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 13..14,
+                                value: Int(
+                                    2,
+                                ),
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 16..17,
+                                value: Int(
+                                    3,
+                                ),
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+]

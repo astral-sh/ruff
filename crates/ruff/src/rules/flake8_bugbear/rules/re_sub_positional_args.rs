@@ -1,9 +1,10 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Ranged};
+use ruff_python_ast::{self as ast};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -13,8 +14,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// Passing `count`, `maxsplit`, or `flags` as positional arguments to
-/// `re.sub`, re.subn`, or `re.split` can lead to confusion, as most methods in
-/// the `re` module accepts `flags` as the third positional argument, while
+/// `re.sub`, `re.subn`, or `re.split` can lead to confusion, as most methods in
+/// the `re` module accept `flags` as the third positional argument, while
 /// `re.sub`, `re.subn`, and `re.split` have different signatures.
 ///
 /// Instead, pass `count`, `maxsplit`, and `flags` as keyword arguments.
@@ -68,7 +69,7 @@ pub(crate) fn re_sub_positional_args(checker: &mut Checker, call: &ast::ExprCall
         return;
     };
 
-    if call.args.len() > method.num_args() {
+    if call.arguments.args.len() > method.num_args() {
         checker.diagnostics.push(Diagnostic::new(
             ReSubPositionalArgs { method },
             call.range(),

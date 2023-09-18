@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -63,10 +64,12 @@ pub(crate) fn useless_metaclass_type(
 
     let mut diagnostic = Diagnostic::new(UselessMetaclassType, stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let stmt = checker.semantic().stmt();
-        let parent = checker.semantic().stmt_parent();
-        let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator, checker.indexer);
-        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(parent)));
+        let stmt = checker.semantic().current_statement();
+        let parent = checker.semantic().current_statement_parent();
+        let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
+        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(
+            checker.semantic().current_statement_parent_id(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

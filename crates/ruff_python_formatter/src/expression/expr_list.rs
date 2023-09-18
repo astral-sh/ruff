@@ -1,10 +1,13 @@
-use crate::comments::{dangling_comments, CommentLinePosition};
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
-use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::{format_args, write};
+use ruff_formatter::prelude::format_with;
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::{ExprList, Ranged};
+use ruff_python_ast::ExprList;
+use ruff_text_size::Ranged;
+
+use crate::comments::SourceComment;
+use crate::expression::parentheses::{
+    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprList;
@@ -18,38 +21,11 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
-        // The empty list is special because there can be dangling comments, and they can be in two
-        // positions:
-        // ```python
-        // a3 = [  # end-of-line
-        //     # own line
-        // ]
-        // ```
-        // In all other cases comments get assigned to a list element
         if elts.is_empty() {
-            let end_of_line_split = dangling.partition_point(|comment| {
-                comment.line_position() == CommentLinePosition::EndOfLine
-            });
-            debug_assert!(dangling[end_of_line_split..]
-                .iter()
-                .all(|comment| comment.line_position() == CommentLinePosition::OwnLine));
-            return write!(
-                f,
-                [group(&format_args![
-                    text("["),
-                    dangling_comments(&dangling[..end_of_line_split]),
-                    soft_block_indent(&dangling_comments(&dangling[end_of_line_split..])),
-                    text("]")
-                ])]
-            );
+            return empty_parenthesized("[", dangling, "]").fmt(f);
         }
-
-        debug_assert!(
-            dangling.is_empty(),
-            "A non-empty expression list has dangling comments"
-        );
 
         let items = format_with(|f| {
             f.join_comma_separated(item.end())
@@ -57,10 +33,16 @@ impl FormatNodeRule<ExprList> for FormatExprList {
                 .finish()
         });
 
-        parenthesized("[", &items, "]").fmt(f)
+        parenthesized("[", &items, "]")
+            .with_dangling_comments(dangling)
+            .fmt(f)
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprList, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`
         Ok(())
     }

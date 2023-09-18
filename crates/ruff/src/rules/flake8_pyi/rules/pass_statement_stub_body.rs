@@ -1,11 +1,31 @@
-use rustpython_parser::ast::{Ranged, Stmt};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Stmt;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for `pass` statements in empty stub bodies.
+///
+/// ## Why is this bad?
+/// For consistency, empty stub bodies should contain `...` instead of `pass`.
+///
+/// Additionally, an ellipsis better conveys the intent of the stub body (that
+/// the body has been implemented, but has been intentionally left blank to
+/// document the interface).
+///
+/// ## Example
+/// ```python
+/// def foo(bar: int) -> list[int]:
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar: int) -> list[int]: ...
+/// ```
 #[violation]
 pub struct PassStatementStubBody;
 
@@ -22,17 +42,16 @@ impl AlwaysAutofixableViolation for PassStatementStubBody {
 
 /// PYI009
 pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
-    if body.len() != 1 {
+    let [Stmt::Pass(pass)] = body else {
         return;
-    }
-    if body[0].is_pass_stmt() {
-        let mut diagnostic = Diagnostic::new(PassStatementStubBody, body[0].range());
-        if checker.patch(Rule::PassStatementStubBody) {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                format!("..."),
-                body[0].range(),
-            )));
-        };
-        checker.diagnostics.push(diagnostic);
-    }
+    };
+
+    let mut diagnostic = Diagnostic::new(PassStatementStubBody, pass.range());
+    if checker.patch(Rule::PassStatementStubBody) {
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            format!("..."),
+            pass.range(),
+        )));
+    };
+    checker.diagnostics.push(diagnostic);
 }

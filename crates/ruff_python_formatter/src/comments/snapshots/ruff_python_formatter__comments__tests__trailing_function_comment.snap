@@ -34,15 +34,15 @@ expression: comments.debug(test_case.source_code)
         ],
     },
     Node {
-        kind: StmtFunctionDef,
-        range: 193..237,
-        source: `def other(y, z):⏎`,
+        kind: StmtIf,
+        range: 214..237,
+        source: `if y == z:⏎`,
     }: {
         "leading": [],
         "dangling": [],
         "trailing": [
             SourceComment {
-                text: "# Trailing `other` function comment",
+                text: "# Trailing `if` statement comment",
                 position: OwnLine,
                 formatted: false,
             },
@@ -57,7 +57,22 @@ expression: comments.debug(test_case.source_code)
         "dangling": [],
         "trailing": [
             SourceComment {
-                text: "# Trailing `if` comment",
+                text: "# Trailing `pass` comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtFunctionDef,
+        range: 333..357,
+        source: `def func():⏎`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing `func` function comment",
                 position: OwnLine,
                 formatted: false,
             },

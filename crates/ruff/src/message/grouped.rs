@@ -4,16 +4,15 @@ use std::num::NonZeroUsize;
 
 use colored::Colorize;
 
-use ruff_python_ast::source_code::OneIndexed;
+use ruff_notebook::NotebookIndex;
+use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
-use crate::jupyter::{JupyterIndex, Notebook};
 use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
-use crate::source_kind::SourceKind;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
@@ -66,10 +65,7 @@ impl Emitter for GroupedEmitter {
                     writer,
                     "{}",
                     DisplayGroupedMessage {
-                        jupyter_index: context
-                            .source_kind(message.filename())
-                            .and_then(SourceKind::notebook)
-                            .map(Notebook::index),
+                        notebook_index: context.notebook_index(message.filename()),
                         message,
                         show_fix_status: self.show_fix_status,
                         show_source: self.show_source,
@@ -96,7 +92,7 @@ struct DisplayGroupedMessage<'a> {
     show_source: bool,
     row_length: NonZeroUsize,
     column_length: NonZeroUsize,
-    jupyter_index: Option<&'a JupyterIndex>,
+    notebook_index: Option<&'a NotebookIndex>,
 }
 
 impl Display for DisplayGroupedMessage<'_> {
@@ -114,7 +110,7 @@ impl Display for DisplayGroupedMessage<'_> {
         )?;
 
         // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-        let (row, col) = if let Some(jupyter_index) = self.jupyter_index {
+        let (row, col) = if let Some(jupyter_index) = self.notebook_index {
             write!(
                 f,
                 "cell {cell}{sep}",
@@ -154,7 +150,7 @@ impl Display for DisplayGroupedMessage<'_> {
                 "{}",
                 MessageCodeFrame {
                     message,
-                    jupyter_index: self.jupyter_index
+                    notebook_index: self.notebook_index
                 }
             )?;
         }

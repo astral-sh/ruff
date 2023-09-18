@@ -1,0 +1,70 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    Constant(
+        ExprConstant {
+            range: 2..6,
+            value: Str(
+                StringConstant {
+                    value: "mix ",
+                    unicode: false,
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    FormattedValue(
+        ExprFormattedValue {
+            range: 6..13,
+            value: Name(
+                ExprName {
+                    range: 7..11,
+                    id: "user",
+                    ctx: Load,
+                },
+            ),
+            debug_text: Some(
+                DebugText {
+                    leading: "",
+                    trailing: "=",
+                },
+            ),
+            conversion: None,
+            format_spec: None,
+        },
+    ),
+    Constant(
+        ExprConstant {
+            range: 13..28,
+            value: Str(
+                StringConstant {
+                    value: " with text and ",
+                    unicode: false,
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    FormattedValue(
+        ExprFormattedValue {
+            range: 28..37,
+            value: Name(
+                ExprName {
+                    range: 29..35,
+                    id: "second",
+                    ctx: Load,
+                },
+            ),
+            debug_text: Some(
+                DebugText {
+                    leading: "",
+                    trailing: "=",
+                },
+            ),
+            conversion: None,
+            format_spec: None,
+        },
+    ),
+]

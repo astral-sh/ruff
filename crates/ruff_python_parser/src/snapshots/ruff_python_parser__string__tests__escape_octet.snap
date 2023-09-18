@@ -1,0 +1,28 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..14,
+            value: Constant(
+                ExprConstant {
+                    range: 0..14,
+                    value: Bytes(
+                        BytesConstant {
+                            value: [
+                                35,
+                                97,
+                                4,
+                                83,
+                                52,
+                            ],
+                            implicit_concatenated: false,
+                        },
+                    ),
+                },
+            ),
+        },
+    ),
+]

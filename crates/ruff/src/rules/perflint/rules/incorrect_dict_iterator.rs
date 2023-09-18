@@ -1,13 +1,11 @@
 use std::fmt;
 
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Expr;
-use rustpython_parser::{ast, lexer, Mode, Tok};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
-use rustpython_parser::ast::Ranged;
+use ruff_python_ast as ast;
+use ruff_python_ast::{Arguments, Expr};
+use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -29,16 +27,16 @@ use crate::registry::AsRule;
 ///
 /// ## Example
 /// ```python
-/// some_dict = {"a": 1, "b": 2}
-/// for _, val in some_dict.items():
-///     print(val)
+/// obj = {"a": 1, "b": 2}
+/// for key, value in obj.items():
+///     print(value)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// some_dict = {"a": 1, "b": 2}
-/// for val in some_dict.values():
-///     print(val)
+/// obj = {"a": 1, "b": 2}
+/// for value in obj.values():
+///     print(value)
 /// ```
 #[violation]
 pub struct IncorrectDictIterator {
@@ -59,30 +57,35 @@ impl AlwaysAutofixableViolation for IncorrectDictIterator {
 }
 
 /// PERF102
-pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
+pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
         return;
     };
-    if elts.len() != 2 {
+    let [key, value] = elts.as_slice() else {
         return;
-    }
-    let Expr::Call(ast::ExprCall { func, args, .. }) = iter else {
+    };
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: Arguments { args, .. },
+        ..
+    }) = stmt_for.iter.as_ref()
+    else {
         return;
     };
     if !args.is_empty() {
         return;
     }
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
         return;
     };
     if attr != "items" {
         return;
     }
 
-    let unused_key = is_ignored_tuple_or_name(&elts[0]);
-    let unused_value = is_ignored_tuple_or_name(&elts[1]);
-
-    match (unused_key, unused_value) {
+    match (
+        is_unused(key, checker.semantic()),
+        is_unused(value, checker.semantic()),
+    ) {
         (true, true) => {
             // Both the key and the value are unused.
         }
@@ -98,14 +101,12 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
                 func.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(range) = attribute_range(value.end(), checker.locator) {
-                    let replace_attribute = Edit::range_replacement("values".to_string(), range);
-                    let replace_target = Edit::range_replacement(
-                        checker.locator.slice(elts[1].range()).to_string(),
-                        target.range(),
-                    );
-                    diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
-                }
+                let replace_attribute = Edit::range_replacement("values".to_string(), attr.range());
+                let replace_target = Edit::range_replacement(
+                    checker.locator().slice(value).to_string(),
+                    stmt_for.target.range(),
+                );
+                diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -118,14 +119,12 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
                 func.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(range) = attribute_range(value.end(), checker.locator) {
-                    let replace_attribute = Edit::range_replacement("keys".to_string(), range);
-                    let replace_target = Edit::range_replacement(
-                        checker.locator.slice(elts[0].range()).to_string(),
-                        target.range(),
-                    );
-                    diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
-                }
+                let replace_attribute = Edit::range_replacement("keys".to_string(), attr.range());
+                let replace_target = Edit::range_replacement(
+                    checker.locator().slice(key).to_string(),
+                    stmt_for.target.range(),
+                );
+                diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -147,24 +146,35 @@ impl fmt::Display for DictSubset {
     }
 }
 
-/// Returns `true` if the given expression is either an ignored value or a tuple of ignored values.
-fn is_ignored_tuple_or_name(expr: &Expr) -> bool {
+/// Returns `true` if the given expression is either an unused value or a tuple of unused values.
+fn is_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_ignored_tuple_or_name),
-        Expr::Name(ast::ExprName { id, .. }) => id == "_",
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().all(|expr| is_unused(expr, semantic))
+        }
+        Expr::Name(ast::ExprName { id, .. }) => {
+            // Treat a variable as used if it has any usages, _or_ it's shadowed by another variable
+            // with usages.
+            //
+            // If we don't respect shadowing, we'll incorrectly flag `bar` as unused in:
+            // ```python
+            // from random import random
+            //
+            // for bar in range(10):
+            //     if random() > 0.5:
+            //         break
+            // else:
+            //     bar = 1
+            //
+            // print(bar)
+            // ```
+            let scope = semantic.current_scope();
+            scope
+                .get_all(id)
+                .map(|binding_id| semantic.binding(binding_id))
+                .filter(|binding| binding.start() >= expr.start())
+                .all(|binding| !binding.is_used())
+        }
         _ => false,
     }
-}
-
-/// Returns the range of the attribute identifier after the given location, if any.
-fn attribute_range(at: TextSize, locator: &Locator) -> Option<TextRange> {
-    lexer::lex_starts_at(locator.after(at), Mode::Expression, at)
-        .flatten()
-        .find_map(|(tok, range)| {
-            if matches!(tok, Tok::Name { .. }) {
-                Some(range)
-            } else {
-                None
-            }
-        })
 }

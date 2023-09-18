@@ -1,13 +1,14 @@
 use log::error;
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Stmt, Suite};
-use rustpython_parser::Parse;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_python_codegen::Stylist;
+use ruff_python_parser::parse_suite;
+use ruff_source_file::Locator;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::importer::Importer;
 use crate::registry::Rule;
@@ -90,7 +91,7 @@ fn add_required_import(
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
-    is_stub: bool,
+    source_type: PySourceType,
 ) -> Option<Diagnostic> {
     // Don't add imports to semantically-empty files.
     if python_ast.iter().all(is_docstring_stmt) {
@@ -98,7 +99,7 @@ fn add_required_import(
     }
 
     // We don't need to add `__future__` imports to stubs.
-    if is_stub && required_import.is_future_import() {
+    if source_type.is_stub() && required_import.is_future_import() {
         return None;
     }
 
@@ -130,14 +131,14 @@ pub(crate) fn add_required_imports(
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
-    is_stub: bool,
+    source_type: PySourceType,
 ) -> Vec<Diagnostic> {
     settings
         .isort
         .required_imports
         .iter()
         .flat_map(|required_import| {
-            let Ok(body) = Suite::parse(required_import, "<filename>") else {
+            let Ok(body) = parse_suite(required_import, "<filename>") else {
                 error!("Failed to parse required import: `{}`", required_import);
                 return vec![];
             };
@@ -171,7 +172,7 @@ pub(crate) fn add_required_imports(
                             locator,
                             stylist,
                             settings,
-                            is_stub,
+                            source_type,
                         )
                     })
                     .collect(),
@@ -189,7 +190,7 @@ pub(crate) fn add_required_imports(
                             locator,
                             stylist,
                             settings,
-                            is_stub,
+                            source_type,
                         )
                     })
                     .collect(),

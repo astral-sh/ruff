@@ -1,7 +1,7 @@
 """
 Should emit:
-B009 - Line 19, 20, 21, 22, 23, 24
-B010 - Line 40, 41, 42, 43, 44, 45
+B009 - Lines 19-31
+B010 - Lines 40-45
 """
 
 # Valid getattr usage
@@ -24,6 +24,16 @@ getattr(foo, r"abc123")
 _ = lambda x: getattr(x, "bar")
 if getattr(x, "bar"):
     pass
+getattr(1, "real")
+getattr(1., "real")
+getattr(1.0, "real")
+getattr(1j, "real")
+getattr(True, "real")
+getattr(x := 1, "real")
+getattr(x + y, "real")
+getattr("foo"
+        "bar", "real")
+
 
 # Valid setattr usage
 setattr(foo, bar, None)
@@ -43,3 +53,6 @@ setattr(foo, "__123abc__", None)
 setattr(foo, "abc123", None)
 setattr(foo, r"abc123", None)
 setattr(foo.bar, r"baz", None)
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
+assert getattr(func, '_rpc')is True

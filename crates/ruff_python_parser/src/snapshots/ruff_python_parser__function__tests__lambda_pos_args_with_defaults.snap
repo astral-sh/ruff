@@ -1,0 +1,91 @@
+---
+source: crates/ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        Expr(
+            StmtExpr {
+                range: 0..23,
+                value: Lambda(
+                    ExprLambda {
+                        range: 0..23,
+                        parameters: Some(
+                            Parameters {
+                                range: 7..20,
+                                posonlyargs: [],
+                                args: [
+                                    ParameterWithDefault {
+                                        range: 7..8,
+                                        parameter: Parameter {
+                                            range: 7..8,
+                                            name: Identifier {
+                                                id: "a",
+                                                range: 7..8,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: None,
+                                    },
+                                    ParameterWithDefault {
+                                        range: 10..14,
+                                        parameter: Parameter {
+                                            range: 10..11,
+                                            name: Identifier {
+                                                id: "b",
+                                                range: 10..11,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: Some(
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 12..14,
+                                                    value: Int(
+                                                        20,
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                    ParameterWithDefault {
+                                        range: 16..20,
+                                        parameter: Parameter {
+                                            range: 16..17,
+                                            name: Identifier {
+                                                id: "c",
+                                                range: 16..17,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: Some(
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 18..20,
+                                                    value: Int(
+                                                        30,
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ],
+                                vararg: None,
+                                kwonlyargs: [],
+                                kwarg: None,
+                            },
+                        ),
+                        body: Constant(
+                            ExprConstant {
+                                range: 22..23,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+)

@@ -1,11 +1,11 @@
-use itertools::izip;
 use log::error;
-use once_cell::unsync::Lazy;
-use rustpython_parser::ast::{CmpOp, Expr, Ranged};
+use ruff_python_ast::{CmpOp, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
+use ruff_python_parser::locate_cmp_ops;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -77,16 +77,21 @@ pub(crate) fn invalid_literal_comparison(
     comparators: &[Expr],
     expr: &Expr,
 ) {
-    let located = Lazy::new(|| helpers::locate_cmp_ops(expr, checker.locator));
+    let mut lazy_located = None;
     let mut left = left;
-    for (index, (op, right)) in izip!(ops, comparators).enumerate() {
+    for (index, (op, right)) in ops.iter().zip(comparators).enumerate() {
         if matches!(op, CmpOp::Is | CmpOp::IsNot)
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right))
         {
             let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(located_op) = &located.get(index) {
+                if lazy_located.is_none() {
+                    lazy_located = Some(locate_cmp_ops(expr, checker.locator().contents()));
+                }
+                if let Some(located_op) =
+                    lazy_located.as_ref().and_then(|located| located.get(index))
+                {
                     assert_eq!(located_op.op, *op);
                     if let Some(content) = match located_op.op {
                         CmpOp::Is => Some("==".to_string()),

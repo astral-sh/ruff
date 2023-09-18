@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, Stmt, StmtClassDef};
+use ruff_python_ast::{self as ast, Constant, Expr, Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -70,7 +70,7 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
                                 Expr::Constant(ast::ExprConstant {
                                     value: Constant::Str(_),
                                     ..
-                                }) | Expr::JoinedStr(_)
+                                }) | Expr::FString(_)
                             ) {
                                 checker
                                     .diagnostics
@@ -92,7 +92,7 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
                             Expr::Constant(ast::ExprConstant {
                                 value: Constant::Str(_),
                                 ..
-                            }) | Expr::JoinedStr(_)
+                            }) | Expr::FString(_)
                         ) {
                             checker
                                 .diagnostics

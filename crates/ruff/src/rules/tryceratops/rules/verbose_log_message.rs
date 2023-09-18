@@ -1,9 +1,10 @@
-use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
@@ -67,7 +68,8 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
 
         // Find all calls to `logging.exception`.
         let calls = {
-            let mut visitor = LoggerCandidateVisitor::new(checker.semantic());
+            let mut visitor =
+                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
             visitor.visit_body(body);
             visitor.calls
         };
@@ -78,7 +80,7 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
                     // Collect all referenced names in the `logging.exception` call.
                     let names: Vec<&ast::ExprName> = {
                         let mut names = Vec::new();
-                        for arg in &expr.args {
+                        for arg in &expr.arguments.args {
                             let mut visitor = NameVisitor::default();
                             visitor.visit_expr(arg);
                             names.extend(visitor.names);

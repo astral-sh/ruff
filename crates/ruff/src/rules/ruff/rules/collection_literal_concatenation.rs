@@ -1,10 +1,9 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, ExprContext, Operator, Ranged};
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::has_comments;
+use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
+use ruff_text_size::{Ranged, TextRange};
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -40,7 +39,7 @@ use crate::registry::AsRule;
 /// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
 #[violation]
 pub struct CollectionLiteralConcatenation {
-    expr: String,
+    expression: SourceCodeSnippet,
 }
 
 impl Violation for CollectionLiteralConcatenation {
@@ -48,13 +47,21 @@ impl Violation for CollectionLiteralConcatenation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CollectionLiteralConcatenation { expr } = self;
-        format!("Consider `{expr}` instead of concatenation")
+        let CollectionLiteralConcatenation { expression } = self;
+        if let Some(expression) = expression.full_display() {
+            format!("Consider `{expression}` instead of concatenation")
+        } else {
+            format!("Consider iterable unpacking instead of concatenation")
+        }
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let CollectionLiteralConcatenation { expr } = self;
-        Some(format!("Replace with `{expr}`"))
+        let CollectionLiteralConcatenation { expression } = self;
+        if let Some(expression) = expression.full_display() {
+            Some(format!("Replace with `{expression}`"))
+        } else {
+            Some(format!("Replace with iterable unpacking"))
+        }
     }
 }
 
@@ -167,7 +174,7 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
 pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
     // If the expression is already a child of an addition, we'll have analyzed it already.
     if matches!(
-        checker.semantic().expr_parent(),
+        checker.semantic().current_expression_parent(),
         Some(Expr::BinOp(ast::ExprBinOp {
             op: Operator::Add,
             ..
@@ -187,12 +194,12 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
     };
     let mut diagnostic = Diagnostic::new(
         CollectionLiteralConcatenation {
-            expr: contents.clone(),
+            expression: SourceCodeSnippet::new(contents.clone()),
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(expr, checker.locator) {
+        if !checker.indexer().has_comments(expr, checker.locator()) {
             // This suggestion could be unsafe if the non-literal expression in the
             // expression has overridden the `__add__` (or `__radd__`) magic methods.
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

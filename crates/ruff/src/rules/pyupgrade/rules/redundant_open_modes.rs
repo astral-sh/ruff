@@ -1,15 +1,14 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
-use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::{self as ast, Constant, Expr, PySourceType};
+use ruff_python_parser::{lexer, AsMode};
 use ruff_python_semantic::SemanticModel;
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -64,26 +63,32 @@ impl AlwaysAutofixableViolation for RedundantOpenModes {
 }
 
 /// UP015
-pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
-    let Some((mode_param, keywords)) = match_open(expr, checker.semantic()) else {
+pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) {
+    if !is_open_builtin(call.func.as_ref(), checker.semantic()) {
         return;
-    };
-    match mode_param {
+    }
+
+    match call.arguments.find_argument("mode", 1) {
         None => {
-            if !keywords.is_empty() {
-                if let Some(keyword) = find_keyword(keywords, MODE_KEYWORD_ARGUMENT) {
+            if !call.arguments.is_empty() {
+                if let Some(keyword) = call.arguments.find_keyword(MODE_KEYWORD_ARGUMENT) {
                     if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(mode_param_value),
+                        value:
+                            Constant::Str(ast::StringConstant {
+                                value: mode_param_value,
+                                ..
+                            }),
                         ..
                     }) = &keyword.value
                     {
-                        if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
+                        if let Ok(mode) = OpenMode::from_str(mode_param_value) {
                             checker.diagnostics.push(create_check(
-                                expr,
+                                call,
                                 &keyword.value,
                                 mode.replacement_value(),
-                                checker.locator,
+                                checker.locator(),
                                 checker.patch(Rule::RedundantOpenModes),
+                                checker.source_type,
                             ));
                         }
                     }
@@ -96,13 +101,14 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                 ..
             }) = &mode_param
             {
-                if let Ok(mode) = OpenMode::from_str(value.as_str()) {
+                if let Ok(mode) = OpenMode::from_str(value) {
                     checker.diagnostics.push(create_check(
-                        expr,
+                        call,
                         mode_param,
                         mode.replacement_value(),
-                        checker.locator,
+                        checker.locator(),
                         checker.patch(Rule::RedundantOpenModes),
+                        checker.source_type,
                     ));
                 }
             }
@@ -113,25 +119,12 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
 const OPEN_FUNC_NAME: &str = "open";
 const MODE_KEYWORD_ARGUMENT: &str = "mode";
 
-fn match_open<'a>(
-    expr: &'a Expr,
-    model: &SemanticModel,
-) -> Option<(Option<&'a Expr>, &'a [Keyword])> {
-    let ast::ExprCall {
-        func,
-        args,
-        keywords,
-        range: _,
-    } = expr.as_call_expr()?;
-
-    let ast::ExprName { id, .. } = func.as_name_expr()?;
-
-    if id.as_str() == OPEN_FUNC_NAME && model.is_builtin(id) {
-        // Return the "open mode" parameter and keywords.
-        Some((args.get(1), keywords))
-    } else {
-        None
-    }
+/// Returns `true` if the given `call` is a call to the `open` builtin.
+fn is_open_builtin(func: &Expr, semantic: &SemanticModel) -> bool {
+    let Some(ast::ExprName { id, .. }) = func.as_name_expr() else {
+        return false;
+    };
+    id.as_str() == OPEN_FUNC_NAME && semantic.is_builtin(id)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -176,12 +169,13 @@ impl OpenMode {
     }
 }
 
-fn create_check(
-    expr: &Expr,
+fn create_check<T: Ranged>(
+    expr: &T,
     mode_param: &Expr,
     replacement_value: Option<&str>,
     locator: &Locator,
     patch: bool,
+    source_type: PySourceType,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
@@ -197,22 +191,28 @@ fn create_check(
             )));
         } else {
             diagnostic.try_set_fix(|| {
-                create_remove_param_fix(locator, expr, mode_param).map(Fix::automatic)
+                create_remove_param_fix(locator, expr, mode_param, source_type).map(Fix::automatic)
             });
         }
     }
     diagnostic
 }
 
-fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Edit> {
-    let content = locator.slice(expr.range());
+fn create_remove_param_fix<T: Ranged>(
+    locator: &Locator,
+    expr: &T,
+    mode_param: &Expr,
+    source_type: PySourceType,
+) -> Result<Edit> {
+    let content = locator.slice(expr);
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
     let mut fix_start: Option<TextSize> = None;
     let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (tok, range) in lexer::lex_starts_at(content, Mode::Module, expr.start()).flatten() {
+    for (tok, range) in lexer::lex_starts_at(content, source_type.as_mode(), expr.start()).flatten()
+    {
         if range.start() == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;
