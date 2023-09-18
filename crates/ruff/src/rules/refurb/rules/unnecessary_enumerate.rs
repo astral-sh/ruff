@@ -120,9 +120,6 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
         return;
     };
 
-    // Get the `start` argument, if it is a constant integer.
-    let start = start(arguments);
-
     // Get the first argument, which is the sequence to iterate over.
     let Some(Expr::Name(ast::ExprName { id: sequence, .. })) = arguments.args.first() else {
         return;
@@ -141,6 +138,9 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
         }
         (true, false) => {
             // The index is unused, so replace with `for value in sequence`.
+
+            // Get the `start` argument, if it is a constant integer.
+            let start = start(arguments);
 
             // Attempt to create a suggested iterator replacement, as it's used
             // in both the message and the autofix.
@@ -187,6 +187,9 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
         }
         (false, true) => {
             // The value is unused, so replace with `for index in range(len(sequence))`.
+
+            // Get the `start` argument, if it is a constant integer.
+            let start = start(arguments);
 
             // Create suggested iterator replacement, as it's used in both the
             // message and the autofix.
