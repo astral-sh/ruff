@@ -429,7 +429,6 @@ pub type FormatResult<F> = Result<F, FormatError>;
 /// impl Format<SimpleFormatContext> for Paragraph {
 ///     fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
 ///         write!(f, [
-///             hard_line_break(),
 ///             text(&self.0, None),
 ///             hard_line_break(),
 ///         ])
@@ -440,7 +439,7 @@ pub type FormatResult<F> = Result<F, FormatError>;
 /// let paragraph = Paragraph(String::from("test"));
 /// let formatted = format!(SimpleFormatContext::default(), [paragraph])?;
 ///
-/// assert_eq!("\ntest\n", formatted.print()?.as_code());
+/// assert_eq!("test\n", formatted.print()?.as_code());
 /// # Ok(())
 /// # }
 /// ```
