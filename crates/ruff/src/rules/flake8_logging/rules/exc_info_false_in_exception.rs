@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// The `exception()` method captures the exception automatically. Disabling this by setting
 /// `exc_info=False` is the same as using `error()`, which is clearer and doesn’t need the
-/// `exc_info`argument. This rule detects `exception()` calls with an exc_info argument that is
+/// `exc_info` argument. This rule detects `exception()` calls with an exc_info argument that is
 /// falsy.
 ///
 /// ## Example
