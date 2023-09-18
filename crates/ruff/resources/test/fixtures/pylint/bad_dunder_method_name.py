@@ -59,6 +59,10 @@ class Apples:
     def __attrs_init__(self):
         pass
 
+    # Allow __html__, used by Jinja2 and Django.
+    def __html__(self):
+        pass
+
 
 def __foo_bar__():  # this is not checked by the [bad-dunder-name] rule
     ...
