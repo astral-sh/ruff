@@ -27,10 +27,10 @@ use crate::registry::AsRule;
 ///
 /// ## Example
 /// ```python
-/// for index, value in enumerate(sequence):
+/// for index, _ in enumerate(sequence):
 ///     print(index)
 ///
-/// for index, value in enumerate(sequence):
+/// for _, value in enumerate(sequence):
 ///     print(value)
 /// ```
 ///
