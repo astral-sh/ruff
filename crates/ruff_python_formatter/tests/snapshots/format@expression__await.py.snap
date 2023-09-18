@@ -47,6 +47,13 @@ await (yield foo)
 await (not foo)
 await 1, 2, 3
 await (1, 2, 3)
+await ( # comment
+    [foo]
+)
+await (
+    # comment
+    [foo]
+)
 ```
 
 ## Output
@@ -98,9 +105,9 @@ await ""
 await f""
 await f""
 await [foo]
-await ([foo])
+await [foo]
 await {foo}
-await ({foo})
+await {foo}
 await (lambda foo: foo)
 await (foo or bar)
 await (foo * bar)
@@ -108,6 +115,13 @@ await (yield foo)
 await (not foo)
 await 1, 2, 3
 await (1, 2, 3)
+await (  # comment
+    [foo]
+)
+await (
+    # comment
+    [foo]
+)
 ```
 
 

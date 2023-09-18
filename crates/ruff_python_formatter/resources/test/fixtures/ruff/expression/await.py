@@ -41,3 +41,10 @@ await (yield foo)
 await (not foo)
 await 1, 2, 3
 await (1, 2, 3)
+await ( # comment
+    [foo]
+)
+await (
+    # comment
+    [foo]
+)
