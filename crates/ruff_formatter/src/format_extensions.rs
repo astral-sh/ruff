@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::prelude::*;
-use std::cell::RefCell;
+use std::cell::OnceCell;
 use std::marker::PhantomData;
 
 use crate::Buffer;
@@ -70,7 +70,7 @@ impl<T, Context> MemoizeFormat<Context> for T where T: Format<Context> {}
 #[derive(Debug)]
 pub struct Memoized<F, Context> {
     inner: F,
-    memory: RefCell<Option<FormatResult<Option<FormatElement>>>>,
+    memory: OnceCell<FormatResult<Option<FormatElement>>>,
     options: PhantomData<Context>,
 }
 
@@ -81,7 +81,7 @@ where
     fn new(inner: F) -> Self {
         Self {
             inner,
-            memory: RefCell::new(None),
+            memory: OnceCell::new(),
             options: PhantomData,
         }
     }
@@ -142,10 +142,7 @@ where
     /// # }
     /// ```
     pub fn inspect(&mut self, f: &mut Formatter<Context>) -> FormatResult<&[FormatElement]> {
-        let result = self
-            .memory
-            .get_mut()
-            .get_or_insert_with(|| f.intern(&self.inner));
+        let result = self.memory.get_or_init(|| f.intern(&self.inner));
 
         match result.as_ref() {
             Ok(Some(FormatElement::Interned(interned))) => Ok(&**interned),
@@ -161,8 +158,7 @@ where
     F: Format<Context>,
 {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        let mut memory = self.memory.borrow_mut();
-        let result = memory.get_or_insert_with(|| f.intern(&self.inner));
+        let result = self.memory.get_or_init(|| f.intern(&self.inner));
 
         match result {
             Ok(Some(elements)) => {
