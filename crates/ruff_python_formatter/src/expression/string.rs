@@ -548,11 +548,15 @@ fn preferred_quotes(
                                     // `"""` or `'''`
                                     chars.next();
                                     uses_triple_quotes = true;
+                                    break;
                                 }
                                 Some(_) => {}
                                 None => {
-                                    // Handle `''' ""'''`
+                                    // Handle `''' ""'''`. At this point we have consumed both
+                                    // double quotes, so on the next iteration the iterator is empty
+                                    // and we'd miss the string ending with a preferred quote
                                     uses_triple_quotes = true;
+                                    break;
                                 }
                             }
                         }
@@ -562,6 +566,7 @@ fn preferred_quotes(
                         None => {
                             // Trailing quote at the end of the comment
                             uses_triple_quotes = true;
+                            break;
                         }
                     }
                 }
