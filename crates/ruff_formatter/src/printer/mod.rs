@@ -1183,7 +1183,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                 // line break should be printed as regular line break
                                 return Ok(Fits::Yes);
                             }
-                            MeasureMode::AllLines => {
+                            MeasureMode::AllLines | MeasureMode::AllLinesAllowTextOverflow => {
                                 // Continue measuring on the next line
                                 self.state.line_width = 0;
                                 self.state.pending_indent = args.indention();
@@ -1370,32 +1370,42 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 condition,
                 propagate_expand,
             })) => {
-                let condition_met = match condition {
-                    Some(condition) => {
-                        let group_mode = match condition.group_id {
-                            Some(group_id) => self.group_modes().get_print_mode(group_id)?,
-                            None => args.mode(),
+                match args.mode() {
+                    PrintMode::Expanded => {
+                        // As usual, nothing to measure
+                        self.stack.push(TagKind::FitsExpanded, args);
+                    }
+                    PrintMode::Flat => {
+                        let condition_met = match condition {
+                            Some(condition) => {
+                                let group_mode = match condition.group_id {
+                                    Some(group_id) => {
+                                        self.group_modes().get_print_mode(group_id)?
+                                    }
+                                    None => args.mode(),
+                                };
+
+                                condition.mode == group_mode
+                            }
+                            None => true,
                         };
 
-                        condition.mode == group_mode
-                    }
-                    None => true,
-                };
+                        if condition_met {
+                            // Measure in fully expanded mode and allow overflows
+                            self.stack.push(
+                                TagKind::FitsExpanded,
+                                args.with_measure_mode(MeasureMode::AllLinesAllowTextOverflow)
+                                    .with_print_mode(PrintMode::Expanded),
+                            );
+                        } else {
+                            if propagate_expand.get() {
+                                return Ok(Fits::No);
+                            }
 
-                if condition_met {
-                    // Measure in fully expanded mode.
-                    self.stack.push(
-                        TagKind::FitsExpanded,
-                        args.with_print_mode(PrintMode::Expanded)
-                            .with_measure_mode(MeasureMode::AllLines),
-                    );
-                } else {
-                    if propagate_expand.get() && args.mode().is_flat() {
-                        return Ok(Fits::No);
+                            // As usual
+                            self.stack.push(TagKind::FitsExpanded, args);
+                        }
                     }
-
-                    // As usual
-                    self.stack.push(TagKind::FitsExpanded, args);
                 }
             }
 
@@ -1482,7 +1492,8 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                 }
                                 match args.measure_mode() {
                                     MeasureMode::FirstLine => return Fits::Yes,
-                                    MeasureMode::AllLines => {
+                                    MeasureMode::AllLines
+                                    | MeasureMode::AllLinesAllowTextOverflow => {
                                         self.state.line_width = 0;
                                         continue;
                                     }
@@ -1498,7 +1509,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
         }
 
-        if self.state.line_width > self.options().line_width.into() {
+        if self.state.line_width > self.options().line_width.into()
+            && !args.measure_mode().allows_text_overflow()
+        {
             return Fits::No;
         }
 
@@ -1601,6 +1614,17 @@ enum MeasureMode {
     /// The content only fits if none of the lines exceed the print width. Lines are terminated by either
     /// a hard line break or a soft line break in [`PrintMode::Expanded`].
     AllLines,
+
+    /// Measures all lines and allows lines to exceed the configured line width. Useful when it only matters
+    /// whether the content *before* and *after* fits.
+    AllLinesAllowTextOverflow,
+}
+
+impl MeasureMode {
+    /// Returns `true` if this mode allows text exceeding the configured line width.
+    const fn allows_text_overflow(self) -> bool {
+        matches!(self, MeasureMode::AllLinesAllowTextOverflow)
+    }
 }
 
 impl From<BestFittingMode> for MeasureMode {

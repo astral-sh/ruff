@@ -155,32 +155,34 @@ impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        let inner = format_with(|f| {
+        let current_level = f.context().node_level();
+
+        let content = format_with(|f| {
             group(&format_args![
-                token(self.left),
                 dangling_open_parenthesis_comments(self.comments),
-                soft_block_indent(&Arguments::from(&self.content)),
-                token(self.right)
+                soft_block_indent(&Arguments::from(&self.content))
             ])
             .fmt(f)
         });
 
-        let current_level = f.context().node_level();
+        let inner = format_with(|f| {
+            if let NodeLevel::Expression(Some(group_id)) = current_level {
+                // Use fits expanded if there's an enclosing group that adds the optional parentheses.
+                // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
+                write!(
+                    f,
+                    [fits_expanded(&content)
+                        .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
+                )
+            } else {
+                // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
+                content.fmt(f)
+            }
+        });
 
         let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-        if let NodeLevel::Expression(Some(group_id)) = current_level {
-            // Use fits expanded if there's an enclosing group that adds the optional parentheses.
-            // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
-            write!(
-                f,
-                [fits_expanded(&inner)
-                    .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
-            )
-        } else {
-            // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
-            write!(f, [inner])
-        }
+        write!(f, [token(self.left), inner, token(self.right)])
     }
 }
 

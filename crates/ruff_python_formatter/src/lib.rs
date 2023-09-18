@@ -217,13 +217,17 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-def main() -> None:
+if True:
     if True:
-        some_very_long_variable_name_abcdefghijk = Foo()
-        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
-            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
-            == "This is a very long string abcdefghijk"
-        ]
+        if True:
+            if True:
+                msg += " " + _(
+                    "Since the role is not mentionable, it will be momentarily made mentionable "
+                    "when announcing a streamalert. Please make sure I have the correct "
+                    "permissions to manage this role, or else members of this role won't receive "
+                    "a notification."
+                )
+
 
 "#;
         // Tokenize once

@@ -2155,15 +2155,18 @@ impl<Context> std::fmt::Debug for IndentIfGroupBreaks<'_, Context> {
     }
 }
 
-/// Changes the definition of *fits* for `content`. Instead of measuring it in *flat*, measure it with
-/// all line breaks expanded and test if no line exceeds the line width. The [`FitsExpanded`] acts
-/// as a expands boundary similar to best fitting, meaning that a [`hard_line_break`] will not cause the parent group to expand.
+/// Changes the definition of *fits* for `content`. It measures the width of all lines and allows
+/// the content inside of the [`fits_expanded`] to exceed the configured line width. The content
+/// coming before and after [`fits_expanded`] must fit into the configured line width.
+///
+/// The [`fits_expanded`] acts as a expands boundary similar to best fitting,
+/// meaning that a [`hard_line_break`] will not cause the parent group to expand.
 ///
 /// Useful in conjunction with a group with a condition.
 ///
 /// ## Examples
-/// The outer group with the binary expression remains *flat* regardless of the array expression
-/// that spans multiple lines.
+/// The outer group with the binary expression remains *flat* regardless of the array expression that
+/// spans multiple lines with items exceeding the configured line width.
 ///
 /// ```
 /// # use ruff_formatter::{format, format_args, LineWidth, SimpleFormatOptions, write};
@@ -2183,7 +2186,7 @@ impl<Context> std::fmt::Debug for IndentIfGroupBreaks<'_, Context> {
 ///                 token("["),
 ///                 soft_block_indent(&format_args![
 ///                     token("a,"), space(), token("# comment"), expand_parent(), soft_line_break_or_space(),
-///                     token("b")
+///                     token("'A very long string that exceeds the configured line width of 80 characters but the enclosing binary expression still fits.'")
 ///                 ]),
 ///                 token("]")
 ///             ]))
@@ -2194,7 +2197,7 @@ impl<Context> std::fmt::Debug for IndentIfGroupBreaks<'_, Context> {
 /// let formatted = format!(SimpleFormatContext::default(), [content])?;
 ///
 /// assert_eq!(
-///     "a + [\n\ta, # comment\n\tb\n]",
+///     "a + [\n\ta, # comment\n\t'A very long string that exceeds the configured line width of 80 characters but the enclosing binary expression still fits.'\n]",
 ///     formatted.print()?.as_code()
 /// );
 /// # Ok(())

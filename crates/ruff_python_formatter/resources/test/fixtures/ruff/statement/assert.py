@@ -153,3 +153,8 @@ def test():
             key9: value9,
         }
     ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeee"
+
+# Test for https://github.com/astral-sh/ruff/issues/7246
+assert items == [
+    "a very very very very very very very very very very very very very very very long string",
+]

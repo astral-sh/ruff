@@ -400,6 +400,18 @@ z = (
     # c: and this comment
     + a
 )
+
+# Test for https://github.com/astral-sh/ruff/issues/7431
+if True:
+    if True:
+        if True:
+            if True:
+                msg += " " + _(
+                    "Since the role is not mentionable, it will be momentarily made mentionable "
+                    "when announcing a streamalert. Please make sure I have the correct "
+                    "permissions to manage this role, or else members of this role won't receive "
+                    "a notification."
+                )
 ```
 
 ## Output
@@ -849,6 +861,18 @@ z = (
     # c: and this comment
     + a
 )
+
+# Test for https://github.com/astral-sh/ruff/issues/7431
+if True:
+    if True:
+        if True:
+            if True:
+                msg += " " + _(
+                    "Since the role is not mentionable, it will be momentarily made mentionable "
+                    "when announcing a streamalert. Please make sure I have the correct "
+                    "permissions to manage this role, or else members of this role won't receive "
+                    "a notification."
+                )
 ```
 
 
