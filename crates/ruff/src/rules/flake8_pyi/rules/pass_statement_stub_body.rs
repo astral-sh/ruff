@@ -6,6 +6,26 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for `pass` statements in empty stub bodies.
+///
+/// ## Why is this bad?
+/// For consistency, empty stub bodies should contain `...` instead of `pass`.
+///
+/// Additionally, an ellipsis better conveys the intent of the stub body (that
+/// the body has been implemented, but has been intentionally left blank to
+/// document the interface).
+///
+/// ## Example
+/// ```python
+/// def foo(bar: int) -> list[int]:
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar: int) -> list[int]: ...
+/// ```
 #[violation]
 pub struct PassStatementStubBody;
 
