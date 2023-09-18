@@ -60,7 +60,9 @@ impl Violation for UnnecessaryEnumerate {
             subset,
             iterable_suggestion,
         } = self;
-        if let Some(suggestion) = iterable_suggestion.map(SourceCodeSnippet::full_display)
+        if let Some(suggestion) = iterable_suggestion
+            .as_ref()
+            .and_then(SourceCodeSnippet::full_display)
         {
             format!("Do not iterate over `enumerate` when only using the {subset}, iterate over `{suggestion}` instead")
         } else {
