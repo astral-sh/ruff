@@ -1,8 +1,9 @@
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::{self as ast, Expr, ExprCall};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
+use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -37,11 +38,19 @@ impl Violation for ExcInfoFalseInException {
 
 /// LOG007
 pub(crate) fn exc_info_false_in_exception(checker: &mut Checker, call: &ExprCall) {
-    if checker
-        .semantic()
-        .resolve_call_path(call.func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "exception"]))
-    {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
+        return;
+    };
+
+    if attr.as_str() != "exception" {
+        return;
+    }
+
+    if is_logger_candidate(
+        call.func.as_ref(),
+        checker.semantic(),
+        &["exception".to_string()],
+    ) {
         if call
             .arguments
             .find_keyword("exc_info")
