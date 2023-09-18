@@ -213,7 +213,7 @@ fn handle_enclosed_comment<'a>(
         }
         AnyNodeRef::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, locator),
         AnyNodeRef::ExprNamedExpr(_) => handle_named_expr_comment(comment, locator),
-        AnyNodeRef::ExprLambda(_) => handle_lambda_comment(comment, locator),
+        AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, locator),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
@@ -1626,45 +1626,115 @@ fn handle_named_expr_comment<'a>(
 
 /// Handles comments around the `:` token in a lambda expression.
 ///
-/// For example, here, `# 1` and `# 2` will be marked as dangling comments on the lambda,
-/// while `# 3` and `4` will be attached `y` (via our general parenthesized comment handling), and
-/// `# 5` will be a trailing comment on the lambda.
+/// For parameterized lambdas, both the comments between the `lambda` and the parameters, and the
+/// comments between the parameters and the body, are considered dangling, as is the case for all
+/// of the following:
 ///
 /// ```python
 /// (
-///     lambda
-///     :=  # 1
+///     lambda  # 1
 ///     # 2
-///     (  # 3
-///         x  # 4
-///     ) # 5
-/// ):
-///     pass
+///     x
+///     :  # 3
+///     # 4
+///     y
+/// )
+/// ```
+///
+/// For non-parameterized lambdas, all comments before the body are considered dangling, as is the
+/// case for all of the following:
+///
+/// ```python
+/// (
+///     lambda  # 1
+///     # 2
+///     :  # 3
+///     # 4
+///     y
+/// )
 /// ```
 fn handle_lambda_comment<'a>(
     comment: DecoratedComment<'a>,
+    lambda: &'a ast::ExprLambda,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    debug_assert!(comment.enclosing_node().is_expr_lambda());
+    if let Some(parameters) = lambda.parameters.as_deref() {
+        // Comments between the `lambda` and the parameters are dangling on the lambda:
+        // ```python
+        // (
+        //     lambda  # comment
+        //     x:
+        //     y
+        // )
+        // ```
+        if comment.start() < parameters.start() {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
 
-    let (Some(target), Some(value)) = (comment.preceding_node(), comment.following_node()) else {
-        return CommentPlacement::Default(comment);
-    };
+        // Comments between the parameters and the body are dangling on the lambda:
+        // ```python
+        // (
+        //     lambda x:  # comment
+        //     y
+        // )
+        // ```
+        if parameters.end() < comment.start() && comment.start() < lambda.body.start() {
+            // If the value is parenthesized, and the comment is within the parentheses, it should
+            // be a leading comment on the value, not a dangling comment in the lambda, as in:
+            // ```python
+            // (
+            //     lambda x:  (  # comment
+            //         y
+            //     )
+            // )
+            // ```
+            let tokenizer = SimpleTokenizer::new(
+                locator.contents(),
+                TextRange::new(parameters.end(), comment.start()),
+            );
+            if tokenizer
+                .skip_trivia()
+                .any(|token| token.kind == SimpleTokenKind::LParen)
+            {
+                return CommentPlacement::Default(comment);
+            }
 
-    let colon_equal = find_only_token_in_range(
-        TextRange::new(target.end(), value.start()),
-        SimpleTokenKind::Colon,
-        locator.contents(),
-    );
-
-    if comment.end() < colon_equal.start() {
-        // If the comment is before the `:` token, then it must be a trailing comment of the
-        // target.
-        CommentPlacement::trailing(target, comment)
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
     } else {
-        // Otherwise, treat it as dangling. We effectively treat it as a comment on the `:` itself.
-        CommentPlacement::dangling(comment.enclosing_node(), comment)
+        // Comments between the lambda and the body are dangling on the lambda:
+        // ```python
+        // (
+        //     lambda:  # comment
+        //     y
+        // )
+        // ```
+        if comment.start() < lambda.body.start() {
+            // If the value is parenthesized, and the comment is within the parentheses, it should
+            // be a leading comment on the value, not a dangling comment in the lambda, as in:
+            // ```python
+            // (
+            //     lambda:  (  # comment
+            //         y
+            //     )
+            // )
+            // ```
+            let tokenizer = SimpleTokenizer::new(
+                locator.contents(),
+                TextRange::new(lambda.start(), comment.start()),
+            );
+            if tokenizer
+                .skip_trivia()
+                .any(|token| token.kind == SimpleTokenKind::LParen)
+            {
+                return CommentPlacement::Default(comment);
+            }
+
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
     }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Attach trailing end-of-line comments on the operator as dangling comments on the enclosing
