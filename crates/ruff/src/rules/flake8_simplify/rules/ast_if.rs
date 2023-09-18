@@ -990,7 +990,6 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
 }
 
 /// SIM401
-// var = a_dict[key] if key in a_dict else "default3"
 pub(crate) fn if_expr_with_dict(
     checker: &mut Checker,
     expr: &Expr,
@@ -1030,25 +1029,25 @@ pub(crate) fn if_expr_with_dict(
         return;
     }
 
-    let node = orelse.clone();
-    let node1 = *test_key.clone();
-    let node2 = ast::ExprAttribute {
+    let default_value_node = orelse.clone();
+    let dict_key_node = *test_key.clone();
+    let dict_get_node = ast::ExprAttribute {
         value: expected_subscript.clone(),
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     };
-    let node3 = ast::ExprCall {
-        func: Box::new(node2.into()),
+    let fixed_node = ast::ExprCall {
+        func: Box::new(dict_get_node.into()),
         arguments: Arguments {
-            args: vec![node1, node],
+            args: vec![dict_key_node, default_value_node],
             keywords: vec![],
             range: TextRange::default(),
         },
         range: TextRange::default(),
     };
 
-    let contents = checker.generator().expr(&node3.into());
+    let contents = checker.generator().expr(&fixed_node.into());
 
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfDictGet {
