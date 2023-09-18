@@ -36,7 +36,7 @@ regex = { version = "1.9.5" }
 rustc-hash = { version = "1.1.0" }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
-serde_json = { version = "1.0.106" }
+serde_json = { version = "1.0.107" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1", features = ["inline"] }
 smallvec = { version = "1.10.0" }
