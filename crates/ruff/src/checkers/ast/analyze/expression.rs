@@ -898,6 +898,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::InvalidGetLoggerArgument) {
                 flake8_logging::rules::invalid_get_logger_argument(checker, call);
             }
+            if checker.enabled(Rule::ExceptionWithoutExcInfo) {
+                flake8_logging::rules::exception_without_exc_info(checker, call);
+            }
         }
         Expr::Dict(ast::ExprDict {
             keys,
