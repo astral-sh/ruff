@@ -14,4 +14,3 @@ from logging import exception
 
 exception("foo", exc_info=False)  # LOG007
 exception("foo", exc_info=True)  # OK
-

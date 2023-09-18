@@ -9,22 +9,26 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of `logging.exception()` with `exc_info` set to `False`
+/// Checks for uses of `logging.exception()` with `exc_info` set to `False`.
 ///
 /// ## Why is this bad?
-/// The `exception()` method captures the exception automatically. Disabling this by setting
-/// `exc_info=False` is the same as using `error()`, which is clearer and doesn’t need the
-/// `exc_info` argument. This rule detects `exception()` calls with an exc_info argument that is
-/// falsy.
+/// The `logging.exception()` method captures the exception automatically, but
+/// accepts an optional `exc_info` argument to override this behavior. Setting
+/// `exc_info` to `False` disables the automatic capture of the exception and
+/// stack trace.
+///
+/// Instead of setting `exc_info` to `False`, prefer `logging.error()`, which
+/// has equivalent behavior to `logging.exception()` with `exc_info` set to
+/// `False`, but is clearer in intent.
 ///
 /// ## Example
 /// ```python
-/// logging.exception("foo", exc_info=False)
+/// logging.exception("...", exc_info=False)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// logging.error("foo")
+/// logging.error("...")
 /// ```
 #[violation]
 pub struct ExcInfoFalseInException;
@@ -38,23 +42,24 @@ impl Violation for ExcInfoFalseInException {
 
 /// LOG007
 pub(crate) fn exc_info_false_in_exception(checker: &mut Checker, call: &ExprCall) {
-    if is_logger_candidate(
+    if !is_logger_candidate(
         call.func.as_ref(),
         checker.semantic(),
         &["exception".to_string()],
     ) {
-        if call
-            .arguments
-            .find_keyword("exc_info")
-            .filter(|keyword| {
-                Truthiness::from_expr(&keyword.value, |id| checker.semantic().is_builtin(id))
-                    .is_falsey()
-            })
-            .is_some()
-        {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ExcInfoFalseInException, call.range()));
-        }
+        return;
+    }
+
+    if call
+        .arguments
+        .find_keyword("exc_info")
+        .map(|keyword| &keyword.value)
+        .is_some_and(|value| {
+            Truthiness::from_expr(value, |id| checker.semantic().is_builtin(id)).is_falsey()
+        })
+    {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(ExcInfoFalseInException, call.range()));
     }
 }
