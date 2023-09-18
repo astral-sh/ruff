@@ -91,3 +91,10 @@ class Registry:
 
     def foo(self) -> None:
         object.__setattr__(self, "flag", True)
+
+
+from typing import Optional, Union
+
+
+def passes(x: Union[list, Optional[int | str | float | bool]]):
+    pass

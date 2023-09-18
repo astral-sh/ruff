@@ -89,4 +89,11 @@ FBT.py:89:19: FBT001 Boolean-typed positional argument in function definition
 90 |         pass
    |
 
+FBT.py:99:12: FBT001 Boolean-typed positional argument in function definition
+    |
+ 99 | def passes(x: Union[list, Optional[int | str | float | bool]]):
+    |            ^ FBT001
+100 |     pass
+    |
+
 

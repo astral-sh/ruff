@@ -4,6 +4,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -96,6 +97,37 @@ impl Violation for BooleanTypeHintPositionalArgument {
     }
 }
 
+fn match_annotation_to_bool(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    // check for both bool (python class) and 'bool' (string annotation)
+    let hint = match annotation {
+        Expr::Name(name) => &name.id == "bool",
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
+        Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: ast::Operator::BitOr,
+            right,
+            ..
+        }) => match_annotation_to_bool(left, semantic) || match_annotation_to_bool(right, semantic),
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            if semantic.match_typing_expr(value, "Union") {
+                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                    elts.iter()
+                        .any(|elt| match_annotation_to_bool(elt, semantic))
+                } else {
+                    // Union with a single type is an invalid type annotation
+                    false
+                }
+            } else if semantic.match_typing_expr(value, "Optional") {
+                match_annotation_to_bool(slice, semantic)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    };
+    hint && semantic.is_builtin("bool")
+}
+
 pub(crate) fn boolean_type_hint_positional_argument(
     checker: &mut Checker,
     name: &str,
@@ -123,13 +155,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
             continue;
         };
 
-        // check for both bool (python class) and 'bool' (string annotation)
-        let hint = match annotation.as_ref() {
-            Expr::Name(name) => &name.id == "bool",
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
-            _ => false,
-        };
-        if !hint || !checker.semantic().is_builtin("bool") {
+        if !match_annotation_to_bool(annotation, checker.semantic()) {
             continue;
         }
         checker.diagnostics.push(Diagnostic::new(
