@@ -1,5 +1,5 @@
 use ruff_formatter::prelude::tag::Condition;
-use ruff_formatter::{format_args, write, Argument, Arguments, FormatContext, FormatOptions};
+use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExpressionRef;
 use ruff_python_trivia::CommentRanges;
@@ -24,33 +24,12 @@ pub(crate) enum OptionalParentheses {
     Always,
 
     /// Add parentheses if it helps to make this expression fit. Otherwise never add parentheses.
-    /// This mode should only be used for expressions that don't have their own split points, e.g. identifiers,
-    /// or constants.
+    /// This mode should only be used for expressions that don't have their own split points to the left, e.g. identifiers,
+    /// or constants, calls starting with an identifier, etc.
     BestFit,
 
     /// Never add parentheses. Use it for expressions that have their own parentheses or if the expression body always spans multiple lines (multiline strings).
     Never,
-}
-
-pub(super) fn should_use_best_fit<T>(value: T, context: &PyFormatContext) -> bool
-where
-    T: Ranged,
-{
-    let text_len = context.source()[value.range()].len();
-
-    // Only use best fits if:
-    // * The text is longer than 5 characters:
-    //   This is to align the behavior with `True` and `False`, that don't use best fits and are 5 characters long.
-    //   It allows to avoid [`OptionalParentheses::BestFit`] for most numbers and common identifiers like `self`.
-    //   The downside is that it can result in short values not being parenthesized if they exceed the line width.
-    //   This is considered an edge case not worth the performance penalty and IMO, breaking an identifier
-    //   of 5 characters to avoid it exceeding the line width by 1 reduces the readability.
-    // * The text is know to never fit: The text can never fit even when parenthesizing if it is longer
-    //   than the configured line width (minus indent).
-    text_len > 5
-        && text_len
-            <= context.options().line_width().value() as usize
-                - context.options().indent_width().value() as usize
 }
 
 pub(crate) trait NeedsParentheses {

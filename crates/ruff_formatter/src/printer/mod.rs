@@ -174,6 +174,75 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::Group, args.with_print_mode(print_mode));
             }
 
+            FormatElement::Tag(StartBestFitParenthesize { id }) => {
+                const OPEN_PAREN: FormatElement = FormatElement::Token { text: "(" };
+                const INDENT: FormatElement = FormatElement::Tag(Tag::StartIndent);
+                const HARD_LINE_BREAK: FormatElement = FormatElement::Line(LineMode::Hard);
+
+                let fits_flat = self.flat_group_print_mode(
+                    TagKind::BestFitParenthesize,
+                    *id,
+                    args,
+                    queue,
+                    stack,
+                )? == PrintMode::Flat;
+
+                let print_mode = if fits_flat {
+                    PrintMode::Flat
+                } else {
+                    // Test if the content fits in expanded mode. If not, prefer avoiding the parentheses
+                    // over parenthesizing the expression.
+                    if let Some(id) = id {
+                        self.state
+                            .group_modes
+                            .insert_print_mode(*id, PrintMode::Expanded);
+                    }
+
+                    stack.push(
+                        TagKind::BestFitParenthesize,
+                        args.with_measure_mode(MeasureMode::AllLines),
+                    );
+
+                    queue.extend_back(&[OPEN_PAREN, INDENT, HARD_LINE_BREAK]);
+                    let fits_expanded = self.fits(queue, stack)?;
+                    queue.pop_slice();
+                    stack.pop(TagKind::BestFitParenthesize)?;
+
+                    if fits_expanded {
+                        PrintMode::Expanded
+                    } else {
+                        PrintMode::Flat
+                    }
+                };
+
+                if let Some(id) = id {
+                    self.state.group_modes.insert_print_mode(*id, print_mode);
+                }
+
+                if print_mode.is_expanded() {
+                    // Parenthesize the content. The `EndIndent` is handled inside of the `EndBestFitParenthesize`
+                    queue.extend_back(&[OPEN_PAREN, INDENT, HARD_LINE_BREAK]);
+                }
+
+                stack.push(
+                    TagKind::BestFitParenthesize,
+                    args.with_print_mode(print_mode),
+                );
+            }
+
+            FormatElement::Tag(EndBestFitParenthesize) => {
+                if args.mode().is_expanded() {
+                    const HARD_LINE_BREAK: FormatElement = FormatElement::Line(LineMode::Hard);
+                    const CLOSE_PAREN: FormatElement = FormatElement::Token { text: ")" };
+
+                    // Finish the indent and print the hardline break and closing parentheses.
+                    stack.pop(TagKind::Indent)?;
+                    queue.extend_back(&[HARD_LINE_BREAK, CLOSE_PAREN]);
+                }
+
+                stack.pop(TagKind::BestFitParenthesize)?;
+            }
+
             FormatElement::Tag(StartConditionalGroup(group)) => {
                 let condition = group.condition();
                 let expected_mode = match condition.group_id {
@@ -1202,6 +1271,38 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::Tag(StartGroup(group)) => {
                 return Ok(self.fits_group(TagKind::Group, group.mode(), group.id(), args));
+            }
+
+            FormatElement::Tag(StartBestFitParenthesize { id }) => {
+                if let Some(id) = id {
+                    self.printer
+                        .state
+                        .group_modes
+                        .insert_print_mode(*id, args.mode());
+                }
+
+                // Don't use the parenthesized with indent layout even when measuring expanded mode similar to `BestFitting`.
+                // This is to expand the left and not right after the `(` parentheses (it is okay to expand after the content that it wraps).
+                self.stack.push(TagKind::BestFitParenthesize, args);
+            }
+
+            FormatElement::Tag(EndBestFitParenthesize) => {
+                // If this is the end tag of the outer most parentheses for which we measure if it fits,
+                // pop the indent.
+                if args.mode().is_expanded() && self.stack.top_kind() == Some(TagKind::Indent) {
+                    self.stack.pop(TagKind::Indent).unwrap();
+                    let unindented = self.stack.pop(TagKind::BestFitParenthesize)?;
+
+                    // There's a hard line break after the indent but don't return `Fits::Yes` here
+                    // to ensure any trailing comments (that, unfortunately, are attached to the statement and not the expression)
+                    // fit too.
+                    self.state.line_width = 0;
+                    self.state.pending_indent = unindented.indention();
+
+                    return Ok(self.fits_text(Text::Token(")"), unindented));
+                }
+
+                self.stack.pop(TagKind::BestFitParenthesize)?;
             }
 
             FormatElement::Tag(StartConditionalGroup(group)) => {

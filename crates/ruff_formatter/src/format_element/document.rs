@@ -40,6 +40,9 @@ impl Document {
                 expands_before: bool,
             },
             BestFitting,
+            BestFitParenthesize {
+                expanded: bool,
+            },
         }
 
         fn expand_parent(enclosing: &[Enclosing]) {
@@ -67,6 +70,18 @@ impl Document {
                         Some(Enclosing::Group(group)) => !group.mode().is_flat(),
                         _ => false,
                     },
+                    FormatElement::Tag(Tag::StartBestFitParenthesize { .. }) => {
+                        enclosing.push(Enclosing::BestFitParenthesize { expanded: expands });
+                        expands = false;
+                        continue;
+                    }
+
+                    FormatElement::Tag(Tag::EndBestFitParenthesize) => {
+                        if let Some(Enclosing::BestFitParenthesize { expanded }) = enclosing.pop() {
+                            expands = expanded;
+                        }
+                        continue;
+                    }
                     FormatElement::Tag(Tag::StartConditionalGroup(group)) => {
                         enclosing.push(Enclosing::ConditionalGroup(group));
                         false
@@ -503,6 +518,21 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             }
                         }
 
+                        StartBestFitParenthesize { id } => {
+                            write!(f, [token("best_fit_parenthesize(")])?;
+
+                            if let Some(group_id) = id {
+                                write!(
+                                    f,
+                                    [
+                                        text(&std::format!("\"{group_id:?}\""), None),
+                                        token(","),
+                                        space(),
+                                    ]
+                                )?;
+                            }
+                        }
+
                         StartConditionalGroup(group) => {
                             write!(
                                 f,
@@ -611,6 +641,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         | EndIndent
                         | EndGroup
                         | EndConditionalGroup
+                        | EndBestFitParenthesize
                         | EndLineSuffix
                         | EndDedent
                         | EndFitsExpanded
