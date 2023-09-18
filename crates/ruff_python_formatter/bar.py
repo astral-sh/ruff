@@ -1,0 +1,4 @@
+(
+    lambda: # comment
+    x
+)

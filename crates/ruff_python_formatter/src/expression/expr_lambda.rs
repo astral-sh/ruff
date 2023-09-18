@@ -44,7 +44,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         }
 
         // Insert hard line break if body has leading comment to ensure consistent formatting
-        if comments.has_leading(body.as_ref()) {
+        if comments.has_leading_own_line(body.as_ref()) {
             write!(f, [hard_line_break()])?;
         }
 

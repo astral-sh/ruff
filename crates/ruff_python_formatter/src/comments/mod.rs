@@ -370,6 +370,17 @@ impl<'a> Comments<'a> {
         !self.leading(node).is_empty()
     }
 
+    /// Returns `true` if the given `node` has any [leading own line comments](self#leading-comments).
+    #[inline]
+    pub(crate) fn has_leading_own_line<T>(&self, node: T) -> bool
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
+        self.leading(node)
+            .iter()
+            .any(|comment| comment.line_position().is_own_line())
+    }
+
     /// Returns the `node`'s [leading comments](self#leading-comments).
     #[inline]
     pub(crate) fn leading<T>(&self, node: T) -> &[SourceComment]
