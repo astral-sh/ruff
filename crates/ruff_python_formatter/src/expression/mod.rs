@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use itertools::Itertools;
 
 use ruff_formatter::{
-    format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+    write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
@@ -195,8 +195,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 f.context().source(),
             );
 
-        let has_comments =
-            comments.has_leading(*expression) || comments.has_trailing_own_line(*expression);
+        let node_comments = comments.leading_dangling_trailing(*expression);
+
+        let has_comments = node_comments.has_leading() || node_comments.has_trailing_own_line();
 
         // If the expression has comments, we always want to preserve the parentheses. This also
         // ensures that we correctly handle parenthesized comments, and don't need to worry about
@@ -245,53 +246,16 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
                 Parenthesize::IfBreaks => {
-                    let group_id = f.group_id("optional_parentheses");
-                    let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
-                    let mut format_expression = expression
-                        .format()
-                        .with_options(Parentheses::Never)
-                        .memoized();
-
-                    // Don't use best fitting if it is known that the expression can never fit
-                    if format_expression.inspect(f)?.will_break() {
-                        // The group here is necessary because `format_expression` may contain IR elements
-                        // that refer to the group id
-                        group(&format_args![
-                            token("("),
-                            soft_block_indent(&format_expression),
-                            token(")")
-                        ])
-                        .with_group_id(Some(group_id))
-                        .fmt(f)
+                    if node_comments.has_trailing() {
+                        expression.format().with_options(Parentheses::Always).fmt(f)
                     } else {
-                        // Only add parentheses if it makes the expression fit on the line.
-                        // Using the flat version as the most expanded version gives a left-to-right splitting behavior
-                        // which differs from when using regular groups, because they split right-to-left.
-                        best_fitting![
-                            // ---------------------------------------------------------------------
-                            // Variant 1:
-                            // Try to fit the expression without any parentheses
-                            group(&format_expression).with_group_id(Some(group_id)),
-                            // ---------------------------------------------------------------------
-                            // Variant 2:
-                            // Try to fit the expression by adding parentheses and indenting the expression.
-                            group(&format_args![
-                                token("("),
-                                soft_block_indent(&format_expression),
-                                token(")")
-                            ])
-                            .with_group_id(Some(group_id))
-                            .should_expand(true),
-                            // ---------------------------------------------------------------------
-                            // Variant 3: Fallback, no parentheses
-                            // Expression doesn't fit regardless of adding the parentheses. Remove the parentheses again.
-                            group(&format_expression)
-                                .with_group_id(Some(group_id))
-                                .should_expand(true)
-                        ]
-                        // Measure all lines, to avoid that the printer decides that this fits right after hitting
-                        // the `(`.
-                        .with_mode(BestFittingMode::AllLines)
+                        // The group id is necessary because the nested expressions may reference it.
+                        let group_id = f.group_id("optional_parentheses");
+                        let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
+                        ruff_formatter::prelude::best_fit_parenthesize(
+                            &expression.format().with_options(Parentheses::Never),
+                        )
+                        .with_group_id(Some(group_id))
                         .fmt(f)
                     }
                 }

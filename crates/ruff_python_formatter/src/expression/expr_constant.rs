@@ -5,7 +5,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::SourceComment;
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
-use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::expression::string::{
     AnyString, FormatString, StringLayout, StringPrefix, StringQuotes,
 };
@@ -76,16 +76,10 @@ impl NeedsParentheses for ExprConstant {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if is_multiline_string(self, context.source())
-            || self.value.is_none()
-            || self.value.is_bool()
-            || self.value.is_ellipsis()
-        {
+        } else if is_multiline_string(self, context.source()) {
             OptionalParentheses::Never
-        } else if should_use_best_fit(self, context) {
-            OptionalParentheses::BestFit
         } else {
-            OptionalParentheses::Never
+            OptionalParentheses::BestFit
         }
     }
 }
