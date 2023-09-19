@@ -1,9 +1,10 @@
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::{self as ast, Expr, ExprCall};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_semantic::analyze::logging::is_logger_candidate;
+use ruff_python_semantic::analyze::logging;
+use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -42,10 +43,21 @@ impl Violation for ExceptionWithoutExcInfo {
 
 /// LOG007
 pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall) {
-    if !is_logger_candidate(
-        call.func.as_ref(),
+    let Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) = call.func.as_ref() else {
+        return;
+    };
+
+    if !matches!(
+        LoggingLevel::from_attribute(attr.as_str()),
+        Some(LoggingLevel::Exception)
+    ) {
+        return;
+    }
+
+    if !logging::is_logger_candidate(
+        &call.func,
         checker.semantic(),
-        &["exception".to_string()],
+        &checker.settings.logger_objects,
     ) {
         return;
     }

@@ -8,6 +8,8 @@ logging.exception("foo", exc_info=[])  # LOG007
 logger.exception("foo")  # OK
 logger.exception("foo", exc_info=False)  # LOG007
 logger.exception("foo", exc_info=[])  # LOG007
+logger.error("foo", exc_info=False)  # OK
+logger.info("foo", exc_info=False)  # OK
 
 
 from logging import exception
