@@ -349,4 +349,20 @@ W19.py:146:1: W191 Indentation contains tabs
 148 | #: W191 - okay
     |
 
+W19.py:157:1: W191 Indentation contains tabs
+    |
+156 | f"test{
+157 |     tab_indented_should_be_flagged
+    | ^^^^ W191
+158 | }   <- this tab is fine"
+    |
+
+W19.py:161:1: W191 Indentation contains tabs
+    |
+160 | f"""test{
+161 |     tab_indented_should_be_flagged
+    | ^^^^ W191
+162 | }   <- this tab is fine"""
+    |
+
 
