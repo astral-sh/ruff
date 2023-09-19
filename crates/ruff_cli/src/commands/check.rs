@@ -58,13 +58,13 @@ pub(crate) fn check(
 
         match pyproject_config.strategy {
             PyprojectDiscoveryStrategy::Fixed => {
-                init_cache(&pyproject_config.settings.cli.cache_dir);
+                init_cache(&pyproject_config.settings.lib.cache_dir);
             }
             PyprojectDiscoveryStrategy::Hierarchical => {
                 for settings in
-                    std::iter::once(&pyproject_config.settings).chain(resolver.settings())
+                    std::iter::once(&pyproject_config.settings.lib).chain(resolver.settings())
                 {
-                    init_cache(&settings.cli.cache_dir);
+                    init_cache(&settings.cache_dir);
                 }
             }
         }
@@ -88,12 +88,8 @@ pub(crate) fn check(
             .unique()
             .par_bridge()
             .map(|cache_root| {
-                let settings = resolver.resolve_all(cache_root, pyproject_config);
-                let cache = Cache::open(
-                    &settings.cli.cache_dir,
-                    cache_root.to_path_buf(),
-                    &settings.lib,
-                );
+                let settings = resolver.resolve(cache_root, pyproject_config);
+                let cache = Cache::open(cache_root.to_path_buf(), settings);
                 (cache_root, cache)
             })
             .collect::<HashMap<&Path, Cache>>()

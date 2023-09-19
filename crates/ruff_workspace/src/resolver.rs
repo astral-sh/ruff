@@ -92,38 +92,30 @@ impl Relativity {
 
 #[derive(Default)]
 pub struct Resolver {
-    settings: BTreeMap<PathBuf, AllSettings>,
+    settings: BTreeMap<PathBuf, Settings>,
 }
 
 impl Resolver {
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: PathBuf, settings: AllSettings) {
+    fn add(&mut self, path: PathBuf, settings: Settings) {
         self.settings.insert(path, settings);
     }
 
-    /// Return the appropriate [`AllSettings`] for a given [`Path`].
-    pub fn resolve_all<'a>(
-        &'a self,
-        path: &Path,
-        pyproject_config: &'a PyprojectConfig,
-    ) -> &'a AllSettings {
-        match pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings,
-            PyprojectDiscoveryStrategy::Hierarchical => self
-                .settings
-                .iter()
-                .rev()
-                .find_map(|(root, settings)| path.starts_with(root).then_some(settings))
-                .unwrap_or(&pyproject_config.settings),
-        }
-    }
-
+    /// Return the appropriate [`Settings`] for a given [`Path`].
     pub fn resolve<'a>(
         &'a self,
         path: &Path,
         pyproject_config: &'a PyprojectConfig,
     ) -> &'a Settings {
-        &self.resolve_all(path, pyproject_config).lib
+        match pyproject_config.strategy {
+            PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings.lib,
+            PyprojectDiscoveryStrategy::Hierarchical => self
+                .settings
+                .iter()
+                .rev()
+                .find_map(|(root, settings)| path.starts_with(root).then_some(settings))
+                .unwrap_or(&pyproject_config.settings.lib),
+        }
     }
 
     /// Return a mapping from Python package to its package root.
@@ -162,7 +154,7 @@ impl Resolver {
     }
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
-    pub fn settings(&self) -> impl Iterator<Item = &AllSettings> {
+    pub fn settings(&self) -> impl Iterator<Item = &Settings> {
         self.settings.values()
     }
 }
@@ -291,7 +283,7 @@ pub fn python_files_in_path(
                     if let Some(pyproject) = settings_toml(ancestor)? {
                         let (root, settings) =
                             resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
-                        resolver.add(root, settings);
+                        resolver.add(root, settings.lib);
                     }
                 }
             }
@@ -366,7 +358,7 @@ pub fn python_files_in_path(
                                 processor,
                             ) {
                                 Ok((root, settings)) => {
-                                    resolver.write().unwrap().add(root, settings);
+                                    resolver.write().unwrap().add(root, settings.lib);
                                 }
                                 Err(err) => {
                                     *error.lock().unwrap() = Err(err);
@@ -438,7 +430,7 @@ pub fn python_file_at_path(
             if let Some(pyproject) = settings_toml(ancestor)? {
                 let (root, settings) =
                     resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
-                resolver.add(root, settings);
+                resolver.add(root, settings.lib);
             }
         }
     }

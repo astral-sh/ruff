@@ -1,11 +1,12 @@
+use std::collections::HashSet;
+
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
-use std::collections::HashSet;
 
-use super::types::{FilePattern, PreviewMode, PythonVersion};
-use super::Settings;
+use ruff_cache::cache_dir;
+
 use crate::codes::{self, RuleCodePrefix};
 use crate::line_width::{LineLength, TabSize};
 use crate::registry::Linter;
@@ -18,6 +19,9 @@ use crate::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use crate::settings::types::FilePatternSet;
+
+use super::types::{FilePattern, PreviewMode, PythonVersion};
+use super::Settings;
 
 pub const PREFIXES: &[RuleSelector] = &[
     RuleSelector::Prefix {
@@ -72,7 +76,10 @@ pub static INCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 
 impl Default for Settings {
     fn default() -> Self {
+        let project_root = path_dedot::CWD.clone();
         Self {
+            cache_dir: cache_dir(&project_root),
+
             rules: PREFIXES
                 .iter()
                 .flat_map(|selector| selector.rules(PreviewMode::default()))
@@ -92,7 +99,7 @@ impl Default for Settings {
             namespace_packages: vec![],
             preview: PreviewMode::default(),
             per_file_ignores: vec![],
-            project_root: path_dedot::CWD.clone(),
+            project_root,
             respect_gitignore: true,
             src: vec![path_dedot::CWD.clone()],
             tab_size: TabSize::default(),

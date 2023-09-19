@@ -222,7 +222,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         format,
         show_fixes,
         show_source,
-        ..
     } = pyproject_config.settings.cli;
 
     // Autofix rules are as follows:

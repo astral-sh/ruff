@@ -109,10 +109,6 @@ impl Configuration {
     pub fn into_all_settings(self, project_root: &Path) -> Result<AllSettings> {
         Ok(AllSettings {
             cli: CliSettings {
-                cache_dir: self
-                    .cache_dir
-                    .clone()
-                    .unwrap_or_else(|| cache_dir(project_root)),
                 fix: self.fix.unwrap_or(false),
                 fix_only: self.fix_only.unwrap_or(false),
                 format: self.format.unwrap_or_default(),
@@ -135,6 +131,11 @@ impl Configuration {
         }
 
         Ok(Settings {
+            cache_dir: self
+                .cache_dir
+                .clone()
+                .unwrap_or_else(|| cache_dir(project_root)),
+
             rules: self.as_rule_table(),
             allowed_confusables: self
                 .allowed_confusables

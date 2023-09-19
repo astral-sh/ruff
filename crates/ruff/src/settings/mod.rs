@@ -41,7 +41,6 @@ pub struct AllSettings {
 #[allow(clippy::struct_excessive_bools)]
 /// Settings that are not used by this library and only here so that `ruff_cli` can use them.
 pub struct CliSettings {
-    pub cache_dir: PathBuf,
     pub fix: bool,
     pub fix_only: bool,
     pub format: SerializationFormat,
@@ -52,6 +51,9 @@ pub struct CliSettings {
 #[derive(Debug, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
+    #[cache_key(ignore)]
+    pub cache_dir: PathBuf,
+
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 
