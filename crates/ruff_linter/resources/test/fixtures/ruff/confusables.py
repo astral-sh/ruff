@@ -29,3 +29,19 @@ x = "βα Bαd"
 # consisting of a single ambiguous character, while the second character is a "word
 # boundary" (whitespace) that it itself ambiguous.
 x = "Р усский"
+
+# Same test cases as above but using f-strings instead:
+x = f"𝐁ad string"
+x = f"−"
+x = f"Русский"
+x = f"βα Bαd"
+x = f"Р усский"
+
+# Nested f-strings
+x = f"𝐁ad string {f" {f"Р усский"}"}"
+
+# Comments inside f-strings
+x = f"string { # And here's a comment with an unusual parenthesis: ）
+# And here's a comment with a greek alpha: ∗
+foo # And here's a comment with an unusual punctuation mark: ᜵
+}"
