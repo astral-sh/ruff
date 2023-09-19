@@ -21,7 +21,7 @@ use ruff::logging::DisplayParseError;
 use ruff::message::Message;
 use ruff::pyproject_toml::lint_pyproject_toml;
 use ruff::registry::AsRule;
-use ruff::settings::{flags, AllSettings, Settings};
+use ruff::settings::{flags, Settings};
 use ruff::source_kind::SourceKind;
 use ruff::{fs, IOError, SyntaxError};
 use ruff_diagnostics::Diagnostic;
@@ -143,7 +143,7 @@ impl AddAssign for Diagnostics {
 pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
-    settings: &AllSettings,
+    settings: &Settings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
@@ -178,7 +178,6 @@ pub(crate) fn lint_path(
     let source_type = match SourceType::from(path) {
         SourceType::Toml(TomlSourceType::Pyproject) => {
             let messages = if settings
-                .lib
                 .rules
                 .iter_enabled()
                 .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
@@ -187,15 +186,11 @@ pub(crate) fn lint_path(
                     match std::fs::read_to_string(path).map_err(SourceExtractionError::Io) {
                         Ok(contents) => contents,
                         Err(err) => {
-                            return Ok(Diagnostics::from_source_error(
-                                &err,
-                                Some(path),
-                                &settings.lib,
-                            ));
+                            return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
                         }
                     };
                 let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-                lint_pyproject_toml(source_file, &settings.lib)
+                lint_pyproject_toml(source_file, settings)
             } else {
                 vec![]
             };
@@ -213,11 +208,7 @@ pub(crate) fn lint_path(
         Ok(Some(sources)) => sources,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
-            return Ok(Diagnostics::from_source_error(
-                &err,
-                Some(path),
-                &settings.lib,
-            ));
+            return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
         }
     };
 
@@ -233,14 +224,8 @@ pub(crate) fn lint_path(
             result,
             transformed,
             fixed,
-        }) = lint_fix(
-            path,
-            package,
-            noqa,
-            &settings.lib,
-            &source_kind,
-            source_type,
-        ) {
+        }) = lint_fix(path, package, noqa, settings, &source_kind, source_type)
+        {
             if !fixed.is_empty() {
                 match autofix {
                     flags::FixMode::Apply => match transformed.as_ref() {
@@ -317,26 +302,12 @@ pub(crate) fn lint_path(
             (result, fixed)
         } else {
             // If we fail to autofix, lint the original source code.
-            let result = lint_only(
-                path,
-                package,
-                &settings.lib,
-                noqa,
-                &source_kind,
-                source_type,
-            );
+            let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
             let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
-        let result = lint_only(
-            path,
-            package,
-            &settings.lib,
-            noqa,
-            &source_kind,
-            source_type,
-        );
+        let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
         let fixed = FxHashMap::default();
         (result, fixed)
     };

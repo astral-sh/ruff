@@ -349,7 +349,7 @@ mod tests {
     use std::time::SystemTime;
 
     use itertools::Itertools;
-    use ruff::settings::{flags, AllSettings};
+    use ruff::settings::{flags, AllSettings, Settings};
     use ruff_cache::CACHE_DIR_NAME;
 
     use crate::cache::RelativePathBuf;
@@ -371,10 +371,10 @@ mod tests {
         let _ = fs::remove_dir_all(&cache_dir);
         cache::init(&cache_dir).unwrap();
 
-        let settings = AllSettings::default();
+        let settings = Settings::default();
 
         let package_root = fs::canonicalize(package_root).unwrap();
-        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+        let cache = Cache::open(&cache_dir, package_root.clone(), &settings);
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
@@ -426,7 +426,7 @@ mod tests {
 
         cache.store().unwrap();
 
-        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+        let cache = Cache::open(&cache_dir, package_root.clone(), &settings);
         assert_ne!(cache.package.files.len(), 0);
 
         parse_errors.sort();
@@ -710,7 +710,7 @@ mod tests {
             lint_path(
                 &self.package_root.join(path),
                 Some(&self.package_root),
-                &self.settings,
+                &self.settings.lib,
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,

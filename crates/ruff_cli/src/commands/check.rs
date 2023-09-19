@@ -15,7 +15,7 @@ use rustc_hash::FxHashMap;
 
 use ruff::message::Message;
 use ruff::registry::Rule;
-use ruff::settings::{flags, AllSettings};
+use ruff::settings::{flags, Settings};
 use ruff::{fs, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
@@ -111,7 +111,7 @@ pub(crate) fn check(
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
 
-                    let settings = resolver.resolve_all(path, pyproject_config);
+                    let settings = resolver.resolve(path, pyproject_config);
 
                     let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
                     let cache = caches.as_ref().and_then(|caches| {
@@ -199,7 +199,7 @@ pub(crate) fn check(
 fn lint_path(
     path: &Path,
     package: Option<&Path>,
-    settings: &AllSettings,
+    settings: &Settings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
