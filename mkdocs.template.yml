@@ -51,6 +51,8 @@ plugins:
   - search
 extra_css:
   - stylesheets/extra.css
+not_in_nav: |
+  /rules/*
 extra:
   analytics:
     provider: fathom
