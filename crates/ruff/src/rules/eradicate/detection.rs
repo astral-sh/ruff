@@ -6,7 +6,7 @@ use ruff_python_parser::parse_suite;
 
 static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:)"
+        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:|(?i)TODO(?:\([^)]*\))?:)"
     ).unwrap()
 });
 static BRACKET_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[()\[\]{}\s]+$").unwrap());
@@ -278,5 +278,20 @@ mod tests {
             "# XXX: What ever",
             &["XXX".to_string()]
         ));
+    }
+
+    #[test]
+    fn comment_contains_todo() {
+        assert!(comment_contains_code("# TODO(tom)", &[]));
+        assert!(comment_contains_code("# todo(tom)", &[]));
+        assert!(comment_contains_code("# TODO()", &[]));
+        assert!(comment_contains_code("# todo()", &[]));
+
+        assert!(!comment_contains_code("# TODO(tom): Something", &[]));
+        assert!(!comment_contains_code("# todo(tom): Something", &[]));
+        assert!(!comment_contains_code("# TODO: Something", &[]));
+        assert!(!comment_contains_code("# todo: Something", &[]));
+        assert!(!comment_contains_code("# TODO(): Something", &[]));
+        assert!(!comment_contains_code("# todo(): Something", &[]));
     }
 }
