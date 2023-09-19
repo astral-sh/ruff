@@ -28,6 +28,8 @@ from itertools import starmap as sm
 
 [print(x, int) for x, _ in zipped()]
 
+[print(x, *y) for x, y in zipped()]
+
 [print(x, y, 1) for x, y in zipped()]
 
 [print(y, x) for x, y in zipped()]

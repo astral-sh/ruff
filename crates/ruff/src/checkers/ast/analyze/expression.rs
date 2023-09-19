@@ -1297,7 +1297,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::ReimplementedStarmap) {
-                refurb::rules::reimplemented_starmap(checker, comp);
+                refurb::rules::reimplemented_starmap(checker, &comp.into());
             }
         }
         Expr::SetComp(
@@ -1321,7 +1321,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::ReimplementedStarmap) {
-                refurb::rules::reimplemented_starmap(checker, comp);
+                refurb::rules::reimplemented_starmap(checker, &comp.into());
             }
         }
         Expr::DictComp(ast::ExprDictComp {
@@ -1363,7 +1363,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::ReimplementedStarmap) {
-                refurb::rules::reimplemented_starmap(checker, generator);
+                refurb::rules::reimplemented_starmap(checker, &generator.into());
             }
         }
         Expr::BoolOp(

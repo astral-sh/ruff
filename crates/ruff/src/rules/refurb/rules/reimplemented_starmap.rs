@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -68,25 +69,10 @@ impl Violation for ReimplementedStarmap {
     }
 }
 
-/// A abstract node that can be considered a candidate for replacement with `starmap`.
-pub(crate) trait StarmapEquivalent: Ranged {
-    /// Get generated element.
-    fn element(&self) -> &Expr;
-    /// Get generator comprehensions.
-    fn generators(&self) -> &[ast::Comprehension];
-    /// Try to produce a fix suggestion transforming this node into a call to `starmap`.
-    fn try_make_suggestion(
-        name: String,
-        iter: &Expr,
-        func: &Expr,
-        checker: &Checker,
-    ) -> Result<String>;
-}
-
-// FURB140
-pub(crate) fn reimplemented_starmap<T: StarmapEquivalent>(checker: &mut Checker, generator: &T) {
+/// FURB140
+pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandidate) {
     // Generator should have exactly one comprehension.
-    let [comprehension @ ast::Comprehension { .. }] = generator.generators() else {
+    let [comprehension @ ast::Comprehension { .. }] = target.generators() else {
         return;
     };
 
@@ -109,7 +95,7 @@ pub(crate) fn reimplemented_starmap<T: StarmapEquivalent>(checker: &mut Checker,
     //
     // NOTE: `func` is not necessarily just a function name, it can be an attribute access,
     //       or even a call itself.
-    let Some((args, func)) = match_call(generator.element()) else {
+    let Some((args, func)) = match_call(target.element()) else {
         return;
     };
 
@@ -117,16 +103,12 @@ pub(crate) fn reimplemented_starmap<T: StarmapEquivalent>(checker: &mut Checker,
     // same order).
     if elts.len() != args.len()
         || !std::iter::zip(elts, args)
-            // We intentionally do not use ComparableExpr here because it will compare expression
-            // contexts and in `elts` it's definitely `Load`, while in `args` it's always `Store`.
-            //
-            // For this reason, we compare names directly.
-            .all(|(x, y)| get_name_id(x) == get_name_id(y))
+            .all(|(x, y)| ComparableExpr::from(x) == ComparableExpr::from(y))
     {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(ReimplementedStarmap, generator.range());
+    let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             // Try importing `starmap` from `itertools`.
@@ -136,7 +118,7 @@ pub(crate) fn reimplemented_starmap<T: StarmapEquivalent>(checker: &mut Checker,
             // for fix construction.
             let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from("itertools", "starmap"),
-                generator.start(),
+                target.start(),
                 checker.semantic(),
             )?;
             // The actual fix suggestion depends on what type of expression we were looking at.
@@ -145,8 +127,8 @@ pub(crate) fn reimplemented_starmap<T: StarmapEquivalent>(checker: &mut Checker,
             // - For list and set comprehensions, we'd want to wrap it with `list` and `set`
             //   correspondingly.
             let main_edit = Edit::range_replacement(
-                T::try_make_suggestion(starmap_name, iter, func, checker)?,
-                generator.range(),
+                target.try_make_suggestion(starmap_name, iter, func, checker)?,
+                target.range(),
             );
             Ok(Fix::suggested_edits(import_edit, [main_edit]))
         });
@@ -154,87 +136,108 @@ pub(crate) fn reimplemented_starmap<T: StarmapEquivalent>(checker: &mut Checker,
     checker.diagnostics.push(diagnostic);
 }
 
-#[inline]
-fn get_name_id(expr: &Expr) -> Option<&str> {
-    Some(&expr.as_name_expr()?.id)
+/// An enum for a node that can be considered a candidate for replacement with `starmap`.
+#[derive(Debug)]
+pub(crate) enum StarmapCandidate<'a> {
+    Generator(&'a ast::ExprGeneratorExp),
+    ListComp(&'a ast::ExprListComp),
+    SetComp(&'a ast::ExprSetComp),
 }
 
-impl StarmapEquivalent for ast::ExprGeneratorExp {
-    fn element(&self) -> &Expr {
-        self.elt.as_ref()
+impl<'a> From<&'a ast::ExprGeneratorExp> for StarmapCandidate<'a> {
+    fn from(generator: &'a ast::ExprGeneratorExp) -> Self {
+        Self::Generator(generator)
     }
-    fn generators(&self) -> &[ast::Comprehension] {
-        self.generators.as_slice()
+}
+
+impl<'a> From<&'a ast::ExprListComp> for StarmapCandidate<'a> {
+    fn from(list_comp: &'a ast::ExprListComp) -> Self {
+        Self::ListComp(list_comp)
     }
-    fn try_make_suggestion(
+}
+
+impl<'a> From<&'a ast::ExprSetComp> for StarmapCandidate<'a> {
+    fn from(set_comp: &'a ast::ExprSetComp) -> Self {
+        Self::SetComp(set_comp)
+    }
+}
+
+impl Ranged for StarmapCandidate<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::Generator(generator) => generator.range(),
+            Self::ListComp(list_comp) => list_comp.range(),
+            Self::SetComp(set_comp) => set_comp.range(),
+        }
+    }
+}
+
+impl StarmapCandidate<'_> {
+    /// Return the generated element for the candidate.
+    pub(crate) fn element(&self) -> &Expr {
+        match self {
+            Self::Generator(generator) => generator.elt.as_ref(),
+            Self::ListComp(list_comp) => list_comp.elt.as_ref(),
+            Self::SetComp(set_comp) => set_comp.elt.as_ref(),
+        }
+    }
+
+    /// Return the generator comprehensions for the candidate.
+    pub(crate) fn generators(&self) -> &[ast::Comprehension] {
+        match self {
+            Self::Generator(generator) => generator.generators.as_slice(),
+            Self::ListComp(list_comp) => list_comp.generators.as_slice(),
+            Self::SetComp(set_comp) => set_comp.generators.as_slice(),
+        }
+    }
+
+    /// Try to produce a fix suggestion transforming this node into a call to `starmap`.
+    pub(crate) fn try_make_suggestion(
+        &self,
         name: String,
         iter: &Expr,
         func: &Expr,
         checker: &Checker,
     ) -> Result<String> {
-        // For generator expressions, we replace
-        // ```python
-        // (foo(...) for ... in iter)
-        // ```
-        //
-        // with
-        // ```python
-        // itertools.starmap(foo, iter)
-        // ```
-        let call = construct_starmap_call(name, iter, func);
-        Ok(checker.generator().expr(&call.into()))
-    }
-}
-
-impl StarmapEquivalent for ast::ExprListComp {
-    fn element(&self) -> &Expr {
-        self.elt.as_ref()
-    }
-    fn generators(&self) -> &[ast::Comprehension] {
-        self.generators.as_slice()
-    }
-    fn try_make_suggestion(
-        name: String,
-        iter: &Expr,
-        func: &Expr,
-        checker: &Checker,
-    ) -> Result<String> {
-        // For list comprehensions, we replace
-        // ```python
-        // [foo(...) for ... in iter]
-        // ```
-        //
-        // with
-        // ```python
-        // list(itertools.starmap(foo, iter))
-        // ```
-        try_construct_call(name, iter, func, "list", checker)
-    }
-}
-
-impl StarmapEquivalent for ast::ExprSetComp {
-    fn element(&self) -> &Expr {
-        self.elt.as_ref()
-    }
-    fn generators(&self) -> &[ast::Comprehension] {
-        self.generators.as_slice()
-    }
-    fn try_make_suggestion(
-        name: String,
-        iter: &Expr,
-        func: &Expr,
-        checker: &Checker,
-    ) -> Result<String> {
-        // For set comprehensions, we replace
-        // ```python
-        // {foo(...) for ... in iter}
-        // ```
-        //
-        // with
-        // ```python
-        // set(itertools.starmap(foo, iter))
-        // ```
-        try_construct_call(name, iter, func, "set", checker)
+        match self {
+            Self::Generator(_) => {
+                // For generator expressions, we replace:
+                // ```python
+                // (foo(...) for ... in iter)
+                // ```
+                //
+                // with:
+                // ```python
+                // itertools.starmap(foo, iter)
+                // ```
+                let call = construct_starmap_call(name, iter, func);
+                Ok(checker.generator().expr(&call.into()))
+            }
+            Self::ListComp(_) => {
+                // For list comprehensions, we replace:
+                // ```python
+                // [foo(...) for ... in iter]
+                // ```
+                //
+                // with:
+                // ```python
+                // list(itertools.starmap(foo, iter))
+                // ```
+                try_construct_call(name, iter, func, "list", checker)
+            }
+            Self::SetComp(_) => {
+                // For set comprehensions, we replace:
+                // ```python
+                // {foo(...) for ... in iter}
+                // ```
+                //
+                // with:
+                // ```python
+                // set(itertools.starmap(foo, iter))
+                // ```
+                try_construct_call(name, iter, func, "set", checker)
+            }
+        }
     }
 }
 
@@ -252,12 +255,12 @@ fn try_construct_call(
         bail!(format!("Can't use built-in `{builtin}` constructor"))
     }
 
-    // In general, we replace
+    // In general, we replace:
     // ```python
     // foo(...) for ... in iter
     // ```
     //
-    // with
+    // with:
     // ```python
     // builtin(itertools.starmap(foo, iter))
     // ```
