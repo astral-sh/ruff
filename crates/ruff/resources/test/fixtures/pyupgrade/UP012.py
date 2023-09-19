@@ -75,3 +75,8 @@ print("foo".encode())  # print(b"foo")
 (f"foo{bar}").encode(encoding="utf-8")
 ("unicode text©").encode("utf-8")
 ("unicode text©").encode(encoding="utf-8")
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459882
+def _match_ignore(line):
+	input=stdin and'\n'.encode()or None

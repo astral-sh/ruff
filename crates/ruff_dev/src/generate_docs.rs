@@ -103,7 +103,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
 
                 let anchor = option.replace('.', "-");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));
-                after.push_str(&format!("[{option}]: ../../settings#{anchor}\n"));
+                after.push_str(&format!("[{option}]: ../settings.md#{anchor}\n"));
 
                 continue;
             }
@@ -151,8 +151,8 @@ Something [`else`][other].
 
 [other]: http://example.com.
 
-[task-tags]: ../../settings#task-tags
-[mccabe.max-complexity]: ../../settings#mccabe-max-complexity
+[task-tags]: ../settings.md#task-tags
+[mccabe.max-complexity]: ../settings.md#mccabe-max-complexity
 "
         );
     }

@@ -96,4 +96,19 @@ UP003.py:5:1: UP003 [*] Use `complex` instead of `type(...)`
 7 7 | # OK
 8 8 | type(arg)(" ")
 
+UP003.py:14:29: UP003 [*] Use `str` instead of `type(...)`
+   |
+13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459841
+14 | assert isinstance(fullname, type("")is not True)
+   |                             ^^^^^^^^ UP003
+   |
+   = help: Replace `type(...)` with `str`
+
+ℹ Fix
+11 11 | y = x.dtype.type(0.0)
+12 12 | 
+13 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459841
+14    |-assert isinstance(fullname, type("")is not True)
+   14 |+assert isinstance(fullname, str is not True)
+
 

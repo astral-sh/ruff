@@ -5,7 +5,7 @@ use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::{remove_argument, Parentheses};
+use crate::autofix::edits::{pad, remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
@@ -151,7 +151,10 @@ fn replace_with_bytes_literal(
         prev = range.end();
     }
 
-    Fix::automatic(Edit::range_replacement(replacement, call.range()))
+    Fix::automatic(Edit::range_replacement(
+        pad(replacement, call.range(), locator),
+        call.range(),
+    ))
 }
 
 /// UP012

@@ -543,10 +543,21 @@ fn preferred_quotes(
                             // `""` or `''`
                             chars.next();
 
-                            if chars.peek().copied() == Some(configured_quote_char) {
-                                // `"""` or `'''`
-                                chars.next();
-                                uses_triple_quotes = true;
+                            match chars.peek().copied() {
+                                Some(c) if c == configured_quote_char => {
+                                    // `"""` or `'''`
+                                    chars.next();
+                                    uses_triple_quotes = true;
+                                    break;
+                                }
+                                Some(_) => {}
+                                None => {
+                                    // Handle `''' ""'''`. At this point we have consumed both
+                                    // double quotes, so on the next iteration the iterator is empty
+                                    // and we'd miss the string ending with a preferred quote
+                                    uses_triple_quotes = true;
+                                    break;
+                                }
                             }
                         }
                         Some(_) => {
@@ -555,6 +566,7 @@ fn preferred_quotes(
                         None => {
                             // Trailing quote at the end of the comment
                             uses_triple_quotes = true;
+                            break;
                         }
                     }
                 }

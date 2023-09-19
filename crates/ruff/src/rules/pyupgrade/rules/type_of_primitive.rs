@@ -1,5 +1,6 @@
 use ruff_python_ast::{self as ast, Expr};
 
+use crate::autofix::edits::pad;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
@@ -76,7 +77,7 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
         let builtin = primitive.builtin();
         if checker.semantic().is_builtin(&builtin) {
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                primitive.builtin(),
+                pad(primitive.builtin(), expr.range(), checker.locator()),
                 expr.range(),
             )));
         }

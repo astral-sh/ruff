@@ -12,50 +12,6 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprDict;
 
-struct KeyValuePair<'a> {
-    key: &'a Option<Expr>,
-    value: &'a Expr,
-}
-
-impl Ranged for KeyValuePair<'_> {
-    fn range(&self) -> TextRange {
-        if let Some(key) = self.key {
-            TextRange::new(key.start(), self.value.end())
-        } else {
-            self.value.range()
-        }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        if let Some(key) = self.key {
-            write!(
-                f,
-                [group(&format_args![
-                    key.format(),
-                    token(":"),
-                    space(),
-                    self.value.format()
-                ])]
-            )
-        } else {
-            // TODO(charlie): Make these dangling comments on the `ExprDict`, and identify them
-            // dynamically, so as to avoid the parent rendering its child's comments.
-            let comments = f.context().comments().clone();
-            let leading_value_comments = comments.leading(self.value);
-            write!(
-                f,
-                [
-                    // make sure the leading comments are hoisted past the `**`
-                    leading_comments(leading_value_comments),
-                    group(&format_args![token("**"), self.value.format()])
-                ]
-            )
-        }
-    }
-}
-
 impl FormatNodeRule<ExprDict> for FormatExprDict {
     fn fmt_fields(&self, item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprDict {
@@ -106,5 +62,50 @@ impl NeedsParentheses for ExprDict {
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Never
+    }
+}
+
+#[derive(Debug)]
+struct KeyValuePair<'a> {
+    key: &'a Option<Expr>,
+    value: &'a Expr,
+}
+
+impl Ranged for KeyValuePair<'_> {
+    fn range(&self) -> TextRange {
+        if let Some(key) = self.key {
+            TextRange::new(key.start(), self.value.end())
+        } else {
+            self.value.range()
+        }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        if let Some(key) = self.key {
+            write!(
+                f,
+                [group(&format_args![
+                    key.format(),
+                    token(":"),
+                    space(),
+                    self.value.format()
+                ])]
+            )
+        } else {
+            // TODO(charlie): Make these dangling comments on the `ExprDict`, and identify them
+            // dynamically, so as to avoid the parent rendering its child's comments.
+            let comments = f.context().comments().clone();
+            let leading_value_comments = comments.leading(self.value);
+            write!(
+                f,
+                [
+                    // make sure the leading comments are hoisted past the `**`
+                    leading_comments(leading_value_comments),
+                    group(&format_args![token("**"), self.value.format()])
+                ]
+            )
+        }
     }
 }

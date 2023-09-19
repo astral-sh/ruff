@@ -53,4 +53,4 @@ imara-diff = "0.1.5"
 singlethreaded = []
 
 [dev-dependencies]
-indoc = "2.0.3"
+indoc = "2.0.4"

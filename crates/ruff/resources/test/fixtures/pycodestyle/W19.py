@@ -1,3 +1,6 @@
+	'''File starts with a tab
+	multiline string with tab in it'''
+
 #: W191
 if False:
 	print  # indented with 1 tab

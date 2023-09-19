@@ -86,6 +86,10 @@ pub(crate) fn check_tokens(
         }
     }
 
+    if settings.rules.enabled(Rule::TabIndentation) {
+        pycodestyle::rules::tab_indentation(&mut diagnostics, tokens, locator, indexer);
+    }
+
     if settings.rules.any_enabled(&[
         Rule::InvalidCharacterBackspace,
         Rule::InvalidCharacterSub,

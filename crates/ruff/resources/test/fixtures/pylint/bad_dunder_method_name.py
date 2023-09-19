@@ -49,6 +49,20 @@ class Apples:
     def __doc__(self):
         return "Docstring"
 
+    # Allow dunder methods recommended by attrs.
+    def __attrs_post_init__(self):
+        pass
+
+    def __attrs_pre_init__(self):
+        pass
+
+    def __attrs_init__(self):
+        pass
+
+    # Allow __html__, used by Jinja2 and Django.
+    def __html__(self):
+        pass
+
 
 def __foo_bar__():  # this is not checked by the [bad-dunder-name] rule
     ...
