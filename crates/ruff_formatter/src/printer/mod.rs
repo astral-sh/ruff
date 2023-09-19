@@ -1354,9 +1354,11 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
 
             FormatElement::Tag(StartLineSuffix { reserved_width }) => {
-                self.state.line_width += reserved_width;
-                if self.state.line_width > self.options().line_width.into() {
-                    return Ok(Fits::No);
+                if *reserved_width > 0 {
+                    self.state.line_width += reserved_width;
+                    if self.state.line_width > self.options().line_width.into() {
+                        return Ok(Fits::No);
+                    }
                 }
                 self.queue.skip_content(TagKind::LineSuffix);
                 self.state.has_line_suffix = true;
