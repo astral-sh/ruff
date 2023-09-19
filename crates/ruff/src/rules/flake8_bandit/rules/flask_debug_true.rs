@@ -67,26 +67,23 @@ pub(crate) fn flask_debug_true(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    checker
-        .semantic()
-        .resolve_name(name)
-        .map_or((), |binding_id| {
-            if let Some(Stmt::Assign(StmtAssign { value, .. })) = checker
-                .semantic()
-                .binding(binding_id)
-                .statement(checker.semantic())
-            {
-                if let Expr::Call(ExprCall { func, .. }) = value.as_ref() {
-                    if checker
-                        .semantic()
-                        .resolve_call_path(func)
-                        .is_some_and(|call_path| matches!(call_path.as_slice(), ["flask", "Flask"]))
-                    {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(FlaskDebugTrue, debug_argument.range()));
-                    }
+    if let Some(binding_id) = checker.semantic().resolve_name(name) {
+        if let Some(Stmt::Assign(StmtAssign { value, .. })) = checker
+            .semantic()
+            .binding(binding_id)
+            .statement(checker.semantic())
+        {
+            if let Expr::Call(ExprCall { func, .. }) = value.as_ref() {
+                if checker
+                    .semantic()
+                    .resolve_call_path(func)
+                    .is_some_and(|call_path| matches!(call_path.as_slice(), ["flask", "Flask"]))
+                {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(FlaskDebugTrue, debug_argument.range()));
                 }
             }
-        });
+        }
+    };
 }
