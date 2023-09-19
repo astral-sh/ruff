@@ -108,3 +108,9 @@ class ServiceRefOrValue:
 # Regression test for: https://github.com/astral-sh/ruff/issues/7201
 class ServiceRefOrValue:
     service_specification: Optional[str]is not True = None
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7452
+class Collection(Protocol[*_B0]):
+    def __iter__(self) -> Iterator[Union[*_B0]]:
+        ...
