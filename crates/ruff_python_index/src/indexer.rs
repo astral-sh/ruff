@@ -1,15 +1,17 @@
 //! Struct used to index source code, to enable efficient lookup of tokens that
 //! are omitted from the AST (e.g., commented lines).
 
-use crate::CommentRangesBuilder;
 use ruff_python_ast::Stmt;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{StringKind, Tok};
+use ruff_python_parser::Tok;
 use ruff_python_trivia::{
     has_leading_content, has_trailing_content, is_python_whitespace, CommentRanges,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::fstring_ranges::{FStringRanges, FStringRangesBuilder};
+use crate::CommentRangesBuilder;
 
 pub struct Indexer {
     comment_ranges: CommentRanges,
@@ -17,9 +19,8 @@ pub struct Indexer {
     /// Stores the start offset of continuation lines.
     continuation_lines: Vec<TextSize>,
 
-    /// The range of all f-string in the source document. The ranges are sorted by their
-    /// [`TextRange::start`] position in increasing order. No two ranges are overlapping.
-    f_string_ranges: Vec<TextRange>,
+    /// The range of all f-string in the source document.
+    fstring_ranges: FStringRanges,
 }
 
 impl Indexer {
@@ -27,8 +28,8 @@ impl Indexer {
         assert!(TextSize::try_from(locator.contents().len()).is_ok());
 
         let mut comment_ranges_builder = CommentRangesBuilder::default();
+        let mut fstring_ranges_builder = FStringRangesBuilder::default();
         let mut continuation_lines = Vec::new();
-        let mut f_string_ranges = Vec::new();
         // Token, end
         let mut prev_end = TextSize::default();
         let mut prev_token: Option<&Tok> = None;
@@ -59,18 +60,10 @@ impl Indexer {
             }
 
             comment_ranges_builder.visit_token(tok, *range);
+            fstring_ranges_builder.visit_token(tok, *range);
 
-            match tok {
-                Tok::Newline | Tok::NonLogicalNewline => {
-                    line_start = range.end();
-                }
-                Tok::String {
-                    kind: StringKind::FString | StringKind::RawFString,
-                    ..
-                } => {
-                    f_string_ranges.push(*range);
-                }
-                _ => {}
+            if matches!(tok, Tok::Newline | Tok::NonLogicalNewline) {
+                line_start = range.end();
             }
 
             prev_token = Some(tok);
@@ -79,13 +72,18 @@ impl Indexer {
         Self {
             comment_ranges: comment_ranges_builder.finish(),
             continuation_lines,
-            f_string_ranges,
+            fstring_ranges: fstring_ranges_builder.finish(),
         }
     }
 
     /// Returns the byte offset ranges of comments
     pub const fn comment_ranges(&self) -> &CommentRanges {
         &self.comment_ranges
+    }
+
+    /// Returns the byte offset ranges of f-strings.
+    pub const fn fstring_ranges(&self) -> &FStringRanges {
+        &self.fstring_ranges
     }
 
     /// Returns the line start positions of continuations (backslash).
@@ -97,22 +95,6 @@ impl Indexer {
     pub fn is_continuation(&self, offset: TextSize, locator: &Locator) -> bool {
         let line_start = locator.line_start(offset);
         self.continuation_lines.binary_search(&line_start).is_ok()
-    }
-
-    /// Return the [`TextRange`] of the f-string containing a given offset.
-    pub fn f_string_range(&self, offset: TextSize) -> Option<TextRange> {
-        let Ok(string_range_index) = self.f_string_ranges.binary_search_by(|range| {
-            if offset < range.start() {
-                std::cmp::Ordering::Greater
-            } else if range.contains(offset) {
-                std::cmp::Ordering::Equal
-            } else {
-                std::cmp::Ordering::Less
-            }
-        }) else {
-            return None;
-        };
-        Some(self.f_string_ranges[string_range_index])
     }
 
     /// Returns `true` if a statement or expression includes at least one comment.
@@ -250,7 +232,7 @@ mod tests {
     use ruff_python_parser::lexer::LexResult;
     use ruff_python_parser::{lexer, Mode};
     use ruff_source_file::Locator;
-    use ruff_text_size::TextSize;
+    use ruff_text_size::{TextRange, TextSize};
 
     use crate::Indexer;
 
@@ -333,5 +315,195 @@ import os
                 TextSize::from(116)
             ]
         );
+
+        let contents = r"
+f'foo { 'str1' \
+    'str2' \
+    'str3'
+    f'nested { 'str4'
+        'str5' \
+        'str6'
+    }'
+}'
+"
+        .trim();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(
+            indexer.continuation_line_starts(),
+            [
+                // row 1
+                TextSize::new(0),
+                // row 2
+                TextSize::new(17),
+                // row 5
+                TextSize::new(63),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_f_string_ranges() {
+        let contents = r#"
+f"normal f-string"
+f"start {f"inner {f"another"}"} end"
+f"implicit " f"concatenation"
+"#
+        .trim();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(
+            indexer.fstring_ranges().ranges().collect::<Vec<_>>(),
+            &[
+                TextRange::new(TextSize::from(0), TextSize::from(18)),
+                TextRange::new(TextSize::from(19), TextSize::from(55)),
+                TextRange::new(TextSize::from(28), TextSize::from(49)),
+                TextRange::new(TextSize::from(37), TextSize::from(47)),
+                TextRange::new(TextSize::from(56), TextSize::from(68)),
+                TextRange::new(TextSize::from(69), TextSize::from(85)),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_triple_quoted_f_string_ranges() {
+        let contents = r#"
+f"""
+this is one
+multiline f-string
+"""
+f'''
+and this is
+another
+'''
+f"""
+this is a {f"""nested multiline
+f-string"""}
+"""
+"#
+        .trim();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(
+            indexer.fstring_ranges().ranges().collect::<Vec<_>>(),
+            &[
+                TextRange::new(TextSize::from(0), TextSize::from(39)),
+                TextRange::new(TextSize::from(40), TextSize::from(68)),
+                TextRange::new(TextSize::from(69), TextSize::from(122)),
+                TextRange::new(TextSize::from(85), TextSize::from(117)),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_fstring_innermost_outermost() {
+        let contents = r#"
+f"no nested f-string"
+
+if True:
+    f"first {f"second {f"third"} second"} first"
+    foo = "normal string"
+
+f"implicit " f"concatenation"
+
+f"first line {
+    foo + f"second line {bar}"
+} third line"
+
+f"""this is a
+multi-line {f"""nested
+f-string"""}
+the end"""
+"#
+        .trim();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+
+        // For reference, the ranges of the f-strings in the above code are as
+        // follows where the ones inside parentheses are nested f-strings:
+        //
+        // [0..21, (36..80, 45..72, 55..63), 108..120, 121..137, (139..198, 164..184), (200..260, 226..248)]
+
+        for (offset, innermost_range, outermost_range) in [
+            // Inside a normal f-string
+            (
+                TextSize::new(130),
+                TextRange::new(TextSize::new(121), TextSize::new(137)),
+                TextRange::new(TextSize::new(121), TextSize::new(137)),
+            ),
+            // Left boundary
+            (
+                TextSize::new(121),
+                TextRange::new(TextSize::new(121), TextSize::new(137)),
+                TextRange::new(TextSize::new(121), TextSize::new(137)),
+            ),
+            // Right boundary
+            (
+                TextSize::new(136), // End offsets are exclusive
+                TextRange::new(TextSize::new(121), TextSize::new(137)),
+                TextRange::new(TextSize::new(121), TextSize::new(137)),
+            ),
+            // "first" left
+            (
+                TextSize::new(40),
+                TextRange::new(TextSize::new(36), TextSize::new(80)),
+                TextRange::new(TextSize::new(36), TextSize::new(80)),
+            ),
+            // "second" left
+            (
+                TextSize::new(50),
+                TextRange::new(TextSize::new(45), TextSize::new(72)),
+                TextRange::new(TextSize::new(36), TextSize::new(80)),
+            ),
+            // "third"
+            (
+                TextSize::new(60),
+                TextRange::new(TextSize::new(55), TextSize::new(63)),
+                TextRange::new(TextSize::new(36), TextSize::new(80)),
+            ),
+            // "second" right
+            (
+                TextSize::new(70),
+                TextRange::new(TextSize::new(45), TextSize::new(72)),
+                TextRange::new(TextSize::new(36), TextSize::new(80)),
+            ),
+            // "first" right
+            (
+                TextSize::new(75),
+                TextRange::new(TextSize::new(36), TextSize::new(80)),
+                TextRange::new(TextSize::new(36), TextSize::new(80)),
+            ),
+            // Single-quoted f-strings spanning across multiple lines
+            (
+                TextSize::new(160),
+                TextRange::new(TextSize::new(139), TextSize::new(198)),
+                TextRange::new(TextSize::new(139), TextSize::new(198)),
+            ),
+            (
+                TextSize::new(170),
+                TextRange::new(TextSize::new(164), TextSize::new(184)),
+                TextRange::new(TextSize::new(139), TextSize::new(198)),
+            ),
+            // Multi-line f-strings
+            (
+                TextSize::new(220),
+                TextRange::new(TextSize::new(200), TextSize::new(260)),
+                TextRange::new(TextSize::new(200), TextSize::new(260)),
+            ),
+            (
+                TextSize::new(240),
+                TextRange::new(TextSize::new(226), TextSize::new(248)),
+                TextRange::new(TextSize::new(200), TextSize::new(260)),
+            ),
+        ] {
+            assert_eq!(
+                indexer.fstring_ranges().innermost(offset).unwrap(),
+                innermost_range
+            );
+            assert_eq!(
+                indexer.fstring_ranges().outermost(offset).unwrap(),
+                outermost_range
+            );
+        }
     }
 }
