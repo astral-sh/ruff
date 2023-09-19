@@ -57,6 +57,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "no-indented-block-comment",
     "no-space-after-block-comment",
     "no-space-after-inline-comment",
+    "non-empty-stub-body",
     "one-blank-line-after-class",
     "over-indentation",
     "over-indented",

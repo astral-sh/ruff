@@ -7,6 +7,27 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for non-empty function stub bodies.
+///
+/// ## Why is this bad?
+/// Stub files are meant to be used as a reference for the interface of a
+/// module, and should not contain any implementation details. Thus, the
+/// body of a stub function should be empty.
+///
+/// ## Example
+/// ```python
+/// def double(x: int) -> int:
+///     return x * 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def double(x: int) -> int: ...
+/// ```
+///
+/// ## References
+/// - [PEP 484 – Type Hints: Stub Files](https://www.python.org/dev/peps/pep-0484/#stub-files)
 #[violation]
 pub struct NonEmptyStubBody;
 
