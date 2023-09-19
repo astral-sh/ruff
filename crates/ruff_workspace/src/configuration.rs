@@ -850,17 +850,17 @@ mod tests {
         Rule::DeleteFullSlice,
         Rule::CheckAndRemoveFromSet,
         Rule::QuadraticListSummation,
-        Rule::ReimplementedStarmap,
     ];
 
     const PREVIEW_RULES: &[Rule] = &[
         Rule::DirectLoggerInstantiation,
+        Rule::InvalidGetLoggerArgument,
         Rule::ManualDictComprehension,
+        Rule::ReimplementedStarmap,
         Rule::SliceCopy,
         Rule::TooManyPublicMethods,
         Rule::TooManyPublicMethods,
         Rule::UndocumentedWarn,
-        Rule::InvalidGetLoggerArgument,
     ];
 
     #[allow(clippy::needless_pass_by_value)]
