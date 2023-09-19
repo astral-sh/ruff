@@ -193,17 +193,17 @@ Arguments:
 
 Options:
       --fix
-          Attempt to automatically fix lint violations
+          Attempt to automatically fix lint violations. Use `--no-fix` to disable
       --show-source
-          Show violations with source code
+          Show violations with source code. Use `--no-show-source` to disable
       --show-fixes
-          Show an enumeration of all autofixed lint violations
+          Show an enumeration of all autofixed lint violations. Use `--no-show-fixes` to disable
       --diff
           Avoid writing any fixed files back; instead, output a diff for each changed file to stdout. Implies `--fix-only`
   -w, --watch
           Run in watch mode by re-running whenever files change
       --fix-only
-          Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
+          Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`. Use `--no-fix-only` to disable
       --ignore-noqa
           Ignore any `# noqa` comments
       --format <FORMAT>
@@ -213,7 +213,7 @@ Options:
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
       --preview
-          Enable preview mode; checks will include unstable rules and fixes
+          Enable preview mode; checks will include unstable rules and fixes. Use `--no-preview` to disable
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
       --statistics
@@ -248,8 +248,8 @@ Rule selection:
 File selection:
       --exclude <FILE_PATTERN>         List of paths, used to omit files and/or directories from analysis
       --extend-exclude <FILE_PATTERN>  Like --exclude, but adds additional files and directories on top of those already excluded
-      --respect-gitignore              Respect file exclusions via `.gitignore` and other standard ignore files
-      --force-exclude                  Enforce exclusions, even for paths passed to Ruff directly on the command-line
+      --respect-gitignore              Respect file exclusions via `.gitignore` and other standard ignore files. Use `--no-respect-gitignore` to disable
+      --force-exclude                  Enforce exclusions, even for paths passed to Ruff directly on the command-line. Use `--no-force-exclude` to disable
 
 Miscellaneous:
   -n, --no-cache
