@@ -56,8 +56,8 @@ fn ruff_check_paths(
     let mut pyproject_config = resolve(
         cli.isolated,
         cli.config.as_deref(),
-        &overrides,
         cli.stdin_filename.as_deref(),
+        &overrides,
     )?;
     // We don't want to format pyproject.toml
     pyproject_config.settings.lib.include = FilePatternSet::try_from_vec(vec![

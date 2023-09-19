@@ -187,8 +187,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let pyproject_config = resolve::resolve(
         cli.isolated,
         cli.config.as_deref(),
-        &overrides,
         cli.stdin_filename.as_deref(),
+        &overrides,
     )?;
 
     let mut writer: Box<dyn Write> = match cli.output_file {
@@ -327,8 +327,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         pyproject_config = resolve::resolve(
                             cli.isolated,
                             cli.config.as_deref(),
-                            &overrides,
                             cli.stdin_filename.as_deref(),
+                            &overrides,
                         )?;
                     }
                     Printer::clear_screen()?;

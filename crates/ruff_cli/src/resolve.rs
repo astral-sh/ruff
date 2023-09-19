@@ -3,33 +3,31 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use log::debug;
 use path_absolutize::path_dedot;
+use ruff::settings::AllSettings;
 
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject;
 use ruff_workspace::resolver::{
-    resolve_settings_with_processor, ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy,
-    Relativity,
+    resolve_configuration, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
 };
 
-use crate::args::Overrides;
+use crate::args::CliConfigurationOverrides;
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
 pub fn resolve(
     isolated: bool,
-    config: Option<&Path>,
-    overrides: &Overrides,
+    config_path: Option<&Path>,
     stdin_filename: Option<&Path>,
+    overrides: &CliConfigurationOverrides,
 ) -> Result<PyprojectConfig> {
     // First priority: if we're running in isolated mode, use the default settings.
     if isolated {
-        let mut config = Configuration::default();
-        overrides.process_config(&mut config);
-        let settings = config.into_all_settings(&path_dedot::CWD)?;
+        let config = overrides.transform(Configuration::default());
         debug!("Isolated mode, not reading any pyproject.toml");
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Fixed,
-            settings,
+            config.into_all_settings(&path_dedot::CWD)?,
             None,
         ));
     }
@@ -37,12 +35,12 @@ pub fn resolve(
     // Second priority: the user specified a `pyproject.toml` file. Use that
     // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
     // current working directory. (This matches ESLint's behavior.)
-    if let Some(pyproject) = config
+    if let Some(pyproject) = config_path
         .map(|config| config.display().to_string())
         .map(|config| shellexpand::full(&config).map(|config| PathBuf::from(config.as_ref())))
         .transpose()?
     {
-        let settings = resolve_settings_with_processor(&pyproject, Relativity::Cwd, overrides)?;
+        let settings = resolve_settings(&pyproject, &path_dedot::CWD, overrides)?;
         debug!(
             "Using user specified pyproject.toml at {}",
             pyproject.display()
@@ -65,7 +63,7 @@ pub fn resolve(
             .unwrap_or(&path_dedot::CWD.as_path()),
     )? {
         debug!("Using pyproject.toml (parent) at {}", pyproject.display());
-        let settings = resolve_settings_with_processor(&pyproject, Relativity::Parent, overrides)?;
+        let settings = resolve_settings(&pyproject, pyproject.parent().unwrap(), overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,
@@ -79,7 +77,7 @@ pub fn resolve(
     // these act as the "default" settings.)
     if let Some(pyproject) = pyproject::find_user_settings_toml() {
         debug!("Using pyproject.toml (cwd) at {}", pyproject.display());
-        let settings = resolve_settings_with_processor(&pyproject, Relativity::Cwd, overrides)?;
+        let settings = resolve_settings(&pyproject, &path_dedot::CWD, overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,
@@ -92,12 +90,23 @@ pub fn resolve(
     // "closest" `pyproject.toml` file for every Python file later on, so these act
     // as the "default" settings.)
     debug!("Using Ruff default settings");
-    let mut config = Configuration::default();
-    overrides.process_config(&mut config);
+    let config = overrides.transform(Configuration::default());
     let settings = config.into_all_settings(&path_dedot::CWD)?;
     Ok(PyprojectConfig::new(
         PyprojectDiscoveryStrategy::Hierarchical,
         settings,
         None,
     ))
+}
+
+fn resolve_settings(
+    pyproject: &Path,
+    project_root: &Path,
+    overrides: &CliConfigurationOverrides,
+) -> Result<AllSettings> {
+    let configuration = resolve_configuration(pyproject, project_root)?;
+
+    overrides
+        .transform(configuration)
+        .into_all_settings(project_root)
 }

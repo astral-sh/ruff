@@ -22,7 +22,7 @@ use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
 use ruff_source_file::{find_newline, LineEnding};
 use ruff_workspace::resolver::python_files_in_path;
 
-use crate::args::{FormatArguments, Overrides};
+use crate::args::{CliConfigurationOverrides, FormatArguments};
 use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
 use crate::ExitStatus;
@@ -38,14 +38,14 @@ pub(crate) enum FormatMode {
 /// Format a set of files, and return the exit status.
 pub(crate) fn format(
     cli: &FormatArguments,
-    overrides: &Overrides,
+    overrides: &CliConfigurationOverrides,
     log_level: LogLevel,
 ) -> Result<ExitStatus> {
     let pyproject_config = resolve(
         cli.isolated,
         cli.config.as_deref(),
-        overrides,
         cli.stdin_filename.as_deref(),
+        overrides,
     )?;
     let mode = if cli.check {
         FormatMode::Check

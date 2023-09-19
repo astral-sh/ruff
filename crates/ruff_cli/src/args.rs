@@ -12,7 +12,7 @@ use ruff::settings::types::{
 };
 use ruff::{RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
-use ruff_workspace::resolver::ConfigProcessor;
+use ruff_workspace::resolver::ConfigurationTransformer;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -440,7 +440,7 @@ impl From<&LogLevelArgs> for LogLevel {
 impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (CheckArguments, Overrides) {
+    pub fn partition(self) -> (CheckArguments, CliConfigurationOverrides) {
         (
             CheckArguments {
                 add_noqa: self.add_noqa,
@@ -460,7 +460,7 @@ impl CheckCommand {
                 stdin_filename: self.stdin_filename,
                 watch: self.watch,
             },
-            Overrides {
+            CliConfigurationOverrides {
                 dummy_variable_rgx: self.dummy_variable_rgx,
                 exclude: self.exclude,
                 extend_exclude: self.extend_exclude,
@@ -496,7 +496,7 @@ impl CheckCommand {
 impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (FormatArguments, Overrides) {
+    pub fn partition(self) -> (FormatArguments, CliConfigurationOverrides) {
         (
             FormatArguments {
                 check: self.check,
@@ -505,7 +505,7 @@ impl FormatCommand {
                 isolated: self.isolated,
                 stdin_filename: self.stdin_filename,
             },
-            Overrides {
+            CliConfigurationOverrides {
                 line_length: self.line_length,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
@@ -514,7 +514,7 @@ impl FormatCommand {
                 preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 // Unsupported on the formatter CLI, but required on `Overrides`.
-                ..Overrides::default()
+                ..CliConfigurationOverrides::default()
             },
         )
     }
@@ -562,10 +562,9 @@ pub struct FormatArguments {
     pub stdin_filename: Option<PathBuf>,
 }
 
-/// CLI settings that function as configuration overrides.
 #[derive(Clone, Default)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct Overrides {
+pub struct CliConfigurationOverrides {
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend_exclude: Option<Vec<FilePattern>>,
@@ -592,8 +591,8 @@ pub struct Overrides {
     pub show_fixes: Option<bool>,
 }
 
-impl ConfigProcessor for Overrides {
-    fn process_config(&self, config: &mut Configuration) {
+impl ConfigurationTransformer for CliConfigurationOverrides {
+    fn transform(&self, mut config: Configuration) -> Configuration {
         if let Some(cache_dir) = &self.cache_dir {
             config.cache_dir = Some(cache_dir.clone());
         }
@@ -659,6 +658,8 @@ impl ConfigProcessor for Overrides {
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);
         }
+
+        config
     }
 }
 
@@ -668,7 +669,7 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pair.prefix);
     }
     per_file_ignores

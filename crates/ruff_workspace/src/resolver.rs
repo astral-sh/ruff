@@ -10,7 +10,6 @@ use anyhow::{anyhow, bail};
 use ignore::{DirEntry, WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
-use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::configuration::Configuration;
@@ -27,7 +26,7 @@ pub struct PyprojectConfig {
     pub strategy: PyprojectDiscoveryStrategy,
     /// All settings from the `pyproject.toml` file.
     pub settings: AllSettings,
-    /// Absolute path to the `pyproject.toml` file. This would be `None` when
+    /// Absolute path to the `pyproject.toml` file. This is`None` when
     /// either using the default settings or the `--isolated` flag is set.
     pub path: Option<PathBuf>,
 }
@@ -65,28 +64,6 @@ impl PyprojectDiscoveryStrategy {
 
     pub const fn is_hierarchical(self) -> bool {
         matches!(self, PyprojectDiscoveryStrategy::Hierarchical)
-    }
-}
-
-/// The strategy for resolving file paths in a `pyproject.toml`.
-#[derive(Copy, Clone)]
-pub enum Relativity {
-    /// Resolve file paths relative to the current working directory.
-    Cwd,
-    /// Resolve file paths relative to the directory containing the
-    /// `pyproject.toml`.
-    Parent,
-}
-
-impl Relativity {
-    pub fn resolve(self, path: &Path) -> PathBuf {
-        match self {
-            Relativity::Parent => path
-                .parent()
-                .expect("Expected pyproject.toml file to be in parent directory")
-                .to_path_buf(),
-            Relativity::Cwd => path_dedot::CWD.clone(),
-        }
     }
 }
 
@@ -186,8 +163,8 @@ fn is_package_with_cache<'a>(
         .or_insert_with(|| is_package(path, namespace_packages))
 }
 
-pub trait ConfigProcessor: Sync {
-    fn process_config(&self, config: &mut Configuration);
+pub trait ConfigurationTransformer: Sync {
+    fn transform(&self, config: Configuration) -> Configuration;
 }
 
 /// Recursively resolve a [`Configuration`] from a `pyproject.toml` file at the
@@ -196,11 +173,7 @@ pub trait ConfigProcessor: Sync {
 // configuration file extends another in the same path, we'll re-parse the same
 // file at least twice (possibly more than twice, since we'll also parse it when
 // resolving the "default" configuration).
-fn resolve_configuration(
-    pyproject: &Path,
-    relativity: Relativity,
-    processor: &dyn ConfigProcessor,
-) -> Result<Configuration> {
+pub fn resolve_configuration(pyproject: &Path, project_root: &Path) -> Result<Configuration> {
     let mut seen = FxHashSet::default();
     let mut stack = vec![];
     let mut next = Some(fs::normalize_path(pyproject));
@@ -212,8 +185,8 @@ fn resolve_configuration(
         // Resolve the current path.
         let options = pyproject::load_options(&path)
             .map_err(|err| anyhow!("Failed to parse `{}`: {}", path.display(), err))?;
-        let project_root = relativity.resolve(&path);
-        let configuration = Configuration::from_options(options, &project_root)?;
+
+        let configuration = Configuration::from_options(options, project_root)?;
 
         // If extending, continue to collect.
         next = configuration.extend.as_ref().map(|extend| {
@@ -236,7 +209,7 @@ fn resolve_configuration(
     while let Some(extend) = stack.pop() {
         configuration = configuration.combine(extend);
     }
-    processor.process_config(&mut configuration);
+
     Ok(configuration)
 }
 
@@ -244,31 +217,23 @@ fn resolve_configuration(
 /// `pyproject.toml`.
 fn resolve_scoped_settings(
     pyproject: &Path,
-    relativity: Relativity,
-    processor: &dyn ConfigProcessor,
-) -> Result<(PathBuf, AllSettings)> {
-    let configuration = resolve_configuration(pyproject, relativity, processor)?;
-    let project_root = relativity.resolve(pyproject);
-    let settings = configuration.into_all_settings(&project_root)?;
-    Ok((project_root, settings))
-}
-
-/// Extract the [`Settings`] from a given `pyproject.toml` and process the
-/// configuration with the given [`ConfigProcessor`].
-pub fn resolve_settings_with_processor(
-    pyproject: &Path,
-    relativity: Relativity,
-    processor: &dyn ConfigProcessor,
-) -> Result<AllSettings> {
-    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, processor)?;
-    Ok(settings)
+    transformer: &dyn ConfigurationTransformer,
+) -> Result<(PathBuf, Settings)> {
+    let project_root = pyproject
+        .parent()
+        .expect("Expected project root to be the parent of the `pyproject.toml`.");
+    let configuration = resolve_configuration(pyproject, project_root)?;
+    let settings = transformer
+        .transform(configuration)
+        .into_settings(project_root)?;
+    Ok((project_root.to_path_buf(), settings))
 }
 
 /// Find all Python (`.py`, `.pyi` and `.ipynb` files) in a set of paths.
 pub fn python_files_in_path(
     paths: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    processor: &dyn ConfigProcessor,
+    processor: &dyn ConfigurationTransformer,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
@@ -281,9 +246,8 @@ pub fn python_files_in_path(
         for ancestor in ancestors {
             if seen.insert(ancestor) {
                 if let Some(pyproject) = settings_toml(ancestor)? {
-                    let (root, settings) =
-                        resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
-                    resolver.add(root, settings.lib);
+                    let (root, settings) = resolve_scoped_settings(&pyproject, processor)?;
+                    resolver.add(root, settings);
                 }
             }
         }
@@ -351,19 +315,17 @@ pub fn python_files_in_path(
                         .is_some_and(|file_type| file_type.is_dir())
                     {
                         match settings_toml(entry.path()) {
-                            Ok(Some(pyproject)) => match resolve_scoped_settings(
-                                &pyproject,
-                                Relativity::Parent,
-                                processor,
-                            ) {
-                                Ok((root, settings)) => {
-                                    resolver.write().unwrap().add(root, settings.lib);
+                            Ok(Some(pyproject)) => {
+                                match resolve_scoped_settings(&pyproject, processor) {
+                                    Ok((root, settings)) => {
+                                        resolver.write().unwrap().add(root, settings);
+                                    }
+                                    Err(err) => {
+                                        *error.lock().unwrap() = Err(err);
+                                        return WalkState::Quit;
+                                    }
                                 }
-                                Err(err) => {
-                                    *error.lock().unwrap() = Err(err);
-                                    return WalkState::Quit;
-                                }
-                            },
+                            }
                             Ok(None) => {}
                             Err(err) => {
                                 *error.lock().unwrap() = Err(err);
@@ -413,7 +375,7 @@ pub fn python_files_in_path(
 pub fn python_file_at_path(
     path: &Path,
     pyproject_config: &PyprojectConfig,
-    processor: &dyn ConfigProcessor,
+    processor: &dyn ConfigurationTransformer,
 ) -> Result<bool> {
     if !pyproject_config.settings.lib.force_exclude {
         return Ok(true);
@@ -427,9 +389,8 @@ pub fn python_file_at_path(
     if pyproject_config.strategy.is_hierarchical() {
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
-                let (root, settings) =
-                    resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
-                resolver.add(root, settings.lib);
+                let (root, settings) = resolve_scoped_settings(&pyproject, processor)?;
+                resolver.add(root, settings);
             }
         }
     }
@@ -500,30 +461,29 @@ mod tests {
     use ruff::settings::AllSettings;
 
     use crate::resolver::{
-        is_file_excluded, match_exclusion, python_files_in_path, resolve_settings_with_processor,
-        ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,
+        is_file_excluded, match_exclusion, python_files_in_path, resolve_configuration,
+        ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy, Resolver,
     };
     use crate::tests::test_resource_path;
 
     struct NoOpProcessor;
 
-    impl ConfigProcessor for NoOpProcessor {
-        fn process_config(&self, _config: &mut Configuration) {}
+    impl ConfigurationTransformer for NoOpProcessor {
+        fn transform(&self, config: Configuration) -> Configuration {
+            config
+        }
     }
 
     #[test]
     fn rooted_exclusion() -> Result<()> {
         let package_root = test_resource_path("package");
         let resolver = Resolver::default();
-        let pyproject_config = PyprojectConfig::new(
-            PyprojectDiscoveryStrategy::Hierarchical,
-            resolve_settings_with_processor(
-                &find_settings_toml(&package_root)?.unwrap(),
-                Relativity::Parent,
-                &NoOpProcessor,
-            )?,
-            None,
-        );
+        let pyproject = find_settings_toml(&package_root)?.unwrap();
+        let project_root = package_root.parent().unwrap();
+        let configuration = resolve_configuration(&pyproject, project_root)?;
+        let settings = configuration.into_all_settings(project_root)?;
+        let pyproject_config =
+            PyprojectConfig::new(PyprojectDiscoveryStrategy::Hierarchical, settings, None);
         // src/app.py should not be excluded even if it lives in a hierarchy that should
         // be excluded by virtue of the pyproject.toml having `resources/*` in
         // it.
