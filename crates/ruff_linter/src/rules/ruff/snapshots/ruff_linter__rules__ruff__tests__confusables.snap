@@ -49,6 +49,8 @@ confusables.py:31:6: RUF001 String contains ambiguous `Р` (CYRILLIC CAPITAL LET
 30 | # boundary" (whitespace) that it itself ambiguous.
 31 | x = "Р усский"
    |      ^ RUF001
+32 | 
+33 | # Same test cases as above but using f-strings instead:
    |
 
 confusables.py:31:7: RUF001 String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
@@ -57,6 +59,100 @@ confusables.py:31:7: RUF001 String contains ambiguous ` ` (EN QUAD). Did you m
 30 | # boundary" (whitespace) that it itself ambiguous.
 31 | x = "Р усский"
    |       ^ RUF001
+32 | 
+33 | # Same test cases as above but using f-strings instead:
+   |
+
+confusables.py:34:7: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+   |
+33 | # Same test cases as above but using f-strings instead:
+34 | x = f"𝐁ad string"
+   |       ^ RUF001
+35 | x = f"−"
+36 | x = f"Русский"
+   |
+
+confusables.py:37:11: RUF001 String contains ambiguous `α` (GREEK SMALL LETTER ALPHA). Did you mean `a` (LATIN SMALL LETTER A)?
+   |
+35 | x = f"−"
+36 | x = f"Русский"
+37 | x = f"βα Bαd"
+   |           ^ RUF001
+38 | x = f"Р усский"
+   |
+
+confusables.py:38:7: RUF001 String contains ambiguous `Р` (CYRILLIC CAPITAL LETTER ER). Did you mean `P` (LATIN CAPITAL LETTER P)?
+   |
+36 | x = f"Русский"
+37 | x = f"βα Bαd"
+38 | x = f"Р усский"
+   |       ^ RUF001
+39 | 
+40 | # Nested f-strings
+   |
+
+confusables.py:38:8: RUF001 String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
+   |
+36 | x = f"Русский"
+37 | x = f"βα Bαd"
+38 | x = f"Р усский"
+   |        ^ RUF001
+39 | 
+40 | # Nested f-strings
+   |
+
+confusables.py:41:7: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+   |
+40 | # Nested f-strings
+41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
+   |       ^ RUF001
+42 | 
+43 | # Comments inside f-strings
+   |
+
+confusables.py:41:21: RUF001 String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
+   |
+40 | # Nested f-strings
+41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
+   |                     ^ RUF001
+42 | 
+43 | # Comments inside f-strings
+   |
+
+confusables.py:41:25: RUF001 String contains ambiguous `Р` (CYRILLIC CAPITAL LETTER ER). Did you mean `P` (LATIN CAPITAL LETTER P)?
+   |
+40 | # Nested f-strings
+41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
+   |                         ^ RUF001
+42 | 
+43 | # Comments inside f-strings
+   |
+
+confusables.py:41:26: RUF001 String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
+   |
+40 | # Nested f-strings
+41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
+   |                          ^ RUF001
+42 | 
+43 | # Comments inside f-strings
+   |
+
+confusables.py:44:68: RUF003 Comment contains ambiguous `）` (FULLWIDTH RIGHT PARENTHESIS). Did you mean `)` (RIGHT PARENTHESIS)?
+   |
+43 | # Comments inside f-strings
+44 | x = f"string { # And here's a comment with an unusual parenthesis: ）
+   |                                                                    ^^ RUF003
+45 | # And here's a comment with a greek alpha: ∗
+46 | foo # And here's a comment with an unusual punctuation mark: ᜵
+   |
+
+confusables.py:46:62: RUF003 Comment contains ambiguous `᜵` (PHILIPPINE SINGLE PUNCTUATION). Did you mean `/` (SOLIDUS)?
+   |
+44 | x = f"string { # And here's a comment with an unusual parenthesis: ）
+45 | # And here's a comment with a greek alpha: ∗
+46 | foo # And here's a comment with an unusual punctuation mark: ᜵
+   |                                                              ^ RUF003
+47 | }"
    |
 
 
