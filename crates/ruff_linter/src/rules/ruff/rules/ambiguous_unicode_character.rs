@@ -123,6 +123,7 @@ impl Violation for AmbiguousUnicodeCharacterComment {
     }
 }
 
+/// RUF001, RUF002, RUF003
 pub(crate) fn ambiguous_unicode_character(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
