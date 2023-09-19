@@ -44,7 +44,7 @@ pub struct CliSettings {
     pub cache_dir: PathBuf,
     pub fix: bool,
     pub fix_only: bool,
-    pub format: SerializationFormat,
+    pub output_format: SerializationFormat,
     pub show_fixes: bool,
     pub show_source: bool,
 }

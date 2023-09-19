@@ -236,20 +236,33 @@ pub struct Options {
     /// A list of rule codes or prefixes to consider autofixable. By default,
     /// all rules are considered autofixable.
     pub fixable: Option<Vec<RuleSelector>>,
-    #[option(
-        default = r#""text""#,
-        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
-        example = r#"
-            # Group violations by containing file.
-            format = "grouped"
-        "#
-    )]
+
     /// The style in which violation messages should be formatted: `"text"`
     /// (default), `"grouped"` (group messages by file), `"json"`
     /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
     /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
     /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
+    ///
+    /// This option has been **deprecated** in favor of `output-format`
+    /// to avoid ambiguity with Ruff's upcoming formatter.
+    #[cfg_attr(feature = "schemars", schemars(skip))]
     pub format: Option<SerializationFormat>,
+
+    /// The style in which violation messages should be formatted: `"text"`
+    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
+    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
+    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
+    #[option(
+        default = r#""text""#,
+        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
+        example = r#"
+            # Group violations by containing file.
+            output-format = "grouped"
+        "#
+    )]
+    pub output_format: Option<SerializationFormat>,
+
     #[option(
         default = r#"false"#,
         value_type = "bool",
