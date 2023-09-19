@@ -516,7 +516,7 @@ dependencies = [
  "clap",
  "criterion-plot",
  "is-terminal",
- "itertools",
+ "itertools 0.10.5",
  "num-traits",
  "once_cell",
  "oorandom",
@@ -535,7 +535,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
 dependencies = [
  "cast",
- "itertools",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -816,7 +816,7 @@ dependencies = [
  "clap",
  "colored",
  "configparser",
- "itertools",
+ "itertools 0.11.0",
  "log",
  "once_cell",
  "pep440_rs",
@@ -1144,6 +1144,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1189,7 +1198,7 @@ dependencies = [
  "diff",
  "ena",
  "is-terminal",
- "itertools",
+ "itertools 0.10.5",
  "lalrpop-util",
  "petgraph",
  "regex",
@@ -1749,7 +1758,7 @@ checksum = "09963355b9f467184c04017ced4a2ba2d75cbcb4e7462690d388233253d4b1a9"
 dependencies = [
  "anstyle",
  "difflib",
- "itertools",
+ "itertools 0.10.5",
  "predicates-core",
 ]
 
@@ -2035,7 +2044,7 @@ dependencies = [
  "imperative",
  "insta",
  "is-macro",
- "itertools",
+ "itertools 0.11.0",
  "libcst",
  "log",
  "memchr",
@@ -2112,7 +2121,7 @@ dependencies = [
  "filetime",
  "glob",
  "globset",
- "itertools",
+ "itertools 0.11.0",
  "regex",
  "ruff_macros",
 ]
@@ -2139,7 +2148,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "is-macro",
- "itertools",
+ "itertools 0.11.0",
  "itoa",
  "log",
  "mimalloc",
@@ -2186,7 +2195,7 @@ dependencies = [
  "imara-diff",
  "indicatif",
  "indoc",
- "itertools",
+ "itertools 0.11.0",
  "libcst",
  "once_cell",
  "pretty_assertions",
@@ -2255,7 +2264,7 @@ dependencies = [
 name = "ruff_macros"
 version = "0.0.0"
 dependencies = [
- "itertools",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "ruff_python_trivia",
@@ -2268,7 +2277,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "insta",
- "itertools",
+ "itertools 0.11.0",
  "once_cell",
  "ruff_diagnostics",
  "ruff_source_file",
@@ -2288,7 +2297,7 @@ dependencies = [
  "bitflags 2.4.0",
  "insta",
  "is-macro",
- "itertools",
+ "itertools 0.11.0",
  "memchr",
  "num-bigint",
  "num-traits",
@@ -2323,7 +2332,7 @@ dependencies = [
  "clap",
  "countme",
  "insta",
- "itertools",
+ "itertools 0.11.0",
  "memchr",
  "once_cell",
  "ruff_formatter",
@@ -2348,7 +2357,7 @@ dependencies = [
 name = "ruff_python_index"
 version = "0.0.0"
 dependencies = [
- "itertools",
+ "itertools 0.11.0",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_python_trivia",
@@ -2363,7 +2372,7 @@ dependencies = [
  "bitflags 2.4.0",
  "hexf-parse",
  "is-macro",
- "itertools",
+ "itertools 0.11.0",
  "lexical-parse-float",
  "num-traits",
  "rand",
@@ -2377,7 +2386,7 @@ dependencies = [
  "anyhow",
  "insta",
  "is-macro",
- "itertools",
+ "itertools 0.11.0",
  "lalrpop",
  "lalrpop-util",
  "num-bigint",
@@ -2430,7 +2439,7 @@ name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
  "insta",
- "itertools",
+ "itertools 0.11.0",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_source_file",
@@ -2511,7 +2520,7 @@ dependencies = [
  "glob",
  "globset",
  "ignore",
- "itertools",
+ "itertools 0.11.0",
  "log",
  "path-absolutize",
  "pep440_rs",
