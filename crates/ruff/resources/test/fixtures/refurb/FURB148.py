@@ -1,7 +1,6 @@
 books = ["Dune", "Foundation", "Neuromancer"]
 
-# Errors.
-
+# Errors
 for index, _ in enumerate(books):
     print(index)
 
@@ -38,8 +37,13 @@ for index, (_, _) in enumerate(books):
 for (_, _), book in enumerate(books):
     print(book)
 
-# OK.
+for(index, _)in enumerate(books):
+    print(index)
 
+for(index), _ in enumerate(books):
+    print(index)
+
+# OK
 for index, book in enumerate(books):
     print(index, book)
 

@@ -1,7 +1,7 @@
-use num_traits::ToPrimitive;
 use std::fmt;
 
-use crate::autofix::snippet::SourceCodeSnippet;
+use num_traits::ToPrimitive;
+
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -10,6 +10,7 @@ use ruff_python_codegen::Generator;
 use ruff_python_semantic::helpers::is_unused;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::autofix::edits::pad;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -50,7 +51,6 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnnecessaryEnumerate {
     subset: EnumerateSubset,
-    iterable_suggestion: Option<SourceCodeSnippet>,
 }
 
 impl Violation for UnnecessaryEnumerate {
@@ -58,39 +58,22 @@ impl Violation for UnnecessaryEnumerate {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryEnumerate {
-            subset,
-            iterable_suggestion,
-        } = self;
-        if let Some(suggestion) = iterable_suggestion
-            .as_ref()
-            .and_then(SourceCodeSnippet::full_display)
-        {
-            format!("Do not iterate over `enumerate` when only using the {subset}, iterate over `{suggestion}` instead")
-        } else {
-            format!("Do not iterate over `enumerate` when only using the {subset}")
+        let UnnecessaryEnumerate { subset } = self;
+        match subset {
+            EnumerateSubset::Indices => {
+                format!("`enumerate` value is unused, use `for x in range(len(y))` instead")
+            }
+            EnumerateSubset::Values => {
+                format!("`enumerate` index is unused, use `for x in y` instead")
+            }
         }
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let UnnecessaryEnumerate {
-            subset,
-            iterable_suggestion,
-        } = self;
-        if let Some(suggestion) = iterable_suggestion
-            .as_ref()
-            .and_then(SourceCodeSnippet::full_display)
-        {
-            Some(format!("Replace with `{suggestion}`"))
-        } else {
-            match subset {
-                EnumerateSubset::Indices => {
-                    Some("Replace with iteration over `range(len(...))`".to_string())
-                }
-                EnumerateSubset::Values => {
-                    Some("Replace with direct iteration over the sequence".to_string())
-                }
-            }
+        let UnnecessaryEnumerate { subset } = self;
+        match subset {
+            EnumerateSubset::Indices => Some("Replace with `range(len(...))`".to_string()),
+            EnumerateSubset::Values => Some("Remove `enumerate`".to_string()),
         }
     }
 }
@@ -139,46 +122,25 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             // Both the index and the value are used.
         }
         (true, false) => {
-            // The index is unused, so replace with `for value in sequence`.
-
-            // Get the `start` argument, if it is a constant integer.
-            let start = start(arguments);
-
-            // Attempt to create a suggested iterator replacement, as it's used
-            // in both the message and the autofix.
-            let replace_iter = match start {
-                Some(start) if start > 0 => {
-                    // If the start argument is a positive integer, there isn't a clear fix.
-                    None
-                }
-                _ => {
-                    // Otherwise, suggest iterating over the sequence itself.
-                    Some(Edit::range_replacement(
-                        sequence.into(),
-                        stmt_for.iter.range(),
-                    ))
-                }
-            };
-            let iterable_suggestion: Option<SourceCodeSnippet> =
-                replace_iter.as_ref().and_then(|edit| {
-                    edit.content()
-                        .map(|content| SourceCodeSnippet::new(content.to_string()))
-                });
-
             let mut diagnostic = Diagnostic::new(
                 UnnecessaryEnumerate {
                     subset: EnumerateSubset::Values,
-                    iterable_suggestion,
                 },
                 func.range(),
             );
 
+            // The index is unused, so replace with `for value in sequence`.
             if checker.patch(diagnostic.kind.rule()) {
-                // If we made a suggested iterator replacement, use it and
-                // replace the target to produce a fix.
-                if let Some(replace_iter) = replace_iter {
+                // Get the `start` argument, if it is a constant integer.
+                if start(arguments).map_or(true, |start| start == 0) {
+                    let replace_iter =
+                        Edit::range_replacement(sequence.into(), stmt_for.iter.range());
                     let replace_target = Edit::range_replacement(
-                        checker.locator().slice(value).to_string(),
+                        pad(
+                            checker.locator().slice(value).to_string(),
+                            stmt_for.target.range(),
+                            checker.locator(),
+                        ),
                         stmt_for.target.range(),
                     );
                     diagnostic.set_fix(Fix::suggested_edits(replace_iter, [replace_target]));
@@ -189,34 +151,30 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
         }
         (false, true) => {
             // The value is unused, so replace with `for index in range(len(sequence))`.
-
-            // Get the `start` argument, if it is a constant integer.
-            let start = start(arguments);
-
-            // Create suggested iterator replacement, as it's used in both the
-            // message and the autofix.
-            let replace_iter = Edit::range_replacement(
-                generate_range_len_call(sequence, start, checker.generator()),
-                stmt_for.iter.range(),
-            );
-            let iterable_suggestion = replace_iter
-                .content()
-                .map(|content| SourceCodeSnippet::new(content.to_string()));
-
             let mut diagnostic = Diagnostic::new(
                 UnnecessaryEnumerate {
                     subset: EnumerateSubset::Indices,
-                    iterable_suggestion,
                 },
                 func.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                // Replace the target and combine it with the suggested
-                // iterator replacement to produce a fix.
+                // Get the `start` argument, if it is a constant integer.
+                let start = start(arguments);
+
+                let replace_iter = Edit::range_replacement(
+                    generate_range_len_call(sequence, start, checker.generator()),
+                    stmt_for.iter.range(),
+                );
+
                 let replace_target = Edit::range_replacement(
-                    checker.locator().slice(index).to_string(),
+                    pad(
+                        checker.locator().slice(index).to_string(),
+                        stmt_for.target.range(),
+                        checker.locator(),
+                    ),
                     stmt_for.target.range(),
                 );
+
                 diagnostic.set_fix(Fix::suggested_edits(replace_iter, [replace_target]));
             }
             checker.diagnostics.push(diagnostic);
@@ -226,7 +184,9 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
 
 #[derive(Debug, PartialEq, Eq)]
 enum EnumerateSubset {
+    /// E.g., `for _, value in enumerate(sequence):`.
     Indices,
+    /// E.g., `for index, _ in enumerate(sequence):`.
     Values,
 }
 
