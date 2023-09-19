@@ -4,7 +4,6 @@ mod branches;
 mod context;
 mod definition;
 mod globals;
-pub mod helpers;
 mod model;
 mod nodes;
 mod reference;

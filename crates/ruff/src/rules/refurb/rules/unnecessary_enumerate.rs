@@ -7,7 +7,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Constant, Expr};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::helpers::is_unused;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::edits::pad;
@@ -112,8 +111,8 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
 
     // Check if the index and value are used.
     match (
-        is_unused(index, checker.semantic()),
-        is_unused(value, checker.semantic()),
+        checker.semantic().is_unused(index),
+        checker.semantic().is_unused(value),
     ) {
         (true, true) => {
             // Both the index and the value are unused.

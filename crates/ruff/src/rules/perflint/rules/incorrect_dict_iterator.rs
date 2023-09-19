@@ -4,7 +4,6 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr};
-use ruff_python_semantic::helpers::is_unused;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -83,8 +82,8 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
     }
 
     match (
-        is_unused(key, checker.semantic()),
-        is_unused(value, checker.semantic()),
+        checker.semantic().is_unused(key),
+        checker.semantic().is_unused(value),
     ) {
         (true, true) => {
             // Both the key and the value are unused.
