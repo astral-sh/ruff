@@ -919,6 +919,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "131") => (RuleGroup::Nursery, rules::refurb::rules::DeleteFullSlice),
         #[allow(deprecated)]
         (Refurb, "132") => (RuleGroup::Nursery, rules::refurb::rules::CheckAndRemoveFromSet),
+        (Refurb, "140") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedStarmap),
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
 
         // flake8-logging

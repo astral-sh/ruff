@@ -1279,16 +1279,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_simplify::rules::twisted_arms_in_ifexpr(checker, expr, test, body, orelse);
             }
         }
-        Expr::ListComp(ast::ExprListComp {
-            elt,
-            generators,
-            range: _,
-        })
-        | Expr::SetComp(ast::ExprSetComp {
-            elt,
-            generators,
-            range: _,
-        }) => {
+        Expr::ListComp(
+            comp @ ast::ExprListComp {
+                elt,
+                generators,
+                range: _,
+            },
+        ) => {
             if checker.enabled(Rule::UnnecessaryComprehension) {
                 flake8_comprehensions::rules::unnecessary_list_set_comprehension(
                     checker, expr, elt, generators,
@@ -1301,6 +1298,33 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 for generator in generators {
                     pylint::rules::iteration_over_set(checker, &generator.iter);
                 }
+            }
+            if checker.enabled(Rule::ReimplementedStarmap) {
+                refurb::rules::reimplemented_starmap(checker, &comp.into());
+            }
+        }
+        Expr::SetComp(
+            comp @ ast::ExprSetComp {
+                elt,
+                generators,
+                range: _,
+            },
+        ) => {
+            if checker.enabled(Rule::UnnecessaryComprehension) {
+                flake8_comprehensions::rules::unnecessary_list_set_comprehension(
+                    checker, expr, elt, generators,
+                );
+            }
+            if checker.enabled(Rule::FunctionUsesLoopVariable) {
+                flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
+            }
+            if checker.enabled(Rule::IterationOverSet) {
+                for generator in generators {
+                    pylint::rules::iteration_over_set(checker, &generator.iter);
+                }
+            }
+            if checker.enabled(Rule::ReimplementedStarmap) {
+                refurb::rules::reimplemented_starmap(checker, &comp.into());
             }
         }
         Expr::DictComp(ast::ExprDictComp {
@@ -1326,11 +1350,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::static_key_dict_comprehension(checker, key);
             }
         }
-        Expr::GeneratorExp(ast::ExprGeneratorExp {
-            generators,
-            elt: _,
-            range: _,
-        }) => {
+        Expr::GeneratorExp(
+            generator @ ast::ExprGeneratorExp {
+                generators,
+                elt: _,
+                range: _,
+            },
+        ) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
             }
@@ -1338,6 +1364,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 for generator in generators {
                     pylint::rules::iteration_over_set(checker, &generator.iter);
                 }
+            }
+            if checker.enabled(Rule::ReimplementedStarmap) {
+                refurb::rules::reimplemented_starmap(checker, &generator.into());
             }
         }
         Expr::BoolOp(
