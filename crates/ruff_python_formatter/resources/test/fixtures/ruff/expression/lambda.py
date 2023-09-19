@@ -152,4 +152,54 @@ lambda *x\
         x: x
 )
 
+lambda: ( # comment
+    x)
 
+(
+    lambda:  # comment
+    x
+)
+
+(
+    lambda:
+    # comment
+    x
+)
+
+(
+    lambda  # comment
+    :
+    x
+)
+
+(
+    lambda
+    # comment
+    :
+    x
+)
+
+(
+    lambda:  # comment
+    (  # comment
+        x
+    )
+)
+
+(
+    lambda  # 1
+    # 2
+    x  # 3
+    # 4
+    :  # 5
+    # 6
+    x
+)
+
+(
+    lambda
+    x,
+    # comment
+    y:
+    z
+)
