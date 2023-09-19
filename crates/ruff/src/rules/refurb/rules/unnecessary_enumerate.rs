@@ -1,6 +1,6 @@
 use std::fmt;
 
-use num_traits::ToPrimitive;
+use num_traits::Zero;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -130,20 +130,16 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
 
             // The index is unused, so replace with `for value in sequence`.
             if checker.patch(diagnostic.kind.rule()) {
-                // Get the `start` argument, if it is a constant integer.
-                if start(arguments).map_or(true, |start| start == 0) {
-                    let replace_iter =
-                        Edit::range_replacement(sequence.into(), stmt_for.iter.range());
-                    let replace_target = Edit::range_replacement(
-                        pad(
-                            checker.locator().slice(value).to_string(),
-                            stmt_for.target.range(),
-                            checker.locator(),
-                        ),
+                let replace_iter = Edit::range_replacement(sequence.into(), stmt_for.iter.range());
+                let replace_target = Edit::range_replacement(
+                    pad(
+                        checker.locator().slice(value).to_string(),
                         stmt_for.target.range(),
-                    );
-                    diagnostic.set_fix(Fix::suggested_edits(replace_iter, [replace_target]));
-                }
+                        checker.locator(),
+                    ),
+                    stmt_for.target.range(),
+                );
+                diagnostic.set_fix(Fix::suggested_edits(replace_iter, [replace_target]));
             }
 
             checker.diagnostics.push(diagnostic);
@@ -156,25 +152,40 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 },
                 func.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Get the `start` argument, if it is a constant integer.
-                let start = start(arguments);
+            if checker.patch(diagnostic.kind.rule())
+                && checker.semantic().is_builtin("range")
+                && checker.semantic().is_builtin("len")
+            {
+                // If the `start` argument is set to something other than the `range` default,
+                // there's no clear fix.
+                let start = arguments.find_argument("start", 1);
+                if start.map_or(true, |start| {
+                    if let Expr::Constant(ast::ExprConstant {
+                        value: Constant::Int(value),
+                        ..
+                    }) = start
+                    {
+                        value.is_zero()
+                    } else {
+                        false
+                    }
+                }) {
+                    let replace_iter = Edit::range_replacement(
+                        generate_range_len_call(sequence, checker.generator()),
+                        stmt_for.iter.range(),
+                    );
 
-                let replace_iter = Edit::range_replacement(
-                    generate_range_len_call(sequence, start, checker.generator()),
-                    stmt_for.iter.range(),
-                );
-
-                let replace_target = Edit::range_replacement(
-                    pad(
-                        checker.locator().slice(index).to_string(),
+                    let replace_target = Edit::range_replacement(
+                        pad(
+                            checker.locator().slice(index).to_string(),
+                            stmt_for.target.range(),
+                            checker.locator(),
+                        ),
                         stmt_for.target.range(),
-                        checker.locator(),
-                    ),
-                    stmt_for.target.range(),
-                );
+                    );
 
-                diagnostic.set_fix(Fix::suggested_edits(replace_iter, [replace_target]));
+                    diagnostic.set_fix(Fix::suggested_edits(replace_iter, [replace_target]));
+                }
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -198,24 +209,9 @@ impl fmt::Display for EnumerateSubset {
     }
 }
 
-/// Returns the value of the `start` argument to `enumerate`, if it is a
-/// constant integer. Otherwise, returns `None`.
-fn start(arguments: &Arguments) -> Option<u32> {
-    let step_param = arguments.find_argument("start", 1)?;
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
-        ..
-    }) = &step_param
-    {
-        value.to_u32()
-    } else {
-        None
-    }
-}
-
 /// Format a code snippet to call `range(len(name))`, where `name` is the given
 /// sequence name.
-fn generate_range_len_call(name: &str, start: Option<u32>, generator: Generator) -> String {
+fn generate_range_len_call(name: &str, generator: Generator) -> String {
     // Construct `name`.
     let var = ast::ExprName {
         id: name.to_string(),
@@ -240,16 +236,6 @@ fn generate_range_len_call(name: &str, start: Option<u32>, generator: Generator)
         range: TextRange::default(),
     };
     // Construct `range(len(name))`.
-    let range_args: Vec<Expr> = match start {
-        Some(start) if start > 0 => {
-            let start_expr: Expr = Expr::Constant(ast::ExprConstant {
-                range: TextRange::default(),
-                value: Constant::Int(start.into()),
-            });
-            vec![start_expr, len.into()]
-        }
-        _ => vec![len.into()],
-    };
     let range = ast::ExprCall {
         func: Box::new(
             ast::ExprName {
@@ -260,7 +246,7 @@ fn generate_range_len_call(name: &str, start: Option<u32>, generator: Generator)
             .into(),
         ),
         arguments: Arguments {
-            args: range_args,
+            args: vec![len.into()],
             keywords: vec![],
             range: TextRange::default(),
         },

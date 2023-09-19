@@ -16,6 +16,12 @@ for index, _ in enumerate(books, start=1):
 for index, _ in enumerate(books, 1):
     print(index)
 
+for index, _ in enumerate(books, start=x):
+    print(book)
+
+for index, _ in enumerate(books, x):
+    print(book)
+
 for _, book in enumerate(books):
     print(book)
 
@@ -29,6 +35,12 @@ for _, book in enumerate(books, start=1):
     print(book)
 
 for _, book in enumerate(books, 1):
+    print(book)
+
+for _, book in enumerate(books, start=x):
+    print(book)
+
+for _, book in enumerate(books, x):
     print(book)
 
 for index, (_, _) in enumerate(books):
