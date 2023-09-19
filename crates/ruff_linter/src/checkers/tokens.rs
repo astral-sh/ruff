@@ -77,14 +77,14 @@ pub(crate) fn check_tokens(
 
     if settings.rules.enabled(Rule::InvalidEscapeSequence) {
         for (tok, range) in tokens.iter().flatten() {
-            if tok.is_string() {
-                pycodestyle::rules::invalid_escape_sequence(
-                    &mut diagnostics,
-                    locator,
-                    *range,
-                    settings.rules.should_fix(Rule::InvalidEscapeSequence),
-                );
-            }
+            pycodestyle::rules::invalid_escape_sequence(
+                &mut diagnostics,
+                locator,
+                indexer,
+                tok,
+                *range,
+                settings.rules.should_fix(Rule::InvalidEscapeSequence),
+            );
         }
     }
 
