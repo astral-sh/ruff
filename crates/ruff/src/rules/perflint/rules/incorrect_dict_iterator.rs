@@ -4,7 +4,6 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr};
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -83,8 +82,8 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
     }
 
     match (
-        is_unused(key, checker.semantic()),
-        is_unused(value, checker.semantic()),
+        checker.semantic().is_unused(key),
+        checker.semantic().is_unused(value),
     ) {
         (true, true) => {
             // Both the key and the value are unused.
@@ -143,38 +142,5 @@ impl fmt::Display for DictSubset {
             DictSubset::Keys => fmt.write_str("keys"),
             DictSubset::Values => fmt.write_str("values"),
         }
-    }
-}
-
-/// Returns `true` if the given expression is either an unused value or a tuple of unused values.
-fn is_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().all(|expr| is_unused(expr, semantic))
-        }
-        Expr::Name(ast::ExprName { id, .. }) => {
-            // Treat a variable as used if it has any usages, _or_ it's shadowed by another variable
-            // with usages.
-            //
-            // If we don't respect shadowing, we'll incorrectly flag `bar` as unused in:
-            // ```python
-            // from random import random
-            //
-            // for bar in range(10):
-            //     if random() > 0.5:
-            //         break
-            // else:
-            //     bar = 1
-            //
-            // print(bar)
-            // ```
-            let scope = semantic.current_scope();
-            scope
-                .get_all(id)
-                .map(|binding_id| semantic.binding(binding_id))
-                .filter(|binding| binding.start() >= expr.start())
-                .all(|binding| !binding.is_used())
-        }
-        _ => false,
     }
 }

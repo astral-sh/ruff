@@ -19,6 +19,7 @@ mod tests {
     #[test_case(Rule::CheckAndRemoveFromSet, Path::new("FURB132.py"))]
     #[test_case(Rule::ReimplementedStarmap, Path::new("FURB140.py"))]
     #[test_case(Rule::SliceCopy, Path::new("FURB145.py"))]
+    #[test_case(Rule::UnnecessaryEnumerate, Path::new("FURB148.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
