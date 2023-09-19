@@ -21,7 +21,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
-use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, PyprojectDiscoveryStrategy};
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
 
 use crate::args::Overrides;
 use crate::cache::{self, Cache};
@@ -56,18 +56,7 @@ pub(crate) fn check(
             }
         }
 
-        match pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => {
-                init_cache(&pyproject_config.settings.cli.cache_dir);
-            }
-            PyprojectDiscoveryStrategy::Hierarchical => {
-                for settings in
-                    std::iter::once(&pyproject_config.settings).chain(resolver.settings())
-                {
-                    init_cache(&settings.cli.cache_dir);
-                }
-            }
-        }
+        init_cache(&pyproject_config.settings.cli.cache_dir);
     };
 
     // Discover the package root for each Python file.
@@ -88,11 +77,11 @@ pub(crate) fn check(
             .unique()
             .par_bridge()
             .map(|cache_root| {
-                let settings = resolver.resolve_all(cache_root, pyproject_config);
+                let settings = resolver.resolve(cache_root, pyproject_config);
                 let cache = Cache::open(
-                    &settings.cli.cache_dir,
+                    &pyproject_config.settings.cli.cache_dir,
                     cache_root.to_path_buf(),
-                    &settings.lib,
+                    settings,
                 );
                 (cache_root, cache)
             })

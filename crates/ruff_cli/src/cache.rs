@@ -349,7 +349,7 @@ mod tests {
     use std::time::SystemTime;
 
     use itertools::Itertools;
-    use ruff::settings::{flags, AllSettings, Settings};
+    use ruff::settings::{flags, Settings};
     use ruff_cache::CACHE_DIR_NAME;
 
     use crate::cache::RelativePathBuf;
@@ -653,7 +653,7 @@ mod tests {
     struct TestCache {
         cache_dir: PathBuf,
         package_root: PathBuf,
-        settings: AllSettings,
+        settings: Settings,
     }
 
     impl TestCache {
@@ -672,7 +672,7 @@ mod tests {
             cache::init(&cache_dir).unwrap();
             fs::create_dir(package_root.clone()).unwrap();
 
-            let settings = AllSettings::default();
+            let settings = Settings::default();
 
             Self {
                 cache_dir,
@@ -695,11 +695,7 @@ mod tests {
         }
 
         fn open(&self) -> Cache {
-            Cache::open(
-                &self.cache_dir,
-                self.package_root.clone(),
-                &self.settings.lib,
-            )
+            Cache::open(&self.cache_dir, self.package_root.clone(), &self.settings)
         }
 
         fn lint_file_with_cache(
@@ -710,7 +706,7 @@ mod tests {
             lint_path(
                 &self.package_root.join(path),
                 Some(&self.package_root),
-                &self.settings.lib,
+                &self.settings,
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
