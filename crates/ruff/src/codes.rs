@@ -640,7 +640,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Datetimez, "012") => (RuleGroup::Unspecified, rules::flake8_datetimez::rules::CallDateFromtimestamp),
 
         // pygrep-hooks
-        (PygrepHooks, "001") => (RuleGroup::Unspecified, rules::pygrep_hooks::rules::Eval),
         (PygrepHooks, "002") => (RuleGroup::Unspecified, rules::pygrep_hooks::rules::DeprecatedLogWarn),
         (PygrepHooks, "003") => (RuleGroup::Unspecified, rules::pygrep_hooks::rules::BlanketTypeIgnore),
         (PygrepHooks, "004") => (RuleGroup::Unspecified, rules::pygrep_hooks::rules::BlanketNOQA),

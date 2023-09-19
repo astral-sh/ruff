@@ -736,9 +736,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::CallDateFromtimestamp) {
                 flake8_datetimez::rules::call_date_fromtimestamp(checker, func, expr.range());
             }
-            if checker.enabled(Rule::Eval) {
-                pygrep_hooks::rules::no_eval(checker, func);
-            }
             if checker.enabled(Rule::DeprecatedLogWarn) {
                 pygrep_hooks::rules::deprecated_log_warn(checker, func);
             }
