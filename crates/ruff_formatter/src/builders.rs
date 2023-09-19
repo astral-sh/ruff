@@ -9,9 +9,7 @@ use Tag::*;
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
-use crate::{
-    format_element, write, Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize,
-};
+use crate::{write, Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize};
 use crate::{Buffer, VecBuffer};
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -1453,6 +1451,150 @@ impl<Context> std::fmt::Debug for Group<'_, Context> {
     }
 }
 
+/// Content that may get parenthesized if it exceeds the configured line width but only if the parenthesized
+/// layout doesn't exceed the line width too, in which case it falls back to the flat layout.
+///
+/// This IR is identical to the following [`best_fitting`] layout but is implemented as custom IR for
+/// best performance.
+///
+/// ```rust
+/// # use ruff_formatter::prelude::*;
+/// # use ruff_formatter::format_args;
+///
+/// let format_expression = format_with(|f: &mut Formatter<SimpleFormatContext>| token("A long string").fmt(f));
+/// let _ = best_fitting![
+///     // ---------------------------------------------------------------------
+///     // Variant 1:
+///     // Try to fit the expression without any parentheses
+///     group(&format_expression),
+///     // ---------------------------------------------------------------------
+///     // Variant 2:
+///     // Try to fit the expression by adding parentheses and indenting the expression.
+///     group(&format_args![
+///         token("("),
+///         soft_block_indent(&format_expression),
+///         token(")")
+///     ])
+///     .should_expand(true),
+///     // ---------------------------------------------------------------------
+///     // Variant 3: Fallback, no parentheses
+///     // Expression doesn't fit regardless of adding the parentheses. Remove the parentheses again.
+///     group(&format_expression).should_expand(true)
+/// ]
+/// // Measure all lines, to avoid that the printer decides that this fits right after hitting
+/// // the `(`.
+/// .with_mode(BestFittingMode::AllLines)        ;
+/// ```
+///
+/// The element breaks from left-to-right because it uses the unintended version as *expanded* layout, the same as the above showed best fitting example.
+///
+/// ## Examples
+///
+/// ### Content that fits into the configured line width.
+///
+/// ```rust
+/// # use ruff_formatter::prelude::*;
+/// # use ruff_formatter::{format, PrintResult, write};
+///
+/// # fn main() -> FormatResult<()> {
+///     let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
+///         write!(f, [
+///             token("aLongerVariableName = "),
+///             best_fit_parenthesize(&token("'a string that fits into the configured line width'"))
+///         ])
+///     })])?;
+///
+///     assert_eq!(formatted.print()?.as_code(), "aLongerVariableName = 'a string that fits into the configured line width'");
+///     # Ok(())
+/// # }
+/// ```
+///
+/// ### Content that fits parenthesized
+///
+/// ```rust
+/// # use ruff_formatter::prelude::*;
+/// # use ruff_formatter::{format, PrintResult, write};
+///
+/// # fn main() -> FormatResult<()> {
+///     let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
+///         write!(f, [
+///             token("aLongerVariableName = "),
+///             best_fit_parenthesize(&token("'a string that exceeds configured line width but fits parenthesized'"))
+///         ])
+///     })])?;
+///
+///     assert_eq!(formatted.print()?.as_code(), "aLongerVariableName = (\n\t'a string that exceeds configured line width but fits parenthesized'\n)");
+///     # Ok(())
+/// # }
+/// ```
+///
+/// ### Content that exceeds the line width, parenthesized or not
+///
+/// ```rust
+/// # use ruff_formatter::prelude::*;
+/// # use ruff_formatter::{format, PrintResult, write};
+///
+/// # fn main() -> FormatResult<()> {
+///     let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
+///         write!(f, [
+///             token("aLongerVariableName = "),
+///             best_fit_parenthesize(&token("'a string that exceeds the configured line width and even parenthesizing doesn't make it fit'"))
+///         ])
+///     })])?;
+///
+///     assert_eq!(formatted.print()?.as_code(), "aLongerVariableName = 'a string that exceeds the configured line width and even parenthesizing doesn't make it fit'");
+///     # Ok(())
+/// # }
+/// ```
+#[inline]
+pub fn best_fit_parenthesize<Context>(
+    content: &impl Format<Context>,
+) -> BestFitParenthesize<Context> {
+    BestFitParenthesize {
+        content: Argument::new(content),
+        group_id: None,
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct BestFitParenthesize<'a, Context> {
+    content: Argument<'a, Context>,
+    group_id: Option<GroupId>,
+}
+
+impl<Context> BestFitParenthesize<'_, Context> {
+    /// Optional ID that can be used in conditional content that supports [`Condition`] to gate content
+    /// depending on whether the parentheses are rendered (flat: no parentheses, expanded: parentheses).
+    #[must_use]
+    pub fn with_group_id(mut self, group_id: Option<GroupId>) -> Self {
+        self.group_id = group_id;
+        self
+    }
+}
+
+impl<Context> Format<Context> for BestFitParenthesize<'_, Context> {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(StartBestFitParenthesize {
+            id: self.group_id,
+        }));
+
+        Arguments::from(&self.content).fmt(f)?;
+
+        f.write_element(FormatElement::Tag(EndBestFitParenthesize));
+
+        Ok(())
+    }
+}
+
+impl<Context> std::fmt::Debug for BestFitParenthesize<'_, Context> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BestFitParenthesize")
+            .field("group_id", &self.group_id)
+            .field("content", &"{{content}}")
+            .finish()
+    }
+}
+
 /// Sets the `condition` for the group. The element will behave as a regular group if `condition` is met,
 /// and as *ungrouped* content if the condition is not met.
 ///
@@ -2543,15 +2685,12 @@ impl<Context> Format<Context> for BestFitting<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let variants = self.variants.items();
 
-        let mut formatted_variants = Vec::with_capacity(variants.len());
+        let mut buffer = VecBuffer::with_capacity(variants.len() * 8, f.state_mut());
 
         for variant in variants {
-            let mut buffer = VecBuffer::with_capacity(8, f.state_mut());
-            buffer.write_element(FormatElement::Tag(StartEntry));
+            buffer.write_element(FormatElement::Tag(StartBestFittingEntry));
             buffer.write_fmt(Arguments::from(variant))?;
-            buffer.write_element(FormatElement::Tag(EndEntry));
-
-            formatted_variants.push(buffer.into_vec().into_boxed_slice());
+            buffer.write_element(FormatElement::Tag(EndBestFittingEntry));
         }
 
         // SAFETY: The constructor guarantees that there are always at least two variants. It's, therefore,
@@ -2559,9 +2698,7 @@ impl<Context> Format<Context> for BestFitting<'_, Context> {
         #[allow(unsafe_code)]
         let element = unsafe {
             FormatElement::BestFitting {
-                variants: format_element::BestFittingVariants::from_vec_unchecked(
-                    formatted_variants,
-                ),
+                variants: BestFittingVariants::from_vec_unchecked(buffer.into_vec()),
                 mode: self.mode,
             }
         };

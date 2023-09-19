@@ -2,6 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr};
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::autofix::edits::pad;
 use crate::autofix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -133,7 +134,10 @@ pub(crate) fn repeated_isinstance_calls(
                 expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(call, expr.range())));
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    pad(call, expr.range(), checker.locator()),
+                    expr.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

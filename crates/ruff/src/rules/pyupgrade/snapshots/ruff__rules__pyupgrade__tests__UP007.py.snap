@@ -410,5 +410,8 @@ UP007.py:110:28: UP007 [*] Use `X | Y` for type annotations
 109 109 | class ServiceRefOrValue:
 110     |-    service_specification: Optional[str]is not True = None
     110 |+    service_specification: str | None is not True = None
+111 111 | 
+112 112 | 
+113 113 | # Regression test for: https://github.com/astral-sh/ruff/issues/7452
 
 

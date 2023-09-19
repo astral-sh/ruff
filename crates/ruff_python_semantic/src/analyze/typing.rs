@@ -143,7 +143,7 @@ pub fn to_pep604_operator(
     slice: &Expr,
     semantic: &SemanticModel,
 ) -> Option<Pep604Operator> {
-    /// Returns `true` if any argument in the slice is a quoted annotation).
+    /// Returns `true` if any argument in the slice is a quoted annotation.
     fn quoted_annotation(slice: &Expr) -> bool {
         match slice {
             Expr::Constant(ast::ExprConstant {
@@ -151,6 +151,15 @@ pub fn to_pep604_operator(
                 ..
             }) => true,
             Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(quoted_annotation),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if any argument in the slice is a starred expression.
+    fn starred_annotation(slice: &Expr) -> bool {
+        match slice {
+            Expr::Starred(_) => true,
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(starred_annotation),
             _ => false,
         }
     }
@@ -173,6 +182,14 @@ pub fn to_pep604_operator(
         if semantic.execution_context().is_runtime() {
             return None;
         }
+    }
+
+    // If any of the elements are starred expressions, we can't rewrite the subscript:
+    // ```python
+    // def f(x: Union[*int, str]): ...
+    // ```
+    if starred_annotation(slice) {
+        return None;
     }
 
     semantic

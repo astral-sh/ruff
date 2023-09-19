@@ -305,3 +305,21 @@ import os
 
 import sys
 ```
+
+### Parentheses around awaited collections are not preserved
+
+Black preserves parentheses around awaited collections:
+
+```python
+await ([1, 2, 3])
+```
+
+Ruff will instead remove them:
+
+```python
+await [1, 2, 3]
+```
+
+This is more consistent to the formatting of other awaited expressions: Ruff and Black both
+remove parentheses around, e.g., `await (1)`, only retaining them when syntactically required,
+as in, e.g., `await (x := 1)`.

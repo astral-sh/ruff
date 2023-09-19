@@ -573,6 +573,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "110") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::TryExceptPass),
         (Flake8Bandit, "112") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::TryExceptContinue),
         (Flake8Bandit, "113") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::RequestWithoutTimeout),
+        (Flake8Bandit, "201") => (RuleGroup::Preview, rules::flake8_bandit::rules::FlaskDebugTrue),
         (Flake8Bandit, "301") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::SuspiciousPickleUsage),
         (Flake8Bandit, "302") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::SuspiciousMarshalUsage),
         (Flake8Bandit, "303") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::SuspiciousInsecureHashUsage),
@@ -918,12 +919,14 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "131") => (RuleGroup::Nursery, rules::refurb::rules::DeleteFullSlice),
         #[allow(deprecated)]
         (Refurb, "132") => (RuleGroup::Nursery, rules::refurb::rules::CheckAndRemoveFromSet),
+        (Refurb, "140") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedStarmap),
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
         (Refurb, "148") => (RuleGroup::Unspecified, rules::refurb::rules::UnnecessaryEnumerate),
 
         // flake8-logging
         (Flake8Logging, "001") => (RuleGroup::Preview, rules::flake8_logging::rules::DirectLoggerInstantiation),
         (Flake8Logging, "002") => (RuleGroup::Preview, rules::flake8_logging::rules::InvalidGetLoggerArgument),
+        (Flake8Logging, "007") => (RuleGroup::Preview, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Preview, rules::flake8_logging::rules::UndocumentedWarn),
 
         _ => return None,

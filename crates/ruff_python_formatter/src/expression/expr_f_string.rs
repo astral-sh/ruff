@@ -4,7 +4,7 @@ use ruff_formatter::FormatResult;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprFString;
 
-use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
 use super::string::{AnyString, FormatString};
@@ -26,9 +26,7 @@ impl NeedsParentheses for ExprFString {
     ) -> OptionalParentheses {
         if self.implicit_concatenated {
             OptionalParentheses::Multiline
-        } else if memchr2(b'\n', b'\r', context.source()[self.range].as_bytes()).is_none()
-            && should_use_best_fit(self, context)
-        {
+        } else if memchr2(b'\n', b'\r', context.source()[self.range].as_bytes()).is_none() {
             OptionalParentheses::BestFit
         } else {
             OptionalParentheses::Never

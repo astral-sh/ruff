@@ -10,6 +10,7 @@ use libcst_native::{
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
     self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
@@ -293,7 +294,13 @@ pub(crate) fn unittest_assertion(
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 checker.generator().stmt(&stmt),
-                                expr.range(),
+                                parenthesized_range(
+                                    expr.into(),
+                                    checker.semantic().current_statement().into(),
+                                    checker.indexer().comment_ranges(),
+                                    checker.locator().contents(),
+                                )
+                                .unwrap_or(expr.range()),
                             )));
                         }
                     }

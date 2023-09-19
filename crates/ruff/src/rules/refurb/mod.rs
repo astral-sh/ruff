@@ -17,6 +17,7 @@ mod tests {
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
     #[test_case(Rule::DeleteFullSlice, Path::new("FURB131.py"))]
     #[test_case(Rule::CheckAndRemoveFromSet, Path::new("FURB132.py"))]
+    #[test_case(Rule::ReimplementedStarmap, Path::new("FURB140.py"))]
     #[test_case(Rule::SliceCopy, Path::new("FURB145.py"))]
     #[test_case(Rule::UnnecessaryEnumerate, Path::new("FURB148.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
