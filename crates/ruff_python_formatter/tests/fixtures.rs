@@ -255,12 +255,14 @@ impl fmt::Display for DisplayPyOptions<'_> {
 line-width              = {line_width}
 indent-width            = {indent_width}
 quote-style             = {quote_style:?}
-magic-trailing-comma    = {magic_trailing_comma:?}"#,
+magic-trailing-comma    = {magic_trailing_comma:?}
+preview                 = {preview:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
             quote_style = self.0.quote_style(),
-            magic_trailing_comma = self.0.magic_trailing_comma()
+            magic_trailing_comma = self.0.magic_trailing_comma(),
+            preview = self.0.preview()
         )
     }
 }
