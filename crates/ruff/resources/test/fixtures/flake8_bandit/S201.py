@@ -6,14 +6,14 @@ app = Flask(__name__)
 def main():
     raise
 
-#bad
+# OK
 app.run(debug=True)
 
-#okay
+# Errors
 app.run()
 app.run(debug=False)
 
-#unrelated
+# Unrelated
 run()
 run(debug=True)
 run(debug)
