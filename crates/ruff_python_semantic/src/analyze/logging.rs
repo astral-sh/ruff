@@ -21,41 +21,55 @@ pub fn is_logger_candidate(
     semantic: &SemanticModel,
     logger_objects: &[String],
 ) -> bool {
-    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func else {
-        return false;
-    };
+    // logging.exception(), logger.error(), ...
+    if let Expr::Attribute(ast::ExprAttribute { value, .. }) = func {
+        // If the symbol was imported from another module, ensure that it's either a user-specified
+        // logger object, the `logging` module itself, or `flask.current_app.logger`.
+        if let Some(call_path) = semantic.resolve_call_path(value) {
+            if matches!(
+                call_path.as_slice(),
+                ["logging"] | ["flask", "current_app", "logger"]
+            ) {
+                return true;
+            }
 
-    // If the symbol was imported from another module, ensure that it's either a user-specified
-    // logger object, the `logging` module itself, or `flask.current_app.logger`.
-    if let Some(call_path) = semantic.resolve_call_path(value) {
-        if matches!(
-            call_path.as_slice(),
-            ["logging"] | ["flask", "current_app", "logger"]
-        ) {
-            return true;
+            if logger_objects
+                .iter()
+                .any(|logger| from_qualified_name(logger) == call_path)
+            {
+                return true;
+            }
+
+            return false;
         }
 
-        if logger_objects
-            .iter()
-            .any(|logger| from_qualified_name(logger) == call_path)
-        {
-            return true;
+        // Otherwise, if the symbol was defined in the current module, match against some common
+        // logger names.
+        if let Some(call_path) = collect_call_path(value) {
+            if let Some(tail) = call_path.last() {
+                if tail.starts_with("log")
+                    || tail.ends_with("logger")
+                    || tail.ends_with("logging")
+                    || tail.starts_with("LOG")
+                    || tail.ends_with("LOGGER")
+                    || tail.ends_with("LOGGING")
+                {
+                    return true;
+                }
+            }
         }
-
-        return false;
     }
 
-    // Otherwise, if the symbol was defined in the current module, match against some common
-    // logger names.
-    if let Some(call_path) = collect_call_path(value) {
-        if let Some(tail) = call_path.last() {
-            if tail.starts_with("log")
-                || tail.ends_with("logger")
-                || tail.ends_with("logging")
-                || tail.starts_with("LOG")
-                || tail.ends_with("LOGGER")
-                || tail.ends_with("LOGGING")
-            {
+    // exception(), error(), ...
+    if let Expr::Name(_) = func {
+        if let Some(call_path) = semantic.resolve_call_path(func) {
+            if matches!(
+                call_path.as_slice(),
+                [
+                    "logging",
+                    "critical" | "debug" | "error" | "exception" | "info" | "log" | "warning"
+                ]
+            ) {
                 return true;
             }
         }
