@@ -334,7 +334,7 @@ macro_rules! best_fitting {
             $crate::BestFitting::from_arguments_unchecked($crate::format_args!($least_expanded, $($tail),+))
         }
     }}
-}
+    }
 
 #[cfg(test)]
 mod tests {

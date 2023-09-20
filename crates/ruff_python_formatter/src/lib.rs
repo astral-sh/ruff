@@ -1,5 +1,6 @@
+use std::str::FromStr;
 use thiserror::Error;
-use tracing::Level;
+use tracing::{warn, Level};
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
@@ -10,12 +11,14 @@ use ruff_python_parser::lexer::LexicalError;
 use ruff_python_parser::{parse_ok_tokens, Mode, ParseError};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::{
     dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
+use crate::statement::suite::SuiteKind;
 use crate::verbatim::suppressed_node;
 pub use settings::FormatterSettings;
 
@@ -134,6 +137,73 @@ pub fn format_module_source(
     Ok(formatted.print()?)
 }
 
+/// Range formatting coordinate: Zero-indexed row and zero-indexed char-based column separated by
+/// colon, e.g. `1:2`.
+///
+/// See [`Locator::convert_row_and_column`] for details on the semantics.
+#[derive(Copy, Clone, Debug, Default)]
+pub struct LspRowColumn {
+    row: usize,
+    col: usize,
+}
+
+impl FromStr for LspRowColumn {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let Some((row, col)) = s.split_once(':') else {
+            return Err("Coordinate is missing a colon, the format is `<row>:<column>`");
+        };
+
+        Ok(LspRowColumn {
+            row: row.parse().map_err(|_| "row must be a number")?,
+            col: col.parse().map_err(|_| "col must be a number")?,
+        })
+    }
+}
+#[tracing::instrument(name = "format", level = Level::TRACE, skip_all)]
+pub fn format_module_source_range(
+    source: &str,
+    options: PyFormatOptions,
+    start: Option<LspRowColumn>,
+    end: Option<LspRowColumn>,
+) -> Result<String, FormatModuleError> {
+    let (tokens, comment_ranges) = tokens_and_ranges(source)?;
+    let module = parse_ok_tokens(tokens, Mode::Module, "<filename>")?;
+    let locator = Locator::new(source);
+
+    let start = if let Some(start) = start {
+        locator
+            .convert_row_and_column(start.row, start.col)
+            .ok_or(FormatError::RangeError {
+                row: start.row,
+                col: start.col,
+            })?
+    } else {
+        TextSize::default()
+    };
+    let end = if let Some(end) = end {
+        locator
+            .convert_row_and_column(end.row, end.col)
+            .ok_or(FormatError::RangeError {
+                row: end.row,
+                col: end.col,
+            })?
+    } else {
+        source.text_len()
+    };
+
+    let formatted = format_module_range(
+        &module,
+        &comment_ranges,
+        source,
+        options,
+        &locator,
+        TextRange::new(start, end),
+    )?;
+    Ok(formatted)
+}
+
 pub fn format_module_ast<'a>(
     module: &'a Mod,
     comment_ranges: &'a CommentRanges,
@@ -153,6 +223,57 @@ pub fn format_module_ast<'a>(
         .comments()
         .assert_all_formatted(source_code);
     Ok(formatted)
+}
+
+pub fn format_module_range<'a>(
+    module: &'a Mod,
+    comment_ranges: &'a CommentRanges,
+    source: &'a str,
+    options: PyFormatOptions,
+    locator: &Locator<'a>,
+    range: TextRange,
+) -> FormatResult<String> {
+    let comments = Comments::from_ast(&module, SourceCode::new(source), &comment_ranges);
+
+    let Mod::Module(module_inner) = &module else {
+        panic!("That's not a module");
+    };
+
+    // ```
+    // a = 1; b = 2; c = 3; d = 4; e = 5
+    //             ^ b end  ^ d start
+    //          ^^^^^^^^^^^^^^^ range
+    //          ^ range start ^ range end
+    // ```
+    // TODO: If it goes beyond the end of the last stmt or before start, do we need to format the
+    // parent?
+    // TODO: Change suite formatting so we can use a slice instead
+    let in_range: Vec<_> = module_inner
+        .body
+        .iter()
+        .cloned()
+        // TODO: check whether these bounds need equality
+        .skip_while(|child| range.start() > child.end())
+        .take_while(|child| child.start() < range.end())
+        .collect();
+    let (Some(first), Some(last)) = (in_range.first(), in_range.last()) else {
+        // TODO: Use tracing again https://github.com/tokio-rs/tracing/issues/2721
+        // TODO: Forward this to something proper
+        eprintln!("The formatting range contains no statements");
+        return Ok(source.to_string());
+    };
+
+    let mut buffer = source[TextRange::up_to(first.start())].to_string();
+
+    let formatted: Formatted<PyFormatContext> = format!(
+        PyFormatContext::new(options.clone(), locator.contents(), comments),
+        [in_range.format().with_options(SuiteKind::TopLevel)]
+    )?;
+    //println!("{}", formatted.document().display(SourceCode::new(source)));
+    // TODO: Make the printer use the buffer instead
+    buffer += formatted.print()?.as_code();
+    buffer += &source[TextRange::new(last.end(), source.text_len())];
+    return Ok(buffer.to_string());
 }
 
 /// Public function for generating a printable string of the debug comments.

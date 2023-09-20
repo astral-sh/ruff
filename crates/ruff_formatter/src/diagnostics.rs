@@ -1,6 +1,5 @@
 use crate::prelude::TagKind;
 use crate::GroupId;
-use ruff_text_size::TextRange;
 use std::error::Error;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -12,7 +11,7 @@ pub enum FormatError {
     SyntaxError { message: &'static str },
     /// In case range formatting failed because the provided range was larger
     /// than the formatted syntax tree
-    RangeError { input: TextRange, tree: TextRange },
+    RangeError { row: usize, col: usize },
 
     /// In case printing the document failed because it has an invalid structure.
     InvalidDocument(InvalidDocumentError),
@@ -32,9 +31,9 @@ impl std::fmt::Display for FormatError {
             FormatError::SyntaxError {message} => {
                 std::write!(fmt, "syntax error: {message}")
             },
-            FormatError::RangeError { input, tree } => std::write!(
+            FormatError::RangeError { row, col } => std::write!(
                 fmt,
-                "formatting range {input:?} is larger than syntax tree {tree:?}"
+                "formatting range {row}:{col} is not a valid index"
             ),
             FormatError::InvalidDocument(error) => std::write!(fmt, "Invalid document: {error}\n\n This is an internal Rome error. Please report if necessary."),
             FormatError::PoorLayout => {

@@ -8,10 +8,11 @@ use clap::{command, Parser, ValueEnum};
 use ruff_formatter::SourceCode;
 use ruff_python_index::tokens_and_ranges;
 use ruff_python_parser::{parse_ok_tokens, Mode};
-use ruff_text_size::Ranged;
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::collect_comments;
-use crate::{format_module_ast, PyFormatOptions};
+use crate::{format_module_ast, format_module_range, PyFormatOptions};
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum Emit {
@@ -36,19 +37,38 @@ pub struct Cli {
     pub print_ir: bool,
     #[clap(long)]
     pub print_comments: bool,
+    /// byte offset for range formatting
+    #[clap(long)]
+    pub start: Option<u32>,
+    /// byte offset for range formatting
+    #[clap(long)]
+    pub end: Option<u32>,
 }
 
 pub fn format_and_debug_print(source: &str, cli: &Cli, source_type: &Path) -> Result<String> {
     let (tokens, comment_ranges) = tokens_and_ranges(source)
         .map_err(|err| format_err!("Source contains syntax errors {err:?}"))?;
-
-    // Parse the AST.
     let module =
         parse_ok_tokens(tokens, Mode::Module, "<filename>").context("Syntax error in input")?;
-
     let options = PyFormatOptions::from_extension(source_type);
-
     let source_code = SourceCode::new(source);
+    let locator = Locator::new(source);
+
+    if cli.start.is_some() || cli.end.is_some() {
+        let range = TextRange::new(
+            cli.start.map(TextSize::new).unwrap_or_default(),
+            cli.end.map(TextSize::new).unwrap_or(source.text_len()),
+        );
+        return Ok(format_module_range(
+            &module,
+            &comment_ranges,
+            source,
+            options,
+            &locator,
+            range,
+        )?);
+    }
+
     let formatted = format_module_ast(&module, &comment_ranges, source, options)
         .context("Failed to format node")?;
     if cli.print_ir {

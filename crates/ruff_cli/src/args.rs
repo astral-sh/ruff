@@ -11,6 +11,7 @@ use ruff_linter::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_python_formatter::LspRowColumn;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::resolver::ConfigurationTransformer;
 
@@ -395,6 +396,14 @@ pub struct FormatCommand {
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
+    /// Range formatting start: Zero-indexed row and zero-indexed char-based column separated by
+    /// colon, e.g. `1:2`
+    #[clap(long)]
+    pub start: Option<LspRowColumn>,
+    /// Range formatting end: Zero-indexed row and zero-indexed char-based column separated by
+    /// colon, e.g. `3:4`
+    #[clap(long)]
+    pub end: Option<LspRowColumn>,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -516,6 +525,8 @@ impl FormatCommand {
                 files: self.files,
                 isolated: self.isolated,
                 stdin_filename: self.stdin_filename,
+                start: self.start,
+                end: self.end,
             },
             CliOverrides {
                 line_length: self.line_length,
@@ -572,6 +583,8 @@ pub struct FormatArguments {
     pub files: Vec<PathBuf>,
     pub isolated: bool,
     pub stdin_filename: Option<PathBuf>,
+    pub start: Option<LspRowColumn>,
+    pub end: Option<LspRowColumn>,
 }
 
 /// CLI settings that function as configuration overrides.

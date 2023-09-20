@@ -5,7 +5,9 @@ use anyhow::Result;
 use log::warn;
 
 use ruff_python_ast::PySourceType;
-use ruff_python_formatter::{format_module_source, PyFormatOptions};
+use ruff_python_formatter::{
+    format_module_source, format_module_source_range, LspRowColumn, PyFormatOptions,
+};
 use ruff_workspace::resolver::python_file_at_path;
 
 use crate::args::{CliOverrides, FormatArguments};
@@ -42,7 +44,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
         .formatter
         .to_format_options(path.map(PySourceType::from).unwrap_or_default());
 
-    match format_source(path, options, mode) {
+    match format_source(path, options, mode, cli.start, cli.end) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check => {
@@ -65,12 +67,21 @@ fn format_source(
     path: Option<&Path>,
     options: PyFormatOptions,
     mode: FormatMode,
+    start: Option<LspRowColumn>,
+    end: Option<LspRowColumn>,
 ) -> Result<FormatCommandResult, FormatCommandError> {
     let unformatted = read_from_stdin()
         .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err))?;
-    let formatted = format_module_source(&unformatted, options)
-        .map_err(|err| FormatCommandError::FormatModule(path.map(Path::to_path_buf), err))?;
-    let formatted = formatted.as_code();
+    let formatted = if start.is_some() || end.is_some() {
+        let formatted = format_module_source_range(&unformatted, options, start, end)
+            .map_err(|err| FormatCommandError::FormatModule(path.map(Path::to_path_buf), err))?;
+        formatted
+    } else {
+        let formatted = format_module_source(&unformatted, options)
+            .map_err(|err| FormatCommandError::FormatModule(path.map(Path::to_path_buf), err))?;
+        let formatted = formatted.as_code();
+        formatted.to_string()
+    };
     if formatted.len() == unformatted.len() && formatted == unformatted {
         Ok(FormatCommandResult::Unchanged)
     } else {
