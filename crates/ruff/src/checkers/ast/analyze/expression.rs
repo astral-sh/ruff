@@ -583,6 +583,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ParamikoCall) {
                 flake8_bandit::rules::paramiko_call(checker, func);
             }
+            if checker.enabled(Rule::SSHNoHostKeyVerification) {
+                flake8_bandit::rules::ssh_no_host_key_verification(checker, call);
+            }
             if checker.enabled(Rule::LoggingConfigInsecureListen) {
                 flake8_bandit::rules::logging_config_insecure_listen(checker, call);
             }

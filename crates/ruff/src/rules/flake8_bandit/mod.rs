@@ -32,6 +32,7 @@ mod tests {
     #[test_case(Rule::ParamikoCall, Path::new("S601.py"))]
     #[test_case(Rule::RequestWithNoCertValidation, Path::new("S501.py"))]
     #[test_case(Rule::RequestWithoutTimeout, Path::new("S113.py"))]
+    #[test_case(Rule::SSHNoHostKeyVerification, Path::new("S507.py"))]
     #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"))]
     #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"))]
     #[test_case(Rule::StartProcessWithAShell, Path::new("S605.py"))]
