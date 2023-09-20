@@ -99,3 +99,9 @@ def f():
 def f():
     for unused_name, value in some_dict.items():  # PERF102
         print(value)
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7097
+def _create_context(name_to_value):
+    for(B,D)in A.items():
+        if(C:=name_to_value.get(B.name)):A.run(B.set,C)
