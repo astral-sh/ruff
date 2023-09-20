@@ -12,7 +12,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::test_path;
 
     #[test_case(Rule::Assert, Path::new("S101.py"))]
@@ -51,7 +51,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bandit").join(path).as_path(),
-            &Settings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -61,7 +61,7 @@ mod tests {
     fn check_hardcoded_tmp_additional_dirs() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_bandit/S108.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_bandit: super::settings::Settings {
                     hardcoded_tmp_directory: vec![
                         "/tmp".to_string(),
@@ -71,7 +71,7 @@ mod tests {
                     ],
                     check_typed_exception: false,
                 },
-                ..Settings::for_rule(Rule::HardcodedTempFile)
+                ..LinterSettings::for_rule(Rule::HardcodedTempFile)
             },
         )?;
         assert_messages!("S108_extend", diagnostics);
@@ -82,12 +82,12 @@ mod tests {
     fn check_typed_exception() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_bandit/S110.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_bandit: super::settings::Settings {
                     check_typed_exception: true,
                     ..Default::default()
                 },
-                ..Settings::for_rule(Rule::TryExceptPass)
+                ..LinterSettings::for_rule(Rule::TryExceptPass)
             },
         )?;
         assert_messages!("S110_typed", diagnostics);

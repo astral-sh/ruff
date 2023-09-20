@@ -23,7 +23,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_unused_arguments").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -33,11 +33,11 @@ mod tests {
     fn ignore_variadic_names() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_unused_arguments/ignore_variadic_names.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_unused_arguments: super::settings::Settings {
                     ignore_variadic_names: true,
                 },
-                ..settings::Settings::for_rules(vec![
+                ..settings::LinterSettings::for_rules(vec![
                     Rule::UnusedFunctionArgument,
                     Rule::UnusedMethodArgument,
                     Rule::UnusedClassMethodArgument,
@@ -54,11 +54,11 @@ mod tests {
     fn enforce_variadic_names() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_unused_arguments/ignore_variadic_names.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_unused_arguments: super::settings::Settings {
                     ignore_variadic_names: false,
                 },
-                ..settings::Settings::for_rules(vec![
+                ..settings::LinterSettings::for_rules(vec![
                     Rule::UnusedFunctionArgument,
                     Rule::UnusedMethodArgument,
                     Rule::UnusedClassMethodArgument,

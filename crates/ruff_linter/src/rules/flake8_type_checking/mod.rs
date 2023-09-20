@@ -39,7 +39,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -49,12 +49,12 @@ mod tests {
     fn strict(rule_code: Rule, path: &Path) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     strict: true,
                     ..Default::default()
                 },
-                ..settings::Settings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(diagnostics);
@@ -65,12 +65,12 @@ mod tests {
     fn exempt_modules(rule_code: Rule, path: &Path) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     exempt_modules: vec!["pandas".to_string()],
                     ..Default::default()
                 },
-                ..settings::Settings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(diagnostics);
@@ -97,7 +97,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     runtime_evaluated_base_classes: vec![
                         "pydantic.BaseModel".to_string(),
@@ -105,7 +105,7 @@ mod tests {
                     ],
                     ..Default::default()
                 },
-                ..settings::Settings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -128,7 +128,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     runtime_evaluated_decorators: vec![
                         "attrs.define".to_string(),
@@ -136,7 +136,7 @@ mod tests {
                     ],
                     ..Default::default()
                 },
-                ..settings::Settings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -335,7 +335,7 @@ mod tests {
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,
-            &settings::Settings::for_rules(Linter::Flake8TypeChecking.rules()),
+            &settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules()),
         );
         assert_messages!(snapshot, diagnostics);
     }

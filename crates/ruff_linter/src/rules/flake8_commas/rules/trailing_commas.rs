@@ -9,7 +9,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::registry::Rule;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -225,7 +225,7 @@ pub(crate) fn trailing_commas(
     diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
     locator: &Locator,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) {
     let tokens = tokens
         .iter()

@@ -52,7 +52,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -62,7 +62,7 @@ mod tests {
     fn w292_4() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pycodestyle/W292_4.py"),
-            &settings::Settings::for_rule(Rule::MissingNewlineAtEndOfFile),
+            &settings::LinterSettings::for_rule(Rule::MissingNewlineAtEndOfFile),
         )?;
 
         assert_messages!(diagnostics);
@@ -112,7 +112,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -122,7 +122,7 @@ mod tests {
     fn constant_literals() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pycodestyle/constant_literals.py"),
-            &settings::Settings::for_rules(vec![
+            &settings::LinterSettings::for_rules(vec![
                 Rule::NoneComparison,
                 Rule::TrueFalseComparison,
                 Rule::IsLiteral,
@@ -136,7 +136,7 @@ mod tests {
     fn shebang() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pycodestyle/shebang.py"),
-            &settings::Settings::for_rules(vec![
+            &settings::LinterSettings::for_rules(vec![
                 Rule::TooFewSpacesBeforeInlineComment,
                 Rule::NoSpaceAfterInlineComment,
                 Rule::NoSpaceAfterBlockComment,
@@ -153,12 +153,12 @@ mod tests {
         let snapshot = format!("task_tags_{ignore_overlong_task_comments}");
         let diagnostics = test_path(
             Path::new("pycodestyle/E501_1.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 pycodestyle: Settings {
                     ignore_overlong_task_comments,
                     ..Settings::default()
                 },
-                ..settings::Settings::for_rule(Rule::LineTooLong)
+                ..settings::LinterSettings::for_rule(Rule::LineTooLong)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -169,12 +169,12 @@ mod tests {
     fn max_doc_length() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pycodestyle/W505.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 pycodestyle: Settings {
                     max_doc_length: Some(LineLength::try_from(50).unwrap()),
                     ..Settings::default()
                 },
-                ..settings::Settings::for_rule(Rule::DocLineTooLong)
+                ..settings::LinterSettings::for_rule(Rule::DocLineTooLong)
             },
         )?;
         assert_messages!(diagnostics);
@@ -185,12 +185,12 @@ mod tests {
     fn max_doc_length_with_utf_8() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pycodestyle/W505_utf_8.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 pycodestyle: Settings {
                     max_doc_length: Some(LineLength::try_from(50).unwrap()),
                     ..Settings::default()
                 },
-                ..settings::Settings::for_rule(Rule::DocLineTooLong)
+                ..settings::LinterSettings::for_rule(Rule::DocLineTooLong)
             },
         )?;
         assert_messages!(diagnostics);
@@ -205,10 +205,10 @@ mod tests {
         let snapshot = format!("tab_size_{tab_size}");
         let diagnostics = test_path(
             Path::new("pycodestyle/E501_2.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 tab_size: NonZeroU8::new(tab_size).unwrap().into(),
                 line_length: LineLength::try_from(6).unwrap(),
-                ..settings::Settings::for_rule(Rule::LineTooLong)
+                ..settings::LinterSettings::for_rule(Rule::LineTooLong)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

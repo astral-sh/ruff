@@ -16,7 +16,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
 use ruff_linter::registry::Rule;
-use ruff_linter::settings::{flags, Settings};
+use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::{fs, warn_user_once, IOError};
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
@@ -119,7 +119,7 @@ pub(crate) fn check(
                         }
                     });
 
-                    lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
+                    lint_path(path, package, &settings.linter, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
@@ -142,7 +142,7 @@ pub(crate) fn check(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_config);
-                    if settings.rules.enabled(Rule::IOError) {
+                    if settings.linter.rules.enabled(Rule::IOError) {
                         let dummy =
                             SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
@@ -195,7 +195,7 @@ pub(crate) fn check(
 fn lint_path(
     path: &Path,
     package: Option<&Path>,
-    settings: &Settings,
+    settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
@@ -238,7 +238,7 @@ mod test {
 
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
     use ruff_linter::registry::Rule;
-    use ruff_linter::settings::{flags, Settings};
+    use ruff_linter::settings::{flags, LinterSettings, Settings};
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 
     use crate::args::CliOverrides;
@@ -268,7 +268,10 @@ mod test {
         // Configure
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path);
         // invalid pyproject.toml is not active by default
-        let settings = Settings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]);
+        let settings = Settings {
+            linter: LinterSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
+            ..Settings::default()
+        };
         let pyproject_config =
             PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
 

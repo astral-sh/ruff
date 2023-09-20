@@ -16,7 +16,7 @@ use crate::directives::IsortDirectives;
 use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 use crate::source_kind::SourceKind;
 
 fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) -> Option<ImportMap> {
@@ -81,7 +81,7 @@ pub(crate) fn check_imports(
     locator: &Locator,
     indexer: &Indexer,
     directives: &IsortDirectives,
-    settings: &Settings,
+    settings: &LinterSettings,
     stylist: &Stylist,
     path: &Path,
     package: Option<&Path>,

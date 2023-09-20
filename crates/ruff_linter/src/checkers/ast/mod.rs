@@ -64,7 +64,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::Rule;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
-use crate::settings::{flags, Settings};
+use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
 mod analyze;
@@ -85,8 +85,8 @@ pub(crate) struct Checker<'a> {
     /// The [`NoqaMapping`] for the current analysis (i.e., the mapping from line number to
     /// suppression commented line number).
     noqa_line_for: &'a NoqaMapping,
-    /// The [`Settings`] for the current analysis, including the enabled rules.
-    pub(crate) settings: &'a Settings,
+    /// The [`LinterSettings`] for the current analysis, including the enabled rules.
+    pub(crate) settings: &'a LinterSettings,
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
     /// offsets.
     locator: &'a Locator<'a>,
@@ -110,7 +110,7 @@ pub(crate) struct Checker<'a> {
 impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        settings: &'a Settings,
+        settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
         path: &'a Path,
@@ -1929,7 +1929,7 @@ pub(crate) fn check_ast(
     stylist: &Stylist,
     indexer: &Indexer,
     noqa_line_for: &NoqaMapping,
-    settings: &Settings,
+    settings: &LinterSettings,
     noqa: flags::Noqa,
     path: &Path,
     package: Option<&Path>,

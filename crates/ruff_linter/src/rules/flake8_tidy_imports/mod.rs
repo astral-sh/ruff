@@ -14,14 +14,14 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::flake8_tidy_imports;
     use crate::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::test_path;
 
     #[test]
     fn banned_api() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID251.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     banned_api: FxHashMap::from_iter([
                         (
@@ -39,7 +39,7 @@ mod tests {
                     ]),
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![Rule::BannedApi])
+                ..LinterSettings::for_rules(vec![Rule::BannedApi])
             },
         )?;
         assert_messages!(diagnostics);
@@ -50,7 +50,7 @@ mod tests {
     fn banned_api_package() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     banned_api: FxHashMap::from_iter([
                         (
@@ -69,7 +69,7 @@ mod tests {
                     ..Default::default()
                 },
                 namespace_packages: vec![Path::new("my_package").to_path_buf()],
-                ..Settings::for_rules(vec![Rule::BannedApi])
+                ..LinterSettings::for_rules(vec![Rule::BannedApi])
             },
         )?;
         assert_messages!(diagnostics);
@@ -80,12 +80,12 @@ mod tests {
     fn ban_parent_imports() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID252.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     ban_relative_imports: Strictness::Parents,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![Rule::RelativeImports])
+                ..LinterSettings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
         assert_messages!(diagnostics);
@@ -96,12 +96,12 @@ mod tests {
     fn ban_all_imports() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID252.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     ban_relative_imports: Strictness::All,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![Rule::RelativeImports])
+                ..LinterSettings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
         assert_messages!(diagnostics);
@@ -112,13 +112,13 @@ mod tests {
     fn ban_parent_imports_package() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     ban_relative_imports: Strictness::Parents,
                     ..Default::default()
                 },
                 namespace_packages: vec![Path::new("my_package").to_path_buf()],
-                ..Settings::for_rules(vec![Rule::RelativeImports])
+                ..LinterSettings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
         assert_messages!(diagnostics);
@@ -129,7 +129,7 @@ mod tests {
     fn banned_module_level_imports() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID253.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     banned_module_level_imports: vec![
                         "torch".to_string(),
@@ -137,7 +137,7 @@ mod tests {
                     ],
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![Rule::BannedModuleLevelImports])
+                ..LinterSettings::for_rules(vec![Rule::BannedModuleLevelImports])
             },
         )?;
         assert_messages!(diagnostics);

@@ -65,7 +65,7 @@ pub(crate) fn add_noqa(
                     return None;
                 }
             };
-            match add_noqa_to_path(path, package, &source_kind, source_type, settings) {
+            match add_noqa_to_path(path, package, &source_kind, source_type, &settings.linter) {
                 Ok(count) => Some(count),
                 Err(e) => {
                     error!("Failed to add noqa to {}: {e}", path.display());

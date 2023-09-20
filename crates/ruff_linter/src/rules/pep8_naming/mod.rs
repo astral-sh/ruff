@@ -79,8 +79,8 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pep8_naming").join(path).as_path(),
-            &settings::Settings {
-                ..settings::Settings::for_rule(rule_code)
+            &settings::LinterSettings {
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -91,7 +91,7 @@ mod tests {
     fn classmethod_decorators() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pep8_naming").join("N805.py").as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 pep8_naming: pep8_naming::settings::Settings {
                     classmethod_decorators: vec![
                         "classmethod".to_string(),
@@ -99,7 +99,7 @@ mod tests {
                     ],
                     ..Default::default()
                 },
-                ..settings::Settings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
+                ..settings::LinterSettings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
             },
         )?;
         assert_messages!(diagnostics);
@@ -126,7 +126,7 @@ mod tests {
         let snapshot = format!("ignore_names_{}_{path}", rule_code.noqa_code());
         let diagnostics = test_path(
             PathBuf::from_iter(["pep8_naming", "ignore_names", path]).as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 pep8_naming: pep8_naming::settings::Settings {
                     ignore_names: vec![
                         IdentifierPattern::new("*allowed*").unwrap(),
@@ -136,7 +136,7 @@ mod tests {
                     ],
                     ..Default::default()
                 },
-                ..settings::Settings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

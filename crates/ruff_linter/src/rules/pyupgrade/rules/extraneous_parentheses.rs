@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
 
 use crate::registry::Rule;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for extraneous parentheses.
@@ -137,7 +137,7 @@ pub(crate) fn extraneous_parentheses(
     diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
     locator: &Locator,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) {
     let mut i = 0;
     while i < tokens.len() {

@@ -10,7 +10,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
 
     #[test_case(Path::new("test_pass_init"), Path::new("example.py"))]
@@ -30,11 +30,11 @@ mod tests {
         ));
         let diagnostics = test_path(
             p.as_path(),
-            &Settings {
+            &LinterSettings {
                 namespace_packages: vec![test_resource_path(
                     "fixtures/flake8_no_pep420/test_pass_namespace_package",
                 )],
-                ..Settings::for_rule(Rule::ImplicitNamespacePackage)
+                ..LinterSettings::for_rule(Rule::ImplicitNamespacePackage)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

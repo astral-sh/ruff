@@ -24,7 +24,7 @@ pub(crate) fn check_stdin(
         }
     }
     let package_root = filename.and_then(Path::parent).and_then(|path| {
-        packaging::detect_package_root(path, &pyproject_config.settings.namespace_packages)
+        packaging::detect_package_root(path, &pyproject_config.settings.linter.namespace_packages)
     });
     let stdin = read_from_stdin()?;
     let mut diagnostics = lint_stdin(

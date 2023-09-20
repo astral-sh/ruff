@@ -351,7 +351,7 @@ mod tests {
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,
-            &settings::Settings::for_rules(Linter::PandasVet.rules()),
+            &settings::LinterSettings::for_rules(Linter::PandasVet.rules()),
         );
         assert_messages!(snapshot, diagnostics);
     }
@@ -366,7 +366,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pandas_vet").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

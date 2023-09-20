@@ -10,7 +10,7 @@ use ruff_source_file::SourceFile;
 use crate::message::Message;
 use crate::registry::Rule;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 use crate::IOError;
 
 /// Unlike [`pyproject_toml::PyProjectToml`], in our case `build_system` is also optional
@@ -23,7 +23,7 @@ struct PyProjectToml {
     project: Option<Project>,
 }
 
-pub fn lint_pyproject_toml(source_file: SourceFile, settings: &Settings) -> Vec<Message> {
+pub fn lint_pyproject_toml(source_file: SourceFile, settings: &LinterSettings) -> Vec<Message> {
     let Some(err) = toml::from_str::<PyProjectToml>(source_file.source_text()).err() else {
         return Vec::default();
     };

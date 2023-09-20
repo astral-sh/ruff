@@ -32,7 +32,7 @@ use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
-use crate::settings::{flags, Settings};
+use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs};
 
@@ -76,7 +76,7 @@ pub fn check_path(
     stylist: &Stylist,
     indexer: &Indexer,
     directives: &Directives,
-    settings: &Settings,
+    settings: &LinterSettings,
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
@@ -269,7 +269,7 @@ pub fn add_noqa_to_path(
     package: Option<&Path>,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> Result<usize> {
     let contents = source_kind.source_code();
 
@@ -336,7 +336,7 @@ pub fn add_noqa_to_path(
 pub fn lint_only(
     path: &Path,
     package: Option<&Path>,
-    settings: &Settings,
+    settings: &LinterSettings,
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
@@ -418,7 +418,7 @@ pub fn lint_fix<'a>(
     path: &Path,
     package: Option<&Path>,
     noqa: flags::Noqa,
-    settings: &Settings,
+    settings: &LinterSettings,
     source_kind: &'a SourceKind,
     source_type: PySourceType,
 ) -> Result<FixerResult<'a>> {
@@ -635,7 +635,7 @@ mod tests {
         } = test_notebook_path(
             &actual,
             expected,
-            &settings::Settings::for_rule(Rule::UnsortedImports),
+            &settings::LinterSettings::for_rule(Rule::UnsortedImports),
         )?;
         assert_messages!(messages, actual, source_notebook);
         Ok(())
@@ -652,7 +652,7 @@ mod tests {
         } = test_notebook_path(
             &actual,
             expected,
-            &settings::Settings::for_rule(Rule::UnusedImport),
+            &settings::LinterSettings::for_rule(Rule::UnusedImport),
         )?;
         assert_messages!(messages, actual, source_notebook);
         Ok(())
@@ -669,7 +669,7 @@ mod tests {
         } = test_notebook_path(
             &actual,
             expected,
-            &settings::Settings::for_rule(Rule::UnusedVariable),
+            &settings::LinterSettings::for_rule(Rule::UnusedVariable),
         )?;
         assert_messages!(messages, actual, source_notebook);
         Ok(())
@@ -686,7 +686,7 @@ mod tests {
         } = test_notebook_path(
             actual_path,
             &expected_path,
-            &settings::Settings::for_rule(Rule::UnusedImport),
+            &settings::LinterSettings::for_rule(Rule::UnusedImport),
         )?;
         let mut writer = Vec::new();
         fixed_notebook.write(&mut writer)?;
@@ -720,7 +720,7 @@ mod tests {
         let (_, transformed) = test_contents(
             &source_kind,
             path,
-            &settings::Settings::for_rule(Rule::UnusedImport),
+            &settings::LinterSettings::for_rule(Rule::UnusedImport),
         );
         let linted_notebook = transformed.into_owned().expect_ipy_notebook();
         let mut writer = Vec::new();

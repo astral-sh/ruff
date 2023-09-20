@@ -5,7 +5,7 @@ use ruff_python_ast::{Arguments, CmpOp, Constant, Expr};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
 pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
@@ -22,7 +22,7 @@ pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
     }
 }
 
-pub(super) fn in_dunder_init(semantic: &SemanticModel, settings: &Settings) -> bool {
+pub(super) fn in_dunder_init(semantic: &SemanticModel, settings: &LinterSettings) -> bool {
     let scope = semantic.current_scope();
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
