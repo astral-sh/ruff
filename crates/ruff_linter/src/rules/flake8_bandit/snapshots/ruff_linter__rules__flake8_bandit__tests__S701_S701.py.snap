@@ -1,0 +1,51 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S701.py:9:57: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+   |
+ 7 | templateEnv = jinja2.Environment(autoescape=True,
+ 8 |         loader=templateLoader )
+ 9 | Environment(loader=templateLoader, load=templateLoader, autoescape=something)  # S701
+   |                                                         ^^^^^^^^^^^^^^^^^^^^ S701
+10 | templateEnv = jinja2.Environment(autoescape=False, loader=templateLoader )  # S701
+11 | Environment(loader=templateLoader,
+   |
+
+S701.py:10:34: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+   |
+ 8 |         loader=templateLoader )
+ 9 | Environment(loader=templateLoader, load=templateLoader, autoescape=something)  # S701
+10 | templateEnv = jinja2.Environment(autoescape=False, loader=templateLoader )  # S701
+   |                                  ^^^^^^^^^^^^^^^^ S701
+11 | Environment(loader=templateLoader,
+12 |             load=templateLoader,
+   |
+
+S701.py:13:13: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+   |
+11 | Environment(loader=templateLoader,
+12 |             load=templateLoader,
+13 |             autoescape=False)  # S701
+   |             ^^^^^^^^^^^^^^^^ S701
+14 | 
+15 | Environment(loader=templateLoader,  # S701
+   |
+
+S701.py:15:1: S701 By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities.
+   |
+13 |             autoescape=False)  # S701
+14 | 
+15 | Environment(loader=templateLoader,  # S701
+   | ^^^^^^^^^^^ S701
+16 |             load=templateLoader)
+   |
+
+S701.py:29:36: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+   |
+27 | def fake_func():
+28 |     return 'foobar'
+29 | Environment(loader=templateLoader, autoescape=fake_func())  # S701
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^ S701
+   |
+
+

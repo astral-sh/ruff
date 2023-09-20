@@ -1,21 +1,23 @@
 use regex::Regex;
-use ruff::line_width::{LineLength, TabSize};
-use ruff::rules::flake8_pytest_style::settings::SettingsError;
-use ruff::rules::flake8_pytest_style::types;
-use ruff::rules::flake8_quotes::settings::Quote;
-use ruff::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
-use ruff::rules::isort::settings::RelativeImportsOrder;
-use ruff::rules::isort::{ImportSection, ImportType};
-use ruff::rules::pydocstyle::settings::Convention;
-use ruff::rules::pylint::settings::ConstantType;
-use ruff::rules::{
+use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
+use ruff_linter::rules::flake8_pytest_style::types;
+use ruff_linter::rules::flake8_quotes::settings::Quote;
+use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
+use ruff_linter::rules::isort::settings::RelativeImportsOrder;
+use ruff_linter::rules::isort::{ImportSection, ImportType};
+use ruff_linter::rules::pydocstyle::settings::Convention;
+use ruff_linter::rules::pylint::settings::ConstantType;
+use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use ruff::settings::types::{IdentifierPattern, PythonVersion, SerializationFormat, Version};
-use ruff::{warn_user_once, RuleSelector};
+use ruff_linter::settings::types::{
+    IdentifierPattern, PythonVersion, SerializationFormat, Version,
+};
+use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, ConfigurationOptions};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
@@ -683,8 +685,8 @@ pub struct Flake8AnnotationsOptions {
 }
 
 impl Flake8AnnotationsOptions {
-    pub fn into_settings(self) -> ruff::rules::flake8_annotations::settings::Settings {
-        ruff::rules::flake8_annotations::settings::Settings {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_annotations::settings::Settings {
+        ruff_linter::rules::flake8_annotations::settings::Settings {
             mypy_init_return: self.mypy_init_return.unwrap_or(false),
             suppress_dummy_args: self.suppress_dummy_args.unwrap_or(false),
             suppress_none_returning: self.suppress_none_returning.unwrap_or(false),
@@ -727,11 +729,11 @@ pub struct Flake8BanditOptions {
 }
 
 impl Flake8BanditOptions {
-    pub fn into_settings(self) -> ruff::rules::flake8_bandit::settings::Settings {
-        ruff::rules::flake8_bandit::settings::Settings {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_bandit::settings::Settings {
+        ruff_linter::rules::flake8_bandit::settings::Settings {
             hardcoded_tmp_directory: self
                 .hardcoded_tmp_directory
-                .unwrap_or_else(ruff::rules::flake8_bandit::settings::default_tmp_dirs)
+                .unwrap_or_else(ruff_linter::rules::flake8_bandit::settings::default_tmp_dirs)
                 .into_iter()
                 .chain(self.hardcoded_tmp_directory_extend.unwrap_or_default())
                 .collect(),
@@ -764,8 +766,8 @@ pub struct Flake8BugbearOptions {
 }
 
 impl Flake8BugbearOptions {
-    pub fn into_settings(self) -> ruff::rules::flake8_bugbear::settings::Settings {
-        ruff::rules::flake8_bugbear::settings::Settings {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_bugbear::settings::Settings {
+        ruff_linter::rules::flake8_bugbear::settings::Settings {
             extend_immutable_calls: self.extend_immutable_calls.unwrap_or_default(),
         }
     }
@@ -786,8 +788,8 @@ pub struct Flake8BuiltinsOptions {
 }
 
 impl Flake8BuiltinsOptions {
-    pub fn into_settings(self) -> ruff::rules::flake8_builtins::settings::Settings {
-        ruff::rules::flake8_builtins::settings::Settings {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
+        ruff_linter::rules::flake8_builtins::settings::Settings {
             builtins_ignorelist: self.builtins_ignorelist.unwrap_or_default(),
         }
     }
@@ -808,8 +810,8 @@ pub struct Flake8ComprehensionsOptions {
 }
 
 impl Flake8ComprehensionsOptions {
-    pub fn into_settings(self) -> ruff::rules::flake8_comprehensions::settings::Settings {
-        ruff::rules::flake8_comprehensions::settings::Settings {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_comprehensions::settings::Settings {
+        ruff_linter::rules::flake8_comprehensions::settings::Settings {
             allow_dict_calls_with_keyword_arguments: self
                 .allow_dict_calls_with_keyword_arguments
                 .unwrap_or_default(),
@@ -2241,7 +2243,7 @@ impl PyUpgradeOptions {
 #[cfg(test)]
 mod tests {
     use crate::options::Flake8SelfOptions;
-    use ruff::rules::flake8_self;
+    use ruff_linter::rules::flake8_self;
 
     #[test]
     fn flake8_self_options() {

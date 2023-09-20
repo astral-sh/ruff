@@ -1,0 +1,200 @@
+---
+source: crates/ruff_linter/src/rules/mccabe/mod.rs
+---
+C901.py:2:5: C901 `trivial` is too complex (1 > 0)
+  |
+1 | # Complexity = 1
+2 | def trivial():
+  |     ^^^^^^^ C901
+3 |     pass
+  |
+
+C901.py:7:5: C901 `expr_as_statement` is too complex (1 > 0)
+  |
+6 | # Complexity = 1
+7 | def expr_as_statement():
+  |     ^^^^^^^^^^^^^^^^^ C901
+8 |     0xF00D
+  |
+
+C901.py:12:5: C901 `sequential` is too complex (1 > 0)
+   |
+11 | # Complexity = 1
+12 | def sequential(n):
+   |     ^^^^^^^^^^ C901
+13 |     k = n + 4
+14 |     s = k + n
+   |
+
+C901.py:19:5: C901 `if_elif_else_dead_path` is too complex (3 > 0)
+   |
+18 | # Complexity = 3
+19 | def if_elif_else_dead_path(n):
+   |     ^^^^^^^^^^^^^^^^^^^^^^ C901
+20 |     if n > 3:
+21 |         return "bigger than three"
+   |
+
+C901.py:29:5: C901 `nested_ifs` is too complex (3 > 0)
+   |
+28 | # Complexity = 3
+29 | def nested_ifs():
+   |     ^^^^^^^^^^ C901
+30 |     if n > 3:
+31 |         if n > 4:
+   |
+
+C901.py:40:5: C901 `for_loop` is too complex (2 > 0)
+   |
+39 | # Complexity = 2
+40 | def for_loop():
+   |     ^^^^^^^^ C901
+41 |     for i in range(10):
+42 |         print(i)
+   |
+
+C901.py:46:5: C901 `for_else` is too complex (2 > 0)
+   |
+45 | # Complexity = 2
+46 | def for_else(mylist):
+   |     ^^^^^^^^ C901
+47 |     for i in mylist:
+48 |         print(i)
+   |
+
+C901.py:54:5: C901 `recursive` is too complex (2 > 0)
+   |
+53 | # Complexity = 2
+54 | def recursive(n):
+   |     ^^^^^^^^^ C901
+55 |     if n > 4:
+56 |         return f(n - 1)
+   |
+
+C901.py:62:5: C901 `nested_functions` is too complex (3 > 0)
+   |
+61 | # Complexity = 3
+62 | def nested_functions():
+   |     ^^^^^^^^^^^^^^^^ C901
+63 |     def a():
+64 |         def b():
+   |
+
+C901.py:63:9: C901 `a` is too complex (2 > 0)
+   |
+61 | # Complexity = 3
+62 | def nested_functions():
+63 |     def a():
+   |         ^ C901
+64 |         def b():
+65 |             pass
+   |
+
+C901.py:64:13: C901 `b` is too complex (1 > 0)
+   |
+62 | def nested_functions():
+63 |     def a():
+64 |         def b():
+   |             ^ C901
+65 |             pass
+   |
+
+C901.py:73:5: C901 `try_else` is too complex (4 > 0)
+   |
+72 | # Complexity = 4
+73 | def try_else():
+   |     ^^^^^^^^ C901
+74 |     try:
+75 |         print(1)
+   |
+
+C901.py:85:5: C901 `nested_try_finally` is too complex (1 > 0)
+   |
+84 | # Complexity = 3
+85 | def nested_try_finally():
+   |     ^^^^^^^^^^^^^^^^^^ C901
+86 |     try:
+87 |         try:
+   |
+
+C901.py:96:11: C901 `foobar` is too complex (3 > 0)
+   |
+95 | # Complexity = 3
+96 | async def foobar(a, b, c):
+   |           ^^^^^^ C901
+97 |     await whatever(a, b, c)
+98 |     if await b:
+   |
+
+C901.py:107:5: C901 `annotated_assign` is too complex (1 > 0)
+    |
+106 | # Complexity = 1
+107 | def annotated_assign():
+    |     ^^^^^^^^^^^^^^^^ C901
+108 |     x: Any = None
+    |
+
+C901.py:113:9: C901 `handle` is too complex (9 > 0)
+    |
+111 | # Complexity = 9
+112 | class Class:
+113 |     def handle(self, *args, **options):
+    |         ^^^^^^ C901
+114 |         if args:
+115 |             return
+    |
+
+C901.py:118:17: C901 `a` is too complex (1 > 0)
+    |
+117 |         class ServiceProvider:
+118 |             def a(self):
+    |                 ^ C901
+119 |                 pass
+    |
+
+C901.py:121:17: C901 `b` is too complex (2 > 0)
+    |
+119 |                 pass
+120 | 
+121 |             def b(self, data):
+    |                 ^ C901
+122 |                 if not args:
+123 |                     pass
+    |
+
+C901.py:126:17: C901 `c` is too complex (1 > 0)
+    |
+125 |         class Logger:
+126 |             def c(*args, **kwargs):
+    |                 ^ C901
+127 |                 pass
+    |
+
+C901.py:129:17: C901 `error` is too complex (1 > 0)
+    |
+127 |                 pass
+128 | 
+129 |             def error(self, message):
+    |                 ^^^^^ C901
+130 |                 pass
+    |
+
+C901.py:132:17: C901 `info` is too complex (1 > 0)
+    |
+130 |                 pass
+131 | 
+132 |             def info(self, message):
+    |                 ^^^^ C901
+133 |                 pass
+    |
+
+C901.py:135:17: C901 `exception` is too complex (1 > 0)
+    |
+133 |                 pass
+134 | 
+135 |             def exception(self):
+    |                 ^^^^^^^^^ C901
+136 |                 pass
+    |
+
+

@@ -13,11 +13,11 @@ use log::{debug, error, warn};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
-use ruff::message::Message;
-use ruff::registry::Rule;
-use ruff::settings::{flags, Settings};
-use ruff::{fs, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
+use ruff_linter::message::Message;
+use ruff_linter::registry::Rule;
+use ruff_linter::settings::{flags, Settings};
+use ruff_linter::{fs, warn_user_once, IOError};
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
@@ -240,9 +240,9 @@ mod test {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff::message::{Emitter, EmitterContext, TextEmitter};
-    use ruff::registry::Rule;
-    use ruff::settings::{flags, AllSettings, CliSettings, Settings};
+    use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
+    use ruff_linter::registry::Rule;
+    use ruff_linter::settings::{flags, AllSettings, CliSettings, Settings};
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 
     use crate::args::Overrides;

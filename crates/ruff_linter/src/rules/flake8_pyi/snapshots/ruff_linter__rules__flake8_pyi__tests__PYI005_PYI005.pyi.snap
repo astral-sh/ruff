@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI005.pyi:4:4: PYI005 Version comparison must be against a length-1 tuple
+  |
+2 | from sys import platform, version_info
+3 | 
+4 | if sys.version_info[:1] == (2, 7): ...  # Y005
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI005
+5 | if sys.version_info[:2] == (2,): ...  # Y005
+  |
+
+PYI005.pyi:5:4: PYI005 Version comparison must be against a length-2 tuple
+  |
+4 | if sys.version_info[:1] == (2, 7): ...  # Y005
+5 | if sys.version_info[:2] == (2,): ...  # Y005
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI005
+  |
+
+

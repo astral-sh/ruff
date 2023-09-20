@@ -4,8 +4,8 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use ruff::logging::{set_up_logging, LogLevel};
 use ruff_cli::check;
+use ruff_linter::logging::{set_up_logging, LogLevel};
 use std::process::ExitCode;
 
 mod format_dev;

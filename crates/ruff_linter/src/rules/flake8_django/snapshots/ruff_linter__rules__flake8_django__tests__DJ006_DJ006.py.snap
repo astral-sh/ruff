@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_django/mod.rs
+---
+DJ006.py:6:9: DJ006 Do not use `exclude` with `ModelForm`, use `fields` instead
+  |
+4 | class TestModelForm1(forms.ModelForm):
+5 |     class Meta:
+6 |         exclude = ["bar"]
+  |         ^^^^^^^ DJ006
+  |
+
+

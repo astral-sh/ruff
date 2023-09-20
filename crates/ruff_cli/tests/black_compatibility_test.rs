@@ -13,7 +13,7 @@ use insta_cmd::get_cargo_bin;
 use log::info;
 use walkdir::WalkDir;
 
-use ruff::logging::{set_up_logging, LogLevel};
+use ruff_linter::logging::{set_up_logging, LogLevel};
 
 /// Handles `blackd` process and allows submitting code to it for formatting.
 struct Blackd {

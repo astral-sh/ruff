@@ -20,7 +20,7 @@
 #           })
 
 hyperfine --ignore-failure --warmup 5 \
-  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache --silent --select ALL" \
-  "flake8 crates/ruff/resources/test/cpython -qq --docstring-convention=all" \
-  "pycodestyle crates/ruff/resources/test/cpython -qq" \
-  "pylint crates/ruff/resources/test/cpython -j 0  --recursive=y --disable=E,W,C,R"
+  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache --silent --select ALL" \
+  "flake8 crates/ruff_linter/resources/test/cpython -qq --docstring-convention=all" \
+  "pycodestyle crates/ruff_linter/resources/test/cpython -qq" \
+  "pylint crates/ruff_linter/resources/test/cpython -j 0  --recursive=y --disable=E,W,C,R"

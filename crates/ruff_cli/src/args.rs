@@ -4,13 +4,13 @@ use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
-use ruff::line_width::LineLength;
-use ruff::logging::LogLevel;
-use ruff::registry::Rule;
-use ruff::settings::types::{
+use ruff_linter::line_width::LineLength;
+use ruff_linter::logging::LogLevel;
+use ruff_linter::registry::Rule;
+use ruff_linter::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
 };
-use ruff::{RuleSelector, RuleSelectorParser};
+use ruff_linter::{RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::resolver::ConfigProcessor;
 

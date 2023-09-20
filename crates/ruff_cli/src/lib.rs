@@ -9,10 +9,10 @@ use clap::CommandFactory;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
-use ruff::logging::{set_up_logging, LogLevel};
-use ruff::settings::types::SerializationFormat;
-use ruff::settings::{flags, CliSettings};
-use ruff::{fs, warn_user_once};
+use ruff_linter::logging::{set_up_logging, LogLevel};
+use ruff_linter::settings::types::SerializationFormat;
+use ruff_linter::settings::{flags, CliSettings};
+use ruff_linter::{fs, warn_user_once};
 
 use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};

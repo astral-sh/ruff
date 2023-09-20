@@ -1,0 +1,143 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E70.py:2:5: E701 Multiple statements on one line (colon)
+  |
+1 | #: E701:1:5
+2 | if a: a = False
+  |     ^ E701
+3 | #: E701:1:40
+4 | if not header or header[:6] != 'bytes=': return
+  |
+
+E70.py:4:40: E701 Multiple statements on one line (colon)
+  |
+2 | if a: a = False
+3 | #: E701:1:40
+4 | if not header or header[:6] != 'bytes=': return
+  |                                        ^ E701
+5 | #: E702:1:10
+6 | a = False; b = True
+  |
+
+E70.py:25:8: E701 Multiple statements on one line (colon)
+   |
+23 |     def f(x): return 2*x
+24 | #: E704:1:8 E702:1:11 E703:1:14
+25 | if True: x; y;
+   |        ^ E701
+26 | #: E701:1:8
+27 | if True: lambda a: b
+   |
+
+E70.py:27:8: E701 Multiple statements on one line (colon)
+   |
+25 | if True: x; y;
+26 | #: E701:1:8
+27 | if True: lambda a: b
+   |        ^ E701
+28 | #: E701:1:10
+29 | if a := 1: pass
+   |
+
+E70.py:29:10: E701 Multiple statements on one line (colon)
+   |
+27 | if True: lambda a: b
+28 | #: E701:1:10
+29 | if a := 1: pass
+   |          ^ E701
+30 | # E701:1:4 E701:2:18 E701:3:8
+31 | try: lambda foo: bar
+   |
+
+E70.py:31:4: E701 Multiple statements on one line (colon)
+   |
+29 | if a := 1: pass
+30 | # E701:1:4 E701:2:18 E701:3:8
+31 | try: lambda foo: bar
+   |    ^ E701
+32 | except ValueError: pass
+33 | finally: pass
+   |
+
+E70.py:32:18: E701 Multiple statements on one line (colon)
+   |
+30 | # E701:1:4 E701:2:18 E701:3:8
+31 | try: lambda foo: bar
+32 | except ValueError: pass
+   |                  ^ E701
+33 | finally: pass
+34 | # E701:1:7
+   |
+
+E70.py:33:8: E701 Multiple statements on one line (colon)
+   |
+31 | try: lambda foo: bar
+32 | except ValueError: pass
+33 | finally: pass
+   |        ^ E701
+34 | # E701:1:7
+35 | class C: pass
+   |
+
+E70.py:35:8: E701 Multiple statements on one line (colon)
+   |
+33 | finally: pass
+34 | # E701:1:7
+35 | class C: pass
+   |        ^ E701
+36 | # E701:1:7
+37 | with C(): pass
+   |
+
+E70.py:37:9: E701 Multiple statements on one line (colon)
+   |
+35 | class C: pass
+36 | # E701:1:7
+37 | with C(): pass
+   |         ^ E701
+38 | # E701:1:14
+39 | async with C(): pass
+   |
+
+E70.py:39:15: E701 Multiple statements on one line (colon)
+   |
+37 | with C(): pass
+38 | # E701:1:14
+39 | async with C(): pass
+   |               ^ E701
+40 | #:
+41 | lambda a: b
+   |
+
+E70.py:54:8: E701 Multiple statements on one line (colon)
+   |
+52 | def f(): ...
+53 | #: E701:1:8 E702:1:13
+54 | class C: ...; x = 1
+   |        ^ E701
+55 | #: E701:1:8 E702:1:13
+56 | class C: ...; ...
+   |
+
+E70.py:56:8: E701 Multiple statements on one line (colon)
+   |
+54 | class C: ...; x = 1
+55 | #: E701:1:8 E702:1:13
+56 | class C: ...; ...
+   |        ^ E701
+57 | #: E701:2:12
+58 | match *0, 1, *2:
+   |
+
+E70.py:59:12: E701 Multiple statements on one line (colon)
+   |
+57 | #: E701:2:12
+58 | match *0, 1, *2:
+59 |     case 0,: y = 0
+   |            ^ E701
+60 | #:
+61 | class Foo:
+   |
+
+

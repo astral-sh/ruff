@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+---
+G002.py:3:14: G002 Logging statement uses `%`
+  |
+1 | import logging
+2 | 
+3 | logging.info("Hello %s" % "World!")
+  |              ^^^^^^^^^^^^^^^^^^^^^ G002
+4 | logging.log(logging.INFO, "Hello %s" % "World!")
+  |
+
+G002.py:4:27: G002 Logging statement uses `%`
+  |
+3 | logging.info("Hello %s" % "World!")
+4 | logging.log(logging.INFO, "Hello %s" % "World!")
+  |                           ^^^^^^^^^^^^^^^^^^^^^ G002
+  |
+
+

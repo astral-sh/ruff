@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: "ParsedFileExemption::try_extract(source)"
+---
+Ok(
+    Some(
+        All,
+    ),
+)

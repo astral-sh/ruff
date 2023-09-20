@@ -2,12 +2,14 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::options::Options;
 use anyhow::Result;
 use log::debug;
 use pep440_rs::VersionSpecifiers;
-use ruff::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
+
+use ruff_linter::settings::types::PythonVersion;
+
+use crate::options::Options;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Tools {
@@ -152,14 +154,16 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
 mod tests {
     use std::str::FromStr;
 
+    use anyhow::Result;
+    use rustc_hash::FxHashMap;
+
+    use ruff_linter::codes;
+    use ruff_linter::line_width::LineLength;
+    use ruff_linter::settings::types::PatternPrefixPair;
+
     use crate::options::Options;
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
     use crate::tests::test_resource_path;
-    use anyhow::Result;
-    use ruff::codes;
-    use ruff::line_width::LineLength;
-    use ruff::settings::types::PatternPrefixPair;
-    use rustc_hash::FxHashMap;
 
     #[test]
 

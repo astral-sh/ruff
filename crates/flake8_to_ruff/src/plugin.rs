@@ -3,9 +3,9 @@ use std::fmt;
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use ruff::registry::Linter;
-use ruff::settings::types::PreviewMode;
-use ruff::RuleSelector;
+use ruff_linter::registry::Linter;
+use ruff_linter::settings::types::PreviewMode;
+use ruff_linter::RuleSelector;
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {

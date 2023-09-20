@@ -1,0 +1,13 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: "Directive::try_extract(source, TextSize::default())"
+---
+Ok(
+    Some(
+        All(
+            All {
+                range: 0..6,
+            },
+        ),
+    ),
+)
