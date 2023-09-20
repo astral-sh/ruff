@@ -2135,6 +2135,15 @@ impl Parameters {
         }
         false
     }
+
+    /// Returns `true` if the [`Parameters`] is empty.
+    pub fn is_empty(&self) -> bool {
+        self.posonlyargs.is_empty()
+            && self.args.is_empty()
+            && self.kwonlyargs.is_empty()
+            && self.vararg.is_none()
+            && self.kwarg.is_none()
+    }
 }
 
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.

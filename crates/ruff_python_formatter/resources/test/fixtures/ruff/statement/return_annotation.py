@@ -75,6 +75,12 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
 ]:
     ...
 
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     Set[
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
