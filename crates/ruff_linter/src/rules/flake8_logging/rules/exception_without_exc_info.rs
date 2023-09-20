@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, ExprCall};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
+use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -43,44 +42,45 @@ impl Violation for ExceptionWithoutExcInfo {
 
 /// LOG007
 pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall) {
-    if let Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) = call.func.as_ref() {
-        if !matches!(
-            LoggingLevel::from_attribute(attr.as_str()),
-            Some(LoggingLevel::Exception)
-        ) {
-            return;
-        }
-
-        if !logging::is_logger_candidate(
-            &call.func,
-            checker.semantic(),
-            &checker.settings.logger_objects,
-        ) {
-            return;
-        }
-
-        if exc_info_arg_is_falsey(call, checker) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
-        }
-    };
-    if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
-        if id != "exception" {
-            return;
-        }
-
-        if let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) {
-            if !matches!(call_path.as_slice(), ["logging", "exception"]) {
+    match call.func.as_ref() {
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+            if !matches!(
+                LoggingLevel::from_attribute(attr.as_str()),
+                Some(LoggingLevel::Exception)
+            ) {
                 return;
             }
-        }
 
-        if exc_info_arg_is_falsey(call, checker) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
+            if !logging::is_logger_candidate(
+                &call.func,
+                checker.semantic(),
+                &checker.settings.logger_objects,
+            ) {
+                return;
+            }
+
+            if exc_info_arg_is_falsey(call, checker) {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
+            }
         }
+        Expr::Name(_) => {
+            if !checker
+                .semantic()
+                .resolve_call_path(call.func.as_ref())
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "exception"]))
+            {
+                return;
+            }
+
+            if exc_info_arg_is_falsey(call, checker) {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
+            }
+        }
+        _ => {}
     }
 }
 

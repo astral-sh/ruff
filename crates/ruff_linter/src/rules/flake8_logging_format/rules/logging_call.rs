@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Operator};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -153,10 +153,8 @@ impl LoggingCallType {
 
 /// Check logging calls for violations.
 pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
-    let range: TextRange;
-    let logging_call_type;
-
-    match call.func.as_ref() {
+    // Determine the call type (e.g., `info` vs. `exception`) and the range of the attribute.
+    let (logging_call_type, range) = match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) => {
             let Some(call_type) = LoggingCallType::from_attribute(attr.as_str()) else {
                 return;
@@ -168,22 +166,22 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
             ) {
                 return;
             }
-            logging_call_type = call_type;
-            range = attr.range();
+            (call_type, attr.range())
         }
-        Expr::Name(ast::ExprName {
-            id,
-            range: id_range,
-            ..
-        }) => {
-            let Some(call_type) = LoggingCallType::from_attribute(id.as_str()) else {
+        Expr::Name(_) => {
+            let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) else {
                 return;
             };
-            logging_call_type = call_type;
-            range = *id_range;
+            let ["logging", attribute] = call_path.as_slice() else {
+                return;
+            };
+            let Some(call_type) = LoggingCallType::from_attribute(attribute) else {
+                return;
+            };
+            (call_type, call.func.range())
         }
         _ => return,
-    }
+    };
 
     // G001 - G004
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
