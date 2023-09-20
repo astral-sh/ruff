@@ -81,6 +81,12 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
 ]:
     ...
 
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     Set[
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
@@ -341,6 +347,14 @@ def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
 
 # Breaking return type annotations. Black adds parentheses if the parameters are
 # empty; otherwise, it leverages the expressions own parentheses if possible.
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ]
+):
+    ...
+
+
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     Set[
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
