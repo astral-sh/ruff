@@ -43,35 +43,53 @@ impl Violation for ExceptionWithoutExcInfo {
 
 /// LOG007
 pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall) {
-    let Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) = call.func.as_ref() else {
-        return;
+    if let Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) = call.func.as_ref() {
+        if !matches!(
+            LoggingLevel::from_attribute(attr.as_str()),
+            Some(LoggingLevel::Exception)
+        ) {
+            return;
+        }
+
+        if !logging::is_logger_candidate(
+            &call.func,
+            checker.semantic(),
+            &checker.settings.logger_objects,
+        ) {
+            return;
+        }
+
+        if exc_info_arg_is_falsey(call, checker) {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
+        }
     };
+    if let Expr::Name(ast::ExprName { id, ..}) = call.func.as_ref() {
+        if id != "exception" {
+            return;
+        }
 
-    if !matches!(
-        LoggingLevel::from_attribute(attr.as_str()),
-        Some(LoggingLevel::Exception)
-    ) {
-        return;
+        if let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) {
+            if !matches!(call_path.as_slice(),["logging", "exception"]) {
+                return;
+            }
+        }
+
+        if exc_info_arg_is_falsey(call, checker) {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
+        }
     }
+}
 
-    if !logging::is_logger_candidate(
-        &call.func,
-        checker.semantic(),
-        &checker.settings.logger_objects,
-    ) {
-        return;
-    }
-
-    if call
+fn exc_info_arg_is_falsey(call: &ExprCall, checker: &mut Checker) -> bool {
+    call
         .arguments
         .find_keyword("exc_info")
         .map(|keyword| &keyword.value)
         .is_some_and(|value| {
             Truthiness::from_expr(value, |id| checker.semantic().is_builtin(id)).is_falsey()
         })
-    {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
-    }
 }
