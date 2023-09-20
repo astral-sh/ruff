@@ -11,7 +11,7 @@ use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
 use ruff_linter::settings::types::SerializationFormat;
-use ruff_linter::settings::{flags, CliSettings};
+use ruff_linter::settings::{flags, Settings};
 use ruff_linter::{fs, warn_user, warn_user_once};
 
 use crate::args::{Args, CheckCommand, Command, FormatCommand};
@@ -224,14 +224,14 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
-    let CliSettings {
+    let Settings {
         fix,
         fix_only,
         output_format,
         show_fixes,
         show_source,
         ..
-    } = pyproject_config.settings.cli;
+    } = pyproject_config.settings;
 
     // Autofix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.

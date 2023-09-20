@@ -7,8 +7,7 @@ use path_absolutize::path_dedot;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject;
 use ruff_workspace::resolver::{
-    resolve_settings_with_processor, ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy,
-    Relativity,
+    resolve_root_settings, ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity,
 };
 
 use crate::args::Overrides;
@@ -25,7 +24,7 @@ pub fn resolve(
     if isolated {
         let mut config = Configuration::default();
         overrides.process_config(&mut config);
-        let settings = config.into_all_settings(&path_dedot::CWD)?;
+        let settings = config.into_settings(&path_dedot::CWD)?;
         debug!("Isolated mode, not reading any pyproject.toml");
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Fixed,
@@ -42,7 +41,7 @@ pub fn resolve(
         .map(|config| shellexpand::full(&config).map(|config| PathBuf::from(config.as_ref())))
         .transpose()?
     {
-        let settings = resolve_settings_with_processor(&pyproject, Relativity::Cwd, overrides)?;
+        let settings = resolve_root_settings(&pyproject, Relativity::Cwd, overrides)?;
         debug!(
             "Using user specified pyproject.toml at {}",
             pyproject.display()
@@ -65,7 +64,7 @@ pub fn resolve(
             .unwrap_or(&path_dedot::CWD.as_path()),
     )? {
         debug!("Using pyproject.toml (parent) at {}", pyproject.display());
-        let settings = resolve_settings_with_processor(&pyproject, Relativity::Parent, overrides)?;
+        let settings = resolve_root_settings(&pyproject, Relativity::Parent, overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,
@@ -79,7 +78,7 @@ pub fn resolve(
     // these act as the "default" settings.)
     if let Some(pyproject) = pyproject::find_user_settings_toml() {
         debug!("Using pyproject.toml (cwd) at {}", pyproject.display());
-        let settings = resolve_settings_with_processor(&pyproject, Relativity::Cwd, overrides)?;
+        let settings = resolve_root_settings(&pyproject, Relativity::Cwd, overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,
@@ -94,7 +93,7 @@ pub fn resolve(
     debug!("Using Ruff default settings");
     let mut config = Configuration::default();
     overrides.process_config(&mut config);
-    let settings = config.into_all_settings(&path_dedot::CWD)?;
+    let settings = config.into_settings(&path_dedot::CWD)?;
     Ok(PyprojectConfig::new(
         PyprojectDiscoveryStrategy::Hierarchical,
         settings,

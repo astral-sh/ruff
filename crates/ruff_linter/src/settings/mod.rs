@@ -31,27 +31,22 @@ pub mod flags;
 pub mod rule_table;
 pub mod types;
 
-#[derive(Debug, Default)]
-pub struct AllSettings {
-    pub cli: CliSettings,
-    pub lib: Settings,
-}
-
-#[derive(Debug, Default, Clone)]
-#[allow(clippy::struct_excessive_bools)]
-/// Settings that are not used by this library and only here so that `ruff_cli` can use them.
-pub struct CliSettings {
-    pub cache_dir: PathBuf,
-    pub fix: bool,
-    pub fix_only: bool,
-    pub output_format: SerializationFormat,
-    pub show_fixes: bool,
-    pub show_source: bool,
-}
-
 #[derive(Debug, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
+    #[cache_key(ignore)]
+    pub cache_dir: PathBuf,
+    #[cache_key(ignore)]
+    pub fix: bool,
+    #[cache_key(ignore)]
+    pub fix_only: bool,
+    #[cache_key(ignore)]
+    pub output_format: SerializationFormat,
+    #[cache_key(ignore)]
+    pub show_fixes: bool,
+    #[cache_key(ignore)]
+    pub show_source: bool,
+
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 

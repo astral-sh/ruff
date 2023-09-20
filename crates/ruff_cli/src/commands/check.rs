@@ -58,13 +58,13 @@ pub(crate) fn check(
 
         match pyproject_config.strategy {
             PyprojectDiscoveryStrategy::Fixed => {
-                init_cache(&pyproject_config.settings.cli.cache_dir);
+                init_cache(&pyproject_config.settings.cache_dir);
             }
             PyprojectDiscoveryStrategy::Hierarchical => {
                 for settings in
                     std::iter::once(&pyproject_config.settings).chain(resolver.settings())
                 {
-                    init_cache(&settings.cli.cache_dir);
+                    init_cache(&settings.cache_dir);
                 }
             }
         }
@@ -88,12 +88,8 @@ pub(crate) fn check(
             .unique()
             .par_bridge()
             .map(|cache_root| {
-                let settings = resolver.resolve_all(cache_root, pyproject_config);
-                let cache = Cache::open(
-                    &settings.cli.cache_dir,
-                    cache_root.to_path_buf(),
-                    &settings.lib,
-                );
+                let settings = resolver.resolve(cache_root, pyproject_config);
+                let cache = Cache::open(cache_root.to_path_buf(), settings);
                 (cache_root, cache)
             })
             .collect::<HashMap<&Path, Cache>>()
@@ -242,7 +238,7 @@ mod test {
 
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
     use ruff_linter::registry::Rule;
-    use ruff_linter::settings::{flags, AllSettings, CliSettings, Settings};
+    use ruff_linter::settings::{flags, Settings};
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 
     use crate::args::Overrides;
@@ -271,11 +267,8 @@ mod test {
 
         // Configure
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path);
-        let settings = AllSettings {
-            cli: CliSettings::default(),
-            // invalid pyproject.toml is not active by default
-            lib: Settings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
-        };
+        // invalid pyproject.toml is not active by default
+        let settings = Settings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]);
         let pyproject_config =
             PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
 
