@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:378:5: D402 First line should not be the function's signature
+    |
+376 | @expect('D402: First line should not be the function\'s "signature"')
+377 | def foobar():
+378 |     """Signature: foobar()."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D402
+    |
+
+

@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
+---
+YTT202.py:4:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
+  |
+2 | from six import PY3
+3 | 
+4 | if six.PY3:
+  |    ^^^^^^^ YTT202
+5 |     print("3")
+6 | if PY3:
+  |
+
+YTT202.py:6:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
+  |
+4 | if six.PY3:
+5 |     print("3")
+6 | if PY3:
+  |    ^^^ YTT202
+7 |     print("3")
+  |
+
+

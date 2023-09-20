@@ -12,11 +12,11 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
 use tracing::{debug, warn};
 
-use ruff::fs;
-use ruff::logging::LogLevel;
-use ruff::settings::types::PreviewMode;
-use ruff::warn_user_once;
 use ruff_formatter::LineWidth;
+use ruff_linter::fs;
+use ruff_linter::logging::LogLevel;
+use ruff_linter::settings::types::PreviewMode;
+use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
 use ruff_source_file::{find_newline, LineEnding};

@@ -1,0 +1,67 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D401.py:10:5: D401 First line of docstring should be in imperative mood: "Returns foo."
+   |
+ 9 | def bad_liouiwnlkjl():
+10 |     """Returns foo."""
+   |     ^^^^^^^^^^^^^^^^^^ D401
+   |
+
+D401.py:14:5: D401 First line of docstring should be in imperative mood: "Constructor for a foo."
+   |
+13 | def bad_sdgfsdg23245():
+14 |     """Constructor for a foo."""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D401
+   |
+
+D401.py:18:5: D401 First line of docstring should be in imperative mood: "Constructor for a boa."
+   |
+17 |   def bad_sdgfsdg23245777():
+18 |       """
+   |  _____^
+19 | | 
+20 | |     Constructor for a boa.
+21 | | 
+22 | |     """
+   | |_______^ D401
+   |
+
+D401.py:26:5: D401 First line of docstring should be in imperative mood: "Runs something"
+   |
+25 | def bad_run_something():
+26 |     """Runs something"""
+   |     ^^^^^^^^^^^^^^^^^^^^ D401
+27 | 
+28 |     def bad_nested():
+   |
+
+D401.py:29:9: D401 First line of docstring should be in imperative mood: "Runs other things, nested"
+   |
+28 |     def bad_nested():
+29 |         """Runs other things, nested"""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D401
+30 | 
+31 |     bad_nested()
+   |
+
+D401.py:35:5: D401 First line of docstring should be in imperative mood: "Writes a logical line that"
+   |
+34 |   def multi_line():
+35 |       """Writes a logical line that
+   |  _____^
+36 | |     extends to two physical lines.
+37 | |     """
+   | |_______^ D401
+   |
+
+D401.py:74:9: D401 First line of docstring should be in imperative mood: "This method docstring should be written in imperative mood."
+   |
+73 |     def bad_method(self):
+74 |         """This method docstring should be written in imperative mood."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D401
+75 | 
+76 |     @property
+   |
+
+

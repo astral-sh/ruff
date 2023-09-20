@@ -5,9 +5,9 @@
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 
-use ruff::registry::{Linter, Rule, RuleNamespace};
-use ruff::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_diagnostics::AutofixKind;
+use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_workspace::options::Options;
 
 const FIX_SYMBOL: &str = "🛠️";

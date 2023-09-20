@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff::warn_user_once;
+use ruff_linter::warn_user_once;
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
 
 use crate::args::Overrides;

@@ -40,7 +40,7 @@ criterion = { version = "0.5.1", default-features = false }
 codspeed-criterion-compat = { version="2.2.0", default-features = false, optional = true}
 
 [dev-dependencies]
-ruff.path = "../ruff"
+ruff_linter.path = "../ruff_linter"
 ruff_python_ast.path = "../ruff_python_ast"
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_python_index = { path = "../ruff_python_index" }

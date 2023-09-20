@@ -11,11 +11,11 @@ use anyhow::{Context, Result};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use ruff::message::Message;
-use ruff::settings::Settings;
-use ruff::warn_user;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
+use ruff_linter::message::Message;
+use ruff_linter::settings::Settings;
+use ruff_linter::warn_user;
 use ruff_notebook::NotebookIndex;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
@@ -349,8 +349,8 @@ mod tests {
     use std::time::SystemTime;
 
     use itertools::Itertools;
-    use ruff::settings::{flags, AllSettings, Settings};
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_linter::settings::{flags, AllSettings, Settings};
 
     use crate::cache::RelativePathBuf;
     use crate::cache::{self, Cache, FileCache};
@@ -363,7 +363,7 @@ mod tests {
 
     use test_case::test_case;
 
-    #[test_case("../ruff/resources/test/fixtures", "ruff_tests/cache_same_results_ruff"; "ruff_fixtures")]
+    #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
     fn same_results(package_root: &str, cache_dir_path: &str) {
         let mut cache_dir = temp_dir();

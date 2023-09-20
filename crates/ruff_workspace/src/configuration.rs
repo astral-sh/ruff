@@ -17,18 +17,22 @@ use crate::options::{
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
-use ruff::line_width::{LineLength, TabSize};
-use ruff::registry::RuleNamespace;
-use ruff::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
-use ruff::rule_selector::Specificity;
-use ruff::settings::rule_table::RuleTable;
-use ruff::settings::types::{
+use ruff_cache::cache_dir;
+use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_linter::registry::RuleNamespace;
+use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
+use ruff_linter::rule_selector::Specificity;
+use ruff_linter::settings::rule_table::RuleTable;
+use ruff_linter::settings::types::{
     FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
     Version,
 };
-use ruff::settings::{defaults, resolve_per_file_ignores, AllSettings, CliSettings, Settings};
-use ruff::{fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION};
-use ruff_cache::cache_dir;
+use ruff_linter::settings::{
+    defaults, resolve_per_file_ignores, AllSettings, CliSettings, Settings,
+};
+use ruff_linter::{
+    fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
 use shellexpand::LookupError;
@@ -802,10 +806,10 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 #[cfg(test)]
 mod tests {
     use crate::configuration::{Configuration, RuleSelection};
-    use ruff::codes::{Flake8Copyright, Pycodestyle, Refurb};
-    use ruff::registry::{Linter, Rule, RuleSet};
-    use ruff::settings::types::PreviewMode;
-    use ruff::RuleSelector;
+    use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
+    use ruff_linter::registry::{Linter, Rule, RuleSet};
+    use ruff_linter::settings::types::PreviewMode;
+    use ruff_linter::RuleSelector;
 
     const NURSERY_RULES: &[Rule] = &[
         Rule::MissingCopyrightNotice,

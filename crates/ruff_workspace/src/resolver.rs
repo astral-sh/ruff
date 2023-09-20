@@ -13,12 +13,13 @@ use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use ruff_linter::fs;
+use ruff_linter::packaging::is_package;
+use ruff_linter::settings::{AllSettings, Settings};
+
 use crate::configuration::Configuration;
 use crate::pyproject;
 use crate::pyproject::settings_toml;
-use ruff::fs;
-use ruff::packaging::is_package;
-use ruff::settings::{AllSettings, Settings};
 
 /// The configuration information from a `pyproject.toml` file.
 pub struct PyprojectConfig {
@@ -503,11 +504,11 @@ mod tests {
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
+    use ruff_linter::settings::types::FilePattern;
+    use ruff_linter::settings::AllSettings;
+
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
-    use ruff::settings::types::FilePattern;
-    use ruff::settings::AllSettings;
-
     use crate::resolver::{
         is_file_excluded, match_exclusion, python_files_in_path, resolve_settings_with_processor,
         ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,

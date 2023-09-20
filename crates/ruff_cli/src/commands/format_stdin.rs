@@ -4,8 +4,8 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::warn;
-use ruff::settings::types::PreviewMode;
 use ruff_formatter::LineWidth;
+use ruff_linter::settings::types::PreviewMode;
 
 use ruff_python_formatter::{format_module, PyFormatOptions};
 use ruff_workspace::resolver::python_file_at_path;

@@ -6,8 +6,8 @@ use log::{debug, error};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 
-use ruff::linter::add_noqa_to_path;
-use ruff::warn_user_once;
+use ruff_linter::linter::add_noqa_to_path;
+use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
 

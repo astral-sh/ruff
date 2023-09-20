@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_7.py:11:22: F821 Undefined name `Undefined`
+   |
+10 | # Not OK
+11 | _ = DefaultNamedArg("Undefined", name="some_prop_name")
+   |                      ^^^^^^^^^ F821
+12 | _ = DefaultNamedArg(type="Undefined", name="some_prop_name")
+13 | _ = DefaultNamedArg("Undefined", "some_prop_name")
+   |
+
+F821_7.py:12:27: F821 Undefined name `Undefined`
+   |
+10 | # Not OK
+11 | _ = DefaultNamedArg("Undefined", name="some_prop_name")
+12 | _ = DefaultNamedArg(type="Undefined", name="some_prop_name")
+   |                           ^^^^^^^^^ F821
+13 | _ = DefaultNamedArg("Undefined", "some_prop_name")
+   |
+
+F821_7.py:13:22: F821 Undefined name `Undefined`
+   |
+11 | _ = DefaultNamedArg("Undefined", name="some_prop_name")
+12 | _ = DefaultNamedArg(type="Undefined", name="some_prop_name")
+13 | _ = DefaultNamedArg("Undefined", "some_prop_name")
+   |                      ^^^^^^^^^ F821
+   |
+
+

@@ -18,7 +18,7 @@ use imara_diff::{diff, Algorithm};
 use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use ruff::line_width::LineLength;
+use ruff_linter::line_width::LineLength;
 use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
@@ -29,11 +29,11 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use ruff::logging::LogLevel;
-use ruff::settings::types::{FilePattern, FilePatternSet};
 use ruff_cli::args::{FormatCommand, LogLevelArgs};
 use ruff_cli::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
+use ruff_linter::logging::LogLevel;
+use ruff_linter::settings::types::{FilePattern, FilePatternSet};
 use ruff_python_formatter::{
     format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
 };

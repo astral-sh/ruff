@@ -5,14 +5,14 @@ use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use ruff::directives;
-use ruff::line_width::{LineLength, TabSize};
-use ruff::linter::{check_path, LinterResult};
-use ruff::registry::AsRule;
-use ruff::settings::types::{PreviewMode, PythonVersion};
-use ruff::settings::{defaults, flags, Settings};
-use ruff::source_kind::SourceKind;
 use ruff_formatter::{FormatResult, Formatted, LineWidth};
+use ruff_linter::directives;
+use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_linter::linter::{check_path, LinterResult};
+use ruff_linter::registry::AsRule;
+use ruff_linter::settings::types::{PreviewMode, PythonVersion};
+use ruff_linter::settings::{defaults, flags, Settings};
+use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_node, pretty_comments, PyFormatContext, PyFormatOptions};
@@ -101,7 +101,7 @@ pub struct Workspace {
 #[wasm_bindgen]
 impl Workspace {
     pub fn version() -> String {
-        ruff::VERSION.to_string()
+        ruff_linter::VERSION.to_string()
     }
 
     #[wasm_bindgen(constructor)]

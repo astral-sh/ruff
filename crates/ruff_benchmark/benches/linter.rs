@@ -1,12 +1,12 @@
-use ruff::linter::lint_only;
-use ruff::settings::rule_table::RuleTable;
-use ruff::settings::{flags, Settings};
-use ruff::source_kind::SourceKind;
-use ruff::{registry::Rule, RuleSelector};
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
 };
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
+use ruff_linter::linter::lint_only;
+use ruff_linter::settings::rule_table::RuleTable;
+use ruff_linter::settings::{flags, Settings};
+use ruff_linter::source_kind::SourceKind;
+use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
 
 #[cfg(target_os = "windows")]

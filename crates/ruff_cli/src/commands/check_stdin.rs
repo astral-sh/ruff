@@ -2,8 +2,8 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use ruff::packaging;
-use ruff::settings::flags;
+use ruff_linter::packaging;
+use ruff_linter::settings::flags;
 use ruff_workspace::resolver::{python_file_at_path, PyprojectConfig};
 
 use crate::args::Overrides;

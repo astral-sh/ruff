@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
+---
+YTT303.py:4:7: YTT303 `sys.version[:1]` referenced (python10), use `sys.version_info`
+  |
+2 | from sys import version
+3 | 
+4 | print(sys.version[:1])
+  |       ^^^^^^^^^^^ YTT303
+5 | print(version[:1])
+  |
+
+YTT303.py:5:7: YTT303 `sys.version[:1]` referenced (python10), use `sys.version_info`
+  |
+4 | print(sys.version[:1])
+5 | print(version[:1])
+  |       ^^^^^^^ YTT303
+  |
+
+

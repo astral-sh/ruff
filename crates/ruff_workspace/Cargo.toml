@@ -13,7 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff = { path = "../ruff" }
+ruff_linter = { path = "../ruff_linter" }
 ruff_cache = { path = "../ruff_cache" }
 ruff_macros = { path = "../ruff_macros" }
 
