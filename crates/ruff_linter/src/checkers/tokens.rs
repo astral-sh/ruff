@@ -136,6 +136,7 @@ pub(crate) fn check_tokens(
             tokens,
             &settings.flake8_implicit_str_concat,
             locator,
+            indexer,
         );
     }
 
