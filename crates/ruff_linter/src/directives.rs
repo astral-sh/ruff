@@ -1,5 +1,6 @@
 //! Extract `# noqa`, `# isort: skip`, and `# TODO` directives from tokenized source.
 
+use std::iter::Peekable;
 use std::str::FromStr;
 
 use bitflags::bitflags;
@@ -85,6 +86,39 @@ pub fn extract_directives(
     }
 }
 
+struct SortedMergeIter<L, R, Item>
+where
+    L: Iterator<Item = Item>,
+    R: Iterator<Item = Item>,
+{
+    left: Peekable<L>,
+    right: Peekable<R>,
+}
+
+impl<L, R, Item> Iterator for SortedMergeIter<L, R, Item>
+where
+    L: Iterator<Item = Item>,
+    R: Iterator<Item = Item>,
+    Item: Ranged,
+{
+    type Item = Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.left.peek(), self.right.peek()) {
+            (Some(left), Some(right)) => {
+                if left.start() <= right.start() {
+                    Some(self.left.next().unwrap())
+                } else {
+                    Some(self.right.next().unwrap())
+                }
+            }
+            (Some(_), None) => Some(self.left.next().unwrap()),
+            (None, Some(_)) => Some(self.right.next().unwrap()),
+            (None, None) => None,
+        }
+    }
+}
+
 /// Extract a mapping from logical line to noqa line.
 fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer) -> NoqaMapping {
     let mut string_mappings = Vec::new();
@@ -164,33 +198,16 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
         continuation_mappings.len() + string_mappings.len() + fstring_mappings.len(),
     );
 
-    let mut continuation_mappings = continuation_mappings.into_iter().peekable();
-    let mut string_mappings = string_mappings.into_iter().peekable();
-    let mut fstring_mappings = fstring_mappings.into_iter().peekable();
+    let string_mappings = SortedMergeIter {
+        left: fstring_mappings.into_iter().peekable(),
+        right: string_mappings.into_iter().peekable(),
+    };
+    let all_mappings = SortedMergeIter {
+        left: string_mappings.peekable(),
+        right: continuation_mappings.into_iter().peekable(),
+    };
 
-    while let (Some(continuation), Some(string), Some(fstring)) = (
-        continuation_mappings.peek(),
-        string_mappings.peek(),
-        fstring_mappings.peek(),
-    ) {
-        if continuation.start() <= string.start() && continuation.start() <= fstring.start() {
-            mappings.push_mapping(continuation_mappings.next().unwrap());
-        } else if string.start() <= continuation.start() && string.start() <= fstring.start() {
-            mappings.push_mapping(string_mappings.next().unwrap());
-        } else {
-            mappings.push_mapping(fstring_mappings.next().unwrap());
-        }
-    }
-
-    for mapping in continuation_mappings {
-        mappings.push_mapping(mapping);
-    }
-
-    for mapping in string_mappings {
-        mappings.push_mapping(mapping);
-    }
-
-    for mapping in fstring_mappings {
+    for mapping in all_mappings {
         mappings.push_mapping(mapping);
     }
 
