@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::prelude::*;
 use std::cell::OnceCell;
 use std::marker::PhantomData;

@@ -120,7 +120,6 @@ impl SourceMapGeneration {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LineEnding {

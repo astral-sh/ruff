@@ -94,8 +94,3 @@ def f():
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = (
         True
     )
-
-# Regression test for https://github.com/astral-sh/ruff/issues/7462
-if grid is not None:
-    rgrid = (rgrid.rio.reproject_match(grid, nodata=fillvalue) # rio.reproject nodata is use to initlialize the destination array
-             .where(~grid.isnull()))

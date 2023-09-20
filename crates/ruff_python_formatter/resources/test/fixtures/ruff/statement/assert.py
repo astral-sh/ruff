@@ -153,3 +153,19 @@ def test():
             key9: value9,
         }
     ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeee"
+
+# Test for https://github.com/astral-sh/ruff/issues/7246
+assert items == [
+    "a very very very very very very very very very very very very very very very long string",
+]
+
+assert package.files == [
+    {
+        "file": "pytest-3.5.0-py2.py3-none-any.whl",
+        "hash": "sha256:6266f87ab64692112e5477eba395cfedda53b1933ccd29478e671e73b420c19c",  # noqa: E501
+    },
+    {
+        "file": "pytest-3.5.0.tar.gz",
+        "hash": "sha256:fae491d1874f199537fd5872b5e1f0e74a009b979df9d53d1553fd03da1703e1",  # noqa: E501
+    },
+]
