@@ -1,4 +1,3 @@
-use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
@@ -29,7 +28,7 @@ fn unit_struct_cache_key() {
 
     UnitStruct.cache_key(&mut key);
 
-    let mut hash = DefaultHasher::new();
+    let mut hash = CacheKeyHasher::new();
     UnitStruct.hash(&mut hash);
 
     assert_eq!(hash.finish(), key.finish());
@@ -46,7 +45,7 @@ fn named_field_struct() {
 
     named_fields.cache_key(&mut key);
 
-    let mut hash = DefaultHasher::new();
+    let mut hash = CacheKeyHasher::new();
     named_fields.hash(&mut hash);
 
     assert_eq!(hash.finish(), key.finish());
@@ -60,7 +59,7 @@ fn unnamed_field_struct() {
 
     unnamed_fields.cache_key(&mut key);
 
-    let mut hash = DefaultHasher::new();
+    let mut hash = CacheKeyHasher::new();
     unnamed_fields.hash(&mut hash);
 
     assert_eq!(hash.finish(), key.finish());
@@ -73,7 +72,7 @@ fn enum_unit_variant() {
     let variant = Enum::Unit;
     variant.cache_key(&mut key);
 
-    let mut hash = DefaultHasher::new();
+    let mut hash = CacheKeyHasher::new();
     variant.hash(&mut hash);
 
     assert_eq!(hash.finish(), key.finish());
@@ -89,7 +88,7 @@ fn enum_named_fields_variant() {
     };
     variant.cache_key(&mut key);
 
-    let mut hash = DefaultHasher::new();
+    let mut hash = CacheKeyHasher::new();
     variant.hash(&mut hash);
 
     assert_eq!(hash.finish(), key.finish());
@@ -102,7 +101,7 @@ fn enum_unnamed_fields_variant() {
     let variant = Enum::UnnamedFields("Hello".to_string(), "World".to_string());
     variant.cache_key(&mut key);
 
-    let mut hash = DefaultHasher::new();
+    let mut hash = CacheKeyHasher::new();
     variant.hash(&mut hash);
 
     assert_eq!(hash.finish(), key.finish());
