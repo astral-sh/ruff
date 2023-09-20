@@ -187,8 +187,11 @@ fn is_package_with_cache<'a>(
         .or_insert_with(|| is_package(path, namespace_packages))
 }
 
-pub trait ConfigProcessor: Sync {
-    fn process_config(&self, config: &mut Configuration);
+/// Applies a transformation to a [`Configuration`].
+///
+/// Used to override options with the the values provided by the CLI.
+pub trait ConfigurationTransformer: Sync {
+    fn transform(&self, config: Configuration) -> Configuration;
 }
 
 /// Recursively resolve a [`Configuration`] from a `pyproject.toml` file at the
@@ -200,7 +203,7 @@ pub trait ConfigProcessor: Sync {
 fn resolve_configuration(
     pyproject: &Path,
     relativity: Relativity,
-    processor: &dyn ConfigProcessor,
+    transformer: &dyn ConfigurationTransformer,
 ) -> Result<Configuration> {
     let mut seen = FxHashSet::default();
     let mut stack = vec![];
@@ -242,8 +245,7 @@ fn resolve_configuration(
     while let Some(extend) = stack.pop() {
         configuration = configuration.combine(extend);
     }
-    processor.process_config(&mut configuration);
-    Ok(configuration)
+    Ok(transformer.transform(configuration))
 }
 
 /// Extract the project root (scope) and [`Settings`] from a given
@@ -251,22 +253,22 @@ fn resolve_configuration(
 fn resolve_scoped_settings(
     pyproject: &Path,
     relativity: Relativity,
-    processor: &dyn ConfigProcessor,
+    transformer: &dyn ConfigurationTransformer,
 ) -> Result<(PathBuf, Settings)> {
-    let configuration = resolve_configuration(pyproject, relativity, processor)?;
+    let configuration = resolve_configuration(pyproject, relativity, transformer)?;
     let project_root = relativity.resolve(pyproject);
     let settings = configuration.into_settings(&project_root)?;
     Ok((project_root, settings))
 }
 
 /// Extract the [`Settings`] from a given `pyproject.toml` and process the
-/// configuration with the given [`ConfigProcessor`].
+/// configuration with the given [`ConfigurationTransformer`].
 pub fn resolve_root_settings(
     pyproject: &Path,
     relativity: Relativity,
-    processor: &dyn ConfigProcessor,
+    transformer: &dyn ConfigurationTransformer,
 ) -> Result<Settings> {
-    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, processor)?;
+    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, transformer)?;
     Ok(settings)
 }
 
@@ -274,7 +276,7 @@ pub fn resolve_root_settings(
 pub fn python_files_in_path(
     paths: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    processor: &dyn ConfigProcessor,
+    transformer: &dyn ConfigurationTransformer,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
@@ -288,7 +290,7 @@ pub fn python_files_in_path(
                 if seen.insert(ancestor) {
                     if let Some(pyproject) = settings_toml(ancestor)? {
                         let (root, settings) =
-                            resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
+                            resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
                         resolver.add(root, settings);
                     }
                 }
@@ -361,7 +363,7 @@ pub fn python_files_in_path(
                             Ok(Some(pyproject)) => match resolve_scoped_settings(
                                 &pyproject,
                                 Relativity::Parent,
-                                processor,
+                                transformer,
                             ) {
                                 Ok((root, settings)) => {
                                     resolver.write().unwrap().add(root, settings);
@@ -420,7 +422,7 @@ pub fn python_files_in_path(
 pub fn python_file_at_path(
     path: &Path,
     pyproject_config: &PyprojectConfig,
-    processor: &dyn ConfigProcessor,
+    transformer: &dyn ConfigurationTransformer,
 ) -> Result<bool> {
     if !pyproject_config.settings.force_exclude {
         return Ok(true);
@@ -435,7 +437,7 @@ pub fn python_file_at_path(
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
                 let (root, settings) =
-                    resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
+                    resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
                 resolver.add(root, settings);
             }
         }
@@ -508,14 +510,17 @@ mod tests {
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
         is_file_excluded, match_exclusion, python_files_in_path, resolve_root_settings,
-        ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,
+        ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity,
+        Resolver,
     };
     use crate::tests::test_resource_path;
 
-    struct NoOpProcessor;
+    struct NoOpTransformer;
 
-    impl ConfigProcessor for NoOpProcessor {
-        fn process_config(&self, _config: &mut Configuration) {}
+    impl ConfigurationTransformer for NoOpTransformer {
+        fn transform(&self, config: Configuration) -> Configuration {
+            config
+        }
     }
 
     #[test]
@@ -527,7 +532,7 @@ mod tests {
             resolve_root_settings(
                 &find_settings_toml(&package_root)?.unwrap(),
                 Relativity::Parent,
-                &NoOpProcessor,
+                &NoOpTransformer,
             )?,
             None,
         );
@@ -571,7 +576,7 @@ mod tests {
         let (paths, _) = python_files_in_path(
             &[root.to_path_buf()],
             &PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, Settings::default(), None),
-            &NoOpProcessor,
+            &NoOpTransformer,
         )?;
         let paths = paths
             .iter()
