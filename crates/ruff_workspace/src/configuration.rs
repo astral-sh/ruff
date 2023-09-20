@@ -27,7 +27,9 @@ use ruff_linter::settings::types::{
     FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
     Version,
 };
-use ruff_linter::settings::{defaults, resolve_per_file_ignores, Settings};
+use ruff_linter::settings::{
+    defaults, resolve_per_file_ignores, FileResolverSettings, Settings, EXCLUDE, INCLUDE,
+};
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
 };
@@ -139,16 +141,20 @@ impl Configuration {
             dummy_variable_rgx: self
                 .dummy_variable_rgx
                 .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone()),
-            exclude: FilePatternSet::try_from_vec(
-                self.exclude.unwrap_or_else(|| defaults::EXCLUDE.clone()),
-            )?,
-            extend_exclude: FilePatternSet::try_from_vec(self.extend_exclude)?,
-            extend_include: FilePatternSet::try_from_vec(self.extend_include)?,
+            file_resolver: FileResolverSettings {
+                exclude: FilePatternSet::try_from_vec(
+                    self.exclude.unwrap_or_else(|| EXCLUDE.clone()),
+                )?,
+                extend_exclude: FilePatternSet::try_from_vec(self.extend_exclude)?,
+                extend_include: FilePatternSet::try_from_vec(self.extend_include)?,
+                force_exclude: self.force_exclude.unwrap_or(false),
+                include: FilePatternSet::try_from_vec(
+                    self.include.unwrap_or_else(|| INCLUDE.clone()),
+                )?,
+                respect_gitignore: self.respect_gitignore.unwrap_or(true),
+                project_root: project_root.to_path_buf(),
+            },
             external: FxHashSet::from_iter(self.external.unwrap_or_default()),
-            force_exclude: self.force_exclude.unwrap_or(false),
-            include: FilePatternSet::try_from_vec(
-                self.include.unwrap_or_else(|| defaults::INCLUDE.clone()),
-            )?,
             ignore_init_module_imports: self.ignore_init_module_imports.unwrap_or_default(),
             line_length: self.line_length.unwrap_or_default(),
             tab_size: self.tab_size.unwrap_or_default(),
@@ -160,9 +166,7 @@ impl Configuration {
                     .chain(self.extend_per_file_ignores)
                     .collect(),
             )?,
-            respect_gitignore: self.respect_gitignore.unwrap_or(true),
             src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
-            project_root: project_root.to_path_buf(),
             target_version: self.target_version.unwrap_or_default(),
             task_tags: self.task_tags.unwrap_or_else(|| {
                 defaults::TASK_TAGS

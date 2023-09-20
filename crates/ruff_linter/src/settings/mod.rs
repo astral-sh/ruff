@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use globset::{Glob, GlobMatcher};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 
@@ -19,7 +20,9 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
+use crate::settings::types::{
+    FilePattern, FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat,
+};
 
 use super::line_width::{LineLength, TabSize};
 
@@ -30,6 +33,69 @@ pub mod defaults;
 pub mod flags;
 pub mod rule_table;
 pub mod types;
+
+pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
+    vec![
+        FilePattern::Builtin(".bzr"),
+        FilePattern::Builtin(".direnv"),
+        FilePattern::Builtin(".eggs"),
+        FilePattern::Builtin(".git"),
+        FilePattern::Builtin(".git-rewrite"),
+        FilePattern::Builtin(".hg"),
+        FilePattern::Builtin(".ipynb_checkpoints"),
+        FilePattern::Builtin(".mypy_cache"),
+        FilePattern::Builtin(".nox"),
+        FilePattern::Builtin(".pants.d"),
+        FilePattern::Builtin(".pyenv"),
+        FilePattern::Builtin(".pytest_cache"),
+        FilePattern::Builtin(".pytype"),
+        FilePattern::Builtin(".ruff_cache"),
+        FilePattern::Builtin(".svn"),
+        FilePattern::Builtin(".tox"),
+        FilePattern::Builtin(".venv"),
+        FilePattern::Builtin(".vscode"),
+        FilePattern::Builtin("__pypackages__"),
+        FilePattern::Builtin("_build"),
+        FilePattern::Builtin("buck-out"),
+        FilePattern::Builtin("build"),
+        FilePattern::Builtin("dist"),
+        FilePattern::Builtin("node_modules"),
+        FilePattern::Builtin("venv"),
+    ]
+});
+
+pub static INCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
+    vec![
+        FilePattern::Builtin("*.py"),
+        FilePattern::Builtin("*.pyi"),
+        FilePattern::Builtin("**/pyproject.toml"),
+    ]
+});
+
+#[derive(Debug, CacheKey)]
+pub struct FileResolverSettings {
+    pub exclude: FilePatternSet,
+    pub extend_exclude: FilePatternSet,
+    pub force_exclude: bool,
+    pub include: FilePatternSet,
+    pub extend_include: FilePatternSet,
+    pub respect_gitignore: bool,
+    pub project_root: PathBuf,
+}
+
+impl FileResolverSettings {
+    fn with_project_root(project_root: PathBuf) -> Self {
+        Self {
+            project_root,
+            exclude: FilePatternSet::try_from_vec(EXCLUDE.clone()).unwrap(),
+            extend_exclude: FilePatternSet::default(),
+            extend_include: FilePatternSet::default(),
+            force_exclude: false,
+            respect_gitignore: true,
+            include: FilePatternSet::try_from_vec(INCLUDE.clone()).unwrap(),
+        }
+    }
+}
 
 #[derive(Debug, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
@@ -47,20 +113,13 @@ pub struct Settings {
     #[cache_key(ignore)]
     pub show_source: bool,
 
+    pub file_resolver: FileResolverSettings,
+
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 
     pub target_version: PythonVersion,
     pub preview: PreviewMode,
-
-    // Resolver settings
-    pub exclude: FilePatternSet,
-    pub extend_exclude: FilePatternSet,
-    pub force_exclude: bool,
-    pub include: FilePatternSet,
-    pub extend_include: FilePatternSet,
-    pub respect_gitignore: bool,
-    pub project_root: PathBuf,
 
     // Rule-specific settings
     pub allowed_confusables: FxHashSet<char>,

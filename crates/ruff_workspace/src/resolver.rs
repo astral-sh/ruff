@@ -299,7 +299,7 @@ pub fn python_files_in_path(
     }
 
     // Check if the paths themselves are excluded.
-    if pyproject_config.settings.force_exclude {
+    if pyproject_config.settings.file_resolver.force_exclude {
         paths.retain(|path| !is_file_excluded(path, &resolver, pyproject_config));
         if paths.is_empty() {
             return Ok((vec![], resolver));
@@ -315,7 +315,7 @@ pub fn python_files_in_path(
     for path in &paths[1..] {
         builder.add(path);
     }
-    builder.standard_filters(pyproject_config.settings.respect_gitignore);
+    builder.standard_filters(pyproject_config.settings.file_resolver.respect_gitignore);
     builder.hidden(false);
     let walker = builder.build_parallel();
 
@@ -333,13 +333,17 @@ pub fn python_files_in_path(
                     let resolver = resolver.read().unwrap();
                     let settings = resolver.resolve(path, pyproject_config);
                     if let Some(file_name) = path.file_name() {
-                        if !settings.exclude.is_empty()
-                            && match_exclusion(path, file_name, &settings.exclude)
+                        if !settings.file_resolver.exclude.is_empty()
+                            && match_exclusion(path, file_name, &settings.file_resolver.exclude)
                         {
                             debug!("Ignored path via `exclude`: {:?}", path);
                             return WalkState::Skip;
-                        } else if !settings.extend_exclude.is_empty()
-                            && match_exclusion(path, file_name, &settings.extend_exclude)
+                        } else if !settings.file_resolver.extend_exclude.is_empty()
+                            && match_exclusion(
+                                path,
+                                file_name,
+                                &settings.file_resolver.extend_exclude,
+                            )
                         {
                             debug!("Ignored path via `extend-exclude`: {:?}", path);
                             return WalkState::Skip;
@@ -395,10 +399,10 @@ pub fn python_files_in_path(
                     let path = entry.path();
                     let resolver = resolver.read().unwrap();
                     let settings = resolver.resolve(path, pyproject_config);
-                    if settings.include.is_match(path) {
+                    if settings.file_resolver.include.is_match(path) {
                         debug!("Included path via `include`: {:?}", path);
                         true
-                    } else if settings.extend_include.is_match(path) {
+                    } else if settings.file_resolver.extend_include.is_match(path) {
                         debug!("Included path via `extend-include`: {:?}", path);
                         true
                     } else {
@@ -424,7 +428,7 @@ pub fn python_file_at_path(
     pyproject_config: &PyprojectConfig,
     transformer: &dyn ConfigurationTransformer,
 ) -> Result<bool> {
-    if !pyproject_config.settings.force_exclude {
+    if !pyproject_config.settings.file_resolver.force_exclude {
         return Ok(true);
     }
 
@@ -460,11 +464,13 @@ fn is_file_excluded(
         }
         let settings = resolver.resolve(path, pyproject_strategy);
         if let Some(file_name) = path.file_name() {
-            if !settings.exclude.is_empty() && match_exclusion(path, file_name, &settings.exclude) {
+            if !settings.file_resolver.exclude.is_empty()
+                && match_exclusion(path, file_name, &settings.file_resolver.exclude)
+            {
                 debug!("Ignored path via `exclude`: {:?}", path);
                 return true;
-            } else if !settings.extend_exclude.is_empty()
-                && match_exclusion(path, file_name, &settings.extend_exclude)
+            } else if !settings.file_resolver.extend_exclude.is_empty()
+                && match_exclusion(path, file_name, &settings.file_resolver.extend_exclude)
             {
                 debug!("Ignored path via `extend-exclude`: {:?}", path);
                 return true;
@@ -473,7 +479,7 @@ fn is_file_excluded(
             debug!("Ignored path due to error in parsing: {:?}", path);
             return true;
         }
-        if path == settings.project_root {
+        if path == settings.file_resolver.project_root {
             // Bail out; we'd end up past the project root on the next iteration
             // (excludes etc. are thus "rooted" to the project).
             break;

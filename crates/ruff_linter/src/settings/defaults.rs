@@ -5,7 +5,7 @@ use ruff_cache::cache_dir;
 use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
-use super::types::{FilePattern, PreviewMode, PythonVersion};
+use super::types::{PreviewMode, PythonVersion};
 use super::Settings;
 use crate::codes::{self, RuleCodePrefix};
 use crate::line_width::{LineLength, TabSize};
@@ -18,7 +18,8 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{FilePatternSet, SerializationFormat};
+use crate::settings::types::SerializationFormat;
+use crate::settings::FileResolverSettings;
 
 pub const PREFIXES: &[RuleSelector] = &[
     RuleSelector::Prefix {
@@ -33,44 +34,6 @@ pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 pub static DUMMY_VARIABLE_RGX: Lazy<Regex> =
     Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
 
-pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
-    vec![
-        FilePattern::Builtin(".bzr"),
-        FilePattern::Builtin(".direnv"),
-        FilePattern::Builtin(".eggs"),
-        FilePattern::Builtin(".git"),
-        FilePattern::Builtin(".git-rewrite"),
-        FilePattern::Builtin(".hg"),
-        FilePattern::Builtin(".ipynb_checkpoints"),
-        FilePattern::Builtin(".mypy_cache"),
-        FilePattern::Builtin(".nox"),
-        FilePattern::Builtin(".pants.d"),
-        FilePattern::Builtin(".pyenv"),
-        FilePattern::Builtin(".pytest_cache"),
-        FilePattern::Builtin(".pytype"),
-        FilePattern::Builtin(".ruff_cache"),
-        FilePattern::Builtin(".svn"),
-        FilePattern::Builtin(".tox"),
-        FilePattern::Builtin(".venv"),
-        FilePattern::Builtin(".vscode"),
-        FilePattern::Builtin("__pypackages__"),
-        FilePattern::Builtin("_build"),
-        FilePattern::Builtin("buck-out"),
-        FilePattern::Builtin("build"),
-        FilePattern::Builtin("dist"),
-        FilePattern::Builtin("node_modules"),
-        FilePattern::Builtin("venv"),
-    ]
-});
-
-pub static INCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
-    vec![
-        FilePattern::Builtin("*.py"),
-        FilePattern::Builtin("*.pyi"),
-        FilePattern::Builtin("**/pyproject.toml"),
-    ]
-});
-
 impl Default for Settings {
     fn default() -> Self {
         let project_root = path_dedot::CWD.clone();
@@ -82,6 +45,8 @@ impl Default for Settings {
             show_fixes: false,
             show_source: false,
 
+            file_resolver: FileResolverSettings::with_project_root(project_root),
+
             rules: PREFIXES
                 .iter()
                 .flat_map(|selector| selector.rules(PreviewMode::default()))
@@ -89,20 +54,14 @@ impl Default for Settings {
             allowed_confusables: FxHashSet::from_iter([]),
             builtins: vec![],
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
-            exclude: FilePatternSet::try_from_vec(EXCLUDE.clone()).unwrap(),
-            extend_exclude: FilePatternSet::default(),
-            extend_include: FilePatternSet::default(),
             external: HashSet::default(),
-            force_exclude: false,
             ignore_init_module_imports: false,
-            include: FilePatternSet::try_from_vec(INCLUDE.clone()).unwrap(),
             line_length: LineLength::default(),
             logger_objects: vec![],
             namespace_packages: vec![],
             preview: PreviewMode::default(),
             per_file_ignores: vec![],
-            project_root,
-            respect_gitignore: true,
+
             src: vec![path_dedot::CWD.clone()],
             tab_size: TabSize::default(),
             target_version: PythonVersion::default(),
