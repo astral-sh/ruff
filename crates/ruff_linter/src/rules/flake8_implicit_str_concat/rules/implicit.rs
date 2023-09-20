@@ -1,10 +1,12 @@
 use itertools::Itertools;
 use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 use crate::rules::flake8_implicit_str_concat::settings::Settings;
@@ -94,6 +96,7 @@ pub(crate) fn implicit(
     tokens: &[LexResult],
     settings: &Settings,
     locator: &Locator,
+    indexer: &Indexer,
 ) {
     for ((a_tok, a_range), (b_tok, b_range)) in tokens
         .iter()
@@ -103,24 +106,39 @@ pub(crate) fn implicit(
         })
         .tuple_windows()
     {
-        if a_tok.is_string() && b_tok.is_string() {
-            if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-                diagnostics.push(Diagnostic::new(
-                    MultiLineImplicitStringConcatenation,
-                    TextRange::new(a_range.start(), b_range.end()),
-                ));
-            } else {
-                let mut diagnostic = Diagnostic::new(
-                    SingleLineImplicitStringConcatenation,
-                    TextRange::new(a_range.start(), b_range.end()),
-                );
+        let (a_range, b_range) = match (a_tok, b_tok) {
+            (Tok::String { .. }, Tok::String { .. }) => (*a_range, *b_range),
+            (Tok::String { .. }, Tok::FStringStart) => (
+                *a_range,
+                indexer.fstring_ranges().innermost(b_range.start()).unwrap(),
+            ),
+            (Tok::FStringEnd, Tok::String { .. }) => (
+                indexer.fstring_ranges().innermost(a_range.start()).unwrap(),
+                *b_range,
+            ),
+            (Tok::FStringEnd, Tok::FStringStart) => (
+                indexer.fstring_ranges().innermost(a_range.start()).unwrap(),
+                indexer.fstring_ranges().innermost(b_range.start()).unwrap(),
+            ),
+            _ => continue,
+        };
 
-                if let Some(fix) = concatenate_strings(*a_range, *b_range, locator) {
-                    diagnostic.set_fix(fix);
-                }
+        if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
+            diagnostics.push(Diagnostic::new(
+                MultiLineImplicitStringConcatenation,
+                TextRange::new(a_range.start(), b_range.end()),
+            ));
+        } else {
+            let mut diagnostic = Diagnostic::new(
+                SingleLineImplicitStringConcatenation,
+                TextRange::new(a_range.start(), b_range.end()),
+            );
 
-                diagnostics.push(diagnostic);
-            };
+            if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
+                diagnostic.set_fix(fix);
+            }
+
+            diagnostics.push(diagnostic);
         };
     }
 }
