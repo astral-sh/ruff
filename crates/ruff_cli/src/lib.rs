@@ -10,9 +10,10 @@ use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
+use ruff_linter::settings::flags;
 use ruff_linter::settings::types::SerializationFormat;
-use ruff_linter::settings::{flags, Settings};
 use ruff_linter::{fs, warn_user, warn_user_once};
+use ruff_workspace::Settings;
 
 use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};

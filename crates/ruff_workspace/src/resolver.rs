@@ -14,12 +14,12 @@ use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::packaging::is_package;
-use ruff_linter::settings::Settings;
 use ruff_linter::{fs, warn_user_once};
 
 use crate::configuration::Configuration;
 use crate::pyproject;
 use crate::pyproject::settings_toml;
+use crate::settings::Settings;
 
 /// The configuration information from a `pyproject.toml` file.
 pub struct PyprojectConfig {
@@ -513,7 +513,6 @@ mod tests {
     use tempfile::TempDir;
 
     use ruff_linter::settings::types::FilePattern;
-    use ruff_linter::settings::Settings;
 
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
@@ -522,6 +521,7 @@ mod tests {
         ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity,
         Resolver,
     };
+    use crate::settings::Settings;
     use crate::tests::test_resource_path;
 
     struct NoOpTransformer;

@@ -25,6 +25,7 @@ itertools = { workspace = true }
 log = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
+once_cell = { workspace = true }
 path-absolutize = { workspace = true }
 pep440_rs = { version = "0.3.1", features = ["serde"] }
 regex = { workspace = true }
