@@ -20,7 +20,6 @@ except:
 
 logging.error("Hello World", exc_info=sys.exc_info())
 
-
 # G201
 from logging import error
 try:
