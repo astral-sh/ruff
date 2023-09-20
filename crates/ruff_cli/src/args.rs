@@ -109,9 +109,21 @@ pub struct CheckCommand {
     /// Ignore any `# noqa` comments.
     #[arg(long)]
     ignore_noqa: bool,
-    /// Output serialization format for violations.
-    #[arg(long, value_enum, env = "RUFF_FORMAT")]
+
+    /// Output serialization format for violations. (Deprecated: Use `--output-format` instead).
+    #[arg(
+        long,
+        value_enum,
+        env = "RUFF_FORMAT",
+        conflicts_with = "output_format",
+        hide = true
+    )]
     pub format: Option<SerializationFormat>,
+
+    /// Output serialization format for violations.
+    #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
+    pub output_format: Option<SerializationFormat>,
+
     /// Specify file to write the linter output to (default: stdout).
     #[arg(short, long)]
     pub output_file: Option<PathBuf>,
@@ -486,7 +498,7 @@ impl CheckCommand {
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                format: self.format,
+                output_format: self.output_format.or(self.format),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             },
         )
@@ -588,7 +600,7 @@ pub struct Overrides {
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
     pub force_exclude: Option<bool>,
-    pub format: Option<SerializationFormat>,
+    pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
 }
 
@@ -632,8 +644,8 @@ impl ConfigProcessor for Overrides {
                 .collect(),
             extend_fixable: self.extend_fixable.clone().unwrap_or_default(),
         });
-        if let Some(format) = &self.format {
-            config.format = Some(*format);
+        if let Some(output_format) = &self.output_format {
+            config.output_format = Some(*output_format);
         }
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);

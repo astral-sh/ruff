@@ -206,8 +206,8 @@ Options:
           Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`. Use `--no-fix-only` to disable
       --ignore-noqa
           Ignore any `# noqa` comments
-      --format <FORMAT>
-          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure]
+      --output-format <OUTPUT_FORMAT>
+          Output serialization format for violations [env: RUFF_OUTPUT_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure]
   -o, --output-file <OUTPUT_FILE>
           Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>

@@ -145,7 +145,7 @@ impl Workspace {
             fix_only: None,
             fixable: None,
             force_exclude: None,
-            format: None,
+            output_format: None,
             ignore_init_module_imports: None,
             include: None,
             logger_objects: None,
