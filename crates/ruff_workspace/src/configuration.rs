@@ -27,9 +27,7 @@ use ruff_linter::settings::types::{
     FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
     Version,
 };
-use ruff_linter::settings::{
-    defaults, resolve_per_file_ignores, AllSettings, CliSettings, Settings,
-};
+use ruff_linter::settings::{defaults, resolve_per_file_ignores, Settings};
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
 };
@@ -110,23 +108,6 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn into_all_settings(self, project_root: &Path) -> Result<AllSettings> {
-        Ok(AllSettings {
-            cli: CliSettings {
-                cache_dir: self
-                    .cache_dir
-                    .clone()
-                    .unwrap_or_else(|| cache_dir(project_root)),
-                fix: self.fix.unwrap_or(false),
-                fix_only: self.fix_only.unwrap_or(false),
-                output_format: self.output_format.unwrap_or_default(),
-                show_fixes: self.show_fixes.unwrap_or(false),
-                show_source: self.show_source.unwrap_or(false),
-            },
-            lib: self.into_settings(project_root)?,
-        })
-    }
-
     pub fn into_settings(self, project_root: &Path) -> Result<Settings> {
         if let Some(required_version) = &self.required_version {
             if &**required_version != RUFF_PKG_VERSION {
@@ -139,6 +120,16 @@ impl Configuration {
         }
 
         Ok(Settings {
+            cache_dir: self
+                .cache_dir
+                .clone()
+                .unwrap_or_else(|| cache_dir(project_root)),
+            fix: self.fix.unwrap_or(false),
+            fix_only: self.fix_only.unwrap_or(false),
+            output_format: self.output_format.unwrap_or_default(),
+            show_fixes: self.show_fixes.unwrap_or(false),
+            show_source: self.show_source.unwrap_or(false),
+
             rules: self.as_rule_table(),
             allowed_confusables: self
                 .allowed_confusables

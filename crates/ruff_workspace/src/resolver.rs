@@ -14,7 +14,7 @@ use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::packaging::is_package;
-use ruff_linter::settings::{AllSettings, Settings};
+use ruff_linter::settings::Settings;
 use ruff_linter::{fs, warn_user_once};
 
 use crate::configuration::Configuration;
@@ -27,7 +27,7 @@ pub struct PyprojectConfig {
     /// each Python file.
     pub strategy: PyprojectDiscoveryStrategy,
     /// All settings from the `pyproject.toml` file.
-    pub settings: AllSettings,
+    pub settings: Settings,
     /// Absolute path to the `pyproject.toml` file. This would be `None` when
     /// either using the default settings or the `--isolated` flag is set.
     pub path: Option<PathBuf>,
@@ -36,7 +36,7 @@ pub struct PyprojectConfig {
 impl PyprojectConfig {
     pub fn new(
         strategy: PyprojectDiscoveryStrategy,
-        settings: AllSettings,
+        settings: Settings,
         path: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -93,21 +93,21 @@ impl Relativity {
 
 #[derive(Default)]
 pub struct Resolver {
-    settings: BTreeMap<PathBuf, AllSettings>,
+    settings: BTreeMap<PathBuf, Settings>,
 }
 
 impl Resolver {
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: PathBuf, settings: AllSettings) {
+    fn add(&mut self, path: PathBuf, settings: Settings) {
         self.settings.insert(path, settings);
     }
 
-    /// Return the appropriate [`AllSettings`] for a given [`Path`].
-    pub fn resolve_all<'a>(
+    /// Return the appropriate [`Settings`] for a given [`Path`].
+    pub fn resolve<'a>(
         &'a self,
         path: &Path,
         pyproject_config: &'a PyprojectConfig,
-    ) -> &'a AllSettings {
+    ) -> &'a Settings {
         match pyproject_config.strategy {
             PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings,
             PyprojectDiscoveryStrategy::Hierarchical => self
@@ -117,14 +117,6 @@ impl Resolver {
                 .find_map(|(root, settings)| path.starts_with(root).then_some(settings))
                 .unwrap_or(&pyproject_config.settings),
         }
-    }
-
-    pub fn resolve<'a>(
-        &'a self,
-        path: &Path,
-        pyproject_config: &'a PyprojectConfig,
-    ) -> &'a Settings {
-        &self.resolve_all(path, pyproject_config).lib
     }
 
     /// Return a mapping from Python package to its package root.
@@ -163,7 +155,7 @@ impl Resolver {
     }
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
-    pub fn settings(&self) -> impl Iterator<Item = &AllSettings> {
+    pub fn settings(&self) -> impl Iterator<Item = &Settings> {
         self.settings.values()
     }
 }
@@ -260,20 +252,20 @@ fn resolve_scoped_settings(
     pyproject: &Path,
     relativity: Relativity,
     processor: &dyn ConfigProcessor,
-) -> Result<(PathBuf, AllSettings)> {
+) -> Result<(PathBuf, Settings)> {
     let configuration = resolve_configuration(pyproject, relativity, processor)?;
     let project_root = relativity.resolve(pyproject);
-    let settings = configuration.into_all_settings(&project_root)?;
+    let settings = configuration.into_settings(&project_root)?;
     Ok((project_root, settings))
 }
 
 /// Extract the [`Settings`] from a given `pyproject.toml` and process the
 /// configuration with the given [`ConfigProcessor`].
-pub fn resolve_settings_with_processor(
+pub fn resolve_root_settings(
     pyproject: &Path,
     relativity: Relativity,
     processor: &dyn ConfigProcessor,
-) -> Result<AllSettings> {
+) -> Result<Settings> {
     let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, processor)?;
     Ok(settings)
 }
@@ -305,7 +297,7 @@ pub fn python_files_in_path(
     }
 
     // Check if the paths themselves are excluded.
-    if pyproject_config.settings.lib.force_exclude {
+    if pyproject_config.settings.force_exclude {
         paths.retain(|path| !is_file_excluded(path, &resolver, pyproject_config));
         if paths.is_empty() {
             return Ok((vec![], resolver));
@@ -321,7 +313,7 @@ pub fn python_files_in_path(
     for path in &paths[1..] {
         builder.add(path);
     }
-    builder.standard_filters(pyproject_config.settings.lib.respect_gitignore);
+    builder.standard_filters(pyproject_config.settings.respect_gitignore);
     builder.hidden(false);
     let walker = builder.build_parallel();
 
@@ -430,7 +422,7 @@ pub fn python_file_at_path(
     pyproject_config: &PyprojectConfig,
     processor: &dyn ConfigProcessor,
 ) -> Result<bool> {
-    if !pyproject_config.settings.lib.force_exclude {
+    if !pyproject_config.settings.force_exclude {
         return Ok(true);
     }
 
@@ -510,12 +502,12 @@ mod tests {
     use tempfile::TempDir;
 
     use ruff_linter::settings::types::FilePattern;
-    use ruff_linter::settings::AllSettings;
+    use ruff_linter::settings::Settings;
 
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
-        is_file_excluded, match_exclusion, python_files_in_path, resolve_settings_with_processor,
+        is_file_excluded, match_exclusion, python_files_in_path, resolve_root_settings,
         ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,
     };
     use crate::tests::test_resource_path;
@@ -532,7 +524,7 @@ mod tests {
         let resolver = Resolver::default();
         let pyproject_config = PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
-            resolve_settings_with_processor(
+            resolve_root_settings(
                 &find_settings_toml(&package_root)?.unwrap(),
                 Relativity::Parent,
                 &NoOpProcessor,
@@ -578,11 +570,7 @@ mod tests {
 
         let (paths, _) = python_files_in_path(
             &[root.to_path_buf()],
-            &PyprojectConfig::new(
-                PyprojectDiscoveryStrategy::Fixed,
-                AllSettings::default(),
-                None,
-            ),
+            &PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, Settings::default(), None),
             &NoOpProcessor,
         )?;
         let paths = paths

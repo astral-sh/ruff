@@ -60,7 +60,7 @@ fn ruff_check_paths(
         cli.stdin_filename.as_deref(),
     )?;
     // We don't want to format pyproject.toml
-    pyproject_config.settings.lib.include = FilePatternSet::try_from_vec(vec![
+    pyproject_config.settings.include = FilePatternSet::try_from_vec(vec![
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
     ])

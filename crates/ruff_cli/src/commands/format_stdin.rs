@@ -39,11 +39,11 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &Overrides) -> Resu
     // Format the file.
     let path = cli.stdin_filename.as_deref();
 
-    let preview = match pyproject_config.settings.lib.preview {
+    let preview = match pyproject_config.settings.preview {
         PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
     };
-    let line_length = pyproject_config.settings.lib.line_length;
+    let line_length = pyproject_config.settings.line_length;
 
     let options = path
         .map(PyFormatOptions::from_extension)
