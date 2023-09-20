@@ -95,31 +95,6 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
                 break;
             }
 
-            // F-strings can be multi-line even without triple quotes. For example,
-            //
-            // ```python
-            // f"foo {
-            //    x
-            //        *
-            //             y
-            // }"
-            // ```
-            //
-            // We expect `noqa` directives on the last line of the f-string.
-            Tok::FStringEnd => {
-                // SAFETY: If we're at the end of a f-string, the indexer must have a
-                // corresponding f-string range for it.
-                let fstring_start = indexer
-                    .fstring_ranges()
-                    .outermost(range.start())
-                    .unwrap()
-                    .start();
-                string_mappings.push(TextRange::new(
-                    locator.line_start(fstring_start),
-                    range.end(),
-                ));
-            }
-
             // For multi-line strings, we expect `noqa` directives on the last line of the
             // string.
             Tok::String {
@@ -136,6 +111,26 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
 
             _ => {}
         }
+    }
+
+    // The capacity allocated here might be more than we need if there are
+    // nested f-strings.
+    let mut fstring_mappings = Vec::with_capacity(indexer.fstring_ranges().len());
+
+    // For nested f-strings, we expect `noqa` directives on the last line of the
+    // outermost f-string. The last f-string range will be used to skip over
+    // the inner f-strings.
+    let mut last_fstring_range: TextRange = TextRange::default();
+    for fstring_range in indexer.fstring_ranges().values() {
+        if last_fstring_range.contains_range(*fstring_range) {
+            continue;
+        }
+        let new_range = TextRange::new(
+            locator.line_start(fstring_range.start()),
+            fstring_range.end(),
+        );
+        fstring_mappings.push(new_range);
+        last_fstring_range = new_range;
     }
 
     let mut continuation_mappings = Vec::new();
@@ -162,19 +157,25 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
     }
 
     // Merge the mappings in sorted order
-    let mut mappings =
-        NoqaMapping::with_capacity(continuation_mappings.len() + string_mappings.len());
+    let mut mappings = NoqaMapping::with_capacity(
+        continuation_mappings.len() + string_mappings.len() + fstring_mappings.len(),
+    );
 
     let mut continuation_mappings = continuation_mappings.into_iter().peekable();
     let mut string_mappings = string_mappings.into_iter().peekable();
+    let mut fstring_mappings = fstring_mappings.into_iter().peekable();
 
-    while let (Some(continuation), Some(string)) =
-        (continuation_mappings.peek(), string_mappings.peek())
-    {
-        if continuation.start() <= string.start() {
+    while let (Some(continuation), Some(string), Some(fstring)) = (
+        continuation_mappings.peek(),
+        string_mappings.peek(),
+        fstring_mappings.peek(),
+    ) {
+        if continuation.start() <= string.start() && continuation.start() <= fstring.start() {
             mappings.push_mapping(continuation_mappings.next().unwrap());
-        } else {
+        } else if string.start() <= continuation.start() && string.start() <= fstring.start() {
             mappings.push_mapping(string_mappings.next().unwrap());
+        } else {
+            mappings.push_mapping(fstring_mappings.next().unwrap());
         }
     }
 
@@ -183,6 +184,10 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
     }
 
     for mapping in string_mappings {
+        mappings.push_mapping(mapping);
+    }
+
+    for mapping in fstring_mappings {
         mappings.push_mapping(mapping);
     }
 
@@ -496,6 +501,17 @@ ghi
         assert_eq!(
             noqa_mappings(contents),
             NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(29))])
+        );
+
+        let contents = "x = 1
+y = f'''abc
+def {f'''nested
+fstring''' f'another nested'}
+end'''
+";
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(70))])
         );
 
         let contents = r"x = \
