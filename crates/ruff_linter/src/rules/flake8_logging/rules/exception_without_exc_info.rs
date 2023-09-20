@@ -65,13 +65,13 @@ pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall)
                 .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
         }
     };
-    if let Expr::Name(ast::ExprName { id, ..}) = call.func.as_ref() {
+    if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
         if id != "exception" {
             return;
         }
 
         if let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) {
-            if !matches!(call_path.as_slice(),["logging", "exception"]) {
+            if !matches!(call_path.as_slice(), ["logging", "exception"]) {
                 return;
             }
         }
@@ -85,8 +85,7 @@ pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall)
 }
 
 fn exc_info_arg_is_falsey(call: &ExprCall, checker: &mut Checker) -> bool {
-    call
-        .arguments
+    call.arguments
         .find_keyword("exc_info")
         .map(|keyword| &keyword.value)
         .is_some_and(|value| {

@@ -171,14 +171,18 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
             logging_call_type = call_type;
             range = attr.range();
         }
-        Expr::Name(ast::ExprName{ id , range: id_range, .. }) => {
+        Expr::Name(ast::ExprName {
+            id,
+            range: id_range,
+            ..
+        }) => {
             let Some(call_type) = LoggingCallType::from_attribute(id.as_str()) else {
                 return;
             };
             logging_call_type = call_type;
             range = *id_range;
         }
-        _ => {return}
+        _ => return,
     }
 
     // G001 - G004
