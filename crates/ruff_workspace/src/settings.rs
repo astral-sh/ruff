@@ -3,6 +3,7 @@ use ruff_cache::cache_dir;
 use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFormat};
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
+use ruff_python_formatter::FormatterSettings;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, CacheKey)]
@@ -23,6 +24,7 @@ pub struct Settings {
 
     pub file_resolver: FileResolverSettings,
     pub linter: LinterSettings,
+    pub formatter: FormatterSettings,
 }
 
 impl Default for Settings {
@@ -37,6 +39,7 @@ impl Default for Settings {
             show_source: false,
             linter: LinterSettings::new(project_root),
             file_resolver: FileResolverSettings::new(project_root),
+            formatter: FormatterSettings::default(),
         }
     }
 }

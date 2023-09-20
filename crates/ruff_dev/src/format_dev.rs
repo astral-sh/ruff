@@ -18,7 +18,6 @@ use imara_diff::{diff, Algorithm};
 use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use ruff_linter::line_width::LineLength;
 use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
@@ -551,10 +550,8 @@ fn format_dir_entry(
     let settings = resolver.resolve(&path, pyproject_config);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
     // TODO(micha) use formatter settings instead
-    if settings.linter.line_length != LineLength::default() {
-        options = options.with_line_width(LineWidth::from(NonZeroU16::from(
-            settings.linter.line_length,
-        )));
+    if settings.formatter.line_width != LineWidth::default() {
+        options = options.with_line_width(settings.formatter.line_width);
     }
 
     // Handle panics (mostly in `debug_assert!`)
