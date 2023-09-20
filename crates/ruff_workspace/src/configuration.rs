@@ -14,6 +14,7 @@ use crate::options::{
     Flake8UnusedArgumentsOptions, IsortOptions, McCabeOptions, Options, Pep8NamingOptions,
     PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions, PylintOptions,
 };
+use crate::settings::{FileResolverSettings, Settings, EXCLUDE, INCLUDE};
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
@@ -28,8 +29,7 @@ use ruff_linter::settings::types::{
     Version,
 };
 use ruff_linter::settings::{
-    resolve_per_file_ignores, FileResolverSettings, LinterSettings, Settings, DUMMY_VARIABLE_RGX,
-    EXCLUDE, INCLUDE, PREFIXES, TASK_TAGS,
+    resolve_per_file_ignores, LinterSettings, DUMMY_VARIABLE_RGX, PREFIXES, TASK_TAGS,
 };
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
@@ -137,14 +137,14 @@ impl Configuration {
             show_source: self.show_source.unwrap_or(false),
 
             file_resolver: FileResolverSettings {
-                exclude: FilePatternSet::try_from_vec(
-                    self.exclude.unwrap_or_else(|| EXCLUDE.clone()),
+                exclude: FilePatternSet::try_from_iter(
+                    self.exclude.unwrap_or_else(|| EXCLUDE.to_vec()),
                 )?,
-                extend_exclude: FilePatternSet::try_from_vec(self.extend_exclude)?,
-                extend_include: FilePatternSet::try_from_vec(self.extend_include)?,
+                extend_exclude: FilePatternSet::try_from_iter(self.extend_exclude)?,
+                extend_include: FilePatternSet::try_from_iter(self.extend_include)?,
                 force_exclude: self.force_exclude.unwrap_or(false),
-                include: FilePatternSet::try_from_vec(
-                    self.include.unwrap_or_else(|| INCLUDE.clone()),
+                include: FilePatternSet::try_from_iter(
+                    self.include.unwrap_or_else(|| INCLUDE.to_vec()),
                 )?,
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),

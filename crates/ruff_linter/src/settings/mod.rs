@@ -10,7 +10,6 @@ use globset::{Glob, GlobMatcher};
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
-use ruff_cache::cache_dir;
 use rustc_hash::FxHashSet;
 
 use crate::codes::RuleCodePrefix;
@@ -24,9 +23,7 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{
-    FilePattern, FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat,
-};
+use crate::settings::types::{PerFileIgnore, PythonVersion};
 use crate::{codes, RuleSelector};
 
 use super::line_width::{LineLength, TabSize};
@@ -37,69 +34,6 @@ use self::types::PreviewMode;
 pub mod flags;
 pub mod rule_table;
 pub mod types;
-
-pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
-    vec![
-        FilePattern::Builtin(".bzr"),
-        FilePattern::Builtin(".direnv"),
-        FilePattern::Builtin(".eggs"),
-        FilePattern::Builtin(".git"),
-        FilePattern::Builtin(".git-rewrite"),
-        FilePattern::Builtin(".hg"),
-        FilePattern::Builtin(".ipynb_checkpoints"),
-        FilePattern::Builtin(".mypy_cache"),
-        FilePattern::Builtin(".nox"),
-        FilePattern::Builtin(".pants.d"),
-        FilePattern::Builtin(".pyenv"),
-        FilePattern::Builtin(".pytest_cache"),
-        FilePattern::Builtin(".pytype"),
-        FilePattern::Builtin(".ruff_cache"),
-        FilePattern::Builtin(".svn"),
-        FilePattern::Builtin(".tox"),
-        FilePattern::Builtin(".venv"),
-        FilePattern::Builtin(".vscode"),
-        FilePattern::Builtin("__pypackages__"),
-        FilePattern::Builtin("_build"),
-        FilePattern::Builtin("buck-out"),
-        FilePattern::Builtin("build"),
-        FilePattern::Builtin("dist"),
-        FilePattern::Builtin("node_modules"),
-        FilePattern::Builtin("venv"),
-    ]
-});
-
-pub static INCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
-    vec![
-        FilePattern::Builtin("*.py"),
-        FilePattern::Builtin("*.pyi"),
-        FilePattern::Builtin("**/pyproject.toml"),
-    ]
-});
-
-#[derive(Debug, CacheKey)]
-pub struct FileResolverSettings {
-    pub exclude: FilePatternSet,
-    pub extend_exclude: FilePatternSet,
-    pub force_exclude: bool,
-    pub include: FilePatternSet,
-    pub extend_include: FilePatternSet,
-    pub respect_gitignore: bool,
-    pub project_root: PathBuf,
-}
-
-impl FileResolverSettings {
-    fn with_project_root(project_root: &Path) -> Self {
-        Self {
-            project_root: project_root.to_path_buf(),
-            exclude: FilePatternSet::try_from_vec(EXCLUDE.clone()).unwrap(),
-            extend_exclude: FilePatternSet::default(),
-            extend_include: FilePatternSet::default(),
-            force_exclude: false,
-            respect_gitignore: true,
-            include: FilePatternSet::try_from_vec(INCLUDE.clone()).unwrap(),
-        }
-    }
-}
 
 #[derive(Debug, CacheKey)]
 pub struct LinterSettings {
@@ -181,7 +115,7 @@ impl LinterSettings {
         }
     }
 
-    pub fn with_project_root(project_root: &Path) -> Self {
+    pub fn new(project_root: &Path) -> Self {
         Self {
             target_version: PythonVersion::default(),
             project_root: project_root.to_path_buf(),
@@ -246,28 +180,8 @@ impl LinterSettings {
 
 impl Default for LinterSettings {
     fn default() -> Self {
-        Self::with_project_root(path_dedot::CWD.as_path())
+        Self::new(path_dedot::CWD.as_path())
     }
-}
-
-#[derive(Debug, CacheKey)]
-#[allow(clippy::struct_excessive_bools)]
-pub struct Settings {
-    #[cache_key(ignore)]
-    pub cache_dir: PathBuf,
-    #[cache_key(ignore)]
-    pub fix: bool,
-    #[cache_key(ignore)]
-    pub fix_only: bool,
-    #[cache_key(ignore)]
-    pub output_format: SerializationFormat,
-    #[cache_key(ignore)]
-    pub show_fixes: bool,
-    #[cache_key(ignore)]
-    pub show_source: bool,
-
-    pub file_resolver: FileResolverSettings,
-    pub linter: LinterSettings,
 }
 
 /// Given a list of patterns, create a `GlobSet`.
@@ -287,20 +201,4 @@ pub fn resolve_per_file_ignores(
             Ok((absolute, basename, per_file_ignore.rules))
         })
         .collect()
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        let project_root = path_dedot::CWD.as_path();
-        Self {
-            cache_dir: cache_dir(project_root),
-            fix: false,
-            fix_only: false,
-            output_format: SerializationFormat::default(),
-            show_fixes: false,
-            show_source: false,
-            linter: LinterSettings::with_project_root(project_root),
-            file_resolver: FileResolverSettings::with_project_root(project_root),
-        }
-    }
 }

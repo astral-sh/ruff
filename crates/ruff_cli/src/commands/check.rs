@@ -238,8 +238,9 @@ mod test {
 
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
     use ruff_linter::registry::Rule;
-    use ruff_linter::settings::{flags, LinterSettings, Settings};
+    use ruff_linter::settings::{flags, LinterSettings};
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+    use ruff_workspace::Settings;
 
     use crate::args::CliOverrides;
 

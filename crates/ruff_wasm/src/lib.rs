@@ -11,7 +11,7 @@ use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::linter::{check_path, LinterResult};
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::{PreviewMode, PythonVersion};
-use ruff_linter::settings::{flags, Settings, DUMMY_VARIABLE_RGX, PREFIXES};
+use ruff_linter::settings::{flags, DUMMY_VARIABLE_RGX, PREFIXES};
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
@@ -24,6 +24,7 @@ use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::Options;
+use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"

@@ -22,7 +22,7 @@ use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::{flags, LinterSettings, Settings};
+use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_macros::CacheKey;
@@ -31,6 +31,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
+use ruff_workspace::Settings;
 
 use crate::cache::Cache;
 

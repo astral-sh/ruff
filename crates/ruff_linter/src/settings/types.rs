@@ -152,7 +152,10 @@ pub struct FilePatternSet {
 }
 
 impl FilePatternSet {
-    pub fn try_from_vec(patterns: Vec<FilePattern>) -> Result<Self, anyhow::Error> {
+    pub fn try_from_iter<I>(patterns: I) -> Result<Self, anyhow::Error>
+    where
+        I: IntoIterator<Item = FilePattern>,
+    {
         let mut builder = GlobSetBuilder::new();
         let mut hasher = CacheKeyHasher::new();
 

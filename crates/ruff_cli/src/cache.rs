@@ -14,12 +14,12 @@ use serde::{Deserialize, Serialize};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_linter::message::Message;
-use ruff_linter::settings::Settings;
 use ruff_linter::warn_user;
 use ruff_notebook::NotebookIndex;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
+use ruff_workspace::Settings;
 
 use crate::diagnostics::Diagnostics;
 
@@ -347,7 +347,7 @@ mod tests {
 
     use itertools::Itertools;
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_linter::settings::{flags, Settings};
+    use ruff_linter::settings::flags;
 
     use crate::cache::RelativePathBuf;
     use crate::cache::{self, Cache, FileCache};
@@ -358,6 +358,7 @@ mod tests {
     use anyhow::Result;
     use ruff_python_ast::imports::ImportMap;
 
+    use ruff_workspace::Settings;
     use test_case::test_case;
 
     #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
