@@ -15,7 +15,7 @@ use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
+use ruff_python_formatter::{format_module_source, FormatModuleError, PyFormatOptions};
 use ruff_source_file::{find_newline, LineEnding};
 use ruff_workspace::resolver::python_files_in_path;
 
@@ -153,7 +153,7 @@ fn format_path(
 
     let options = options.with_line_ending(line_ending);
 
-    let formatted = format_module(&unformatted, options)
+    let formatted = format_module_source(&unformatted, options)
         .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?;
 
     let formatted = formatted.as_code();

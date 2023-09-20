@@ -5,7 +5,7 @@ use anyhow::Result;
 use log::warn;
 
 use ruff_python_ast::PySourceType;
-use ruff_python_formatter::{format_module, PyFormatOptions};
+use ruff_python_formatter::{format_module_source, PyFormatOptions};
 use ruff_workspace::resolver::python_file_at_path;
 
 use crate::args::{CliOverrides, FormatArguments};
@@ -68,7 +68,7 @@ fn format_source(
 ) -> Result<FormatCommandResult, FormatCommandError> {
     let unformatted = read_from_stdin()
         .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err))?;
-    let formatted = format_module(&unformatted, options)
+    let formatted = format_module_source(&unformatted, options)
         .map_err(|err| FormatCommandError::FormatModule(path.map(Path::to_path_buf), err))?;
     let formatted = formatted.as_code();
     if formatted.len() == unformatted.len() && formatted == unformatted {
