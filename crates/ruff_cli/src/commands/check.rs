@@ -23,7 +23,7 @@ use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, PyprojectDiscoveryStrategy};
 
-use crate::args::Overrides;
+use crate::args::CliOverrides;
 use crate::cache::{self, Cache};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
@@ -32,7 +32,7 @@ use crate::panic::catch_unwind;
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &Overrides,
+    overrides: &CliOverrides,
     cache: flags::Cache,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
@@ -241,7 +241,7 @@ mod test {
     use ruff_linter::settings::{flags, Settings};
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 
-    use crate::args::Overrides;
+    use crate::args::CliOverrides;
 
     use super::check;
 
@@ -277,7 +277,7 @@ mod test {
             // Notebooks are not included by default
             &[tempdir.path().to_path_buf(), notebook],
             &pyproject_config,
-            &Overrides::default(),
+            &CliOverrides::default(),
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,

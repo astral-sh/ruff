@@ -6,7 +6,7 @@ use ruff_linter::packaging;
 use ruff_linter::settings::flags;
 use ruff_workspace::resolver::{python_file_at_path, PyprojectConfig};
 
-use crate::args::Overrides;
+use crate::args::CliOverrides;
 use crate::diagnostics::{lint_stdin, Diagnostics};
 use crate::stdin::read_from_stdin;
 
@@ -14,7 +14,7 @@ use crate::stdin::read_from_stdin;
 pub(crate) fn check_stdin(
     filename: Option<&Path>,
     pyproject_config: &PyprojectConfig,
-    overrides: &Overrides,
+    overrides: &CliOverrides,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {

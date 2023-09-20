@@ -10,14 +10,14 @@ use ruff_linter::settings::types::PreviewMode;
 use ruff_python_formatter::{format_module, PyFormatOptions};
 use ruff_workspace::resolver::python_file_at_path;
 
-use crate::args::{FormatArguments, Overrides};
+use crate::args::{CliOverrides, FormatArguments};
 use crate::commands::format::{FormatCommandError, FormatCommandResult, FormatMode};
 use crate::resolve::resolve;
 use crate::stdin::read_from_stdin;
 use crate::ExitStatus;
 
 /// Run the formatter over a single file, read from `stdin`.
-pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &Overrides) -> Result<ExitStatus> {
+pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> Result<ExitStatus> {
     let pyproject_config = resolve(
         cli.isolated,
         cli.config.as_deref(),

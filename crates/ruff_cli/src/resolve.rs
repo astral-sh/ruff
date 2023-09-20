@@ -7,23 +7,23 @@ use path_absolutize::path_dedot;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject;
 use ruff_workspace::resolver::{
-    resolve_root_settings, ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity,
+    resolve_root_settings, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
+    Relativity,
 };
 
-use crate::args::Overrides;
+use crate::args::CliOverrides;
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
 pub fn resolve(
     isolated: bool,
     config: Option<&Path>,
-    overrides: &Overrides,
+    overrides: &CliOverrides,
     stdin_filename: Option<&Path>,
 ) -> Result<PyprojectConfig> {
     // First priority: if we're running in isolated mode, use the default settings.
     if isolated {
-        let mut config = Configuration::default();
-        overrides.process_config(&mut config);
+        let config = overrides.transform(Configuration::default());
         let settings = config.into_settings(&path_dedot::CWD)?;
         debug!("Isolated mode, not reading any pyproject.toml");
         return Ok(PyprojectConfig::new(
@@ -91,8 +91,7 @@ pub fn resolve(
     // "closest" `pyproject.toml` file for every Python file later on, so these act
     // as the "default" settings.)
     debug!("Using Ruff default settings");
-    let mut config = Configuration::default();
-    overrides.process_config(&mut config);
+    let config = overrides.transform(Configuration::default());
     let settings = config.into_settings(&path_dedot::CWD)?;
     Ok(PyprojectConfig::new(
         PyprojectDiscoveryStrategy::Hierarchical,
