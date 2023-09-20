@@ -122,6 +122,9 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
     // the inner f-strings.
     let mut last_fstring_range: TextRange = TextRange::default();
     for fstring_range in indexer.fstring_ranges().values() {
+        if !locator.contains_line_break(*fstring_range) {
+            continue;
+        }
         if last_fstring_range.contains_range(*fstring_range) {
             continue;
         }
@@ -513,6 +516,12 @@ end'''
             noqa_mappings(contents),
             NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(70))])
         );
+
+        let contents = "x = 1
+y = f'normal'
+z = f'another but {f'nested but {f'still single line'} nested'}'
+";
+        assert_eq!(noqa_mappings(contents), NoqaMapping::default());
 
         let contents = r"x = \
     1";
