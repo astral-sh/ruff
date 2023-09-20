@@ -764,15 +764,17 @@ impl NoqaMapping {
     pub(crate) fn push_mapping(&mut self, range: TextRange) {
         if let Some(last_range) = self.ranges.last_mut() {
             // Strictly sorted insertion
-            if last_range.end() <= range.start() {
+            if last_range.end() < range.start() {
                 // OK
-            }
-            // Try merging with the last inserted range
-            else if let Some(intersected) = last_range.intersect(range) {
-                *last_range = intersected;
-                return;
-            } else {
+            } else if range.end() < last_range.start() {
+                // Incoming range is strictly before the last range which violates
+                // the function's contract.
                 panic!("Ranges must be inserted in sorted order")
+            } else {
+                // Here, it's guaranteed that `last_range` and `range` overlap
+                // in some way. We want to merge them into a single range.
+                *last_range = last_range.cover(range);
+                return;
             }
         }
 

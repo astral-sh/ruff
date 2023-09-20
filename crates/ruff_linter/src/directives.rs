@@ -461,6 +461,18 @@ y = \
                 TextRange::new(TextSize::from(77), TextSize::from(83)),
             ])
         );
+
+        // https://github.com/astral-sh/ruff/issues/7530
+        let contents = r"
+assert foo, \
+    '''triple-quoted
+    string'''
+"
+        .trim();
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(48))])
+        );
     }
 
     #[test]
