@@ -4,6 +4,9 @@ pub mod pyproject;
 pub mod resolver;
 
 pub mod options_base;
+mod settings;
+
+pub use settings::Settings;
 
 #[cfg(test)]
 mod tests {

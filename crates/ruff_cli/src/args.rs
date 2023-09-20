@@ -12,7 +12,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
-use ruff_workspace::resolver::ConfigProcessor;
+use ruff_workspace::resolver::ConfigurationTransformer;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -109,9 +109,21 @@ pub struct CheckCommand {
     /// Ignore any `# noqa` comments.
     #[arg(long)]
     ignore_noqa: bool,
-    /// Output serialization format for violations.
-    #[arg(long, value_enum, env = "RUFF_FORMAT")]
+
+    /// Output serialization format for violations. (Deprecated: Use `--output-format` instead).
+    #[arg(
+        long,
+        value_enum,
+        env = "RUFF_FORMAT",
+        conflicts_with = "output_format",
+        hide = true
+    )]
     pub format: Option<SerializationFormat>,
+
+    /// Output serialization format for violations.
+    #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
+    pub output_format: Option<SerializationFormat>,
+
     /// Specify file to write the linter output to (default: stdout).
     #[arg(short, long)]
     pub output_file: Option<PathBuf>,
@@ -440,7 +452,7 @@ impl From<&LogLevelArgs> for LogLevel {
 impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (CheckArguments, Overrides) {
+    pub fn partition(self) -> (CheckArguments, CliOverrides) {
         (
             CheckArguments {
                 add_noqa: self.add_noqa,
@@ -460,7 +472,7 @@ impl CheckCommand {
                 stdin_filename: self.stdin_filename,
                 watch: self.watch,
             },
-            Overrides {
+            CliOverrides {
                 dummy_variable_rgx: self.dummy_variable_rgx,
                 exclude: self.exclude,
                 extend_exclude: self.extend_exclude,
@@ -486,7 +498,7 @@ impl CheckCommand {
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                format: self.format,
+                output_format: self.output_format.or(self.format),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             },
         )
@@ -496,7 +508,7 @@ impl CheckCommand {
 impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (FormatArguments, Overrides) {
+    pub fn partition(self) -> (FormatArguments, CliOverrides) {
         (
             FormatArguments {
                 check: self.check,
@@ -505,7 +517,7 @@ impl FormatCommand {
                 isolated: self.isolated,
                 stdin_filename: self.stdin_filename,
             },
-            Overrides {
+            CliOverrides {
                 line_length: self.line_length,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
@@ -514,7 +526,7 @@ impl FormatCommand {
                 preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 // Unsupported on the formatter CLI, but required on `Overrides`.
-                ..Overrides::default()
+                ..CliOverrides::default()
             },
         )
     }
@@ -565,7 +577,7 @@ pub struct FormatArguments {
 /// CLI settings that function as configuration overrides.
 #[derive(Clone, Default)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct Overrides {
+pub struct CliOverrides {
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend_exclude: Option<Vec<FilePattern>>,
@@ -588,12 +600,12 @@ pub struct Overrides {
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
     pub force_exclude: Option<bool>,
-    pub format: Option<SerializationFormat>,
+    pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
 }
 
-impl ConfigProcessor for Overrides {
-    fn process_config(&self, config: &mut Configuration) {
+impl ConfigurationTransformer for CliOverrides {
+    fn transform(&self, mut config: Configuration) -> Configuration {
         if let Some(cache_dir) = &self.cache_dir {
             config.cache_dir = Some(cache_dir.clone());
         }
@@ -632,8 +644,8 @@ impl ConfigProcessor for Overrides {
                 .collect(),
             extend_fixable: self.extend_fixable.clone().unwrap_or_default(),
         });
-        if let Some(format) = &self.format {
-            config.format = Some(*format);
+        if let Some(output_format) = &self.output_format {
+            config.output_format = Some(*output_format);
         }
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
@@ -659,6 +671,8 @@ impl ConfigProcessor for Overrides {
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);
         }
+
+        config
     }
 }
 

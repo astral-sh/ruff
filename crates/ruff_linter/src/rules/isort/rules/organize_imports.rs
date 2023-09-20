@@ -14,7 +14,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::line_width::LineWidthBuilder;
 use crate::registry::AsRule;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 use super::super::block::Block;
 use super::super::{comments, format_imports};
@@ -85,7 +85,7 @@ pub(crate) fn organize_imports(
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
-    settings: &Settings,
+    settings: &LinterSettings,
     package: Option<&Path>,
     source_type: PySourceType,
 ) -> Option<Diagnostic> {

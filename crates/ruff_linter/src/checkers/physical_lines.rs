@@ -12,14 +12,14 @@ use crate::rules::pycodestyle::rules::{
     trailing_whitespace,
 };
 use crate::rules::pylint;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 pub(crate) fn check_physical_lines(
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
     doc_lines: &[TextSize],
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -99,7 +99,7 @@ mod tests {
 
     use crate::line_width::LineLength;
     use crate::registry::Rule;
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
 
     use super::check_physical_lines;
 
@@ -117,9 +117,9 @@ mod tests {
                 &stylist,
                 &indexer,
                 &[],
-                &Settings {
+                &LinterSettings {
                     line_length,
-                    ..Settings::for_rule(Rule::LineTooLong)
+                    ..LinterSettings::for_rule(Rule::LineTooLong)
                 },
             )
         };

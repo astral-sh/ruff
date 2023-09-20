@@ -17,14 +17,14 @@ use crate::rules::{
     eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
     flake8_pyi, flake8_quotes, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 pub(crate) fn check_tokens(
     tokens: &[LexResult],
     path: &Path,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &Settings,
+    settings: &LinterSettings,
     is_stub: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];

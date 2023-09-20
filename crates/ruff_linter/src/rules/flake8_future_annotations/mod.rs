@@ -29,9 +29,9 @@ mod tests {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::FutureRewritableTypeAnnotation)
+                ..settings::LinterSettings::for_rule(Rule::FutureRewritableTypeAnnotation)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -47,9 +47,9 @@ mod tests {
         let snapshot = format!("fa102_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::FutureRequiredTypeAnnotation)
+                ..settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

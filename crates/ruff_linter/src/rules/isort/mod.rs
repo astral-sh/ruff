@@ -324,7 +324,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
 
     use super::categorize::ImportType;
@@ -383,9 +383,9 @@ mod tests {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -401,7 +401,7 @@ mod tests {
         let snapshot = format!("1_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
                         vec![pattern("foo.bar"), pattern("baz")],
@@ -413,7 +413,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -425,7 +425,7 @@ mod tests {
         let snapshot = format!("glob_1_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
                         vec![pattern("foo.*"), pattern("baz")],
@@ -437,7 +437,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -449,7 +449,7 @@ mod tests {
         let snapshot = format!("2_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
                         vec![pattern("foo")],
@@ -461,7 +461,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -477,9 +477,9 @@ mod tests {
     //         Path::new("isort")
     //             .join(path)
     //             .as_path(),
-    //         &Settings {
+    //         &LinterSettings {
     //             src: vec![test_resource_path("fixtures/isort")],
-    //             ..Settings::for_rule(Rule::UnsortedImports)
+    //             ..LinterSettings::for_rule(Rule::UnsortedImports)
     //         },
     //     )?;
     //     crate::assert_messages!(snapshot, diagnostics);
@@ -491,7 +491,7 @@ mod tests {
         let snapshot = format!("known_local_folder_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
                         vec![],
@@ -503,7 +503,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -515,13 +515,13 @@ mod tests {
         let snapshot = format!("case_sensitive_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     case_sensitive: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -533,7 +533,7 @@ mod tests {
         let snapshot = format!("force_to_top_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     force_to_top: BTreeSet::from([
                         "z".to_string(),
@@ -545,7 +545,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -557,13 +557,13 @@ mod tests {
         let snapshot = format!("combine_as_imports_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     combine_as_imports: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -575,14 +575,14 @@ mod tests {
         let snapshot = format!("force_wrap_aliases_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     force_wrap_aliases: true,
                     combine_as_imports: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -594,13 +594,13 @@ mod tests {
         let snapshot = format!("split_on_trailing_comma_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     split_on_trailing_comma: false,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -612,7 +612,7 @@ mod tests {
         let snapshot = format!("force_single_line_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     force_single_line: true,
                     single_line_exclusions: vec!["os".to_string(), "logging.handlers".to_string()]
@@ -621,7 +621,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -633,13 +633,13 @@ mod tests {
         let snapshot = format!("propagate_inline_comments_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     force_single_line: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -651,13 +651,13 @@ mod tests {
         let snapshot = format!("order_by_type_false_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: false,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
@@ -673,7 +673,7 @@ mod tests {
         );
         let mut diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
                     classes: BTreeSet::from([
@@ -685,7 +685,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
@@ -701,7 +701,7 @@ mod tests {
         );
         let mut diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
                     constants: BTreeSet::from([
@@ -715,7 +715,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
@@ -731,7 +731,7 @@ mod tests {
         );
         let mut diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
                     variables: BTreeSet::from([
@@ -743,7 +743,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
@@ -756,14 +756,14 @@ mod tests {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     force_sort_within_sections: true,
                     force_to_top: BTreeSet::from(["z".to_string()]),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
@@ -786,7 +786,7 @@ mod tests {
         let snapshot = format!("required_import_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort/required_imports").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from([
@@ -794,7 +794,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::MissingRequiredImport)
+                ..LinterSettings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -816,7 +816,7 @@ mod tests {
         let snapshot = format!("required_import_with_alias_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort/required_imports").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from([
@@ -824,7 +824,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::MissingRequiredImport)
+                ..LinterSettings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -839,7 +839,7 @@ mod tests {
         let snapshot = format!("required_imports_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort/required_imports").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from([
@@ -848,7 +848,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::MissingRequiredImport)
+                ..LinterSettings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -863,7 +863,7 @@ mod tests {
         let snapshot = format!("combined_required_imports_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort/required_imports").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from(["from __future__ import annotations, \
@@ -871,7 +871,7 @@ mod tests {
                         .to_string()]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::MissingRequiredImport)
+                ..LinterSettings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -886,13 +886,13 @@ mod tests {
         let snapshot = format!("straight_required_import_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort/required_imports").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from(["import os".to_string()]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::MissingRequiredImport)
+                ..LinterSettings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -904,13 +904,13 @@ mod tests {
         let snapshot = format!("closest_to_furthest_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     relative_imports_order: RelativeImportsOrder::ClosestToFurthest,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -922,7 +922,7 @@ mod tests {
         let snapshot = format!("no_lines_before.py_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     no_lines_before: BTreeSet::from([
                         ImportSection::Known(ImportType::Future),
@@ -934,7 +934,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
@@ -950,7 +950,7 @@ mod tests {
         );
         let mut diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     no_lines_before: BTreeSet::from([
                         ImportSection::Known(ImportType::StandardLibrary),
@@ -959,7 +959,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
@@ -974,13 +974,13 @@ mod tests {
         let snapshot = format!("lines_after_imports_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     lines_after_imports: 3,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
@@ -993,13 +993,13 @@ mod tests {
         let snapshot = format!("lines_between_types{}", path.to_string_lossy());
         let mut diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 isort: super::settings::Settings {
                     lines_between_types: 2,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
@@ -1012,7 +1012,7 @@ mod tests {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     forced_separate: vec![
@@ -1023,7 +1023,7 @@ mod tests {
                     ],
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -1035,7 +1035,7 @@ mod tests {
         let snapshot = format!("sections_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
@@ -1056,7 +1056,7 @@ mod tests {
 
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -1068,7 +1068,7 @@ mod tests {
         let snapshot = format!("section_order_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
@@ -1088,7 +1088,7 @@ mod tests {
                     ],
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -1099,13 +1099,13 @@ mod tests {
     fn detect_same_package() -> Result<()> {
         let diagnostics = test_path(
             Path::new("isort/detect_same_package/foo/bar.py"),
-            &Settings {
+            &LinterSettings {
                 src: vec![],
                 isort: super::settings::Settings {
                     detect_same_package: true,
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(diagnostics);
@@ -1116,13 +1116,13 @@ mod tests {
     fn no_detect_same_package() -> Result<()> {
         let diagnostics = test_path(
             Path::new("isort/detect_same_package/foo/bar.py"),
-            &Settings {
+            &LinterSettings {
                 src: vec![],
                 isort: super::settings::Settings {
                     detect_same_package: false,
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::UnsortedImports)
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
         assert_messages!(diagnostics);

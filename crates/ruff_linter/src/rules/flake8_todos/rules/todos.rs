@@ -7,10 +7,10 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::settings::LinterSettings;
 use crate::{
     directives::{TodoComment, TodoDirective, TodoDirectiveKind},
     registry::Rule,
-    settings::Settings,
 };
 
 /// ## What it does
@@ -240,7 +240,7 @@ pub(crate) fn todos(
     todo_comments: &[TodoComment],
     locator: &Locator,
     indexer: &Indexer,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) {
     for todo_comment in todo_comments {
         let TodoComment {
@@ -303,7 +303,7 @@ pub(crate) fn todos(
 fn directive_errors(
     diagnostics: &mut Vec<Diagnostic>,
     directive: &TodoDirective,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) {
     if directive.content == "TODO" {
         return;

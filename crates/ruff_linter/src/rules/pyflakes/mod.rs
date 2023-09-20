@@ -26,7 +26,7 @@ mod tests {
     use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
-    use crate::settings::{flags, Settings};
+    use crate::settings::{flags, LinterSettings};
     use crate::source_kind::SourceKind;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, directives};
@@ -147,7 +147,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
-            &Settings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -157,9 +157,9 @@ mod tests {
     fn f841_dummy_variable_rgx() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/F841_0.py"),
-            &Settings {
+            &LinterSettings {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
-                ..Settings::for_rule(Rule::UnusedVariable)
+                ..LinterSettings::for_rule(Rule::UnusedVariable)
             },
         )?;
         assert_messages!(diagnostics);
@@ -170,7 +170,7 @@ mod tests {
     fn init() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/__init__.py"),
-            &Settings::for_rules(vec![Rule::UndefinedName, Rule::UndefinedExport]),
+            &LinterSettings::for_rules(vec![Rule::UndefinedName, Rule::UndefinedExport]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -180,7 +180,7 @@ mod tests {
     fn default_builtins() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/builtins.py"),
-            &Settings::for_rules(vec![Rule::UndefinedName]),
+            &LinterSettings::for_rules(vec![Rule::UndefinedName]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -190,9 +190,9 @@ mod tests {
     fn extra_builtins() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/builtins.py"),
-            &Settings {
+            &LinterSettings {
                 builtins: vec!["_".to_string()],
-                ..Settings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
         assert_messages!(diagnostics);
@@ -203,7 +203,7 @@ mod tests {
     fn default_typing_modules() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/typing_modules.py"),
-            &Settings::for_rules(vec![Rule::UndefinedName]),
+            &LinterSettings::for_rules(vec![Rule::UndefinedName]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -213,9 +213,9 @@ mod tests {
     fn extra_typing_modules() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/typing_modules.py"),
-            &Settings {
+            &LinterSettings {
                 typing_modules: vec!["airflow.typing_compat".to_string()],
-                ..Settings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
         assert_messages!(diagnostics);
@@ -226,7 +226,7 @@ mod tests {
     fn future_annotations() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/future_annotations.py"),
-            &Settings::for_rules(vec![Rule::UnusedImport, Rule::UndefinedName]),
+            &LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UndefinedName]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -236,7 +236,7 @@ mod tests {
     fn multi_statement_lines() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/multi_statement_lines.py"),
-            &Settings::for_rule(Rule::UnusedImport),
+            &LinterSettings::for_rule(Rule::UnusedImport),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -246,9 +246,9 @@ mod tests {
     fn relative_typing_module() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/project/foo/bar.py"),
-            &Settings {
+            &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..Settings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
         assert_messages!(diagnostics);
@@ -259,9 +259,9 @@ mod tests {
     fn nested_relative_typing_module() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/project/foo/bop/baz.py"),
-            &Settings {
+            &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..Settings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
         assert_messages!(diagnostics);
@@ -273,11 +273,11 @@ mod tests {
         let snapshot = "extend_immutable_calls".to_string();
         let diagnostics = test_path(
             Path::new("pyflakes/F401_15.py"),
-            &Settings {
+            &LinterSettings {
                 pyflakes: pyflakes::settings::Settings {
                     extend_generics: vec!["django.db.models.ForeignKey".to_string()],
                 },
-                ..Settings::for_rules(vec![Rule::UnusedImport])
+                ..LinterSettings::for_rules(vec![Rule::UnusedImport])
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -500,7 +500,10 @@ mod tests {
         "load_after_unbind_from_class_scope"
     )]
     fn contents(contents: &str, snapshot: &str) {
-        let diagnostics = test_snippet(contents, &Settings::for_rules(Linter::Pyflakes.rules()));
+        let diagnostics = test_snippet(
+            contents,
+            &LinterSettings::for_rules(Linter::Pyflakes.rules()),
+        );
         assert_messages!(snapshot, diagnostics);
     }
 
@@ -510,7 +513,7 @@ mod tests {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
-        let settings = Settings::for_rules(Linter::Pyflakes.rules());
+        let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
         let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);

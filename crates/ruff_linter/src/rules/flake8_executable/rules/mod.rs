@@ -12,7 +12,7 @@ pub(crate) use shebang_not_executable::*;
 pub(crate) use shebang_not_first_line::*;
 
 use crate::comments::shebang::ShebangDirective;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 mod shebang_leading_whitespace;
 mod shebang_missing_executable_file;
@@ -24,7 +24,7 @@ pub(crate) fn from_tokens(
     tokens: &[LexResult],
     path: &Path,
     locator: &Locator,
-    settings: &Settings,
+    settings: &LinterSettings,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let mut has_any_shebang = false;

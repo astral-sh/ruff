@@ -12,7 +12,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::importer::Importer;
 use crate::registry::Rule;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Adds any required imports, as specified by the user, to the top of the
@@ -90,7 +90,7 @@ fn add_required_import(
     python_ast: &Suite,
     locator: &Locator,
     stylist: &Stylist,
-    settings: &Settings,
+    settings: &LinterSettings,
     source_type: PySourceType,
 ) -> Option<Diagnostic> {
     // Don't add imports to semantically-empty files.
@@ -130,7 +130,7 @@ pub(crate) fn add_required_imports(
     python_ast: &Suite,
     locator: &Locator,
     stylist: &Stylist,
-    settings: &Settings,
+    settings: &LinterSettings,
     source_type: PySourceType,
 ) -> Vec<Diagnostic> {
     settings

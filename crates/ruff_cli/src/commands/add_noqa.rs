@@ -11,14 +11,14 @@ use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
 
-use crate::args::Overrides;
+use crate::args::CliOverrides;
 use crate::diagnostics::LintSource;
 
 /// Add `noqa` directives to a collection of files.
 pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &Overrides,
+    overrides: &CliOverrides,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
@@ -65,7 +65,7 @@ pub(crate) fn add_noqa(
                     return None;
                 }
             };
-            match add_noqa_to_path(path, package, &source_kind, source_type, settings) {
+            match add_noqa_to_path(path, package, &source_kind, source_type, &settings.linter) {
                 Ok(count) => Some(count),
                 Err(e) => {
                     error!("Failed to add noqa to {}: {e}", path.display());

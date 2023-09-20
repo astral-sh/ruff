@@ -20,7 +20,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_self").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -30,11 +30,11 @@ mod tests {
     fn ignore_names() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_self/SLF001_extended.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_self: flake8_self::settings::Settings {
                     ignore_names: vec!["_meta".to_string()],
                 },
-                ..settings::Settings::for_rule(Rule::PrivateMemberAccess)
+                ..settings::LinterSettings::for_rule(Rule::PrivateMemberAccess)
             },
         )?;
         assert_messages!(diagnostics);

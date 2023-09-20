@@ -16,14 +16,14 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
 use ruff_linter::registry::Rule;
-use ruff_linter::settings::{flags, Settings};
+use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::{fs, warn_user_once, IOError};
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, PyprojectDiscoveryStrategy};
 
-use crate::args::Overrides;
+use crate::args::CliOverrides;
 use crate::cache::{self, Cache};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
@@ -32,7 +32,7 @@ use crate::panic::catch_unwind;
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &Overrides,
+    overrides: &CliOverrides,
     cache: flags::Cache,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
@@ -58,13 +58,13 @@ pub(crate) fn check(
 
         match pyproject_config.strategy {
             PyprojectDiscoveryStrategy::Fixed => {
-                init_cache(&pyproject_config.settings.cli.cache_dir);
+                init_cache(&pyproject_config.settings.cache_dir);
             }
             PyprojectDiscoveryStrategy::Hierarchical => {
                 for settings in
                     std::iter::once(&pyproject_config.settings).chain(resolver.settings())
                 {
-                    init_cache(&settings.cli.cache_dir);
+                    init_cache(&settings.cache_dir);
                 }
             }
         }
@@ -88,12 +88,8 @@ pub(crate) fn check(
             .unique()
             .par_bridge()
             .map(|cache_root| {
-                let settings = resolver.resolve_all(cache_root, pyproject_config);
-                let cache = Cache::open(
-                    &settings.cli.cache_dir,
-                    cache_root.to_path_buf(),
-                    &settings.lib,
-                );
+                let settings = resolver.resolve(cache_root, pyproject_config);
+                let cache = Cache::open(cache_root.to_path_buf(), settings);
                 (cache_root, cache)
             })
             .collect::<HashMap<&Path, Cache>>()
@@ -123,7 +119,7 @@ pub(crate) fn check(
                         }
                     });
 
-                    lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
+                    lint_path(path, package, &settings.linter, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
@@ -146,7 +142,7 @@ pub(crate) fn check(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_config);
-                    if settings.rules.enabled(Rule::IOError) {
+                    if settings.linter.rules.enabled(Rule::IOError) {
                         let dummy =
                             SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
@@ -199,7 +195,7 @@ pub(crate) fn check(
 fn lint_path(
     path: &Path,
     package: Option<&Path>,
-    settings: &Settings,
+    settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
@@ -242,10 +238,11 @@ mod test {
 
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
     use ruff_linter::registry::Rule;
-    use ruff_linter::settings::{flags, AllSettings, CliSettings, Settings};
+    use ruff_linter::settings::{flags, LinterSettings};
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+    use ruff_workspace::Settings;
 
-    use crate::args::Overrides;
+    use crate::args::CliOverrides;
 
     use super::check;
 
@@ -271,10 +268,10 @@ mod test {
 
         // Configure
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path);
-        let settings = AllSettings {
-            cli: CliSettings::default(),
-            // invalid pyproject.toml is not active by default
-            lib: Settings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
+        // invalid pyproject.toml is not active by default
+        let settings = Settings {
+            linter: LinterSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
+            ..Settings::default()
         };
         let pyproject_config =
             PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
@@ -284,7 +281,7 @@ mod test {
             // Notebooks are not included by default
             &[tempdir.path().to_path_buf(), notebook],
             &pyproject_config,
-            &Overrides::default(),
+            &CliOverrides::default(),
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,

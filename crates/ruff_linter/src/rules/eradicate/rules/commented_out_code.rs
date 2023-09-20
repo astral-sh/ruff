@@ -4,7 +4,7 @@ use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 use crate::registry::Rule;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 use super::super::detection::comment_contains_code;
 
@@ -52,7 +52,7 @@ pub(crate) fn commented_out_code(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) {
     for range in indexer.comment_ranges() {
         let line = locator.full_lines(*range);

@@ -10,7 +10,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use crate::registry::AsRule;
 use crate::rules::ruff::rules::confusables::confusable;
 use crate::rules::ruff::rules::Context;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for ambiguous unicode characters in strings.
@@ -128,7 +128,7 @@ pub(crate) fn ambiguous_unicode_character(
     locator: &Locator,
     range: TextRange,
     context: Context,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) {
     let text = locator.slice(range);
 
@@ -241,7 +241,7 @@ impl Candidate {
         }
     }
 
-    fn into_diagnostic(self, context: Context, settings: &Settings) -> Option<Diagnostic> {
+    fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<Diagnostic> {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
             let diagnostic = Diagnostic::new::<DiagnosticKind>(

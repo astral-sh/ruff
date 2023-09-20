@@ -9,7 +9,7 @@ use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 use crate::registry::Rule;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for compound statements (multiple statements on the same line).
@@ -104,7 +104,7 @@ pub(crate) fn compound_statements(
     lxr: &[LexResult],
     locator: &Locator,
     indexer: &Indexer,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) {
     // Track the last seen instance of a variety of tokens.
     let mut colon = None;

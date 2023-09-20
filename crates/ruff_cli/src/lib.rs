@@ -10,9 +10,10 @@ use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
+use ruff_linter::settings::flags;
 use ruff_linter::settings::types::SerializationFormat;
-use ruff_linter::settings::{flags, CliSettings};
-use ruff_linter::{fs, warn_user_once};
+use ruff_linter::{fs, warn_user, warn_user_once};
+use ruff_workspace::Settings;
 
 use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};
@@ -180,6 +181,14 @@ fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
 }
 
 pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
+    if args.format.is_some() {
+        if std::env::var("RUFF_FORMAT").is_ok() {
+            warn_user!("The environment variable `RUFF_FORMAT` is deprecated. Use `RUFF_OUTPUT_FORMAT` instead.");
+        } else {
+            warn_user!("The argument `--format=<FORMAT>` is deprecated. Use `--output-format=<FORMAT>` instead.");
+        }
+    }
+
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -216,14 +225,14 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
-    let CliSettings {
+    let Settings {
         fix,
         fix_only,
-        format,
+        output_format,
         show_fixes,
         show_source,
         ..
-    } = pyproject_config.settings.cli;
+    } = pyproject_config.settings;
 
     // Autofix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
@@ -251,7 +260,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
     if cli.ecosystem_ci {
-        warn_user_once!(
+        warn_user!(
             "The formatting of fixes emitted by this option is a work-in-progress, subject to \
             change at any time, and intended only for internal use."
         );
@@ -262,12 +271,12 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     if cache {
         // `--no-cache` doesn't respect code changes, and so is often confusing during
         // development.
-        warn_user_once!("Detected debug build without --no-cache.");
+        warn_user!("Detected debug build without --no-cache.");
     }
 
     if cli.add_noqa {
         if !autofix.is_generate() {
-            warn_user_once!("--fix is incompatible with --add-noqa.");
+            warn_user!("--fix is incompatible with --add-noqa.");
         }
         let modifications =
             commands::add_noqa::add_noqa(&cli.files, &pyproject_config, &overrides)?;
@@ -281,11 +290,11 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(format, log_level, autofix, printer_flags);
+    let printer = Printer::new(output_format, log_level, autofix, printer_flags);
 
     if cli.watch {
-        if format != SerializationFormat::Text {
-            warn_user_once!("--format 'text' is used in watch mode.");
+        if output_format != SerializationFormat::Text {
+            warn_user!("--format 'text' is used in watch mode.");
         }
 
         // Configure the file watcher.

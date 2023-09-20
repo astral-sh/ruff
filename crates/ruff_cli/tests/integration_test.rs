@@ -28,7 +28,7 @@ use ruff_cli::args::Args;
 use ruff_cli::run;
 
 const BIN_NAME: &str = "ruff";
-const STDIN_BASE_OPTIONS: &[&str] = &["--isolated", "--no-cache", "-", "--format", "text"];
+const STDIN_BASE_OPTIONS: &[&str] = &["--isolated", "--no-cache", "-", "--output-format", "text"];
 
 #[test]
 fn stdin_success() {
@@ -117,7 +117,7 @@ fn stdin_json() {
         "-",
         "--isolated",
         "--no-cache",
-        "--format",
+        "--output-format",
         "json",
         "--stdin-filename",
         "F401.py",
@@ -551,6 +551,7 @@ fn check_input_from_argfile() -> Result<()> {
     let args = vec![
         "check".to_string(),
         "--no-cache".to_string(),
+        "--isolated".to_string(),
         format!("@{}", &input_file_path.display()),
     ];
 

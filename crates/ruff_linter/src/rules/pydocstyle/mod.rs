@@ -90,7 +90,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pydocstyle").join(path).as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 pydocstyle: Settings {
                     convention: None,
                     ignore_decorators: BTreeSet::from_iter(["functools.wraps".to_string()]),
@@ -98,7 +98,7 @@ mod tests {
                         "gi.repository.GObject.Property".to_string()
                     ]),
                 },
-                ..settings::Settings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -109,7 +109,7 @@ mod tests {
     fn bom() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/bom.py"),
-            &settings::Settings::for_rule(Rule::TripleSingleQuotes),
+            &settings::LinterSettings::for_rule(Rule::TripleSingleQuotes),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -119,7 +119,7 @@ mod tests {
     fn d417_unspecified() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 // When inferring the convention, we'll see a few false negatives.
                 // See: https://github.com/PyCQA/pydocstyle/issues/459.
                 pydocstyle: Settings {
@@ -127,7 +127,7 @@ mod tests {
                     ignore_decorators: BTreeSet::new(),
                     property_decorators: BTreeSet::new(),
                 },
-                ..settings::Settings::for_rule(Rule::UndocumentedParam)
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
         assert_messages!(diagnostics);
@@ -138,14 +138,14 @@ mod tests {
     fn d417_google() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 // With explicit Google convention, we should flag every function.
                 pydocstyle: Settings {
                     convention: Some(Convention::Google),
                     ignore_decorators: BTreeSet::new(),
                     property_decorators: BTreeSet::new(),
                 },
-                ..settings::Settings::for_rule(Rule::UndocumentedParam)
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
         assert_messages!(diagnostics);
@@ -156,14 +156,14 @@ mod tests {
     fn d417_numpy() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 // With explicit Google convention, we shouldn't flag anything.
                 pydocstyle: Settings {
                     convention: Some(Convention::Numpy),
                     ignore_decorators: BTreeSet::new(),
                     property_decorators: BTreeSet::new(),
                 },
-                ..settings::Settings::for_rule(Rule::UndocumentedParam)
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
         assert_messages!(diagnostics);
@@ -174,7 +174,10 @@ mod tests {
     fn d209_d400() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D209_D400.py"),
-            &settings::Settings::for_rules([Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod]),
+            &settings::LinterSettings::for_rules([
+                Rule::NewLineAfterLastParagraph,
+                Rule::EndsInPeriod,
+            ]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -184,7 +187,7 @@ mod tests {
     fn all() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/all.py"),
-            &settings::Settings::for_rules([
+            &settings::LinterSettings::for_rules([
                 Rule::UndocumentedPublicModule,
                 Rule::UndocumentedPublicClass,
                 Rule::UndocumentedPublicMethod,

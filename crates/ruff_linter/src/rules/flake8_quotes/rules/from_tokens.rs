@@ -8,7 +8,7 @@ use ruff_source_file::Locator;
 
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::Rule;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 use super::super::settings::Quote;
 
@@ -255,7 +255,7 @@ impl<'a> From<&'a str> for Trivia<'a> {
 }
 
 /// Q003
-fn docstring(locator: &Locator, range: TextRange, settings: &Settings) -> Option<Diagnostic> {
+fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> Option<Diagnostic> {
     let quotes_settings = &settings.flake8_quotes;
 
     let text = locator.slice(range);
@@ -293,7 +293,11 @@ fn docstring(locator: &Locator, range: TextRange, settings: &Settings) -> Option
 }
 
 /// Q001, Q002
-fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Vec<Diagnostic> {
+fn strings(
+    locator: &Locator,
+    sequence: &[TextRange],
+    settings: &LinterSettings,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     let quotes_settings = &settings.flake8_quotes;
@@ -467,7 +471,7 @@ pub(crate) fn from_tokens(
     diagnostics: &mut Vec<Diagnostic>,
     lxr: &[LexResult],
     locator: &Locator,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) {
     // Keep track of sequences of strings, which represent implicit string
     // concatenation, and should thus be handled as a single unit.

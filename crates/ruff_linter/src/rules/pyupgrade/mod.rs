@@ -87,7 +87,7 @@ mod tests {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -97,9 +97,9 @@ mod tests {
     fn non_pep695_type_alias_not_applied_py311() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP040.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 target_version: PythonVersion::Py311,
-                ..settings::Settings::for_rule(Rule::NonPEP695TypeAlias)
+                ..settings::LinterSettings::for_rule(Rule::NonPEP695TypeAlias)
             },
         )?;
         assert_messages!(diagnostics);
@@ -110,12 +110,12 @@ mod tests {
     fn future_annotations_keep_runtime_typing_p37() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 pyupgrade: pyupgrade::settings::Settings {
                     keep_runtime_typing: true,
                 },
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
+                ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
         assert_messages!(diagnostics);
@@ -126,12 +126,12 @@ mod tests {
     fn future_annotations_keep_runtime_typing_p310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 pyupgrade: pyupgrade::settings::Settings {
                     keep_runtime_typing: true,
                 },
                 target_version: PythonVersion::Py310,
-                ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
+                ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
         assert_messages!(diagnostics);
@@ -142,9 +142,9 @@ mod tests {
     fn future_annotations_pep_585_p37() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
+                ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
         assert_messages!(diagnostics);
@@ -155,9 +155,9 @@ mod tests {
     fn future_annotations_pep_585_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 target_version: PythonVersion::Py310,
-                ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
+                ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
         assert_messages!(diagnostics);
@@ -168,9 +168,9 @@ mod tests {
     fn future_annotations_pep_604_p37() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::NonPEP604Annotation)
+                ..settings::LinterSettings::for_rule(Rule::NonPEP604Annotation)
             },
         )?;
         assert_messages!(diagnostics);
@@ -181,9 +181,9 @@ mod tests {
     fn future_annotations_pep_604_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 target_version: PythonVersion::Py310,
-                ..settings::Settings::for_rule(Rule::NonPEP604Annotation)
+                ..settings::LinterSettings::for_rule(Rule::NonPEP604Annotation)
             },
         )?;
         assert_messages!(diagnostics);
@@ -194,9 +194,9 @@ mod tests {
     fn datetime_utc_alias_py311() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP017.py"),
-            &settings::Settings {
+            &settings::LinterSettings {
                 target_version: PythonVersion::Py311,
-                ..settings::Settings::for_rule(Rule::DatetimeTimezoneUTC)
+                ..settings::LinterSettings::for_rule(Rule::DatetimeTimezoneUTC)
             },
         )?;
         assert_messages!(diagnostics);

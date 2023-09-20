@@ -13,13 +13,13 @@ use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_linter::fs;
 use ruff_linter::packaging::is_package;
-use ruff_linter::settings::{AllSettings, Settings};
+use ruff_linter::{fs, warn_user_once};
 
 use crate::configuration::Configuration;
 use crate::pyproject;
 use crate::pyproject::settings_toml;
+use crate::settings::Settings;
 
 /// The configuration information from a `pyproject.toml` file.
 pub struct PyprojectConfig {
@@ -27,7 +27,7 @@ pub struct PyprojectConfig {
     /// each Python file.
     pub strategy: PyprojectDiscoveryStrategy,
     /// All settings from the `pyproject.toml` file.
-    pub settings: AllSettings,
+    pub settings: Settings,
     /// Absolute path to the `pyproject.toml` file. This would be `None` when
     /// either using the default settings or the `--isolated` flag is set.
     pub path: Option<PathBuf>,
@@ -36,7 +36,7 @@ pub struct PyprojectConfig {
 impl PyprojectConfig {
     pub fn new(
         strategy: PyprojectDiscoveryStrategy,
-        settings: AllSettings,
+        settings: Settings,
         path: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -93,21 +93,21 @@ impl Relativity {
 
 #[derive(Default)]
 pub struct Resolver {
-    settings: BTreeMap<PathBuf, AllSettings>,
+    settings: BTreeMap<PathBuf, Settings>,
 }
 
 impl Resolver {
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: PathBuf, settings: AllSettings) {
+    fn add(&mut self, path: PathBuf, settings: Settings) {
         self.settings.insert(path, settings);
     }
 
-    /// Return the appropriate [`AllSettings`] for a given [`Path`].
-    pub fn resolve_all<'a>(
+    /// Return the appropriate [`Settings`] for a given [`Path`].
+    pub fn resolve<'a>(
         &'a self,
         path: &Path,
         pyproject_config: &'a PyprojectConfig,
-    ) -> &'a AllSettings {
+    ) -> &'a Settings {
         match pyproject_config.strategy {
             PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings,
             PyprojectDiscoveryStrategy::Hierarchical => self
@@ -117,14 +117,6 @@ impl Resolver {
                 .find_map(|(root, settings)| path.starts_with(root).then_some(settings))
                 .unwrap_or(&pyproject_config.settings),
         }
-    }
-
-    pub fn resolve<'a>(
-        &'a self,
-        path: &Path,
-        pyproject_config: &'a PyprojectConfig,
-    ) -> &'a Settings {
-        &self.resolve_all(path, pyproject_config).lib
     }
 
     /// Return a mapping from Python package to its package root.
@@ -147,7 +139,10 @@ impl Resolver {
         // Search for the package root for each file.
         let mut package_roots: FxHashMap<&Path, Option<&Path>> = FxHashMap::default();
         for file in files {
-            let namespace_packages = &self.resolve(file, pyproject_config).namespace_packages;
+            let namespace_packages = &self
+                .resolve(file, pyproject_config)
+                .linter
+                .namespace_packages;
             if let Some(package) = file.parent() {
                 if package_roots.contains_key(package) {
                     continue;
@@ -163,7 +158,7 @@ impl Resolver {
     }
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
-    pub fn settings(&self) -> impl Iterator<Item = &AllSettings> {
+    pub fn settings(&self) -> impl Iterator<Item = &Settings> {
         self.settings.values()
     }
 }
@@ -195,8 +190,11 @@ fn is_package_with_cache<'a>(
         .or_insert_with(|| is_package(path, namespace_packages))
 }
 
-pub trait ConfigProcessor: Sync {
-    fn process_config(&self, config: &mut Configuration);
+/// Applies a transformation to a [`Configuration`].
+///
+/// Used to override options with the the values provided by the CLI.
+pub trait ConfigurationTransformer: Sync {
+    fn transform(&self, config: Configuration) -> Configuration;
 }
 
 /// Recursively resolve a [`Configuration`] from a `pyproject.toml` file at the
@@ -208,7 +206,7 @@ pub trait ConfigProcessor: Sync {
 fn resolve_configuration(
     pyproject: &Path,
     relativity: Relativity,
-    processor: &dyn ConfigProcessor,
+    transformer: &dyn ConfigurationTransformer,
 ) -> Result<Configuration> {
     let mut seen = FxHashSet::default();
     let mut stack = vec![];
@@ -221,6 +219,11 @@ fn resolve_configuration(
         // Resolve the current path.
         let options = pyproject::load_options(&path)
             .map_err(|err| anyhow!("Failed to parse `{}`: {}", path.display(), err))?;
+
+        if options.format.is_some() {
+            warn_user_once!("The option `format` has been deprecated to avoid ambiguity with Ruff's upcoming formatter. Use `format-output` instead.");
+        }
+
         let project_root = relativity.resolve(&path);
         let configuration = Configuration::from_options(options, &project_root)?;
 
@@ -245,8 +248,7 @@ fn resolve_configuration(
     while let Some(extend) = stack.pop() {
         configuration = configuration.combine(extend);
     }
-    processor.process_config(&mut configuration);
-    Ok(configuration)
+    Ok(transformer.transform(configuration))
 }
 
 /// Extract the project root (scope) and [`Settings`] from a given
@@ -254,22 +256,22 @@ fn resolve_configuration(
 fn resolve_scoped_settings(
     pyproject: &Path,
     relativity: Relativity,
-    processor: &dyn ConfigProcessor,
-) -> Result<(PathBuf, AllSettings)> {
-    let configuration = resolve_configuration(pyproject, relativity, processor)?;
+    transformer: &dyn ConfigurationTransformer,
+) -> Result<(PathBuf, Settings)> {
+    let configuration = resolve_configuration(pyproject, relativity, transformer)?;
     let project_root = relativity.resolve(pyproject);
-    let settings = configuration.into_all_settings(&project_root)?;
+    let settings = configuration.into_settings(&project_root)?;
     Ok((project_root, settings))
 }
 
 /// Extract the [`Settings`] from a given `pyproject.toml` and process the
-/// configuration with the given [`ConfigProcessor`].
-pub fn resolve_settings_with_processor(
+/// configuration with the given [`ConfigurationTransformer`].
+pub fn resolve_root_settings(
     pyproject: &Path,
     relativity: Relativity,
-    processor: &dyn ConfigProcessor,
-) -> Result<AllSettings> {
-    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, processor)?;
+    transformer: &dyn ConfigurationTransformer,
+) -> Result<Settings> {
+    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, transformer)?;
     Ok(settings)
 }
 
@@ -277,7 +279,7 @@ pub fn resolve_settings_with_processor(
 pub fn python_files_in_path(
     paths: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    processor: &dyn ConfigProcessor,
+    transformer: &dyn ConfigurationTransformer,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
@@ -291,7 +293,7 @@ pub fn python_files_in_path(
                 if seen.insert(ancestor) {
                     if let Some(pyproject) = settings_toml(ancestor)? {
                         let (root, settings) =
-                            resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
+                            resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
                         resolver.add(root, settings);
                     }
                 }
@@ -300,7 +302,7 @@ pub fn python_files_in_path(
     }
 
     // Check if the paths themselves are excluded.
-    if pyproject_config.settings.lib.force_exclude {
+    if pyproject_config.settings.file_resolver.force_exclude {
         paths.retain(|path| !is_file_excluded(path, &resolver, pyproject_config));
         if paths.is_empty() {
             return Ok((vec![], resolver));
@@ -316,7 +318,7 @@ pub fn python_files_in_path(
     for path in &paths[1..] {
         builder.add(path);
     }
-    builder.standard_filters(pyproject_config.settings.lib.respect_gitignore);
+    builder.standard_filters(pyproject_config.settings.file_resolver.respect_gitignore);
     builder.hidden(false);
     let walker = builder.build_parallel();
 
@@ -334,13 +336,17 @@ pub fn python_files_in_path(
                     let resolver = resolver.read().unwrap();
                     let settings = resolver.resolve(path, pyproject_config);
                     if let Some(file_name) = path.file_name() {
-                        if !settings.exclude.is_empty()
-                            && match_exclusion(path, file_name, &settings.exclude)
+                        if !settings.file_resolver.exclude.is_empty()
+                            && match_exclusion(path, file_name, &settings.file_resolver.exclude)
                         {
                             debug!("Ignored path via `exclude`: {:?}", path);
                             return WalkState::Skip;
-                        } else if !settings.extend_exclude.is_empty()
-                            && match_exclusion(path, file_name, &settings.extend_exclude)
+                        } else if !settings.file_resolver.extend_exclude.is_empty()
+                            && match_exclusion(
+                                path,
+                                file_name,
+                                &settings.file_resolver.extend_exclude,
+                            )
                         {
                             debug!("Ignored path via `extend-exclude`: {:?}", path);
                             return WalkState::Skip;
@@ -364,7 +370,7 @@ pub fn python_files_in_path(
                             Ok(Some(pyproject)) => match resolve_scoped_settings(
                                 &pyproject,
                                 Relativity::Parent,
-                                processor,
+                                transformer,
                             ) {
                                 Ok((root, settings)) => {
                                     resolver.write().unwrap().add(root, settings);
@@ -396,10 +402,10 @@ pub fn python_files_in_path(
                     let path = entry.path();
                     let resolver = resolver.read().unwrap();
                     let settings = resolver.resolve(path, pyproject_config);
-                    if settings.include.is_match(path) {
+                    if settings.file_resolver.include.is_match(path) {
                         debug!("Included path via `include`: {:?}", path);
                         true
-                    } else if settings.extend_include.is_match(path) {
+                    } else if settings.file_resolver.extend_include.is_match(path) {
                         debug!("Included path via `extend-include`: {:?}", path);
                         true
                     } else {
@@ -423,9 +429,9 @@ pub fn python_files_in_path(
 pub fn python_file_at_path(
     path: &Path,
     pyproject_config: &PyprojectConfig,
-    processor: &dyn ConfigProcessor,
+    transformer: &dyn ConfigurationTransformer,
 ) -> Result<bool> {
-    if !pyproject_config.settings.lib.force_exclude {
+    if !pyproject_config.settings.file_resolver.force_exclude {
         return Ok(true);
     }
 
@@ -438,7 +444,7 @@ pub fn python_file_at_path(
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
                 let (root, settings) =
-                    resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
+                    resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
                 resolver.add(root, settings);
             }
         }
@@ -461,11 +467,13 @@ fn is_file_excluded(
         }
         let settings = resolver.resolve(path, pyproject_strategy);
         if let Some(file_name) = path.file_name() {
-            if !settings.exclude.is_empty() && match_exclusion(path, file_name, &settings.exclude) {
+            if !settings.file_resolver.exclude.is_empty()
+                && match_exclusion(path, file_name, &settings.file_resolver.exclude)
+            {
                 debug!("Ignored path via `exclude`: {:?}", path);
                 return true;
-            } else if !settings.extend_exclude.is_empty()
-                && match_exclusion(path, file_name, &settings.extend_exclude)
+            } else if !settings.file_resolver.extend_exclude.is_empty()
+                && match_exclusion(path, file_name, &settings.file_resolver.extend_exclude)
             {
                 debug!("Ignored path via `extend-exclude`: {:?}", path);
                 return true;
@@ -474,7 +482,7 @@ fn is_file_excluded(
             debug!("Ignored path due to error in parsing: {:?}", path);
             return true;
         }
-        if path == settings.project_root {
+        if path == settings.file_resolver.project_root {
             // Bail out; we'd end up past the project root on the next iteration
             // (excludes etc. are thus "rooted" to the project).
             break;
@@ -505,20 +513,23 @@ mod tests {
     use tempfile::TempDir;
 
     use ruff_linter::settings::types::FilePattern;
-    use ruff_linter::settings::AllSettings;
 
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
-        is_file_excluded, match_exclusion, python_files_in_path, resolve_settings_with_processor,
-        ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,
+        is_file_excluded, match_exclusion, python_files_in_path, resolve_root_settings,
+        ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity,
+        Resolver,
     };
+    use crate::settings::Settings;
     use crate::tests::test_resource_path;
 
-    struct NoOpProcessor;
+    struct NoOpTransformer;
 
-    impl ConfigProcessor for NoOpProcessor {
-        fn process_config(&self, _config: &mut Configuration) {}
+    impl ConfigurationTransformer for NoOpTransformer {
+        fn transform(&self, config: Configuration) -> Configuration {
+            config
+        }
     }
 
     #[test]
@@ -527,10 +538,10 @@ mod tests {
         let resolver = Resolver::default();
         let pyproject_config = PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
-            resolve_settings_with_processor(
+            resolve_root_settings(
                 &find_settings_toml(&package_root)?.unwrap(),
                 Relativity::Parent,
-                &NoOpProcessor,
+                &NoOpTransformer,
             )?,
             None,
         );
@@ -573,12 +584,8 @@ mod tests {
 
         let (paths, _) = python_files_in_path(
             &[root.to_path_buf()],
-            &PyprojectConfig::new(
-                PyprojectDiscoveryStrategy::Fixed,
-                AllSettings::default(),
-                None,
-            ),
-            &NoOpProcessor,
+            &PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, Settings::default(), None),
+            &NoOpTransformer,
         )?;
         let paths = paths
             .iter()

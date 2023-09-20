@@ -11,7 +11,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::test_path;
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
@@ -57,7 +57,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
-            &Settings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -68,7 +68,7 @@ mod tests {
         let snapshot = "B905.py";
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(snapshot).as_path(),
-            &Settings::for_rule(Rule::ZipWithoutExplicitStrict),
+            &LinterSettings::for_rule(Rule::ZipWithoutExplicitStrict),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -79,14 +79,14 @@ mod tests {
         let snapshot = "extend_immutable_calls_arg_annotation".to_string();
         let diagnostics = test_path(
             Path::new("flake8_bugbear/B006_extended.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_bugbear: super::settings::Settings {
                     extend_immutable_calls: vec![
                         "custom.ImmutableTypeA".to_string(),
                         "custom.ImmutableTypeB".to_string(),
                     ],
                 },
-                ..Settings::for_rule(Rule::MutableArgumentDefault)
+                ..LinterSettings::for_rule(Rule::MutableArgumentDefault)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -98,7 +98,7 @@ mod tests {
         let snapshot = "extend_immutable_calls_arg_default".to_string();
         let diagnostics = test_path(
             Path::new("flake8_bugbear/B008_extended.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_bugbear: super::settings::Settings {
                     extend_immutable_calls: vec![
                         "fastapi.Depends".to_string(),
@@ -106,7 +106,7 @@ mod tests {
                         "custom.ImmutableTypeA".to_string(),
                     ],
                 },
-                ..Settings::for_rule(Rule::FunctionCallInDefaultArgument)
+                ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

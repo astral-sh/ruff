@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Line;
 
 use crate::rules::pycodestyle::helpers::is_overlong;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for lines that exceed the specified maximum character length.
@@ -55,7 +55,7 @@ impl Violation for LineTooLong {
 }
 
 /// E501
-pub(crate) fn line_too_long(line: &Line, settings: &Settings) -> Option<Diagnostic> {
+pub(crate) fn line_too_long(line: &Line, settings: &LinterSettings) -> Option<Diagnostic> {
     let limit = settings.line_length;
 
     is_overlong(

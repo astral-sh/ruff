@@ -60,7 +60,7 @@ fn ruff_check_paths(
         cli.stdin_filename.as_deref(),
     )?;
     // We don't want to format pyproject.toml
-    pyproject_config.settings.lib.include = FilePatternSet::try_from_vec(vec![
+    pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
     ])
@@ -550,8 +550,11 @@ fn format_dir_entry(
 
     let settings = resolver.resolve(&path, pyproject_config);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
-    if settings.line_length != LineLength::default() {
-        options = options.with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
+    // TODO(micha) use formatter settings instead
+    if settings.linter.line_length != LineLength::default() {
+        options = options.with_line_width(LineWidth::from(NonZeroU16::from(
+            settings.linter.line_length,
+        )));
     }
 
     // Handle panics (mostly in `debug_assert!`)

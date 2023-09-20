@@ -22,7 +22,7 @@ use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::{flags, Settings};
+use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_macros::CacheKey;
@@ -31,6 +31,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
+use ruff_workspace::Settings;
 
 use crate::cache::Cache;
 
@@ -85,7 +86,7 @@ impl Diagnostics {
     pub(crate) fn from_source_error(
         err: &SourceExtractionError,
         path: Option<&Path>,
-        settings: &Settings,
+        settings: &LinterSettings,
     ) -> Self {
         let diagnostic = Diagnostic::from(err);
         if settings.rules.enabled(diagnostic.kind.rule()) {
@@ -143,7 +144,7 @@ impl AddAssign for Diagnostics {
 pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
-    settings: &Settings,
+    settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
@@ -381,7 +382,7 @@ pub(crate) fn lint_stdin(
         Ok(Some(sources)) => sources,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
-            return Ok(Diagnostics::from_source_error(&err, path, settings));
+            return Ok(Diagnostics::from_source_error(&err, path, &settings.linter));
         }
     };
 
@@ -401,7 +402,7 @@ pub(crate) fn lint_stdin(
             path.unwrap_or_else(|| Path::new("-")),
             package,
             noqa,
-            settings,
+            &settings.linter,
             &source_kind,
             source_type,
         ) {
@@ -438,7 +439,7 @@ pub(crate) fn lint_stdin(
             let result = lint_only(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
-                settings,
+                &settings.linter,
                 noqa,
                 &source_kind,
                 source_type,
@@ -456,7 +457,7 @@ pub(crate) fn lint_stdin(
         let result = lint_only(
             path.unwrap_or_else(|| Path::new("-")),
             package,
-            settings,
+            &settings.linter,
             noqa,
             &source_kind,
             source_type,

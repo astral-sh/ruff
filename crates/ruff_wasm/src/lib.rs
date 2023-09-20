@@ -11,7 +11,7 @@ use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::linter::{check_path, LinterResult};
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::{PreviewMode, PythonVersion};
-use ruff_linter::settings::{defaults, flags, Settings};
+use ruff_linter::settings::{flags, DUMMY_VARIABLE_RGX, PREFIXES};
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
@@ -24,6 +24,7 @@ use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::Options;
+use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -122,7 +123,7 @@ impl Workspace {
             // Propagate defaults.
             allowed_confusables: Some(Vec::default()),
             builtins: Some(Vec::default()),
-            dummy_variable_rgx: Some(defaults::DUMMY_VARIABLE_RGX.as_str().to_string()),
+            dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
             extend_fixable: Some(Vec::default()),
             extend_ignore: Some(Vec::default()),
             extend_select: Some(Vec::default()),
@@ -131,7 +132,7 @@ impl Workspace {
             ignore: Some(Vec::default()),
             line_length: Some(LineLength::default()),
             preview: Some(false),
-            select: Some(defaults::PREFIXES.to_vec()),
+            select: Some(PREFIXES.to_vec()),
             tab_size: Some(TabSize::default()),
             target_version: Some(PythonVersion::default()),
             // Ignore a bunch of options that don't make sense in a single-file editor.
@@ -145,7 +146,7 @@ impl Workspace {
             fix_only: None,
             fixable: None,
             force_exclude: None,
-            format: None,
+            output_format: None,
             ignore_init_module_imports: None,
             include: None,
             logger_objects: None,
@@ -198,7 +199,7 @@ impl Workspace {
             &stylist,
             &indexer,
             &directives,
-            &self.settings,
+            &self.settings.linter,
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
@@ -301,12 +302,15 @@ impl<'a> ParsedModule<'a> {
 
     fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext>> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
+        // TODO(micha): Use formatter settings instead
         let options = PyFormatOptions::from_source_type(PySourceType::default())
-            .with_preview(match settings.preview {
+            .with_preview(match settings.linter.preview {
                 PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
                 PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
             })
-            .with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
+            .with_line_width(LineWidth::from(NonZeroU16::from(
+                settings.linter.line_length,
+            )));
 
         format_node(
             &self.module,
