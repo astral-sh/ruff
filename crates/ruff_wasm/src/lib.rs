@@ -14,7 +14,7 @@ use ruff_linter::settings::{flags, DUMMY_VARIABLE_RGX, PREFIXES};
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_node, pretty_comments, PyFormatContext};
+use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::{parse_tokens, AsMode, Mode};
@@ -305,7 +305,7 @@ impl<'a> ParsedModule<'a> {
             .formatter
             .to_format_options(PySourceType::default(), self.source_code);
 
-        format_node(
+        format_module_ast(
             &self.module,
             &self.comment_ranges,
             self.source_code,

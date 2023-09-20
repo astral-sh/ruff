@@ -5,7 +5,7 @@ use anyhow::Result;
 use log::warn;
 
 use ruff_python_ast::PySourceType;
-use ruff_python_formatter::format_module;
+use ruff_python_formatter::format_module_source;
 use ruff_workspace::resolver::python_file_at_path;
 use ruff_workspace::FormatterSettings;
 
@@ -70,7 +70,7 @@ fn format_source(
         &unformatted,
     );
 
-    let formatted = format_module(&unformatted, options)
+    let formatted = format_module_source(&unformatted, options)
         .map_err(|err| FormatCommandError::FormatModule(path.map(Path::to_path_buf), err))?;
     let formatted = formatted.as_code();
 
