@@ -14,7 +14,7 @@ use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 pub(crate) fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
@@ -23,7 +23,7 @@ pub(crate) fn check_noqa(
     comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
     let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, path, locator);

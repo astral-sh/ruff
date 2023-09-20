@@ -11,7 +11,7 @@ use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 use crate::noqa::NoqaMapping;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 bitflags! {
     #[derive(Debug, Copy, Clone)]
@@ -22,7 +22,7 @@ bitflags! {
 }
 
 impl Flags {
-    pub fn from_settings(settings: &Settings) -> Self {
+    pub fn from_settings(settings: &LinterSettings) -> Self {
         if settings
             .rules
             .iter_enabled()

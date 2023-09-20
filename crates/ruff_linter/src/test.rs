@@ -26,9 +26,11 @@ use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
-use crate::settings::{flags, Settings};
+use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
-use ruff_notebook::{Notebook, NotebookError};
+use ruff_notebook::Notebook;
+#[cfg(not(fuzzing))]
+use ruff_notebook::NotebookError;
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -37,7 +39,7 @@ pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 
 /// Run [`check_path`] on a file in the `resources/test/fixtures` directory.
 #[cfg(not(fuzzing))]
-pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
+pub(crate) fn test_path(path: impl AsRef<Path>, settings: &LinterSettings) -> Result<Vec<Message>> {
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
     Ok(test_contents(&SourceKind::Python(contents), &path, settings).0)
@@ -54,7 +56,7 @@ pub(crate) struct TestedNotebook {
 pub(crate) fn test_notebook_path(
     path: impl AsRef<Path>,
     expected: impl AsRef<Path>,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> Result<TestedNotebook, NotebookError> {
     let source_notebook = Notebook::from_path(path.as_ref())?;
 
@@ -81,7 +83,7 @@ pub(crate) fn test_notebook_path(
 }
 
 /// Run [`check_path`] on a snippet of Python code.
-pub fn test_snippet(contents: &str, settings: &Settings) -> Vec<Message> {
+pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Message> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
     test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0
@@ -104,7 +106,7 @@ pub(crate) fn max_iterations() -> usize {
 pub(crate) fn test_contents<'a>(
     source_kind: &'a SourceKind,
     path: &Path,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> (Vec<Message>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
     let tokens: Vec<LexResult> =

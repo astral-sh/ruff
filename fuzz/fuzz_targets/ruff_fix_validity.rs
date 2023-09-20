@@ -4,10 +4,10 @@
 #![no_main]
 
 use libfuzzer_sys::{fuzz_target, Corpus};
-use ruff_linter::settings::Settings;
+use ruff_linter::settings::LinterSettings;
 use std::sync::OnceLock;
 
-static SETTINGS: OnceLock<Settings> = OnceLock::new();
+static SETTINGS: OnceLock<LinterSettings> = OnceLock::new();
 
 fn do_fuzz(case: &[u8]) -> Corpus {
     // throw away inputs which aren't utf-8
@@ -16,7 +16,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     };
 
     // the settings are immutable to test_snippet, so we avoid re-initialising here
-    let settings = SETTINGS.get_or_init(Settings::default);
+    let settings = SETTINGS.get_or_init(LinterSettings::default);
     ruff_linter::test::set_max_iterations(usize::MAX);
 
     // unlike in the test framework, where the number of iterations is well-defined, we are only

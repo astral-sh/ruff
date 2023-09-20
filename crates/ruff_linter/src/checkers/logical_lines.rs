@@ -12,7 +12,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     whitespace_around_keywords, whitespace_around_named_parameter_equals,
     whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of 8.
 fn expand_indent(line: &str) -> usize {
@@ -34,7 +34,7 @@ pub(crate) fn check_logical_lines(
     tokens: &[LexResult],
     locator: &Locator,
     stylist: &Stylist,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
@@ -132,12 +132,12 @@ pub(crate) fn check_logical_lines(
 
 #[derive(Debug, Clone)]
 pub(crate) struct LogicalLinesContext<'a> {
-    settings: &'a Settings,
+    settings: &'a LinterSettings,
     diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a> LogicalLinesContext<'a> {
-    fn new(settings: &'a Settings) -> Self {
+    fn new(settings: &'a LinterSettings) -> Self {
         Self {
             settings,
             diagnostics: Vec::new(),

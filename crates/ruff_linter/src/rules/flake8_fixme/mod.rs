@@ -19,7 +19,7 @@ mod tests {
         let snapshot = format!("{}_T00.py", rule_code.as_ref());
         let diagnostics = test_path(
             Path::new("flake8_fixme/T00.py"),
-            &settings::Settings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

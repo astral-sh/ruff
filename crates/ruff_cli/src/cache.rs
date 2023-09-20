@@ -405,7 +405,7 @@ mod tests {
                 let diagnostics = lint_path(
                     &path,
                     Some(&package_root),
-                    &settings,
+                    &settings.linter,
                     Some(&cache),
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
@@ -450,7 +450,7 @@ mod tests {
             got_diagnostics += lint_path(
                 &path,
                 Some(&package_root),
-                &settings,
+                &settings.linter,
                 Some(&cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -707,7 +707,7 @@ mod tests {
             lint_path(
                 &self.package_root.join(path),
                 Some(&self.package_root),
-                &self.settings,
+                &self.settings.linter,
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,

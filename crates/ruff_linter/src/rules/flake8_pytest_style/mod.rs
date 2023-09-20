@@ -295,9 +295,9 @@ mod tests {
     ) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_pytest_style").join(path).as_path(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_pytest_style: plugin_settings,
-                ..settings::Settings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(name, diagnostics);

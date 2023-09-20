@@ -77,11 +77,12 @@ pub(crate) fn format(
 
                     let resolved_settings = resolver.resolve(path, &pyproject_config);
 
-                    let preview = match resolved_settings.preview {
+                    // TODO(micha): Use `formatter` settings instead
+                    let preview = match resolved_settings.linter.preview {
                         PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
                         PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
                     };
-                    let line_length = resolved_settings.line_length;
+                    let line_length = resolved_settings.linter.line_length;
 
                     let options = PyFormatOptions::from_source_type(source_type)
                         .with_line_width(LineWidth::from(NonZeroU16::from(line_length)))

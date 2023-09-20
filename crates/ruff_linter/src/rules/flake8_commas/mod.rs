@@ -17,7 +17,7 @@ mod tests {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_commas").join(path).as_path(),
-            &settings::Settings::for_rules(vec![
+            &settings::LinterSettings::for_rules(vec![
                 Rule::MissingTrailingComma,
                 Rule::TrailingCommaOnBareTuple,
                 Rule::ProhibitedTrailingComma,

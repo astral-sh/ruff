@@ -11,15 +11,15 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::test_path;
 
     #[test]
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/annotation_presence.py"),
-            &Settings {
-                ..Settings::for_rules(vec![
+            &LinterSettings {
+                ..LinterSettings::for_rules(vec![
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
@@ -42,12 +42,12 @@ mod tests {
     fn ignore_fully_untyped() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/ignore_fully_untyped.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_annotations: super::settings::Settings {
                     ignore_fully_untyped: true,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![
+                ..LinterSettings::for_rules(vec![
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
@@ -70,12 +70,12 @@ mod tests {
     fn suppress_dummy_args() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/suppress_dummy_args.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_annotations: super::settings::Settings {
                     suppress_dummy_args: true,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![
+                ..LinterSettings::for_rules(vec![
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
@@ -92,12 +92,12 @@ mod tests {
     fn mypy_init_return() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/mypy_init_return.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_annotations: super::settings::Settings {
                     mypy_init_return: true,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![
+                ..LinterSettings::for_rules(vec![
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
@@ -114,12 +114,12 @@ mod tests {
     fn suppress_none_returning() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/suppress_none_returning.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_annotations: super::settings::Settings {
                     suppress_none_returning: true,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![
+                ..LinterSettings::for_rules(vec![
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
@@ -142,12 +142,12 @@ mod tests {
     fn allow_star_arg_any() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/allow_star_arg_any.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_annotations: super::settings::Settings {
                     allow_star_arg_any: true,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![Rule::AnyType])
+                ..LinterSettings::for_rules(vec![Rule::AnyType])
             },
         )?;
         assert_messages!(diagnostics);
@@ -158,8 +158,8 @@ mod tests {
     fn allow_overload() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/allow_overload.py"),
-            &Settings {
-                ..Settings::for_rules(vec![
+            &LinterSettings {
+                ..LinterSettings::for_rules(vec![
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
@@ -176,8 +176,8 @@ mod tests {
     fn allow_nested_overload() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/allow_nested_overload.py"),
-            &Settings {
-                ..Settings::for_rules(vec![
+            &LinterSettings {
+                ..LinterSettings::for_rules(vec![
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
@@ -194,7 +194,7 @@ mod tests {
     fn simple_magic_methods() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/simple_magic_methods.py"),
-            &Settings::for_rule(Rule::MissingReturnTypeSpecialMethod),
+            &LinterSettings::for_rule(Rule::MissingReturnTypeSpecialMethod),
         )?;
         assert_messages!(diagnostics);
         Ok(())

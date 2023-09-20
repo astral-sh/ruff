@@ -15,7 +15,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::pylint;
     use crate::settings::types::PythonVersion;
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::test_path;
 
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
@@ -137,7 +137,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
-            &Settings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -147,7 +147,7 @@ mod tests {
     fn repeated_isinstance_calls() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/repeated_isinstance_calls.py"),
-            &Settings::for_rule(Rule::RepeatedIsinstanceCalls)
+            &LinterSettings::for_rule(Rule::RepeatedIsinstanceCalls)
                 .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
@@ -158,7 +158,8 @@ mod tests {
     fn continue_in_finally() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/continue_in_finally.py"),
-            &Settings::for_rule(Rule::ContinueInFinally).with_target_version(PythonVersion::Py37),
+            &LinterSettings::for_rule(Rule::ContinueInFinally)
+                .with_target_version(PythonVersion::Py37),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -168,12 +169,12 @@ mod tests {
     fn allow_magic_value_types() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/magic_value_comparison.py"),
-            &Settings {
+            &LinterSettings {
                 pylint: pylint::settings::Settings {
                     allow_magic_value_types: vec![pylint::settings::ConstantType::Int],
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::MagicValueComparison)
+                ..LinterSettings::for_rule(Rule::MagicValueComparison)
             },
         )?;
         assert_messages!(diagnostics);
@@ -184,12 +185,12 @@ mod tests {
     fn max_args() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_arguments_params.py"),
-            &Settings {
+            &LinterSettings {
                 pylint: pylint::settings::Settings {
                     max_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::TooManyArguments)
+                ..LinterSettings::for_rule(Rule::TooManyArguments)
             },
         )?;
         assert_messages!(diagnostics);
@@ -200,9 +201,9 @@ mod tests {
     fn max_args_with_dummy_variables() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_arguments_params.py"),
-            &Settings {
+            &LinterSettings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap(),
-                ..Settings::for_rule(Rule::TooManyArguments)
+                ..LinterSettings::for_rule(Rule::TooManyArguments)
             },
         )?;
         assert_messages!(diagnostics);
@@ -213,12 +214,12 @@ mod tests {
     fn max_branches() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_branches_params.py"),
-            &Settings {
+            &LinterSettings {
                 pylint: pylint::settings::Settings {
                     max_branches: 1,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::TooManyBranches)
+                ..LinterSettings::for_rule(Rule::TooManyBranches)
             },
         )?;
         assert_messages!(diagnostics);
@@ -229,12 +230,12 @@ mod tests {
     fn max_statements() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_statements_params.py"),
-            &Settings {
+            &LinterSettings {
                 pylint: pylint::settings::Settings {
                     max_statements: 1,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::TooManyStatements)
+                ..LinterSettings::for_rule(Rule::TooManyStatements)
             },
         )?;
         assert_messages!(diagnostics);
@@ -245,12 +246,12 @@ mod tests {
     fn max_return_statements() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_return_statements_params.py"),
-            &Settings {
+            &LinterSettings {
                 pylint: pylint::settings::Settings {
                     max_returns: 1,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rule(Rule::TooManyReturnStatements)
+                ..LinterSettings::for_rule(Rule::TooManyReturnStatements)
             },
         )?;
         assert_messages!(diagnostics);
@@ -261,12 +262,12 @@ mod tests {
     fn too_many_public_methods() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_public_methods.py"),
-            &Settings {
+            &LinterSettings {
                 pylint: pylint::settings::Settings {
                     max_public_methods: 7,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyPublicMethods])
+                ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
             },
         )?;
         assert_messages!(diagnostics);

@@ -5,7 +5,7 @@ use ruff_source_file::{Line, Locator};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::registry::Rule;
-use crate::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for superfluous trailing whitespace.
@@ -76,7 +76,7 @@ pub(crate) fn trailing_whitespace(
     line: &Line,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> Option<Diagnostic> {
     let whitespace_len: TextSize = line
         .chars()

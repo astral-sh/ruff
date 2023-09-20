@@ -12,7 +12,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::test_path;
 
     #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
@@ -22,7 +22,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
-            &Settings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -40,11 +40,11 @@ mod tests {
 
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
-            &Settings {
+            &LinterSettings {
                 flake8_builtins: super::settings::Settings {
                     builtins_ignorelist: vec!["id".to_string(), "dir".to_string()],
                 },
-                ..Settings::for_rules(vec![rule_code])
+                ..LinterSettings::for_rules(vec![rule_code])
             },
         )?;
 

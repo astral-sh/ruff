@@ -18,7 +18,7 @@ mod tests {
 import os
 "#
             .trim(),
-            &settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice]),
+            &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
         assert_messages!(diagnostics);
     }
@@ -32,7 +32,7 @@ import os
 import os
 "#
             .trim(),
-            &settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice]),
+            &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
         assert_messages!(diagnostics);
     }
@@ -46,7 +46,7 @@ import os
 import os
 "#
             .trim(),
-            &settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice]),
+            &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
         assert_messages!(diagnostics);
     }
@@ -60,7 +60,7 @@ import os
 import os
 "#
             .trim(),
-            &settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice]),
+            &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
         assert_messages!(diagnostics);
     }
@@ -74,12 +74,12 @@ import os
 import os
 "#
             .trim(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_copyright: super::settings::Settings {
                     author: Some("Ruff".to_string()),
                     ..super::settings::Settings::default()
                 },
-                ..settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice])
+                ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
         assert_messages!(diagnostics);
@@ -94,12 +94,12 @@ import os
 import os
 "#
             .trim(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_copyright: super::settings::Settings {
                     author: Some("Ruff".to_string()),
                     ..super::settings::Settings::default()
                 },
-                ..settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice])
+                ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
         assert_messages!(diagnostics);
@@ -112,12 +112,12 @@ import os
 import os
 "#
             .trim(),
-            &settings::Settings {
+            &settings::LinterSettings {
                 flake8_copyright: super::settings::Settings {
                     min_file_size: 256,
                     ..super::settings::Settings::default()
                 },
-                ..settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice])
+                ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
         assert_messages!(diagnostics);
@@ -151,7 +151,7 @@ import os
 # Copyright 2023
 "#
             .trim(),
-            &settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice]),
+            &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
         assert_messages!(diagnostics);
     }
@@ -162,7 +162,7 @@ import os
             r#"কককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককক
 "#
             .trim(),
-            &settings::Settings::for_rules(vec![Rule::MissingCopyrightNotice]),
+            &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
         assert_messages!(diagnostics);
     }

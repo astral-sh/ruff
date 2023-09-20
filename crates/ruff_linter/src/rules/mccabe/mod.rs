@@ -11,7 +11,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::test_path;
 
     #[test_case(0)]
@@ -21,9 +21,9 @@ mod tests {
         let snapshot = format!("max_complexity_{max_complexity}");
         let diagnostics = test_path(
             Path::new("mccabe/C901.py"),
-            &Settings {
+            &LinterSettings {
                 mccabe: super::settings::Settings { max_complexity },
-                ..Settings::for_rules(vec![Rule::ComplexStructure])
+                ..LinterSettings::for_rules(vec![Rule::ComplexStructure])
             },
         )?;
         assert_messages!(snapshot, diagnostics);

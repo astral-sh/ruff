@@ -139,7 +139,10 @@ impl Resolver {
         // Search for the package root for each file.
         let mut package_roots: FxHashMap<&Path, Option<&Path>> = FxHashMap::default();
         for file in files {
-            let namespace_packages = &self.resolve(file, pyproject_config).namespace_packages;
+            let namespace_packages = &self
+                .resolve(file, pyproject_config)
+                .linter
+                .namespace_packages;
             if let Some(package) = file.parent() {
                 if package_roots.contains_key(package) {
                     continue;

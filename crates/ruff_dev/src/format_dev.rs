@@ -550,8 +550,11 @@ fn format_dir_entry(
 
     let settings = resolver.resolve(&path, pyproject_config);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
-    if settings.line_length != LineLength::default() {
-        options = options.with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
+    // TODO(micha) use formatter settings instead
+    if settings.linter.line_length != LineLength::default() {
+        options = options.with_line_width(LineWidth::from(NonZeroU16::from(
+            settings.linter.line_length,
+        )));
     }
 
     // Handle panics (mostly in `debug_assert!`)

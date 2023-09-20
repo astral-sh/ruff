@@ -12,14 +12,14 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::flake8_import_conventions::settings::default_aliases;
-    use crate::settings::Settings;
+    use crate::settings::LinterSettings;
     use crate::test::test_path;
 
     #[test]
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/defaults.py"),
-            &Settings::for_rule(Rule::UnconventionalImportAlias),
+            &LinterSettings::for_rule(Rule::UnconventionalImportAlias),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -34,13 +34,13 @@ mod tests {
         ]));
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/custom.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
                     aliases,
                     banned_aliases: FxHashMap::default(),
                     banned_from: FxHashSet::default(),
                 },
-                ..Settings::for_rule(Rule::UnconventionalImportAlias)
+                ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
         assert_messages!(diagnostics);
@@ -51,7 +51,7 @@ mod tests {
     fn custom_banned() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/custom_banned.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
                     aliases: default_aliases(),
                     banned_aliases: FxHashMap::from_iter([
@@ -71,7 +71,7 @@ mod tests {
                     ]),
                     banned_from: FxHashSet::default(),
                 },
-                ..Settings::for_rule(Rule::BannedImportAlias)
+                ..LinterSettings::for_rule(Rule::BannedImportAlias)
             },
         )?;
         assert_messages!(diagnostics);
@@ -82,7 +82,7 @@ mod tests {
     fn custom_banned_from() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/custom_banned_from.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
                     aliases: default_aliases(),
                     banned_aliases: FxHashMap::default(),
@@ -92,7 +92,7 @@ mod tests {
                         "pandas".to_string(),
                     ]),
                 },
-                ..Settings::for_rule(Rule::BannedImportFrom)
+                ..LinterSettings::for_rule(Rule::BannedImportFrom)
             },
         )?;
         assert_messages!(diagnostics);
@@ -103,7 +103,7 @@ mod tests {
     fn remove_defaults() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/remove_default.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
                     aliases: FxHashMap::from_iter([
                         ("altair".to_string(), "alt".to_string()),
@@ -114,7 +114,7 @@ mod tests {
                     banned_aliases: FxHashMap::default(),
                     banned_from: FxHashSet::default(),
                 },
-                ..Settings::for_rule(Rule::UnconventionalImportAlias)
+                ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
         assert_messages!(diagnostics);
@@ -131,13 +131,13 @@ mod tests {
 
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/override_default.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
                     aliases,
                     banned_aliases: FxHashMap::default(),
                     banned_from: FxHashSet::default(),
                 },
-                ..Settings::for_rule(Rule::UnconventionalImportAlias)
+                ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
         assert_messages!(diagnostics);
@@ -157,13 +157,13 @@ mod tests {
 
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/from_imports.py"),
-            &Settings {
+            &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
                     aliases,
                     banned_aliases: FxHashMap::default(),
                     banned_from: FxHashSet::default(),
                 },
-                ..Settings::for_rule(Rule::UnconventionalImportAlias)
+                ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
         assert_messages!(diagnostics);
@@ -174,7 +174,7 @@ mod tests {
     fn tricky() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/tricky.py"),
-            &Settings::for_rule(Rule::UnconventionalImportAlias),
+            &LinterSettings::for_rule(Rule::UnconventionalImportAlias),
         )?;
         assert_messages!(diagnostics);
         Ok(())

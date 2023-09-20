@@ -116,7 +116,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::InvalidIndexType) {
                 ruff::rules::invalid_index_type(checker, subscript);
             }
-            if checker.settings.rules.enabled(Rule::SliceCopy) {
+            if checker.enabled(Rule::SliceCopy) {
                 refurb::rules::slice_copy(checker, subscript);
             }
 
