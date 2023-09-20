@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Operator};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -153,20 +153,32 @@ impl LoggingCallType {
 
 /// Check logging calls for violations.
 pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
-    let Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) = call.func.as_ref() else {
-        return;
-    };
+    let range: TextRange;
+    let logging_call_type;
 
-    let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) else {
-        return;
-    };
-
-    if !logging::is_logger_candidate(
-        &call.func,
-        checker.semantic(),
-        &checker.settings.logger_objects,
-    ) {
-        return;
+    match call.func.as_ref() {
+        Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) => {
+            let Some(call_type) = LoggingCallType::from_attribute(attr.as_str()) else {
+                return;
+            };
+            if !logging::is_logger_candidate(
+                &call.func,
+                checker.semantic(),
+                &checker.settings.logger_objects,
+            ) {
+                return;
+            }
+            logging_call_type = call_type;
+            range = attr.range();
+        }
+        Expr::Name(ast::ExprName{ id , range: id_range, .. }) => {
+            let Some(call_type) = LoggingCallType::from_attribute(id.as_str()) else {
+                return;
+            };
+            logging_call_type = call_type;
+            range = *id_range;
+        }
+        _ => {return}
     }
 
     // G001 - G004
@@ -181,11 +193,11 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
             logging_call_type,
             LoggingCallType::LevelCall(LoggingLevel::Warn)
         ) {
-            let mut diagnostic = Diagnostic::new(LoggingWarn, attr.range());
+            let mut diagnostic = Diagnostic::new(LoggingWarn, range);
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     "warning".to_string(),
-                    attr.range(),
+                    range,
                 )));
             }
             checker.diagnostics.push(diagnostic);
@@ -213,7 +225,7 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
                     if checker.enabled(Rule::LoggingExcInfo) {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(LoggingExcInfo, attr.range()));
+                            .push(Diagnostic::new(LoggingExcInfo, range));
                     }
                 }
                 LoggingLevel::Exception => {
