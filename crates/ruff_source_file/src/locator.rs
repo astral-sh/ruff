@@ -441,6 +441,75 @@ impl<'a> Locator<'a> {
         }
     }
 
+    /// Compute the byte offset from zero-indexed row and column indices.
+    ///
+    /// We get row and column from the LSP. E.g.
+    /// ```text
+    /// a=(1,2,)
+    /// b=(3,4,)
+    ///   ^
+    /// c=(5,6,)
+    /// ```
+    /// has coordinates `1:2`. Note that indices are computed in chars, e.g.
+    /// ```text
+    /// a=(1,2,)
+    /// "안녕"
+    ///    ^
+    /// ```
+    /// where the first syllable is a single character (two bytes), we get `1:2`, while for
+    /// ```text
+    /// a=(1,2,)
+    /// "감기"
+    ///    ^
+    /// ```
+    /// where the first syllable is three characters (three times two bytes), we get `1:4`.
+    ///
+    /// ```rust
+    /// # use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+    /// # use ruff_source_file::Locator;
+    ///
+    /// let source = "a=(1,2,)\nb=(3,4,)";
+    /// let locator = Locator::new(source);
+    /// let offset = locator.convert_row_and_column(1, 2).unwrap();
+    /// assert_eq!(&source[TextRange::new(offset, source.text_len())], "(3,4,)");
+    ///
+    /// let source = "a=(1,2,)\n'안녕'";
+    /// let locator = Locator::new(source);
+    /// let offset = locator.convert_row_and_column(1, 2).unwrap();
+    /// assert_eq!(&source[TextRange::new(offset, source.text_len())], "녕'");
+    ///
+    /// let source = "a=(1,2,)\n'감기'";
+    /// let locator = Locator::new(source);
+    /// let offset = locator.convert_row_and_column(1, 4).unwrap();
+    /// assert_eq!(&source[TextRange::new(offset, source.text_len())], "기'");
+    /// ```
+    pub fn convert_row_and_column(&self, row: usize, column: usize) -> Option<TextSize> {
+        let line_start = *self.to_index().line_starts().get(row)?;
+        let next_line_start = self
+            .to_index()
+            .line_starts()
+            .get(row + 1)
+            .copied()
+            .unwrap_or(self.contents.text_len());
+        let line_contents = &self.contents[TextRange::from(line_start..next_line_start)];
+        debug_assert!(
+            line_contents
+                .chars()
+                // Since the range goes to the next line start, `line_contents` contains the line
+                // break
+                .take_while(|c| *c != '\n' && *c != '\r')
+                .count()
+                >= column,
+            "The column is not in the line"
+        );
+        let len_in_line: TextSize = line_contents
+            .chars()
+            .take(column)
+            .map(TextLen::text_len)
+            .sum();
+        Some(line_start + len_in_line)
+    }
+
     /// Take the source code between the given [`TextRange`].
     #[inline]
     pub fn slice<T: Ranged>(&self, ranged: T) -> &'a str {
