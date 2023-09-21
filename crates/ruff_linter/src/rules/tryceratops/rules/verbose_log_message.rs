@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprCall};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -75,47 +75,30 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
         };
 
         for expr in calls {
-            match expr.func.as_ref() {
-                Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                    if attr == "exception" {
-                        let names = collect_referenced_names(expr);
-                        for expr in names {
-                            if expr.id == target.as_str() {
-                                checker
-                                    .diagnostics
-                                    .push(Diagnostic::new(VerboseLogMessage, expr.range()));
-                            }
-                        }
+            let identifier = match expr.func.as_ref() {
+                Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr.as_str(),
+                Expr::Name(ast::ExprName { id, .. }) => id,
+                _ => return,
+            };
+            if identifier == "exception" {
+                // Collect all referenced names in the `logging.exception` call.
+                let names: Vec<&ast::ExprName> = {
+                    let mut names = Vec::new();
+                    for arg in &expr.arguments.args {
+                        let mut visitor = NameVisitor::default();
+                        visitor.visit_expr(arg);
+                        names.extend(visitor.names);
+                    }
+                    names
+                };
+                for expr in names {
+                    if expr.id == target.as_str() {
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(VerboseLogMessage, expr.range()));
                     }
                 }
-                Expr::Name(ast::ExprName { id, .. }) => {
-                    if id.as_str() == "exception" {
-                        let names = collect_referenced_names(expr);
-                        for expr in names {
-                            if expr.id == target.as_str() {
-                                checker
-                                    .diagnostics
-                                    .push(Diagnostic::new(VerboseLogMessage, expr.range()));
-                            }
-                        }
-                    }
-                }
-                _ => {}
             }
         }
     }
-}
-
-fn collect_referenced_names(expr: &ExprCall) -> Vec<&ast::ExprName> {
-    // Collect all referenced names in the `logging.exception` call.
-    let names: Vec<&ast::ExprName> = {
-        let mut names = Vec::new();
-        for arg in &expr.arguments.args {
-            let mut visitor = NameVisitor::default();
-            visitor.visit_expr(arg);
-            names.extend(visitor.names);
-        }
-        names
-    };
-    names
 }
