@@ -1,7 +1,10 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::num::NonZeroU8;
+use std::num::{
+    NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU128, NonZeroU16,
+    NonZeroU32, NonZeroU64, NonZeroU8,
+};
 use std::path::{Path, PathBuf};
 
 use glob::Pattern;
@@ -177,13 +180,28 @@ impl CacheKey for i8 {
         state.write_i8(*self);
     }
 }
-
-impl CacheKey for NonZeroU8 {
-    #[inline]
-    fn cache_key(&self, state: &mut CacheKeyHasher) {
-        state.write_u8(self.get());
-    }
+macro_rules! impl_cache_key_non_zero {
+    ($name:ident) => {
+        impl CacheKey for $name {
+            #[inline]
+            fn cache_key(&self, state: &mut CacheKeyHasher) {
+                self.get().cache_key(state)
+            }
+        }
+    };
 }
+
+impl_cache_key_non_zero!(NonZeroU8);
+impl_cache_key_non_zero!(NonZeroU16);
+impl_cache_key_non_zero!(NonZeroU32);
+impl_cache_key_non_zero!(NonZeroU64);
+impl_cache_key_non_zero!(NonZeroU128);
+
+impl_cache_key_non_zero!(NonZeroI8);
+impl_cache_key_non_zero!(NonZeroI16);
+impl_cache_key_non_zero!(NonZeroI32);
+impl_cache_key_non_zero!(NonZeroI64);
+impl_cache_key_non_zero!(NonZeroI128);
 
 macro_rules! impl_cache_key_tuple {
     () => (

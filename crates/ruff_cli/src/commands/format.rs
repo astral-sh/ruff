@@ -1,6 +1,5 @@
 use std::fmt::{Display, Formatter};
 use std::io;
-use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -10,12 +9,10 @@ use log::error;
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
-use tracing::{debug, warn};
+use tracing::debug;
 
-use ruff_formatter::LineWidth;
 use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::settings::types::PreviewMode;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
@@ -76,17 +73,7 @@ pub(crate) fn format(
                     };
 
                     let resolved_settings = resolver.resolve(path, &pyproject_config);
-
-                    // TODO(micha): Use `formatter` settings instead
-                    let preview = match resolved_settings.linter.preview {
-                        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
-                        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
-                    };
-                    let line_length = resolved_settings.linter.line_length;
-
-                    let options = PyFormatOptions::from_source_type(source_type)
-                        .with_line_width(LineWidth::from(NonZeroU16::from(line_length)))
-                        .with_preview(preview);
+                    let options = resolved_settings.formatter.to_format_options(source_type);
                     debug!("Formatting {} with {:?}", path.display(), options);
 
                     Some(match catch_unwind(|| format_path(path, options, mode)) {

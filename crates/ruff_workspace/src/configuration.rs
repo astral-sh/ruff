@@ -4,21 +4,19 @@
 
 use std::borrow::Cow;
 use std::env::VarError;
+use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 
-use crate::options::{
-    Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
-    Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
-    Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
-    Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, IsortOptions, McCabeOptions, Options, Pep8NamingOptions,
-    PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions, PylintOptions,
-};
-use crate::settings::{FileResolverSettings, Settings, EXCLUDE, INCLUDE};
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
+use rustc_hash::{FxHashMap, FxHashSet};
+use shellexpand;
+use shellexpand::LookupError;
+use strum::IntoEnumIterator;
+
 use ruff_cache::cache_dir;
+use ruff_formatter::{IndentStyle, LineWidth};
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
@@ -34,10 +32,17 @@ use ruff_linter::settings::{
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
-use shellexpand;
-use shellexpand::LookupError;
-use strum::IntoEnumIterator;
+use ruff_python_formatter::{FormatterSettings, MagicTrailingComma, QuoteStyle};
+
+use crate::options::{
+    Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
+    Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
+    Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
+    Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
+    Flake8UnusedArgumentsOptions, IsortOptions, McCabeOptions, Options, Pep8NamingOptions,
+    PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions, PylintOptions,
+};
+use crate::settings::{FileResolverSettings, Settings, EXCLUDE, INCLUDE};
 
 #[derive(Debug, Default)]
 pub struct RuleSelection {
@@ -149,6 +154,7 @@ impl Configuration {
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
             },
+
             linter: LinterSettings {
                 target_version,
                 project_root: project_root.to_path_buf(),
@@ -282,6 +288,21 @@ impl Configuration {
                     .pyupgrade
                     .map(PyUpgradeOptions::into_settings)
                     .unwrap_or_default(),
+            },
+
+            formatter: FormatterSettings {
+                exclude: vec![],
+                preview: self
+                    .preview
+                    .map(|preview| match preview {
+                        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+                        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+                    })
+                    .unwrap_or_default(),
+                line_width: LineWidth::from(NonZeroU16::from(self.line_length.unwrap_or_default())),
+                indent_style: IndentStyle::default(),
+                quote_style: QuoteStyle::default(),
+                magic_trailing_comma: MagicTrailingComma::default(),
             },
         })
     }
@@ -805,11 +826,12 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 
 #[cfg(test)]
 mod tests {
-    use crate::configuration::{Configuration, RuleSelection};
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
     use ruff_linter::settings::types::PreviewMode;
     use ruff_linter::RuleSelector;
+
+    use crate::configuration::{Configuration, RuleSelection};
 
     const NURSERY_RULES: &[Rule] = &[
         Rule::MissingCopyrightNotice,
