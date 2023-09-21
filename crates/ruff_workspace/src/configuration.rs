@@ -16,7 +16,7 @@ use shellexpand::LookupError;
 use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
-use ruff_formatter::LineWidth;
+use ruff_formatter::{IndentStyle, LineWidth};
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
@@ -32,17 +32,20 @@ use ruff_linter::settings::{
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
 };
-use ruff_python_formatter::FormatterSettings;
+use ruff_python_formatter::{MagicTrailingComma, QuoteStyle};
 
 use crate::options::{
     Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
     Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
     Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, IsortOptions, McCabeOptions, Options, Pep8NamingOptions,
-    PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions, PylintOptions,
+    Flake8UnusedArgumentsOptions, FormatOptions, FormatOrOutputFormat, IsortOptions, McCabeOptions,
+    Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions,
+    PyflakesOptions, PylintOptions,
 };
-use crate::settings::{FileResolverSettings, Settings, EXCLUDE, INCLUDE};
+use crate::settings::{
+    FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
+};
 
 #[derive(Debug, Default)]
 pub struct RuleSelection {
@@ -113,6 +116,8 @@ pub struct Configuration {
     pub pyflakes: Option<PyflakesOptions>,
     pub pylint: Option<PylintOptions>,
     pub pyupgrade: Option<PyUpgradeOptions>,
+
+    pub format: FormatConfiguration,
 }
 
 impl Configuration {
@@ -129,6 +134,28 @@ impl Configuration {
 
         let target_version = self.target_version.unwrap_or_default();
         let rules = self.as_rule_table();
+        let preview = self.preview.unwrap_or_default();
+
+        let format = self.format;
+        let format_defaults = FormatterSettings::default();
+        // TODO(micha): Support changing the tab-width but disallow changing the number of spaces
+        let formatter = FormatterSettings {
+            preview: match format.preview.unwrap_or(preview) {
+                PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+                PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+            },
+            line_width: self
+                .line_length
+                .map_or(format_defaults.line_width, |length| {
+                    LineWidth::from(NonZeroU16::from(length))
+                }),
+            line_ending: format.line_ending.unwrap_or(format_defaults.line_ending),
+            indent_style: format.indent_style.unwrap_or(format_defaults.indent_style),
+            quote_style: format.quote_style.unwrap_or(format_defaults.quote_style),
+            magic_trailing_comma: format
+                .magic_trailing_comma
+                .unwrap_or(format_defaults.magic_trailing_comma),
+        };
 
         Ok(Settings {
             cache_dir: self
@@ -185,7 +212,7 @@ impl Configuration {
                     .task_tags
                     .unwrap_or_else(|| TASK_TAGS.iter().map(ToString::to_string).collect()),
                 logger_objects: self.logger_objects.unwrap_or_default(),
-                preview: self.preview.unwrap_or_default(),
+                preview,
                 typing_modules: self.typing_modules.unwrap_or_default(),
                 // Plugins
                 flake8_annotations: self
@@ -290,18 +317,7 @@ impl Configuration {
                     .unwrap_or_default(),
             },
 
-            formatter: FormatterSettings {
-                exclude: vec![],
-                preview: self
-                    .preview
-                    .map(|preview| match preview {
-                        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
-                        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
-                    })
-                    .unwrap_or_default(),
-                line_width: LineWidth::from(NonZeroU16::from(self.line_length.unwrap_or_default())),
-                ..FormatterSettings::default()
-            },
+            formatter,
         })
     }
 
@@ -395,7 +411,12 @@ impl Configuration {
             external: options.external,
             fix: options.fix,
             fix_only: options.fix_only,
-            output_format: options.output_format.or(options.format),
+            output_format: options.output_format.or_else(|| {
+                options
+                    .format
+                    .as_ref()
+                    .and_then(FormatOrOutputFormat::as_output_format)
+            }),
             force_exclude: options.force_exclude,
             ignore_init_module_imports: options.ignore_init_module_imports,
             include: options.include.map(|paths| {
@@ -459,6 +480,12 @@ impl Configuration {
             pyflakes: options.pyflakes,
             pylint: options.pylint,
             pyupgrade: options.pyupgrade,
+
+            format: if let Some(FormatOrOutputFormat::Format(format)) = options.format {
+                FormatConfiguration::from_options(format)?
+            } else {
+                FormatConfiguration::default()
+            },
         })
     }
 
@@ -782,6 +809,52 @@ impl Configuration {
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
+
+            format: self.format.combine(config.format),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct FormatConfiguration {
+    pub preview: Option<PreviewMode>,
+
+    pub indent_style: Option<IndentStyle>,
+
+    pub quote_style: Option<QuoteStyle>,
+
+    pub magic_trailing_comma: Option<MagicTrailingComma>,
+
+    pub line_ending: Option<LineEnding>,
+}
+
+impl FormatConfiguration {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn from_options(options: FormatOptions) -> Result<Self> {
+        Ok(Self {
+            preview: options.preview.map(PreviewMode::from),
+            indent_style: options.indent_style,
+            quote_style: options.quote_style,
+            magic_trailing_comma: options.skip_magic_trailing_comma.map(|skip| {
+                if skip {
+                    MagicTrailingComma::Ignore
+                } else {
+                    MagicTrailingComma::Respect
+                }
+            }),
+            line_ending: options.line_ending,
+        })
+    }
+
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn combine(self, other: Self) -> Self {
+        Self {
+            preview: self.preview.or(other.preview),
+            indent_style: self.indent_style.or(other.indent_style),
+            quote_style: self.quote_style.or(other.quote_style),
+            magic_trailing_comma: self.magic_trailing_comma.or(other.magic_trailing_comma),
+            line_ending: self.line_ending.or(other.line_ending),
         }
     }
 }

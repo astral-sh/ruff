@@ -30,6 +30,7 @@ memchr = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
@@ -52,4 +53,5 @@ required-features = ["serde"]
 
 [features]
 serde = ["dep:serde", "ruff_formatter/serde", "ruff_source_file/serde", "ruff_python_ast/serde"]
-default = ["serde"]
+schemars = ["dep:schemars", "ruff_formatter/schemars"]
+default = []

@@ -549,7 +549,6 @@ fn format_dir_entry(
 
     let settings = resolver.resolve(&path, pyproject_config);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
-    // TODO(micha) use formatter settings instead
     if settings.formatter.line_width != LineWidth::default() {
         options = options.with_line_width(settings.formatter.line_width);
     }

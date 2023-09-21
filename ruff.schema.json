@@ -326,6 +326,17 @@
         "null"
       ]
     },
+    "format": {
+      "description": "Options to configure the code formatting.\n\nPreviously: The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).\n\nThis option has been **deprecated** in favor of `output-format` to avoid ambiguity with Ruff's upcoming formatter.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/FormatOrOutputFormat"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "ignore": {
       "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
       "type": [
@@ -1151,6 +1162,69 @@
       },
       "additionalProperties": false
     },
+    "FormatOptions": {
+      "type": "object",
+      "properties": {
+        "indent-style": {
+          "description": "Whether to use 4 spaces or hard tabs for indenting code.\n\nDefaults to 4 spaces. We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IndentStyle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "line-ending": {
+          "description": "The character Ruff uses at the end of a line.\n\n* `lf`: Line endings will be converted to `\\n`. The default line ending on Unix. * `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows. * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings. * `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LineEnding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "preview": {
+          "description": "Whether to enable the unstable preview style formatting.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "quote-style": {
+          "description": "Whether to prefer single `'` or double `\"` quotes for strings and docstrings.\n\nRuff may deviate from this option if using the configured quotes would require more escaped quotes:\n\n```python a = \"It's monday morning\" b = \"a string without any quotes\" ```\n\nRuff leaves `a` unchanged when using `quote-style = \"single\"` because it is otherwise necessary to escape the `'` which leads to less readable code: `'It\\'s monday morning'`. Ruff changes the quotes of `b` to use single quotes.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/QuoteStyle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skip-magic-trailing-comma": {
+          "description": "Ruff uses existing trailing commas as an indication that short lines should be left separate. If this option is set to `true`, the magic trailing comma is ignored.\n\nFor example, Ruff leaves the arguments separate even though collapsing the arguments to a single line doesn't exceed the line width if `skip-magic-trailing-comma = false`:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test( a, b, ): pass ```\n\nSetting `skip-magic-trailing-comma = true` changes the formatting to:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test(a, b): pass ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "FormatOrOutputFormat": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/FormatOptions"
+        },
+        {
+          "$ref": "#/definitions/SerializationFormat"
+        }
+      ]
+    },
     "ImportSection": {
       "anyOf": [
         {
@@ -1169,6 +1243,24 @@
         "third-party",
         "first-party",
         "local-folder"
+      ]
+    },
+    "IndentStyle": {
+      "oneOf": [
+        {
+          "description": "Use tabs to indent code.",
+          "type": "string",
+          "enum": [
+            "tab"
+          ]
+        },
+        {
+          "description": "Use [`IndentWidth`] spaces to indent code.",
+          "type": "string",
+          "enum": [
+            "space"
+          ]
+        }
       ]
     },
     "IsortOptions": {
@@ -1403,6 +1495,38 @@
         }
       },
       "additionalProperties": false
+    },
+    "LineEnding": {
+      "oneOf": [
+        {
+          "description": "Line endings will be converted to `\\n` as is common on Unix.",
+          "type": "string",
+          "enum": [
+            "lf"
+          ]
+        },
+        {
+          "description": "Line endings will be converted to `\\r\\n` as is common on Windows.",
+          "type": "string",
+          "enum": [
+            "cr-lf"
+          ]
+        },
+        {
+          "description": "The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to [`LineEnding::Lf`] for a files that contain no line endings.",
+          "type": "string",
+          "enum": [
+            "auto"
+          ]
+        },
+        {
+          "description": "Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
+          "type": "string",
+          "enum": [
+            "native"
+          ]
+        }
+      ]
     },
     "LineLength": {
       "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=320",
@@ -1671,6 +1795,13 @@
             "single"
           ]
         }
+      ]
+    },
+    "QuoteStyle": {
+      "type": "string",
+      "enum": [
+        "single",
+        "double"
       ]
     },
     "RelativeImportsOrder": {

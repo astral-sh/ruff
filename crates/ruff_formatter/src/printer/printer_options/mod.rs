@@ -1,5 +1,4 @@
 use crate::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
-use ruff_macros::CacheKey;
 
 /// Options that affect how the [`crate::Printer`] prints the format tokens
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
@@ -121,7 +120,7 @@ impl SourceMapGeneration {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LineEnding {
     ///  Line Feed only (\n), common on Linux and macOS as well as inside git repos

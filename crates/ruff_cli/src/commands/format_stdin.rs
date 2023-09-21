@@ -5,8 +5,9 @@ use anyhow::Result;
 use log::warn;
 
 use ruff_python_ast::PySourceType;
-use ruff_python_formatter::{format_module, PyFormatOptions};
+use ruff_python_formatter::format_module;
 use ruff_workspace::resolver::python_file_at_path;
+use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
 use crate::commands::format::{FormatCommandError, FormatCommandResult, FormatMode};
@@ -37,12 +38,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
     // Format the file.
     let path = cli.stdin_filename.as_deref();
 
-    let options = pyproject_config
-        .settings
-        .formatter
-        .to_format_options(path.map(PySourceType::from).unwrap_or_default());
-
-    match format_source(path, options, mode) {
+    match format_source(path, &pyproject_config.settings.formatter, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check => {
@@ -63,11 +59,17 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
 /// Format source code read from `stdin`.
 fn format_source(
     path: Option<&Path>,
-    options: PyFormatOptions,
+    settings: &FormatterSettings,
     mode: FormatMode,
 ) -> Result<FormatCommandResult, FormatCommandError> {
     let unformatted = read_from_stdin()
         .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err))?;
+
+    let options = settings.to_format_options(
+        path.map(PySourceType::from).unwrap_or_default(),
+        &unformatted,
+    );
+
     let formatted = format_module(&unformatted, options)
         .map_err(|err| FormatCommandError::FormatModule(path.map(Path::to_path_buf), err))?;
     let formatted = formatted.as_code();
