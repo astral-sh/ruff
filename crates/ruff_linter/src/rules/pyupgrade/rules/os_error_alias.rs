@@ -93,16 +93,13 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
-fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
-    let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, target.range());
+fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
+    let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, tuple.range());
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().is_builtin("OSError") {
-            let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
-                panic!("Expected Expr::Tuple");
-            };
-
             // Filter out any `OSErrors` aliases.
-            let mut remaining: Vec<Expr> = elts
+            let mut remaining: Vec<Expr> = tuple
+                .elts
                 .iter()
                 .filter_map(|elt| {
                     if aliases.contains(&elt) {
@@ -114,7 +111,11 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
                 .collect();
 
             // If `OSError` itself isn't already in the tuple, add it.
-            if elts.iter().all(|elt| !is_os_error(elt, checker.semantic())) {
+            if tuple
+                .elts
+                .iter()
+                .all(|elt| !is_os_error(elt, checker.semantic()))
+            {
                 let node = ast::ExprName {
                     id: "OSError".into(),
                     ctx: ExprContext::Load,
@@ -135,8 +136,8 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
             };
 
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                pad(content, target.range(), checker.locator()),
-                target.range(),
+                pad(content, tuple.range(), checker.locator()),
+                tuple.range(),
             )));
         }
     }
@@ -156,16 +157,16 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[ExceptH
                     atom_diagnostic(checker, expr);
                 }
             }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            Expr::Tuple(tuple) => {
                 // List of aliases to replace with `OSError`.
                 let mut aliases: Vec<&Expr> = vec![];
-                for elt in elts {
+                for elt in &tuple.elts {
                     if is_alias(elt, checker.semantic()) {
                         aliases.push(elt);
                     }
                 }
                 if !aliases.is_empty() {
-                    tuple_diagnostic(checker, expr, &aliases);
+                    tuple_diagnostic(checker, tuple, &aliases);
                 }
             }
             _ => {}
