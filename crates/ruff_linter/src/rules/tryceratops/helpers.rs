@@ -34,7 +34,8 @@ impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
                     }
                 }
                 Expr::Name(_) => {
-                    let Some(call_path) = self.semantic.resolve_call_path(call.func.as_ref()) else {
+                    let Some(call_path) = self.semantic.resolve_call_path(call.func.as_ref())
+                    else {
                         return;
                     };
                     let ["logging", attribute] = call_path.as_slice() else {

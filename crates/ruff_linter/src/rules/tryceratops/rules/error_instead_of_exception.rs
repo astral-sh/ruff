@@ -1,4 +1,5 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
+use similar::DiffableStr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -65,13 +66,16 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
             visitor.calls
         };
         for expr in calls {
-            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr.func.as_ref() {
-                if attr == "error" {
-                    if exc_info(&expr.arguments, checker.semantic()).is_none() {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(ErrorInsteadOfException, expr.range()));
-                    }
+            let identifier: &str = match expr.func.as_ref() {
+                Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr.as_str(),
+                Expr::Name(ast::ExprName { id, .. }) => id,
+                _ => return,
+            };
+            if identifier == "error" {
+                if exc_info(&expr.arguments, checker.semantic()).is_none() {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(ErrorInsteadOfException, expr.range()));
                 }
             }
         }
