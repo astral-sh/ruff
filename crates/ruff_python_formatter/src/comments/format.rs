@@ -101,9 +101,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
             } else {
                 last_preceding.end()
             };
-            if lines_after(end, f.context().source()) > 1 {
-                write!(f, [empty_line()])?;
-            }
+            write!(f, [empty_lines(lines_after(end, f.context().source()))])?;
         }
 
         Ok(())
