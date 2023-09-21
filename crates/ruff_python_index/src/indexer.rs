@@ -353,7 +353,11 @@ f"implicit " f"concatenation"
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer.fstring_ranges().ranges().collect::<Vec<_>>(),
+            indexer
+                .fstring_ranges()
+                .values()
+                .copied()
+                .collect::<Vec<_>>(),
             &[
                 TextRange::new(TextSize::from(0), TextSize::from(18)),
                 TextRange::new(TextSize::from(19), TextSize::from(55)),
@@ -385,7 +389,11 @@ f-string"""}
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer.fstring_ranges().ranges().collect::<Vec<_>>(),
+            indexer
+                .fstring_ranges()
+                .values()
+                .copied()
+                .collect::<Vec<_>>(),
             &[
                 TextRange::new(TextSize::from(0), TextSize::from(39)),
                 TextRange::new(TextSize::from(40), TextSize::from(68)),
