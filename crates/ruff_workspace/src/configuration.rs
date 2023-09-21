@@ -16,7 +16,7 @@ use shellexpand::LookupError;
 use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
-use ruff_formatter::{IndentStyle, LineWidth};
+use ruff_formatter::LineWidth;
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
@@ -32,7 +32,7 @@ use ruff_linter::settings::{
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
 };
-use ruff_python_formatter::{FormatterSettings, MagicTrailingComma, QuoteStyle};
+use ruff_python_formatter::FormatterSettings;
 
 use crate::options::{
     Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
@@ -300,9 +300,7 @@ impl Configuration {
                     })
                     .unwrap_or_default(),
                 line_width: LineWidth::from(NonZeroU16::from(self.line_length.unwrap_or_default())),
-                indent_style: IndentStyle::default(),
-                quote_style: QuoteStyle::default(),
-                magic_trailing_comma: MagicTrailingComma::default(),
+                ..FormatterSettings::default()
             },
         })
     }
