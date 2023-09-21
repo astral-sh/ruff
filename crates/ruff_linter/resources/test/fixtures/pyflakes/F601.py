@@ -53,3 +53,8 @@ x = {
     ('a', 'b'): 'asdf',
     ('a', 'b'): 'qwer',
 }
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/4897
+t={"x":"test123", "x":("test123")}
+
+t={"x":("test123"), "x":"test123"}
