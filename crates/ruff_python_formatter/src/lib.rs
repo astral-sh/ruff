@@ -4,8 +4,10 @@ use tracing::{warn, Level};
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::node::AstNode;
-use ruff_python_ast::Mod;
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::{
+    Mod, Stmt, StmtClassDef, StmtFor, StmtFunctionDef, StmtIf, StmtWhile, StmtWith,
+};
 use ruff_python_index::tokens_and_ranges;
 use ruff_python_parser::lexer::LexicalError;
 use ruff_python_parser::{parse_ok_tokens, Mode, ParseError};
@@ -239,23 +241,68 @@ pub fn format_module_range<'a>(
         panic!("That's not a module");
     };
 
+    // TODO: Move this to LspRowColumn? we first count chars to then discard that anyway
+    // Consider someone wanted to format `print(i); print(j)`. This wouldn't work indent-wise, so
+    // we always do whole lines instead which means we can count indentation normally
+    // ```python
+    // if True:
+    //     for i in range(10): j=i+1; print(i); print(j)
+    // ```
+    let range = TextRange::new(
+        locator.line_start(range.start()),
+        locator.line_end(range.end()),
+    );
+
     // ```
     // a = 1; b = 2; c = 3; d = 4; e = 5
     //             ^ b end  ^ d start
     //          ^^^^^^^^^^^^^^^ range
     //          ^ range start ^ range end
     // ```
-    // TODO: If it goes beyond the end of the last stmt or before start, do we need to format the
-    // parent?
+    // TODO: If it goes beyond the end of the last stmt or before start, do we need to format
+    // the parent?
     // TODO: Change suite formatting so we can use a slice instead
-    let in_range: Vec<_> = module_inner
-        .body
-        .iter()
-        .cloned()
-        // TODO: check whether these bounds need equality
-        .skip_while(|child| range.start() > child.end())
-        .take_while(|child| child.start() < range.end())
-        .collect();
+    let mut parent_body = &module_inner.body;
+    let mut in_range: Vec<Stmt>;
+
+    let in_range = loop {
+        in_range = parent_body
+            .into_iter()
+            // TODO: check whether these bounds need equality
+            .skip_while(|child| range.start() > child.end())
+            .take_while(|child| child.start() < range.end())
+            .cloned()
+            .collect();
+
+        let [single_stmt] = in_range.as_slice() else {
+            break in_range;
+        };
+
+        match single_stmt {
+            Stmt::For(StmtFor { body, .. })
+            | Stmt::While(StmtWhile { body, .. })
+            | Stmt::With(StmtWith { body, .. })
+            | Stmt::FunctionDef(StmtFunctionDef { body, .. })
+            | Stmt::ClassDef(StmtClassDef { body, .. }) => {
+                // We need to format the header or a trailing comment
+                // TODO: ignore trivia
+                if range.start() < body.first().unwrap().start()
+                    || range.end() > body.last().unwrap().end()
+                {
+                    break in_range;
+                } else {
+                    parent_body = &body;
+                }
+            }
+            // | Stmt::If(StmtIf { body, .. })
+            // | Stmt::StmtTry(ast::StmtTry { body, .. })
+            // | Stmt::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler { body, .. })
+            // | Stmt::ElifElseClause(ast::ElifElseClause { body, .. }) => &body,
+            // match
+            _ => break in_range,
+        }
+    };
+
     let (Some(first), Some(last)) = (in_range.first(), in_range.last()) else {
         // TODO: Use tracing again https://github.com/tokio-rs/tracing/issues/2721
         // TODO: Forward this to something proper
@@ -271,7 +318,7 @@ pub fn format_module_range<'a>(
     )?;
     //println!("{}", formatted.document().display(SourceCode::new(source)));
     // TODO: Make the printer use the buffer instead
-    buffer += formatted.print()?.as_code();
+    buffer += formatted.print_with_indent(1)?.as_code();
     buffer += &source[TextRange::new(last.end(), source.text_len())];
     return Ok(buffer.to_string());
 }
