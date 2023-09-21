@@ -39,7 +39,7 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
         return false;
     };
 
-    // Ignore comments that are just task tags (e.g., "# TODO: Do something.").
+    // Ignore task tag comments (e.g., "# TODO(tom): Refactor foo").
     if let Some(first) = line.split(&[' ', ':', '(']).next() {
         if task_tags
             .iter()
@@ -106,7 +106,7 @@ fn multiline_case(line: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::comment_contains_code;
-    use crate::settings::defaults::TASK_TAGS;
+    use crate::settings::TASK_TAGS;
 
     #[test]
     fn comment_contains_code_basic() {
