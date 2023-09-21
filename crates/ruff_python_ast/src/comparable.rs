@@ -1161,7 +1161,7 @@ pub struct StmtImport<'a> {
 pub struct StmtImportFrom<'a> {
     module: Option<&'a str>,
     names: Vec<ComparableAlias<'a>>,
-    level: Option<ast::Int>,
+    level: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]

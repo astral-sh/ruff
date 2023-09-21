@@ -308,7 +308,7 @@ impl<'a> Importer<'a> {
                 range: _,
             }) = stmt
             {
-                if level.map_or(true, |level| level.to_u32() == 0)
+                if level.map_or(true, |level| level == 0)
                     && name.as_ref().is_some_and(|name| name == module)
                     && names.iter().all(|alias| alias.name.as_str() != "*")
                 {
