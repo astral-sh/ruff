@@ -71,15 +71,16 @@ fn format_source(
     let formatted = format_module(&unformatted, options)
         .map_err(|err| FormatCommandError::FormatModule(path.map(Path::to_path_buf), err))?;
     let formatted = formatted.as_code();
+
+    if mode.is_write() {
+        stdout()
+            .lock()
+            .write_all(formatted.as_bytes())
+            .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
+    }
     if formatted.len() == unformatted.len() && formatted == unformatted {
         Ok(FormatCommandResult::Unchanged)
     } else {
-        if mode.is_write() {
-            stdout()
-                .lock()
-                .write_all(formatted.as_bytes())
-                .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
-        }
         Ok(FormatCommandResult::Formatted)
     }
 }
