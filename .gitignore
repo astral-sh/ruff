@@ -20,7 +20,6 @@ flamegraph.svg
 # e.g. `CARGO_TARGET_DIR=target-maturin maturin build --release --strip` or
 # `CARGO_TARGET_DIR=target-llvm-lines RUSTFLAGS="-Csymbol-mangling-version=v0" cargo llvm-lines -p ruff --lib`
 /target*
-!crates/ruff_python_resolver/resources/test/airflow/venv
 
 ###
 # Rust.gitignore
@@ -209,3 +208,9 @@ cython_debug/
 # VIM
 .*.sw?
 .sw?
+
+# Custom re-inclusions for the resolver test cases
+!crates/ruff_python_resolver/resources/test/airflow/venv/
+!crates/ruff_python_resolver/resources/test/airflow/venv/lib
+!crates/ruff_python_resolver/resources/test/airflow/venv/lib/python3.11/site-packages/_watchdog_fsevents.cpython-311-darwin.so
+!crates/ruff_python_resolver/resources/test/airflow/venv/lib/python3.11/site-packages/orjson/orjson.cpython-311-darwin.so
