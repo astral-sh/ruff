@@ -6,6 +6,8 @@
 //! [Ruff]: https://github.com/astral-sh/ruff
 
 #[cfg(feature = "clap")]
+pub use registry::clap_completion::RuleParser;
+#[cfg(feature = "clap")]
 pub use rule_selector::clap_completion::RuleSelectorParser;
 pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::{IOError, SyntaxError};

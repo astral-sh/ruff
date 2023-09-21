@@ -225,7 +225,7 @@ fn explain_status_codes_ruf404() {
     ----- stdout -----
 
     ----- stderr -----
-    error: invalid value 'RUF404' for '[RULE]': unknown rule code
+    error: invalid value 'RUF404' for '[RULE]'
 
     For more information, try '--help'.
     "###);

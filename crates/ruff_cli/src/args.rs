@@ -10,7 +10,7 @@ use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
 };
-use ruff_linter::{RuleSelector, RuleSelectorParser};
+use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::resolver::ConfigurationTransformer;
 
@@ -39,7 +39,7 @@ pub enum Command {
     #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
     Rule {
         /// Rule to explain
-        #[arg(value_parser=Rule::from_code, group = "selector")]
+        #[arg(value_parser=RuleParser, group = "selector", hide_possible_values = true)]
         rule: Option<Rule>,
 
         /// Explain all rules

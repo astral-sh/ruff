@@ -360,6 +360,64 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
     ),
 ];
 
+#[cfg(feature = "clap")]
+pub mod clap_completion {
+    use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use strum::IntoEnumIterator;
+
+    use crate::registry::Rule;
+
+    #[derive(Clone)]
+    pub struct RuleParser;
+
+    impl ValueParserFactory for Rule {
+        type Parser = RuleParser;
+
+        fn value_parser() -> Self::Parser {
+            RuleParser
+        }
+    }
+
+    impl TypedValueParser for RuleParser {
+        type Value = Rule;
+
+        fn parse_ref(
+            &self,
+            cmd: &clap::Command,
+            arg: Option<&clap::Arg>,
+            value: &std::ffi::OsStr,
+        ) -> Result<Self::Value, clap::Error> {
+            let value = value
+                .to_str()
+                .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
+
+            Rule::from_code(value).map_err(|_| {
+                let mut error =
+                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                if let Some(arg) = arg {
+                    error.insert(
+                        clap::error::ContextKind::InvalidArg,
+                        clap::error::ContextValue::String(arg.to_string()),
+                    );
+                }
+                error.insert(
+                    clap::error::ContextKind::InvalidValue,
+                    clap::error::ContextValue::String(value.to_string()),
+                );
+                error
+            })
+        }
+
+        fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
+            Some(Box::new(Rule::iter().map(|rule| {
+                let name = rule.noqa_code().to_string();
+                let help = rule.as_ref().to_string();
+                PossibleValue::new(name).help(help)
+            })))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
