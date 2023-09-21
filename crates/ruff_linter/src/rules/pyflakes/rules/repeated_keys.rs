@@ -1,14 +1,15 @@
 use std::hash::BuildHasherDefault;
 
-use ruff_python_ast::Expr;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
@@ -128,19 +129,19 @@ impl Violation for MultiValueRepeatedKeyVariable {
 }
 
 /// F601, F602
-pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
+pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<ComparableExpr, FxHashSet<ComparableExpr>> =
-        FxHashMap::with_capacity_and_hasher(keys.len(), BuildHasherDefault::default());
+        FxHashMap::with_capacity_and_hasher(dict.keys.len(), BuildHasherDefault::default());
 
     // Detect duplicate keys.
-    for (i, key) in keys.iter().enumerate() {
+    for (i, (key, value)) in dict.keys.iter().zip(dict.values.iter()).enumerate() {
         let Some(key) = key else {
             continue;
         };
 
         let comparable_key = ComparableExpr::from(key);
-        let comparable_value = ComparableExpr::from(&values[i]);
+        let comparable_value = ComparableExpr::from(value);
 
         let Some(seen_values) = seen.get_mut(&comparable_key) else {
             seen.insert(comparable_key, FxHashSet::from_iter([comparable_value]));
@@ -159,8 +160,22 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                     if checker.patch(diagnostic.kind.rule()) {
                         if !seen_values.insert(comparable_value) {
                             diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                                values[i - 1].end(),
-                                values[i].end(),
+                                parenthesized_range(
+                                    (&dict.values[i - 1]).into(),
+                                    dict.into(),
+                                    checker.indexer().comment_ranges(),
+                                    checker.locator().contents(),
+                                )
+                                .unwrap_or(dict.values[i - 1].range())
+                                .end(),
+                                parenthesized_range(
+                                    (&dict.values[i]).into(),
+                                    dict.into(),
+                                    checker.indexer().comment_ranges(),
+                                    checker.locator().contents(),
+                                )
+                                .unwrap_or(dict.values[i].range())
+                                .end(),
                             )));
                         }
                     }
@@ -176,11 +191,25 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                         key.range(),
                     );
                     if checker.patch(diagnostic.kind.rule()) {
-                        let comparable_value: ComparableExpr = (&values[i]).into();
+                        let comparable_value: ComparableExpr = (&dict.values[i]).into();
                         if !seen_values.insert(comparable_value) {
                             diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                                values[i - 1].end(),
-                                values[i].end(),
+                                parenthesized_range(
+                                    (&dict.values[i - 1]).into(),
+                                    dict.into(),
+                                    checker.indexer().comment_ranges(),
+                                    checker.locator().contents(),
+                                )
+                                .unwrap_or(dict.values[i - 1].range())
+                                .end(),
+                                parenthesized_range(
+                                    (&dict.values[i]).into(),
+                                    dict.into(),
+                                    checker.indexer().comment_ranges(),
+                                    checker.locator().contents(),
+                                )
+                                .unwrap_or(dict.values[i].range())
+                                .end(),
                             )));
                         }
                     }

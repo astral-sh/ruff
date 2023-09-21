@@ -908,16 +908,18 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
         }
-        Expr::Dict(ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        }) => {
+        Expr::Dict(
+            dict @ ast::ExprDict {
+                keys,
+                values,
+                range: _,
+            },
+        ) => {
             if checker.any_enabled(&[
                 Rule::MultiValueRepeatedKeyLiteral,
                 Rule::MultiValueRepeatedKeyVariable,
             ]) {
-                pyflakes::rules::repeated_keys(checker, keys, values);
+                pyflakes::rules::repeated_keys(checker, dict);
             }
             if checker.enabled(Rule::UnnecessarySpread) {
                 flake8_pie::rules::unnecessary_spread(checker, keys, values);
