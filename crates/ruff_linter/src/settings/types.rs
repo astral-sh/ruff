@@ -58,7 +58,7 @@ impl PythonVersion {
         Self::Py312
     }
 
-    pub const fn as_tuple(&self) -> (u32, u32) {
+    pub const fn as_tuple(&self) -> (u8, u8) {
         match self {
             Self::Py37 => (3, 7),
             Self::Py38 => (3, 8),
@@ -69,11 +69,11 @@ impl PythonVersion {
         }
     }
 
-    pub const fn major(&self) -> u32 {
+    pub const fn major(&self) -> u8 {
         self.as_tuple().0
     }
 
-    pub const fn minor(&self) -> u32 {
+    pub const fn minor(&self) -> u8 {
         self.as_tuple().1
     }
 

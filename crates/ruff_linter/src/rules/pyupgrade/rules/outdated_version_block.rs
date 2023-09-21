@@ -165,7 +165,7 @@ fn compare_version(target_version: &[u32], py_version: PythonVersion, or_equal: 
 
     let (py_major, py_minor) = py_version.as_tuple();
 
-    match if_major.cmp(&py_major) {
+    match if_major.cmp(&py_major.into()) {
         Ordering::Less => true,
         Ordering::Greater => false,
         Ordering::Equal => {
@@ -175,11 +175,11 @@ fn compare_version(target_version: &[u32], py_version: PythonVersion, or_equal: 
             if or_equal {
                 // Ex) `sys.version_info <= 3.8`. If Python 3.8 is the minimum supported version,
                 // the condition won't always evaluate to `false`, so we want to return `false`.
-                *if_minor < py_minor
+                *if_minor < py_minor.into()
             } else {
                 // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
                 // the condition _will_ always evaluate to `false`, so we want to return `true`.
-                *if_minor <= py_minor
+                *if_minor <= py_minor.into()
             }
         }
     }
