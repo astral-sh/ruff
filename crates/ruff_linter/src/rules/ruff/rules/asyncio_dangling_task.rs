@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -70,7 +71,8 @@ pub(crate) fn asyncio_dangling_task(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    let Some(method) = checker
+    // Ex) `asyncio.create_task(...)`
+    if let Some(method) = checker
         .semantic()
         .resolve_call_path(func)
         .and_then(|call_path| match call_path.as_slice() {
@@ -78,14 +80,29 @@ pub(crate) fn asyncio_dangling_task(checker: &mut Checker, expr: &Expr) {
             ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),
             _ => None,
         })
-    else {
+    {
+        checker.diagnostics.push(Diagnostic::new(
+            AsyncioDanglingTask { method },
+            expr.range(),
+        ));
         return;
-    };
+    }
 
-    checker.diagnostics.push(Diagnostic::new(
-        AsyncioDanglingTask { method },
-        expr.range(),
-    ));
+    // Ex) `loop = asyncio.get_running_loop(); loop.create_task(...)`
+    if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() {
+        if attr == "create_task" {
+            if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
+                matches!(call_path.as_slice(), ["asyncio", "get_running_loop"])
+            }) {
+                checker.diagnostics.push(Diagnostic::new(
+                    AsyncioDanglingTask {
+                        method: Method::CreateTask,
+                    },
+                    expr.range(),
+                ));
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

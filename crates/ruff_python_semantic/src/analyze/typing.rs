@@ -521,3 +521,36 @@ fn find_parameter<'a>(
         .chain(parameters.kwonlyargs.iter())
         .find(|arg| arg.parameter.name.range() == binding.range())
 }
+
+/// Return the [`CallPath`] of the value to which the given [`Expr`] is assigned, if any.
+///
+/// For example, given:
+/// ```python
+/// import asyncio
+///
+/// loop = asyncio.get_running_loop()
+/// loop.create_task(...)
+/// ```
+///
+/// This function will return `["asyncio", "get_running_loop"]` for the `loop` binding.
+pub fn resolve_assignment<'a>(
+    expr: &'a Expr,
+    semantic: &'a SemanticModel<'a>,
+) -> Option<CallPath<'a>> {
+    let name = expr.as_name_expr()?;
+    let binding_id = semantic.resolve_name(name)?;
+    let statement = semantic.binding(binding_id).statement(semantic)?;
+    match statement {
+        Stmt::Assign(ast::StmtAssign { value, .. }) => {
+            let ast::ExprCall { func, .. } = value.as_call_expr()?;
+            semantic.resolve_call_path(func)
+        }
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        }) => {
+            let ast::ExprCall { func, .. } = value.as_call_expr()?;
+            semantic.resolve_call_path(func)
+        }
+        _ => None,
+    }
+}
