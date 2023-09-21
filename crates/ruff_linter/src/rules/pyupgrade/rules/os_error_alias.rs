@@ -61,7 +61,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
         matches!(
             call_path.as_slice(),
             ["", "EnvironmentError" | "IOError" | "WindowsError"]
-                | ["mmap" | "select" | "socket", "error"]
+                | ["mmap" | "select" | "socket" | "os", "error"]
         )
     })
 }
