@@ -50,9 +50,20 @@ impl FStringRanges {
             .map(|(_, range)| *range)
     }
 
-    #[cfg(test)]
-    pub(crate) fn ranges(&self) -> impl Iterator<Item = TextRange> + '_ {
-        self.raw.values().copied()
+    /// Returns an iterator over all f-string [`TextRange`] sorted by their
+    /// start location.
+    ///
+    /// For nested f-strings, the outermost f-string is yielded first, moving
+    /// inwards with each iteration.
+    #[inline]
+    pub fn values(&self) -> impl Iterator<Item = &TextRange> + '_ {
+        self.raw.values()
+    }
+
+    /// Returns the number of f-string ranges stored.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.raw.len()
     }
 }
 
