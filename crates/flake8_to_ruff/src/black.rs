@@ -1,7 +1,7 @@
 //! Extract Black configuration settings from a pyproject.toml.
 
-use ruff::line_width::LineLength;
-use ruff::settings::types::PythonVersion;
+use ruff_linter::line_width::LineLength;
+use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]

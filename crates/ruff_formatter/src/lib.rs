@@ -51,9 +51,10 @@ pub use source_code::{SourceCode, SourceCodeSlice};
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
 pub use group_id::GroupId;
+use ruff_macros::CacheKey;
 use ruff_text_size::{TextRange, TextSize};
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Default)]
@@ -116,8 +117,14 @@ impl TryFrom<u8> for IndentWidth {
     }
 }
 
+impl From<NonZeroU8> for IndentWidth {
+    fn from(value: NonZeroU8) -> Self {
+        Self(value)
+    }
+}
+
 /// The maximum visual width to which the formatter should try to limit a line.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineWidth(NonZeroU16);

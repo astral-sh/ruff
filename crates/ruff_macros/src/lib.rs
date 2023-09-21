@@ -33,7 +33,11 @@ pub fn derive_combine_options(input: TokenStream) -> TokenStream {
         .into()
 }
 
-#[proc_macro_derive(CacheKey)]
+/// Generates a [`CacheKey`] implementation for the attributed type.
+///
+/// Struct fields can be attributed with the `cache_key` field-attribute that supports:
+/// * `ignore`: Ignore the attributed field in the cache key
+#[proc_macro_derive(CacheKey, attributes(cache_key))]
 pub fn cache_key(input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as DeriveInput);
 

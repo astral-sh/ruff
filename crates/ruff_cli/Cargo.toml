@@ -14,14 +14,8 @@ readme = "../../README.md"
 [[bin]]
 name = "ruff"
 
-# Since the name of the binary is the same as the name of the `ruff` crate
-# running `cargo doc --no-deps --all` results in an `output filename collision`
-# See also https://github.com/rust-lang/cargo/issues/6313.
-# We therefore disable the documentation generation for the binary.
-doc = false
-
 [dependencies]
-ruff = { path = "../ruff", features = ["clap"] }
+ruff_linter = { path = "../ruff_linter", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_formatter = { path = "../ruff_formatter" }

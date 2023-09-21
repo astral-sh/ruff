@@ -1,0 +1,250 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+---
+import_as.py:7:5: PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
+  |
+5 | q = "bar"
+6 | 
+7 | a = foo_p.abspath(p)
+  |     ^^^^^^^^^^^^^ PTH100
+8 | aa = foo.chmod(p)
+9 | aaa = foo.mkdir(p)
+  |
+
+import_as.py:8:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+   |
+ 7 | a = foo_p.abspath(p)
+ 8 | aa = foo.chmod(p)
+   |      ^^^^^^^^^ PTH101
+ 9 | aaa = foo.mkdir(p)
+10 | foo.makedirs(p)
+   |
+
+import_as.py:9:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
+   |
+ 7 | a = foo_p.abspath(p)
+ 8 | aa = foo.chmod(p)
+ 9 | aaa = foo.mkdir(p)
+   |       ^^^^^^^^^ PTH102
+10 | foo.makedirs(p)
+11 | foo.rename(p)
+   |
+
+import_as.py:10:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+   |
+ 8 | aa = foo.chmod(p)
+ 9 | aaa = foo.mkdir(p)
+10 | foo.makedirs(p)
+   | ^^^^^^^^^^^^ PTH103
+11 | foo.rename(p)
+12 | foo.replace(p)
+   |
+
+import_as.py:11:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
+   |
+ 9 | aaa = foo.mkdir(p)
+10 | foo.makedirs(p)
+11 | foo.rename(p)
+   | ^^^^^^^^^^ PTH104
+12 | foo.replace(p)
+13 | foo.rmdir(p)
+   |
+
+import_as.py:12:1: PTH105 `os.replace()` should be replaced by `Path.replace()`
+   |
+10 | foo.makedirs(p)
+11 | foo.rename(p)
+12 | foo.replace(p)
+   | ^^^^^^^^^^^ PTH105
+13 | foo.rmdir(p)
+14 | foo.remove(p)
+   |
+
+import_as.py:13:1: PTH106 `os.rmdir()` should be replaced by `Path.rmdir()`
+   |
+11 | foo.rename(p)
+12 | foo.replace(p)
+13 | foo.rmdir(p)
+   | ^^^^^^^^^ PTH106
+14 | foo.remove(p)
+15 | foo.unlink(p)
+   |
+
+import_as.py:14:1: PTH107 `os.remove()` should be replaced by `Path.unlink()`
+   |
+12 | foo.replace(p)
+13 | foo.rmdir(p)
+14 | foo.remove(p)
+   | ^^^^^^^^^^ PTH107
+15 | foo.unlink(p)
+16 | foo.getcwd(p)
+   |
+
+import_as.py:15:1: PTH108 `os.unlink()` should be replaced by `Path.unlink()`
+   |
+13 | foo.rmdir(p)
+14 | foo.remove(p)
+15 | foo.unlink(p)
+   | ^^^^^^^^^^ PTH108
+16 | foo.getcwd(p)
+17 | b = foo_p.exists(p)
+   |
+
+import_as.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+   |
+14 | foo.remove(p)
+15 | foo.unlink(p)
+16 | foo.getcwd(p)
+   | ^^^^^^^^^^ PTH109
+17 | b = foo_p.exists(p)
+18 | bb = foo_p.expanduser(p)
+   |
+
+import_as.py:17:5: PTH110 `os.path.exists()` should be replaced by `Path.exists()`
+   |
+15 | foo.unlink(p)
+16 | foo.getcwd(p)
+17 | b = foo_p.exists(p)
+   |     ^^^^^^^^^^^^ PTH110
+18 | bb = foo_p.expanduser(p)
+19 | bbb = foo_p.isdir(p)
+   |
+
+import_as.py:18:6: PTH111 `os.path.expanduser()` should be replaced by `Path.expanduser()`
+   |
+16 | foo.getcwd(p)
+17 | b = foo_p.exists(p)
+18 | bb = foo_p.expanduser(p)
+   |      ^^^^^^^^^^^^^^^^ PTH111
+19 | bbb = foo_p.isdir(p)
+20 | bbbb = foo_p.isfile(p)
+   |
+
+import_as.py:19:7: PTH112 `os.path.isdir()` should be replaced by `Path.is_dir()`
+   |
+17 | b = foo_p.exists(p)
+18 | bb = foo_p.expanduser(p)
+19 | bbb = foo_p.isdir(p)
+   |       ^^^^^^^^^^^ PTH112
+20 | bbbb = foo_p.isfile(p)
+21 | bbbbb = foo_p.islink(p)
+   |
+
+import_as.py:20:8: PTH113 `os.path.isfile()` should be replaced by `Path.is_file()`
+   |
+18 | bb = foo_p.expanduser(p)
+19 | bbb = foo_p.isdir(p)
+20 | bbbb = foo_p.isfile(p)
+   |        ^^^^^^^^^^^^ PTH113
+21 | bbbbb = foo_p.islink(p)
+22 | foo.readlink(p)
+   |
+
+import_as.py:21:9: PTH114 `os.path.islink()` should be replaced by `Path.is_symlink()`
+   |
+19 | bbb = foo_p.isdir(p)
+20 | bbbb = foo_p.isfile(p)
+21 | bbbbb = foo_p.islink(p)
+   |         ^^^^^^^^^^^^ PTH114
+22 | foo.readlink(p)
+23 | foo.stat(p)
+   |
+
+import_as.py:22:1: PTH115 `os.readlink()` should be replaced by `Path.readlink()`
+   |
+20 | bbbb = foo_p.isfile(p)
+21 | bbbbb = foo_p.islink(p)
+22 | foo.readlink(p)
+   | ^^^^^^^^^^^^ PTH115
+23 | foo.stat(p)
+24 | foo_p.isabs(p)
+   |
+
+import_as.py:23:1: PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+   |
+21 | bbbbb = foo_p.islink(p)
+22 | foo.readlink(p)
+23 | foo.stat(p)
+   | ^^^^^^^^ PTH116
+24 | foo_p.isabs(p)
+25 | foo_p.join(p, q)
+   |
+
+import_as.py:24:1: PTH117 `os.path.isabs()` should be replaced by `Path.is_absolute()`
+   |
+22 | foo.readlink(p)
+23 | foo.stat(p)
+24 | foo_p.isabs(p)
+   | ^^^^^^^^^^^ PTH117
+25 | foo_p.join(p, q)
+26 | foo.sep.join([p, q])
+   |
+
+import_as.py:25:1: PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
+   |
+23 | foo.stat(p)
+24 | foo_p.isabs(p)
+25 | foo_p.join(p, q)
+   | ^^^^^^^^^^ PTH118
+26 | foo.sep.join([p, q])
+27 | foo.sep.join((p, q))
+   |
+
+import_as.py:26:1: PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+   |
+24 | foo_p.isabs(p)
+25 | foo_p.join(p, q)
+26 | foo.sep.join([p, q])
+   | ^^^^^^^^^^^^ PTH118
+27 | foo.sep.join((p, q))
+28 | foo_p.basename(p)
+   |
+
+import_as.py:27:1: PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+   |
+25 | foo_p.join(p, q)
+26 | foo.sep.join([p, q])
+27 | foo.sep.join((p, q))
+   | ^^^^^^^^^^^^ PTH118
+28 | foo_p.basename(p)
+29 | foo_p.dirname(p)
+   |
+
+import_as.py:28:1: PTH119 `os.path.basename()` should be replaced by `Path.name`
+   |
+26 | foo.sep.join([p, q])
+27 | foo.sep.join((p, q))
+28 | foo_p.basename(p)
+   | ^^^^^^^^^^^^^^ PTH119
+29 | foo_p.dirname(p)
+30 | foo_p.samefile(p)
+   |
+
+import_as.py:29:1: PTH120 `os.path.dirname()` should be replaced by `Path.parent`
+   |
+27 | foo.sep.join((p, q))
+28 | foo_p.basename(p)
+29 | foo_p.dirname(p)
+   | ^^^^^^^^^^^^^ PTH120
+30 | foo_p.samefile(p)
+31 | foo_p.splitext(p)
+   |
+
+import_as.py:30:1: PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
+   |
+28 | foo_p.basename(p)
+29 | foo_p.dirname(p)
+30 | foo_p.samefile(p)
+   | ^^^^^^^^^^^^^^ PTH121
+31 | foo_p.splitext(p)
+   |
+
+import_as.py:31:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`
+   |
+29 | foo_p.dirname(p)
+30 | foo_p.samefile(p)
+31 | foo_p.splitext(p)
+   | ^^^^^^^^^^^^^^ PTH122
+   |
+
+

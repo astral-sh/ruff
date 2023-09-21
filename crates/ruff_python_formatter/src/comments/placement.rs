@@ -121,51 +121,67 @@ fn handle_parenthesized_comment<'a>(
     //
     // For now, we _can_ assert, but to do so, we stop lexing when we hit a token that precedes an
     // identifier.
-    if comment.line_position().is_end_of_line() {
-        let range = TextRange::new(preceding.end(), comment.start());
-        let tokenizer = SimpleTokenizer::new(locator.contents(), range);
-        if tokenizer
-            .skip_trivia()
-            .take_while(|token| {
-                !matches!(
-                    token.kind,
-                    SimpleTokenKind::As | SimpleTokenKind::Def | SimpleTokenKind::Class
-                )
-            })
-            .any(|token| {
-                debug_assert!(
-                    !matches!(token.kind, SimpleTokenKind::Bogus),
-                    "Unexpected token between nodes: `{:?}`",
-                    locator.slice(range)
-                );
 
-                token.kind() == SimpleTokenKind::LParen
-            })
-        {
-            return CommentPlacement::leading(following, comment);
-        }
-    } else {
-        let range = TextRange::new(comment.end(), following.start());
-        let tokenizer = SimpleTokenizer::new(locator.contents(), range);
-        if tokenizer
-            .skip_trivia()
-            .take_while(|token| {
-                !matches!(
-                    token.kind,
-                    SimpleTokenKind::As | SimpleTokenKind::Def | SimpleTokenKind::Class
-                )
-            })
-            .any(|token| {
-                debug_assert!(
-                    !matches!(token.kind, SimpleTokenKind::Bogus),
-                    "Unexpected token between nodes: `{:?}`",
-                    locator.slice(range)
-                );
-                token.kind() == SimpleTokenKind::RParen
-            })
-        {
-            return CommentPlacement::trailing(preceding, comment);
-        }
+    // Search for comments that to the right of a parenthesized node, e.g.:
+    // ```python
+    // [
+    //     x  # comment,
+    //     (
+    //         y,
+    //     ),
+    // ]
+    // ```
+    let range = TextRange::new(preceding.end(), comment.start());
+    let tokenizer = SimpleTokenizer::new(locator.contents(), range);
+    if tokenizer
+        .skip_trivia()
+        .take_while(|token| {
+            !matches!(
+                token.kind,
+                SimpleTokenKind::As | SimpleTokenKind::Def | SimpleTokenKind::Class
+            )
+        })
+        .any(|token| {
+            debug_assert!(
+                !matches!(token.kind, SimpleTokenKind::Bogus),
+                "Unexpected token between nodes: `{:?}`",
+                locator.slice(range)
+            );
+            token.kind() == SimpleTokenKind::LParen
+        })
+    {
+        return CommentPlacement::leading(following, comment);
+    }
+
+    // Search for comments that to the right of a parenthesized node, e.g.:
+    // ```python
+    // [
+    //     (
+    //         x  # comment,
+    //     ),
+    //     y
+    // ]
+    // ```
+    let range = TextRange::new(comment.end(), following.start());
+    let tokenizer = SimpleTokenizer::new(locator.contents(), range);
+    if tokenizer
+        .skip_trivia()
+        .take_while(|token| {
+            !matches!(
+                token.kind,
+                SimpleTokenKind::As | SimpleTokenKind::Def | SimpleTokenKind::Class
+            )
+        })
+        .any(|token| {
+            debug_assert!(
+                !matches!(token.kind, SimpleTokenKind::Bogus),
+                "Unexpected token between nodes: `{:?}`",
+                locator.slice(range)
+            );
+            token.kind() == SimpleTokenKind::RParen
+        })
+    {
+        return CommentPlacement::trailing(preceding, comment);
     }
 
     CommentPlacement::Default(comment)
@@ -213,7 +229,11 @@ fn handle_enclosed_comment<'a>(
         }
         AnyNodeRef::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, locator),
         AnyNodeRef::ExprNamedExpr(_) => handle_named_expr_comment(comment, locator),
+        AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, locator),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
+            .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator))
+            .or_else(|comment| handle_key_value_comment(comment, locator)),
+        AnyNodeRef::ExprDictComp(_) => handle_key_value_comment(comment, locator)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
         AnyNodeRef::ExprSlice(expr_slice) => {
@@ -272,8 +292,7 @@ fn handle_enclosed_comment<'a>(
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprGeneratorExp(_)
         | AnyNodeRef::ExprListComp(_)
-        | AnyNodeRef::ExprSetComp(_)
-        | AnyNodeRef::ExprDictComp(_) => handle_bracketed_end_of_line_comment(comment, locator),
+        | AnyNodeRef::ExprSetComp(_) => handle_bracketed_end_of_line_comment(comment, locator),
         AnyNodeRef::ExprTuple(tuple) if is_tuple_parenthesized(tuple, locator.contents()) => {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
@@ -1207,9 +1226,55 @@ fn handle_dict_unpacking_comment<'a>(
     .skip_while(|token| token.kind == SimpleTokenKind::RParen);
 
     // if the remaining tokens from the previous node are exactly `**`,
-    // re-assign the comment to the one that follows the stars
+    // re-assign the comment to the one that follows the stars.
     if tokens.any(|token| token.kind == SimpleTokenKind::DoubleStar) {
         CommentPlacement::leading(following, comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
+}
+
+/// Handles comments around the `:` in a key-value pair:
+///
+/// ```python
+/// {
+///     key  # dangling
+///     :  # dangling
+///     # dangling
+///     value
+/// }
+/// ```
+fn handle_key_value_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    debug_assert!(matches!(
+        comment.enclosing_node(),
+        AnyNodeRef::ExprDict(_) | AnyNodeRef::ExprDictComp(_)
+    ));
+
+    let (Some(following), Some(preceding)) = (comment.following_node(), comment.preceding_node())
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // Ensure that the comment is between the key and the value by detecting the colon:
+    // ```python
+    // {
+    //     key  # comment
+    //     : value
+    // }
+    // ```
+    // This prevents against detecting comments on starred expressions as key-value comments.
+    let tokens = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(preceding.end(), following.start()),
+    );
+    if tokens
+        .skip_trivia()
+        .any(|token| token.kind == SimpleTokenKind::Colon)
+    {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::Default(comment)
     }
@@ -1621,6 +1686,119 @@ fn handle_named_expr_comment<'a>(
         // Otherwise, treat it as dangling. We effectively treat it as a comment on the `:=` itself.
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     }
+}
+
+/// Handles comments around the `:` token in a lambda expression.
+///
+/// For parameterized lambdas, both the comments between the `lambda` and the parameters, and the
+/// comments between the parameters and the body, are considered dangling, as is the case for all
+/// of the following:
+///
+/// ```python
+/// (
+///     lambda  # 1
+///     # 2
+///     x
+///     :  # 3
+///     # 4
+///     y
+/// )
+/// ```
+///
+/// For non-parameterized lambdas, all comments before the body are considered dangling, as is the
+/// case for all of the following:
+///
+/// ```python
+/// (
+///     lambda  # 1
+///     # 2
+///     :  # 3
+///     # 4
+///     y
+/// )
+/// ```
+fn handle_lambda_comment<'a>(
+    comment: DecoratedComment<'a>,
+    lambda: &'a ast::ExprLambda,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    if let Some(parameters) = lambda.parameters.as_deref() {
+        // Comments between the `lambda` and the parameters are dangling on the lambda:
+        // ```python
+        // (
+        //     lambda  # comment
+        //     x:
+        //     y
+        // )
+        // ```
+        if comment.start() < parameters.start() {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
+
+        // Comments between the parameters and the body are dangling on the lambda:
+        // ```python
+        // (
+        //     lambda x:  # comment
+        //     y
+        // )
+        // ```
+        if parameters.end() < comment.start() && comment.start() < lambda.body.start() {
+            // If the value is parenthesized, and the comment is within the parentheses, it should
+            // be a leading comment on the value, not a dangling comment in the lambda, as in:
+            // ```python
+            // (
+            //     lambda x:  (  # comment
+            //         y
+            //     )
+            // )
+            // ```
+            let tokenizer = SimpleTokenizer::new(
+                locator.contents(),
+                TextRange::new(parameters.end(), comment.start()),
+            );
+            if tokenizer
+                .skip_trivia()
+                .any(|token| token.kind == SimpleTokenKind::LParen)
+            {
+                return CommentPlacement::Default(comment);
+            }
+
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
+    } else {
+        // Comments between the lambda and the body are dangling on the lambda:
+        // ```python
+        // (
+        //     lambda:  # comment
+        //     y
+        // )
+        // ```
+        if comment.start() < lambda.body.start() {
+            // If the value is parenthesized, and the comment is within the parentheses, it should
+            // be a leading comment on the value, not a dangling comment in the lambda, as in:
+            // ```python
+            // (
+            //     lambda:  (  # comment
+            //         y
+            //     )
+            // )
+            // ```
+            let tokenizer = SimpleTokenizer::new(
+                locator.contents(),
+                TextRange::new(lambda.start(), comment.start()),
+            );
+            if tokenizer
+                .skip_trivia()
+                .any(|token| token.kind == SimpleTokenKind::LParen)
+            {
+                return CommentPlacement::Default(comment);
+            }
+
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Attach trailing end-of-line comments on the operator as dangling comments on the enclosing

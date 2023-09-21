@@ -1,5 +1,5 @@
 # Benchmarking cpython (CONTRIBUTING.md)
-crates/ruff/resources/test/cpython
+crates/ruff_linter/resources/test/cpython
 # generate_mkdocs.py
 mkdocs.generated.yml
 # check_ecosystem.py

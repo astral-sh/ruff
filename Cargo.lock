@@ -822,7 +822,7 @@ dependencies = [
  "pep440_rs",
  "pretty_assertions",
  "regex",
- "ruff",
+ "ruff_linter",
  "ruff_workspace",
  "rustc-hash",
  "serde",
@@ -2029,7 +2029,176 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff"
+name = "ruff_benchmark"
+version = "0.0.0"
+dependencies = [
+ "codspeed-criterion-compat",
+ "criterion",
+ "mimalloc",
+ "once_cell",
+ "ruff_linter",
+ "ruff_python_ast",
+ "ruff_python_formatter",
+ "ruff_python_index",
+ "ruff_python_parser",
+ "serde",
+ "serde_json",
+ "tikv-jemallocator",
+ "ureq",
+ "url",
+]
+
+[[package]]
+name = "ruff_cache"
+version = "0.0.0"
+dependencies = [
+ "filetime",
+ "glob",
+ "globset",
+ "itertools 0.11.0",
+ "regex",
+ "ruff_macros",
+ "seahash",
+]
+
+[[package]]
+name = "ruff_cli"
+version = "0.0.290"
+dependencies = [
+ "annotate-snippets 0.9.1",
+ "anyhow",
+ "argfile",
+ "assert_cmd",
+ "bincode",
+ "bitflags 2.4.0",
+ "cachedir",
+ "chrono",
+ "clap",
+ "clap_complete_command",
+ "clearscreen",
+ "colored",
+ "filetime",
+ "glob",
+ "ignore",
+ "insta",
+ "insta-cmd",
+ "is-macro",
+ "itertools 0.11.0",
+ "itoa",
+ "log",
+ "mimalloc",
+ "notify",
+ "path-absolutize",
+ "rayon",
+ "regex",
+ "ruff_cache",
+ "ruff_diagnostics",
+ "ruff_formatter",
+ "ruff_linter",
+ "ruff_macros",
+ "ruff_notebook",
+ "ruff_python_ast",
+ "ruff_python_formatter",
+ "ruff_python_stdlib",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "ruff_workspace",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "shellexpand",
+ "similar",
+ "strum",
+ "tempfile",
+ "test-case",
+ "thiserror",
+ "tikv-jemallocator",
+ "tracing",
+ "ureq",
+ "walkdir",
+ "wild",
+]
+
+[[package]]
+name = "ruff_dev"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "ignore",
+ "imara-diff",
+ "indicatif",
+ "indoc",
+ "itertools 0.11.0",
+ "libcst",
+ "once_cell",
+ "pretty_assertions",
+ "rayon",
+ "regex",
+ "ruff_cli",
+ "ruff_diagnostics",
+ "ruff_formatter",
+ "ruff_linter",
+ "ruff_notebook",
+ "ruff_python_ast",
+ "ruff_python_codegen",
+ "ruff_python_formatter",
+ "ruff_python_literal",
+ "ruff_python_parser",
+ "ruff_python_stdlib",
+ "ruff_python_trivia",
+ "ruff_workspace",
+ "schemars",
+ "serde",
+ "serde_json",
+ "similar",
+ "strum",
+ "strum_macros",
+ "tempfile",
+ "toml",
+ "tracing",
+ "tracing-indicatif",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "ruff_diagnostics"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "log",
+ "ruff_text_size",
+ "serde",
+]
+
+[[package]]
+name = "ruff_formatter"
+version = "0.0.0"
+dependencies = [
+ "drop_bomb",
+ "insta",
+ "ruff_cache",
+ "ruff_macros",
+ "ruff_text_size",
+ "rustc-hash",
+ "schemars",
+ "serde",
+ "static_assertions",
+ "tracing",
+ "unicode-width",
+]
+
+[[package]]
+name = "ruff_index"
+version = "0.0.0"
+dependencies = [
+ "ruff_macros",
+ "static_assertions",
+]
+
+[[package]]
+name = "ruff_linter"
 version = "0.0.290"
 dependencies = [
  "annotate-snippets 0.9.1",
@@ -2092,172 +2261,6 @@ dependencies = [
  "unicode-width",
  "unicode_names2",
  "wsl",
-]
-
-[[package]]
-name = "ruff_benchmark"
-version = "0.0.0"
-dependencies = [
- "codspeed-criterion-compat",
- "criterion",
- "mimalloc",
- "once_cell",
- "ruff",
- "ruff_python_ast",
- "ruff_python_formatter",
- "ruff_python_index",
- "ruff_python_parser",
- "serde",
- "serde_json",
- "tikv-jemallocator",
- "ureq",
- "url",
-]
-
-[[package]]
-name = "ruff_cache"
-version = "0.0.0"
-dependencies = [
- "filetime",
- "glob",
- "globset",
- "itertools 0.11.0",
- "regex",
- "ruff_macros",
-]
-
-[[package]]
-name = "ruff_cli"
-version = "0.0.290"
-dependencies = [
- "annotate-snippets 0.9.1",
- "anyhow",
- "argfile",
- "assert_cmd",
- "bincode",
- "bitflags 2.4.0",
- "cachedir",
- "chrono",
- "clap",
- "clap_complete_command",
- "clearscreen",
- "colored",
- "filetime",
- "glob",
- "ignore",
- "insta",
- "insta-cmd",
- "is-macro",
- "itertools 0.11.0",
- "itoa",
- "log",
- "mimalloc",
- "notify",
- "path-absolutize",
- "rayon",
- "regex",
- "ruff",
- "ruff_cache",
- "ruff_diagnostics",
- "ruff_formatter",
- "ruff_macros",
- "ruff_notebook",
- "ruff_python_ast",
- "ruff_python_formatter",
- "ruff_python_stdlib",
- "ruff_python_trivia",
- "ruff_source_file",
- "ruff_text_size",
- "ruff_workspace",
- "rustc-hash",
- "serde",
- "serde_json",
- "shellexpand",
- "similar",
- "strum",
- "tempfile",
- "test-case",
- "thiserror",
- "tikv-jemallocator",
- "tracing",
- "ureq",
- "walkdir",
- "wild",
-]
-
-[[package]]
-name = "ruff_dev"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "clap",
- "ignore",
- "imara-diff",
- "indicatif",
- "indoc",
- "itertools 0.11.0",
- "libcst",
- "once_cell",
- "pretty_assertions",
- "rayon",
- "regex",
- "ruff",
- "ruff_cli",
- "ruff_diagnostics",
- "ruff_formatter",
- "ruff_notebook",
- "ruff_python_ast",
- "ruff_python_codegen",
- "ruff_python_formatter",
- "ruff_python_literal",
- "ruff_python_parser",
- "ruff_python_stdlib",
- "ruff_python_trivia",
- "ruff_workspace",
- "schemars",
- "serde",
- "serde_json",
- "similar",
- "strum",
- "strum_macros",
- "tempfile",
- "toml",
- "tracing",
- "tracing-indicatif",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "ruff_diagnostics"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "log",
- "ruff_text_size",
- "serde",
-]
-
-[[package]]
-name = "ruff_formatter"
-version = "0.0.0"
-dependencies = [
- "drop_bomb",
- "insta",
- "ruff_text_size",
- "rustc-hash",
- "schemars",
- "serde",
- "static_assertions",
- "tracing",
- "unicode-width",
-]
-
-[[package]]
-name = "ruff_index"
-version = "0.0.0"
-dependencies = [
- "ruff_macros",
- "static_assertions",
 ]
 
 [[package]]
@@ -2335,7 +2338,9 @@ dependencies = [
  "itertools 0.11.0",
  "memchr",
  "once_cell",
+ "ruff_cache",
  "ruff_formatter",
+ "ruff_macros",
  "ruff_python_ast",
  "ruff_python_index",
  "ruff_python_parser",
@@ -2492,9 +2497,9 @@ dependencies = [
  "console_log",
  "js-sys",
  "log",
- "ruff",
  "ruff_diagnostics",
  "ruff_formatter",
+ "ruff_linter",
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_formatter",
@@ -2522,12 +2527,15 @@ dependencies = [
  "ignore",
  "itertools 0.11.0",
  "log",
+ "once_cell",
  "path-absolutize",
  "pep440_rs",
  "regex",
- "ruff",
  "ruff_cache",
+ "ruff_formatter",
+ "ruff_linter",
  "ruff_macros",
+ "ruff_python_formatter",
  "rustc-hash",
  "schemars",
  "serde",
@@ -2664,6 +2672,12 @@ dependencies = [
  "ring",
  "untrusted",
 ]
+
+[[package]]
+name = "seahash"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 
 [[package]]
 name = "semver"
@@ -3241,9 +3255,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-width"
-version = "0.1.10"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0edd1e5b14653f783770bce4a4dabb4a5108a5370a5f5d8cfe8710c361f6c8b"
+checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
 
 [[package]]
 name = "unicode-xid"

@@ -1,0 +1,92 @@
+---
+source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
+---
+PGH005_0.py:2:8: PGH005 Non-existent mock method: `not_called`
+  |
+1 | # Errors
+2 | assert my_mock.not_called()
+  |        ^^^^^^^^^^^^^^^^^^^^ PGH005
+3 | assert my_mock.called_once_with()
+4 | assert my_mock.not_called
+  |
+
+PGH005_0.py:3:8: PGH005 Non-existent mock method: `called_once_with`
+  |
+1 | # Errors
+2 | assert my_mock.not_called()
+3 | assert my_mock.called_once_with()
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ PGH005
+4 | assert my_mock.not_called
+5 | assert my_mock.called_once_with
+  |
+
+PGH005_0.py:4:8: PGH005 Non-existent mock method: `not_called`
+  |
+2 | assert my_mock.not_called()
+3 | assert my_mock.called_once_with()
+4 | assert my_mock.not_called
+  |        ^^^^^^^^^^^^^^^^^^ PGH005
+5 | assert my_mock.called_once_with
+6 | my_mock.assert_not_called
+  |
+
+PGH005_0.py:5:8: PGH005 Non-existent mock method: `called_once_with`
+  |
+3 | assert my_mock.called_once_with()
+4 | assert my_mock.not_called
+5 | assert my_mock.called_once_with
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^ PGH005
+6 | my_mock.assert_not_called
+7 | my_mock.assert_called
+  |
+
+PGH005_0.py:6:1: PGH005 Mock method should be called: `assert_not_called`
+  |
+4 | assert my_mock.not_called
+5 | assert my_mock.called_once_with
+6 | my_mock.assert_not_called
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ PGH005
+7 | my_mock.assert_called
+8 | my_mock.assert_called_once_with
+  |
+
+PGH005_0.py:7:1: PGH005 Mock method should be called: `assert_called`
+  |
+5 | assert my_mock.called_once_with
+6 | my_mock.assert_not_called
+7 | my_mock.assert_called
+  | ^^^^^^^^^^^^^^^^^^^^^ PGH005
+8 | my_mock.assert_called_once_with
+9 | my_mock.assert_called_once_with
+  |
+
+PGH005_0.py:8:1: PGH005 Mock method should be called: `assert_called_once_with`
+   |
+ 6 | my_mock.assert_not_called
+ 7 | my_mock.assert_called
+ 8 | my_mock.assert_called_once_with
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PGH005
+ 9 | my_mock.assert_called_once_with
+10 | MyMock.assert_called_once_with
+   |
+
+PGH005_0.py:9:1: PGH005 Mock method should be called: `assert_called_once_with`
+   |
+ 7 | my_mock.assert_called
+ 8 | my_mock.assert_called_once_with
+ 9 | my_mock.assert_called_once_with
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PGH005
+10 | MyMock.assert_called_once_with
+   |
+
+PGH005_0.py:10:1: PGH005 Mock method should be called: `assert_called_once_with`
+   |
+ 8 | my_mock.assert_called_once_with
+ 9 | my_mock.assert_called_once_with
+10 | MyMock.assert_called_once_with
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PGH005
+11 | 
+12 | # OK
+   |
+
+

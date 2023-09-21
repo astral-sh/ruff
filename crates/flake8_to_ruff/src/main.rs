@@ -19,7 +19,7 @@ use crate::converter::convert;
 use crate::external_config::ExternalConfig;
 use crate::plugin::Plugin;
 use crate::pyproject::parse;
-use ruff::logging::{set_up_logging, LogLevel};
+use ruff_linter::logging::{set_up_logging, LogLevel};
 
 #[derive(Parser)]
 #[command(

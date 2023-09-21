@@ -1,0 +1,75 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+unexpected_special_method_signature.py:5:9: PLE0302 The special method `__bool__` expects 1 parameter, 2 were given
+  |
+3 |         ...
+4 | 
+5 |     def __bool__(self, x):  # too many mandatory args
+  |         ^^^^^^^^ PLE0302
+6 |         ...
+  |
+
+unexpected_special_method_signature.py:19:9: PLE0302 The special method `__bool__` expects 0 parameters, 1 was given
+   |
+18 |     @staticmethod
+19 |     def __bool__(x):  # too many mandatory args
+   |         ^^^^^^^^ PLE0302
+20 |         ...
+   |
+
+unexpected_special_method_signature.py:32:9: PLE0302 The special method `__eq__` expects 2 parameters, 1 was given
+   |
+30 |         ...
+31 | 
+32 |     def __eq__(self):  # too few mandatory args
+   |         ^^^^^^ PLE0302
+33 |         ...
+   |
+
+unexpected_special_method_signature.py:35:9: PLE0302 The special method `__eq__` expects 2 parameters, 3 were given
+   |
+33 |         ...
+34 | 
+35 |     def __eq__(self, other, other_other):  # too many mandatory args
+   |         ^^^^^^ PLE0302
+36 |         ...
+   |
+
+unexpected_special_method_signature.py:44:9: PLE0302 The special method `__round__` expects between 1 and 2 parameters, 3 were given
+   |
+42 |         ...
+43 | 
+44 |     def __round__(self, x, y):  # disallow 2 args
+   |         ^^^^^^^^^ PLE0302
+45 |         ...
+   |
+
+unexpected_special_method_signature.py:47:9: PLE0302 The special method `__round__` expects between 1 and 2 parameters, 4 were given
+   |
+45 |         ...
+46 | 
+47 |     def __round__(self, x, y, z=2):  # disallow 3 args even when one is optional
+   |         ^^^^^^^^^ PLE0302
+48 |         ...
+   |
+
+unexpected_special_method_signature.py:56:9: PLE0302 The special method `__eq__` expects 2 parameters, 3 were given
+   |
+54 |         ...
+55 | 
+56 |     def __eq__(self, x, y, *args):  # too many args with *args
+   |         ^^^^^^ PLE0302
+57 |         ...
+   |
+
+unexpected_special_method_signature.py:65:9: PLE0302 The special method `__round__` expects between 1 and 2 parameters, 3 were given
+   |
+63 |         ...
+64 | 
+65 |     def __round__(self, x, y, *args):  # disallow 2 args
+   |         ^^^^^^^^^ PLE0302
+66 |         ...
+   |
+
+

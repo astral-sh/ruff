@@ -84,11 +84,14 @@ pub enum Tag {
     StartFitsExpanded(FitsExpanded),
     EndFitsExpanded,
 
+    /// Marks the start and end of a best-fitting variant.
     StartBestFittingEntry,
     EndBestFittingEntry,
 
     /// Parenthesizes the content but only if adding the parentheses and indenting the content
     /// makes the content fit in the configured line width.
+    ///
+    /// See [`crate::builders::best_fit_parenthesize`] for an in-depth explanation.
     StartBestFitParenthesize {
         id: Option<GroupId>,
     },

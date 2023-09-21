@@ -4,7 +4,35 @@
 
 use std::borrow::Cow;
 use std::env::VarError;
+use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
+
+use anyhow::{anyhow, Result};
+use glob::{glob, GlobError, Paths, PatternError};
+use regex::Regex;
+use rustc_hash::{FxHashMap, FxHashSet};
+use shellexpand;
+use shellexpand::LookupError;
+use strum::IntoEnumIterator;
+
+use ruff_cache::cache_dir;
+use ruff_formatter::{IndentStyle, LineWidth};
+use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_linter::registry::RuleNamespace;
+use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
+use ruff_linter::rule_selector::Specificity;
+use ruff_linter::settings::rule_table::RuleTable;
+use ruff_linter::settings::types::{
+    FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
+    Version,
+};
+use ruff_linter::settings::{
+    resolve_per_file_ignores, LinterSettings, DUMMY_VARIABLE_RGX, PREFIXES, TASK_TAGS,
+};
+use ruff_linter::{
+    fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
+};
+use ruff_python_formatter::{FormatterSettings, MagicTrailingComma, QuoteStyle};
 
 use crate::options::{
     Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
@@ -14,25 +42,7 @@ use crate::options::{
     Flake8UnusedArgumentsOptions, IsortOptions, McCabeOptions, Options, Pep8NamingOptions,
     PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions, PylintOptions,
 };
-use anyhow::{anyhow, Result};
-use glob::{glob, GlobError, Paths, PatternError};
-use regex::Regex;
-use ruff::line_width::{LineLength, TabSize};
-use ruff::registry::RuleNamespace;
-use ruff::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
-use ruff::rule_selector::Specificity;
-use ruff::settings::rule_table::RuleTable;
-use ruff::settings::types::{
-    FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
-    Version,
-};
-use ruff::settings::{defaults, resolve_per_file_ignores, AllSettings, CliSettings, Settings};
-use ruff::{fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION};
-use ruff_cache::cache_dir;
-use rustc_hash::{FxHashMap, FxHashSet};
-use shellexpand;
-use shellexpand::LookupError;
-use strum::IntoEnumIterator;
+use crate::settings::{FileResolverSettings, Settings, EXCLUDE, INCLUDE};
 
 #[derive(Debug, Default)]
 pub struct RuleSelection {
@@ -62,7 +72,7 @@ pub struct Configuration {
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
     pub force_exclude: Option<bool>,
-    pub format: Option<SerializationFormat>,
+    pub output_format: Option<SerializationFormat>,
     pub ignore_init_module_imports: Option<bool>,
     pub include: Option<Vec<FilePattern>>,
     pub line_length: Option<LineLength>,
@@ -106,23 +116,6 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn into_all_settings(self, project_root: &Path) -> Result<AllSettings> {
-        Ok(AllSettings {
-            cli: CliSettings {
-                cache_dir: self
-                    .cache_dir
-                    .clone()
-                    .unwrap_or_else(|| cache_dir(project_root)),
-                fix: self.fix.unwrap_or(false),
-                fix_only: self.fix_only.unwrap_or(false),
-                format: self.format.unwrap_or_default(),
-                show_fixes: self.show_fixes.unwrap_or(false),
-                show_source: self.show_source.unwrap_or(false),
-            },
-            lib: self.into_settings(project_root)?,
-        })
-    }
-
     pub fn into_settings(self, project_root: &Path) -> Result<Settings> {
         if let Some(required_version) = &self.required_version {
             if &**required_version != RUFF_PKG_VERSION {
@@ -134,151 +127,183 @@ impl Configuration {
             }
         }
 
+        let target_version = self.target_version.unwrap_or_default();
+        let rules = self.as_rule_table();
+
         Ok(Settings {
-            rules: self.as_rule_table(),
-            allowed_confusables: self
-                .allowed_confusables
-                .map(FxHashSet::from_iter)
-                .unwrap_or_default(),
-            builtins: self.builtins.unwrap_or_default(),
-            dummy_variable_rgx: self
-                .dummy_variable_rgx
-                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone()),
-            exclude: FilePatternSet::try_from_vec(
-                self.exclude.unwrap_or_else(|| defaults::EXCLUDE.clone()),
-            )?,
-            extend_exclude: FilePatternSet::try_from_vec(self.extend_exclude)?,
-            extend_include: FilePatternSet::try_from_vec(self.extend_include)?,
-            external: FxHashSet::from_iter(self.external.unwrap_or_default()),
-            force_exclude: self.force_exclude.unwrap_or(false),
-            include: FilePatternSet::try_from_vec(
-                self.include.unwrap_or_else(|| defaults::INCLUDE.clone()),
-            )?,
-            ignore_init_module_imports: self.ignore_init_module_imports.unwrap_or_default(),
-            line_length: self.line_length.unwrap_or_default(),
-            tab_size: self.tab_size.unwrap_or_default(),
-            namespace_packages: self.namespace_packages.unwrap_or_default(),
-            per_file_ignores: resolve_per_file_ignores(
-                self.per_file_ignores
-                    .unwrap_or_default()
-                    .into_iter()
-                    .chain(self.extend_per_file_ignores)
-                    .collect(),
-            )?,
-            respect_gitignore: self.respect_gitignore.unwrap_or(true),
-            src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
-            project_root: project_root.to_path_buf(),
-            target_version: self.target_version.unwrap_or_default(),
-            task_tags: self.task_tags.unwrap_or_else(|| {
-                defaults::TASK_TAGS
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect()
-            }),
-            logger_objects: self.logger_objects.unwrap_or_default(),
-            preview: self.preview.unwrap_or_default(),
-            typing_modules: self.typing_modules.unwrap_or_default(),
-            // Plugins
-            flake8_annotations: self
-                .flake8_annotations
-                .map(Flake8AnnotationsOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_bandit: self
-                .flake8_bandit
-                .map(Flake8BanditOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_bugbear: self
-                .flake8_bugbear
-                .map(Flake8BugbearOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_builtins: self
-                .flake8_builtins
-                .map(Flake8BuiltinsOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_comprehensions: self
-                .flake8_comprehensions
-                .map(Flake8ComprehensionsOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_copyright: self
-                .flake8_copyright
-                .map(Flake8CopyrightOptions::try_into_settings)
-                .transpose()?
-                .unwrap_or_default(),
-            flake8_errmsg: self
-                .flake8_errmsg
-                .map(Flake8ErrMsgOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_implicit_str_concat: self
-                .flake8_implicit_str_concat
-                .map(Flake8ImplicitStrConcatOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_import_conventions: self
-                .flake8_import_conventions
-                .map(Flake8ImportConventionsOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_pytest_style: self
-                .flake8_pytest_style
-                .map(Flake8PytestStyleOptions::try_into_settings)
-                .transpose()?
-                .unwrap_or_default(),
-            flake8_quotes: self
-                .flake8_quotes
-                .map(Flake8QuotesOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_self: self
-                .flake8_self
-                .map(Flake8SelfOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_tidy_imports: self
-                .flake8_tidy_imports
-                .map(Flake8TidyImportsOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_type_checking: self
-                .flake8_type_checking
-                .map(Flake8TypeCheckingOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_unused_arguments: self
-                .flake8_unused_arguments
-                .map(Flake8UnusedArgumentsOptions::into_settings)
-                .unwrap_or_default(),
-            flake8_gettext: self
-                .flake8_gettext
-                .map(Flake8GetTextOptions::into_settings)
-                .unwrap_or_default(),
-            isort: self
-                .isort
-                .map(IsortOptions::try_into_settings)
-                .transpose()?
-                .unwrap_or_default(),
-            mccabe: self
-                .mccabe
-                .map(McCabeOptions::into_settings)
-                .unwrap_or_default(),
-            pep8_naming: self
-                .pep8_naming
-                .map(Pep8NamingOptions::try_into_settings)
-                .transpose()?
-                .unwrap_or_default(),
-            pycodestyle: self
-                .pycodestyle
-                .map(PycodestyleOptions::into_settings)
-                .unwrap_or_default(),
-            pydocstyle: self
-                .pydocstyle
-                .map(PydocstyleOptions::into_settings)
-                .unwrap_or_default(),
-            pyflakes: self
-                .pyflakes
-                .map(PyflakesOptions::into_settings)
-                .unwrap_or_default(),
-            pylint: self
-                .pylint
-                .map(PylintOptions::into_settings)
-                .unwrap_or_default(),
-            pyupgrade: self
-                .pyupgrade
-                .map(PyUpgradeOptions::into_settings)
-                .unwrap_or_default(),
+            cache_dir: self
+                .cache_dir
+                .clone()
+                .unwrap_or_else(|| cache_dir(project_root)),
+            fix: self.fix.unwrap_or(false),
+            fix_only: self.fix_only.unwrap_or(false),
+            output_format: self.output_format.unwrap_or_default(),
+            show_fixes: self.show_fixes.unwrap_or(false),
+            show_source: self.show_source.unwrap_or(false),
+
+            file_resolver: FileResolverSettings {
+                exclude: FilePatternSet::try_from_iter(
+                    self.exclude.unwrap_or_else(|| EXCLUDE.to_vec()),
+                )?,
+                extend_exclude: FilePatternSet::try_from_iter(self.extend_exclude)?,
+                extend_include: FilePatternSet::try_from_iter(self.extend_include)?,
+                force_exclude: self.force_exclude.unwrap_or(false),
+                include: FilePatternSet::try_from_iter(
+                    self.include.unwrap_or_else(|| INCLUDE.to_vec()),
+                )?,
+                respect_gitignore: self.respect_gitignore.unwrap_or(true),
+                project_root: project_root.to_path_buf(),
+            },
+
+            linter: LinterSettings {
+                target_version,
+                project_root: project_root.to_path_buf(),
+                rules,
+                allowed_confusables: self
+                    .allowed_confusables
+                    .map(FxHashSet::from_iter)
+                    .unwrap_or_default(),
+                builtins: self.builtins.unwrap_or_default(),
+                dummy_variable_rgx: self
+                    .dummy_variable_rgx
+                    .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
+                external: FxHashSet::from_iter(self.external.unwrap_or_default()),
+                ignore_init_module_imports: self.ignore_init_module_imports.unwrap_or_default(),
+                line_length: self.line_length.unwrap_or_default(),
+                tab_size: self.tab_size.unwrap_or_default(),
+                namespace_packages: self.namespace_packages.unwrap_or_default(),
+                per_file_ignores: resolve_per_file_ignores(
+                    self.per_file_ignores
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(self.extend_per_file_ignores)
+                        .collect(),
+                )?,
+                src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
+
+                task_tags: self
+                    .task_tags
+                    .unwrap_or_else(|| TASK_TAGS.iter().map(ToString::to_string).collect()),
+                logger_objects: self.logger_objects.unwrap_or_default(),
+                preview: self.preview.unwrap_or_default(),
+                typing_modules: self.typing_modules.unwrap_or_default(),
+                // Plugins
+                flake8_annotations: self
+                    .flake8_annotations
+                    .map(Flake8AnnotationsOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_bandit: self
+                    .flake8_bandit
+                    .map(Flake8BanditOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_bugbear: self
+                    .flake8_bugbear
+                    .map(Flake8BugbearOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_builtins: self
+                    .flake8_builtins
+                    .map(Flake8BuiltinsOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_comprehensions: self
+                    .flake8_comprehensions
+                    .map(Flake8ComprehensionsOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_copyright: self
+                    .flake8_copyright
+                    .map(Flake8CopyrightOptions::try_into_settings)
+                    .transpose()?
+                    .unwrap_or_default(),
+                flake8_errmsg: self
+                    .flake8_errmsg
+                    .map(Flake8ErrMsgOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_implicit_str_concat: self
+                    .flake8_implicit_str_concat
+                    .map(Flake8ImplicitStrConcatOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_import_conventions: self
+                    .flake8_import_conventions
+                    .map(Flake8ImportConventionsOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_pytest_style: self
+                    .flake8_pytest_style
+                    .map(Flake8PytestStyleOptions::try_into_settings)
+                    .transpose()?
+                    .unwrap_or_default(),
+                flake8_quotes: self
+                    .flake8_quotes
+                    .map(Flake8QuotesOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_self: self
+                    .flake8_self
+                    .map(Flake8SelfOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_tidy_imports: self
+                    .flake8_tidy_imports
+                    .map(Flake8TidyImportsOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_type_checking: self
+                    .flake8_type_checking
+                    .map(Flake8TypeCheckingOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_unused_arguments: self
+                    .flake8_unused_arguments
+                    .map(Flake8UnusedArgumentsOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_gettext: self
+                    .flake8_gettext
+                    .map(Flake8GetTextOptions::into_settings)
+                    .unwrap_or_default(),
+                isort: self
+                    .isort
+                    .map(IsortOptions::try_into_settings)
+                    .transpose()?
+                    .unwrap_or_default(),
+                mccabe: self
+                    .mccabe
+                    .map(McCabeOptions::into_settings)
+                    .unwrap_or_default(),
+                pep8_naming: self
+                    .pep8_naming
+                    .map(Pep8NamingOptions::try_into_settings)
+                    .transpose()?
+                    .unwrap_or_default(),
+                pycodestyle: self
+                    .pycodestyle
+                    .map(PycodestyleOptions::into_settings)
+                    .unwrap_or_default(),
+                pydocstyle: self
+                    .pydocstyle
+                    .map(PydocstyleOptions::into_settings)
+                    .unwrap_or_default(),
+                pyflakes: self
+                    .pyflakes
+                    .map(PyflakesOptions::into_settings)
+                    .unwrap_or_default(),
+                pylint: self
+                    .pylint
+                    .map(PylintOptions::into_settings)
+                    .unwrap_or_default(),
+                pyupgrade: self
+                    .pyupgrade
+                    .map(PyUpgradeOptions::into_settings)
+                    .unwrap_or_default(),
+            },
+
+            formatter: FormatterSettings {
+                exclude: vec![],
+                preview: self
+                    .preview
+                    .map(|preview| match preview {
+                        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+                        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+                    })
+                    .unwrap_or_default(),
+                line_width: LineWidth::from(NonZeroU16::from(self.line_length.unwrap_or_default())),
+                indent_style: IndentStyle::default(),
+                quote_style: QuoteStyle::default(),
+                magic_trailing_comma: MagicTrailingComma::default(),
+            },
         })
     }
 
@@ -372,7 +397,7 @@ impl Configuration {
             external: options.external,
             fix: options.fix,
             fix_only: options.fix_only,
-            format: options.format,
+            output_format: options.output_format.or(options.format),
             force_exclude: options.force_exclude,
             ignore_init_module_imports: options.ignore_init_module_imports,
             include: options.include.map(|paths| {
@@ -443,7 +468,7 @@ impl Configuration {
         let preview = self.preview.unwrap_or_default();
 
         // The select_set keeps track of which rules have been selected.
-        let mut select_set: RuleSet = defaults::PREFIXES
+        let mut select_set: RuleSet = PREFIXES
             .iter()
             .flat_map(|selector| selector.rules(preview))
             .collect();
@@ -704,7 +729,7 @@ impl Configuration {
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),
             fix_only: self.fix_only.or(config.fix_only),
-            format: self.format.or(config.format),
+            output_format: self.output_format.or(config.output_format),
             force_exclude: self.force_exclude.or(config.force_exclude),
             include: self.include.or(config.include),
             ignore_init_module_imports: self
@@ -801,11 +826,12 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 
 #[cfg(test)]
 mod tests {
+    use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
+    use ruff_linter::registry::{Linter, Rule, RuleSet};
+    use ruff_linter::settings::types::PreviewMode;
+    use ruff_linter::RuleSelector;
+
     use crate::configuration::{Configuration, RuleSelection};
-    use ruff::codes::{Flake8Copyright, Pycodestyle, Refurb};
-    use ruff::registry::{Linter, Rule, RuleSet};
-    use ruff::settings::types::PreviewMode;
-    use ruff::RuleSelector;
 
     const NURSERY_RULES: &[Rule] = &[
         Rule::MissingCopyrightNotice,
@@ -861,6 +887,7 @@ mod tests {
         Rule::TooManyPublicMethods,
         Rule::TooManyPublicMethods,
         Rule::UndocumentedWarn,
+        Rule::UnnecessaryEnumerate,
     ];
 
     #[allow(clippy::needless_pass_by_value)]

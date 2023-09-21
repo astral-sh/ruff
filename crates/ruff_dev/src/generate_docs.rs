@@ -8,8 +8,8 @@ use anyhow::Result;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 
-use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff_diagnostics::AutofixKind;
+use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_workspace::options::Options;
 
 use crate::ROOT_DIR;

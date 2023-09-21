@@ -11,7 +11,9 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ruff_cache = { path = "../ruff_cache" }
 ruff_formatter = { path = "../ruff_formatter" }
+ruff_macros = { path = "../ruff_macros" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_source_file = { path = "../ruff_source_file" }
 ruff_python_ast = { path = "../ruff_python_ast" }

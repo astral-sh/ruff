@@ -10,17 +10,17 @@ use itertools::{iterate, Itertools};
 use rustc_hash::FxHashMap;
 use serde::Serialize;
 
-use ruff::fs::relativize_path;
-use ruff::linter::FixTable;
-use ruff::logging::LogLevel;
-use ruff::message::{
+use ruff_linter::fs::relativize_path;
+use ruff_linter::linter::FixTable;
+use ruff_linter::logging::LogLevel;
+use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
     JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, TextEmitter,
 };
-use ruff::notify_user;
-use ruff::registry::{AsRule, Rule};
-use ruff::settings::flags;
-use ruff::settings::types::SerializationFormat;
+use ruff_linter::notify_user;
+use ruff_linter::registry::{AsRule, Rule};
+use ruff_linter::settings::flags;
+use ruff_linter::settings::types::SerializationFormat;
 
 use crate::diagnostics::Diagnostics;
 

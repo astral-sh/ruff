@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+typing_modules.py:6:36: F821 Undefined name `db`
+  |
+6 | X = Union[Literal[False], Literal["db"]]
+  |                                    ^^ F821
+7 | y = Optional["Class"]
+  |
+
+

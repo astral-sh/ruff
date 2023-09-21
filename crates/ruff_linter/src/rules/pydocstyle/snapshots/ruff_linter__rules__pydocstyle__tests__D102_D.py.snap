@@ -1,0 +1,46 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:23:9: D102 Missing docstring in public method
+   |
+22 |     @expect('D102: Missing docstring in public method')
+23 |     def method(self=None):
+   |         ^^^^^^ D102
+24 |         pass
+   |
+
+D.py:56:9: D102 Missing docstring in public method
+   |
+55 |     @expect('D102: Missing docstring in public method')
+56 |     def __new__(self=None):
+   |         ^^^^^^^ D102
+57 |         pass
+   |
+
+D.py:68:9: D102 Missing docstring in public method
+   |
+67 |     @expect('D102: Missing docstring in public method')
+68 |     def __call__(self=None, x=None, y=None, z=None):
+   |         ^^^^^^^^ D102
+69 |         pass
+   |
+
+D.py:650:9: D102 Missing docstring in public method
+    |
+648 | class StatementOnSameLineAsDocstring:
+649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
+650 |     def sort_services(self):
+    |         ^^^^^^^^^^^^^ D102
+651 |         pass
+    |
+
+D.py:659:9: D102 Missing docstring in public method
+    |
+657 | class CommentAfterDocstring:
+658 |     "After this docstring there's a comment."  # priorities=1
+659 |     def sort_services(self):
+    |         ^^^^^^^^^^^^^ D102
+660 |         pass
+    |
+
+

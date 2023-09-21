@@ -1,0 +1,117 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_0.py:2:12: F821 Undefined name `self`
+  |
+1 | def get_name():
+2 |     return self.name
+  |            ^^^^ F821
+  |
+
+F821_0.py:6:13: F821 Undefined name `self`
+  |
+5 | def get_name():
+6 |     return (self.name,)
+  |             ^^^^ F821
+  |
+
+F821_0.py:10:9: F821 Undefined name `self`
+   |
+ 9 | def get_name():
+10 |     del self.name
+   |         ^^^^ F821
+   |
+
+F821_0.py:21:12: F821 Undefined name `numeric_string`
+   |
+20 | def randdec(maxprec, maxexp):
+21 |     return numeric_string(maxprec, maxexp)
+   |            ^^^^^^^^^^^^^^ F821
+   |
+
+F821_0.py:58:5: F821 Undefined name `Bar`
+   |
+56 | y: int = 1
+57 | 
+58 | x: "Bar" = 1
+   |     ^^^ F821
+59 | 
+60 | [first] = ["yup"]
+   |
+
+F821_0.py:83:11: F821 Undefined name `TOMATO`
+   |
+82 | def update_tomato():
+83 |     print(TOMATO)
+   |           ^^^^^^ F821
+84 |     TOMATO = "cherry tomato"
+   |
+
+F821_0.py:87:8: F821 Undefined name `B`
+   |
+87 | A = f'{B}'
+   |        ^ F821
+88 | A = (
+89 |     f'B'
+   |
+
+F821_0.py:90:8: F821 Undefined name `B`
+   |
+88 | A = (
+89 |     f'B'
+90 |     f'{B}'
+   |        ^ F821
+91 | )
+92 | C = f'{A:{B}}'
+   |
+
+F821_0.py:92:11: F821 Undefined name `B`
+   |
+90 |     f'{B}'
+91 | )
+92 | C = f'{A:{B}}'
+   |           ^ F821
+93 | C = f'{A:{f"{B}"}}'
+   |
+
+F821_0.py:93:14: F821 Undefined name `B`
+   |
+91 | )
+92 | C = f'{A:{B}}'
+93 | C = f'{A:{f"{B}"}}'
+   |              ^ F821
+94 | 
+95 | from typing import Annotated, Literal
+   |
+
+F821_0.py:115:10: F821 Undefined name `PEP593Test123`
+    |
+113 |     ]
+114 |     field_with_undefined_stringified_type: Annotated[
+115 |         "PEP593Test123",
+    |          ^^^^^^^^^^^^^ F821
+116 |         123,
+117 |     ]
+    |
+
+F821_0.py:123:15: F821 Undefined name `foo`
+    |
+121 |     ]
+122 |     field_with_undefined_nested_subscript: Annotated[
+123 |         dict["foo", "bar"],  # Expected to fail as undefined.
+    |               ^^^ F821
+124 |         123,
+125 |     ]
+    |
+
+F821_0.py:123:22: F821 Undefined name `bar`
+    |
+121 |     ]
+122 |     field_with_undefined_nested_subscript: Annotated[
+123 |         dict["foo", "bar"],  # Expected to fail as undefined.
+    |                      ^^^ F821
+124 |         123,
+125 |     ]
+    |
+
+

@@ -5,7 +5,7 @@ import json
 import subprocess
 from pathlib import Path
 
-CONFUSABLES_RS_PATH = "crates/ruff/src/rules/ruff/rules/confusables.rs"
+CONFUSABLES_RS_PATH = "crates/ruff_linter/src/rules/ruff/rules/confusables.rs"
 AMBIGUOUS_JSON_URL = "https://raw.githubusercontent.com/hediet/vscode-unicode-data/main/out/ambiguous.json"
 
 prelude = """

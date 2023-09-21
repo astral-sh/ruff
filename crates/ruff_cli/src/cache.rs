@@ -11,15 +11,15 @@ use anyhow::{Context, Result};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use ruff::message::Message;
-use ruff::settings::Settings;
-use ruff::warn_user;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
+use ruff_linter::message::Message;
+use ruff_linter::warn_user;
 use ruff_notebook::NotebookIndex;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
+use ruff_workspace::Settings;
 
 use crate::diagnostics::Diagnostics;
 
@@ -59,21 +59,18 @@ pub(crate) struct Cache {
 impl Cache {
     /// Open or create a new cache.
     ///
-    /// `cache_dir` is considered the root directory of the cache, which can be
-    /// local to the project, global or otherwise set by the user.
-    ///
     /// `package_root` is the path to root of the package that is contained
     /// within this cache and must be canonicalized (to avoid considering `./`
     /// and `../project` being different).
     ///
     /// Finally `settings` is used to ensure we don't open a cache for different
-    /// settings.
-    pub(crate) fn open(cache_dir: &Path, package_root: PathBuf, settings: &Settings) -> Cache {
+    /// settings. It also defines the directory where to store the cache.
+    pub(crate) fn open(package_root: PathBuf, settings: &Settings) -> Cache {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
         let mut buf = itoa::Buffer::new();
         let key = Path::new(buf.format(cache_key(&package_root, settings)));
-        let path = PathBuf::from_iter([cache_dir, Path::new("content"), key]);
+        let path = PathBuf::from_iter([&settings.cache_dir, Path::new("content"), key]);
 
         let file = match File::open(&path) {
             Ok(file) => file,
@@ -349,8 +346,8 @@ mod tests {
     use std::time::SystemTime;
 
     use itertools::Itertools;
-    use ruff::settings::{flags, AllSettings};
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_linter::settings::flags;
 
     use crate::cache::RelativePathBuf;
     use crate::cache::{self, Cache, FileCache};
@@ -361,9 +358,10 @@ mod tests {
     use anyhow::Result;
     use ruff_python_ast::imports::ImportMap;
 
+    use ruff_workspace::Settings;
     use test_case::test_case;
 
-    #[test_case("../ruff/resources/test/fixtures", "ruff_tests/cache_same_results_ruff"; "ruff_fixtures")]
+    #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
     fn same_results(package_root: &str, cache_dir_path: &str) {
         let mut cache_dir = temp_dir();
@@ -371,10 +369,13 @@ mod tests {
         let _ = fs::remove_dir_all(&cache_dir);
         cache::init(&cache_dir).unwrap();
 
-        let settings = AllSettings::default();
+        let settings = Settings {
+            cache_dir,
+            ..Settings::default()
+        };
 
         let package_root = fs::canonicalize(package_root).unwrap();
-        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+        let cache = Cache::open(package_root.clone(), &settings);
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
@@ -405,7 +406,7 @@ mod tests {
                 let diagnostics = lint_path(
                     &path,
                     Some(&package_root),
-                    &settings,
+                    &settings.linter,
                     Some(&cache),
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
@@ -426,7 +427,7 @@ mod tests {
 
         cache.store().unwrap();
 
-        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+        let cache = Cache::open(package_root.clone(), &settings);
         assert_ne!(cache.package.files.len(), 0);
 
         parse_errors.sort();
@@ -450,7 +451,7 @@ mod tests {
             got_diagnostics += lint_path(
                 &path,
                 Some(&package_root),
-                &settings,
+                &settings.linter,
                 Some(&cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -651,9 +652,8 @@ mod tests {
     }
 
     struct TestCache {
-        cache_dir: PathBuf,
         package_root: PathBuf,
-        settings: AllSettings,
+        settings: Settings,
     }
 
     impl TestCache {
@@ -672,10 +672,12 @@ mod tests {
             cache::init(&cache_dir).unwrap();
             fs::create_dir(package_root.clone()).unwrap();
 
-            let settings = AllSettings::default();
+            let settings = Settings {
+                cache_dir,
+                ..Settings::default()
+            };
 
             Self {
-                cache_dir,
                 package_root,
                 settings,
             }
@@ -695,11 +697,7 @@ mod tests {
         }
 
         fn open(&self) -> Cache {
-            Cache::open(
-                &self.cache_dir,
-                self.package_root.clone(),
-                &self.settings.lib,
-            )
+            Cache::open(self.package_root.clone(), &self.settings)
         }
 
         fn lint_file_with_cache(
@@ -710,7 +708,7 @@ mod tests {
             lint_path(
                 &self.package_root.join(path),
                 Some(&self.package_root),
-                &self.settings,
+                &self.settings.linter,
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -720,7 +718,7 @@ mod tests {
 
     impl Drop for TestCache {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.cache_dir);
+            let _ = fs::remove_dir_all(&self.settings.cache_dir);
         }
     }
 }
