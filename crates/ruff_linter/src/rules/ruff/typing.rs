@@ -11,7 +11,7 @@ use ruff_source_file::Locator;
 ///
 /// A known type is either a builtin type, any object from the standard library,
 /// or a type from the `typing_extensions` module.
-fn is_known_type(call_path: &CallPath, minor_version: u32) -> bool {
+fn is_known_type(call_path: &CallPath, minor_version: u8) -> bool {
     match call_path.as_slice() {
         ["" | "typing_extensions", ..] => true,
         [module, ..] => is_known_standard_library(minor_version, module),
@@ -72,7 +72,7 @@ impl<'a> TypingTarget<'a> {
         expr: &'a Expr,
         semantic: &SemanticModel,
         locator: &Locator,
-        minor_version: u32,
+        minor_version: u8,
     ) -> Option<Self> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
@@ -141,7 +141,7 @@ impl<'a> TypingTarget<'a> {
         &self,
         semantic: &SemanticModel,
         locator: &Locator,
-        minor_version: u32,
+        minor_version: u8,
     ) -> bool {
         match self {
             TypingTarget::None
@@ -189,12 +189,7 @@ impl<'a> TypingTarget<'a> {
     }
 
     /// Check if the [`TypingTarget`] explicitly allows `Any`.
-    fn contains_any(
-        &self,
-        semantic: &SemanticModel,
-        locator: &Locator,
-        minor_version: u32,
-    ) -> bool {
+    fn contains_any(&self, semantic: &SemanticModel, locator: &Locator, minor_version: u8) -> bool {
         match self {
             TypingTarget::Any => true,
             // `Literal` cannot contain `Any` as it's a dynamic value.
@@ -242,7 +237,7 @@ pub(crate) fn type_hint_explicitly_allows_none<'a>(
     annotation: &'a Expr,
     semantic: &SemanticModel,
     locator: &Locator,
-    minor_version: u32,
+    minor_version: u8,
 ) -> Option<&'a Expr> {
     match TypingTarget::try_from_expr(annotation, semantic, locator, minor_version) {
         None |
@@ -272,7 +267,7 @@ pub(crate) fn type_hint_resolves_to_any(
     annotation: &Expr,
     semantic: &SemanticModel,
     locator: &Locator,
-    minor_version: u32,
+    minor_version: u8,
 ) -> bool {
     match TypingTarget::try_from_expr(annotation, semantic, locator, minor_version) {
         None |
