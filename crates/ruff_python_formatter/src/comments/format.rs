@@ -86,9 +86,13 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
         if let Some(first_leading) = self.comments.first() {
             // Leading comments only preserves the lines after the comment but not before.
             // Insert the necessary lines.
-            if lines_before(first_leading.start(), f.context().source()) > 1 {
-                write!(f, [empty_line()])?;
-            }
+            write!(
+                f,
+                [empty_lines(lines_before(
+                    first_leading.start(),
+                    f.context().source()
+                ))]
+            )?;
 
             write!(f, [leading_comments(self.comments)])?;
         } else if let Some(last_preceding) = self.last_node {
