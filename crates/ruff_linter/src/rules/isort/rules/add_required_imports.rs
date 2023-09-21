@@ -75,7 +75,7 @@ fn includes_import(stmt: &Stmt, target: &AnyImport) -> bool {
                 return false;
             };
             module.as_deref() == target.module
-                && level.map(|level| level.to_u32()) == target.level
+                && *level == target.level
                 && names.iter().any(|alias| {
                     &alias.name == target.name.name
                         && alias.asname.as_deref() == target.name.as_name
@@ -166,7 +166,7 @@ pub(crate) fn add_required_imports(
                                     name: name.name.as_str(),
                                     as_name: name.asname.as_deref(),
                                 },
-                                level: level.map(|level| level.to_u32()),
+                                level: *level,
                             }),
                             python_ast,
                             locator,

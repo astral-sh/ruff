@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Alias, Identifier, Int, Stmt};
+use ruff_python_ast::{self as ast, Alias, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -80,7 +80,7 @@ pub(crate) fn manual_from_import(
                     asname: None,
                     range: TextRange::default(),
                 }],
-                level: Some(Int::new(0)),
+                level: Some(0),
                 range: TextRange::default(),
             };
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(

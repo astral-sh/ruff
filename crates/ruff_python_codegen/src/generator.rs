@@ -577,7 +577,9 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("from ");
                     if let Some(level) = level {
-                        self.p(&".".repeat(level.to_usize()));
+                        for _ in 0..*level {
+                            self.p(".");
+                        }
                     }
                     if let Some(module) = module {
                         self.p_id(module);

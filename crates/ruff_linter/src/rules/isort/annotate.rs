@@ -118,7 +118,7 @@ pub(crate) fn annotate_imports<'a>(
                     AnnotatedImport::ImportFrom {
                         module: module.as_deref(),
                         names: aliases,
-                        level: level.map(|level| level.to_u32()),
+                        level: *level,
                         trailing_comma: if split_on_trailing_comma {
                             trailing_comma(import, locator, source_type)
                         } else {

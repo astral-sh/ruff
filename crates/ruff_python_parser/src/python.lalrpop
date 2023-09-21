@@ -253,18 +253,18 @@ ImportStatement: ast::Stmt = {
     },
 };
 
-ImportFromLocation: (Option<ast::Int>, Option<ast::Identifier>) = {
+ImportFromLocation: (Option<u32>, Option<ast::Identifier>) = {
     <dots: ImportDots*> <name:DottedName> => {
-        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), Some(name))
+        (Some(dots.iter().sum()), Some(name))
     },
     <dots: ImportDots+> => {
-        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), None)
+        (Some(dots.iter().sum()), None)
     },
 };
 
-ImportDots: ast::Int = {
-    "..." => ast::Int::new(3),
-    "." => ast::Int::new(1),
+ImportDots: u32 = {
+    "..." => 3,
+    "." => 1,
 };
 
 ImportAsNames: Vec<ast::Alias> = {

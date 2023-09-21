@@ -695,7 +695,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             },
         ) => {
             let module = module.as_deref();
-            let level = level.map(|level| level.to_u32());
+            let level = *level;
             if checker.enabled(Rule::ModuleImportNotAtTopOfFile) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
             }
