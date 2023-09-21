@@ -30,7 +30,7 @@ An extremely fast Python linter, written in Rust.
 - 🤝 Python 3.11 compatibility
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [600 built-in rules](https://docs.astral.sh/ruff/rules/)
+- 📏 Over [700 built-in rules](https://docs.astral.sh/ruff/rules/)
 - ⚖️ [Near-parity](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8) with the
     built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
@@ -233,7 +233,7 @@ linting command.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 600 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 700 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
