@@ -10,14 +10,14 @@ expression: trace
       - Parameter
       - Parameter
       - ExprConstant
-        - Int(20)
+        - Int(Small(20))
       - Parameter
       - Parameter
       - ExprConstant
-        - Int(5)
+        - Int(Small(5))
       - Parameter
       - ExprConstant
-        - Int(20)
+        - Int(Small(20))
       - Parameter
     - StmtPass
 

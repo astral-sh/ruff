@@ -39,7 +39,9 @@ expression: indentation_with_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 99,
+            value: Small(
+                99,
+            ),
         },
         22..24,
     ),

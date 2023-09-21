@@ -1,10 +1,8 @@
 use std::borrow::Cow;
 
-use num_traits::Zero;
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr};
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -110,15 +108,13 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
 
 /// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).
 fn is_head_slice(expr: &Expr) -> bool {
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
-        ..
-    }) = expr
-    {
-        value.is_zero()
-    } else {
-        false
-    }
+    matches!(
+        expr,
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(Int::Small(0)),
+            ..
+        })
+    )
 }
 
 #[derive(Debug)]

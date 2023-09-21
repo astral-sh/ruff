@@ -1,8 +1,6 @@
-use num_bigint::BigInt;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, UnaryOp};
+use ruff_python_ast::{self as ast, Constant, Expr, Int, UnaryOp};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -93,7 +91,7 @@ pub(crate) fn unnecessary_subscript_reversal(
     else {
         return;
     };
-    if *val != BigInt::from(1) {
+    if *val != Int::Small(1) {
         return;
     };
     checker.diagnostics.push(Diagnostic::new(

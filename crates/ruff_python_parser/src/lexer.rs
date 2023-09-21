@@ -29,13 +29,13 @@
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::iter::FusedIterator;
-use std::{char, cmp::Ordering, str::FromStr};
+use std::num::IntErrorKind;
+use std::{char, cmp::Ordering, isize, str::FromStr};
 
-use num_bigint::BigInt;
-use num_traits::{Num, Zero};
-use ruff_python_ast::IpyEscapeKind;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use unicode_ident::{is_xid_continue, is_xid_start};
+
+use ruff_python_ast::{Int, IpyEscapeKind};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::indentation::{Indentation, Indentations};
@@ -264,11 +264,23 @@ impl<'source> Lexer<'source> {
 
         let mut number = LexedText::new(self.offset(), self.source);
         self.radix_run(&mut number, radix);
-        let value =
-            BigInt::from_str_radix(number.as_str(), radix.as_u32()).map_err(|e| LexicalError {
-                error: LexicalErrorType::OtherError(format!("{e:?}")),
-                location: self.token_range().start(),
-            })?;
+
+        let value = match isize::from_str_radix(number.as_str(), radix.as_u32()) {
+            Ok(int) => Int::Small(int),
+            Err(err) => {
+                if matches!(
+                    err.kind(),
+                    IntErrorKind::PosOverflow | IntErrorKind::NegOverflow
+                ) {
+                    Int::Big(number.as_str().to_string())
+                } else {
+                    return Err(LexicalError {
+                        error: LexicalErrorType::OtherError(format!("{err:?}")),
+                        location: self.token_range().start(),
+                    });
+                }
+            }
+        };
         Ok(Tok::Int { value })
     }
 
@@ -339,14 +351,38 @@ impl<'source> Lexer<'source> {
                 let imag = f64::from_str(number.as_str()).unwrap();
                 Ok(Tok::Complex { real: 0.0, imag })
             } else {
-                let value = number.as_str().parse::<BigInt>().unwrap();
-                if start_is_zero && !value.is_zero() {
-                    // leading zeros in decimal integer literals are not permitted
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
-                        location: self.token_range().start(),
-                    });
-                }
+                let value = match number.as_str().parse::<isize>() {
+                    Ok(value) => {
+                        if start_is_zero && value != 0 {
+                            // leading zeros in decimal integer literals are not permitted
+                            return Err(LexicalError {
+                                error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
+                                location: self.token_range().start(),
+                            });
+                        }
+                        Int::Small(value)
+                    }
+                    Err(err) => {
+                        if matches!(
+                            err.kind(),
+                            IntErrorKind::PosOverflow | IntErrorKind::NegOverflow
+                        ) {
+                            if start_is_zero {
+                                // leading zeros in decimal integer literals are not permitted
+                                return Err(LexicalError {
+                                    error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
+                                    location: self.token_range().start(),
+                                });
+                            }
+                            Int::Big(number.as_str().to_string())
+                        } else {
+                            return Err(LexicalError {
+                                error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
+                                location: self.token_range().start(),
+                            });
+                        }
+                    }
+                };
                 Ok(Tok::Int { value })
             }
         }

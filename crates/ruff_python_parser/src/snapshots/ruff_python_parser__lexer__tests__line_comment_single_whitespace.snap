@@ -5,7 +5,9 @@ expression: lex_source(&source)
 [
     (
         Int {
-            value: 99232,
+            value: Small(
+                99232,
+            ),
         },
         0..5,
     ),

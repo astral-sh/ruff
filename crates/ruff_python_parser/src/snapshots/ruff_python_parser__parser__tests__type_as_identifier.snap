@@ -631,7 +631,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprConstant {
                             range: 492..493,
                             value: Int(
-                                1,
+                                Small(
+                                    1,
+                                ),
                             ),
                         },
                     ),
@@ -746,7 +748,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 ExprConstant {
                                                     range: 547..549,
                                                     value: Int(
-                                                        12,
+                                                        Small(
+                                                            12,
+                                                        ),
                                                     ),
                                                 },
                                             ),
@@ -924,7 +928,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 624..625,
                     value: Int(
-                        1,
+                        Small(
+                            1,
+                        ),
                     ),
                 },
             ),
@@ -953,7 +959,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 637..638,
                     value: Int(
-                        1,
+                        Small(
+                            1,
+                        ),
                     ),
                 },
             ),
@@ -982,7 +990,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 650..651,
                     value: Int(
-                        1,
+                        Small(
+                            1,
+                        ),
                     ),
                 },
             ),

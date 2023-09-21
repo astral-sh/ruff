@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use num_traits::Zero;
 use smallvec::SmallVec;
 
 use ruff_text_size::{Ranged, TextRange};
@@ -9,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::call_path::CallPath;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
+    self as ast, Arguments, Constant, ExceptHandler, Expr, Int, MatchCase, Pattern, Stmt, TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -1073,7 +1072,7 @@ impl Truthiness {
                 Constant::None => Some(false),
                 Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
                 Constant::Bytes(bytes) => Some(!bytes.is_empty()),
-                Constant::Int(int) => Some(!int.is_zero()),
+                Constant::Int(int) => Some(!matches!(int, Int::Small(0))),
                 Constant::Float(float) => Some(*float != 0.0),
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
@@ -1140,7 +1139,7 @@ mod tests {
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
     use crate::{
-        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
+        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Int, Stmt, StmtTypeAlias,
         TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
     };
 
@@ -1190,15 +1189,15 @@ mod tests {
             ctx: ExprContext::Load,
         });
         let constant_one = Expr::Constant(ExprConstant {
-            value: Constant::Int(1.into()),
+            value: Constant::Int(Int::Small(1)),
             range: TextRange::default(),
         });
         let constant_two = Expr::Constant(ExprConstant {
-            value: Constant::Int(2.into()),
+            value: Constant::Int(Int::Small(2)),
             range: TextRange::default(),
         });
         let constant_three = Expr::Constant(ExprConstant {
-            value: Constant::Int(3.into()),
+            value: Constant::Int(Int::Small(3)),
             range: TextRange::default(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
@@ -1240,7 +1239,7 @@ mod tests {
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
         let bound = Expr::Constant(ExprConstant {
-            value: Constant::Int(1.into()),
+            value: Constant::Int(Int::Small(1)),
             range: TextRange::default(),
         });
 

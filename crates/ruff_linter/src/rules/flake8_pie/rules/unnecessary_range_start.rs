@@ -1,9 +1,7 @@
-use num_bigint::BigInt;
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Constant, Expr, Int};
 use ruff_text_size::Ranged;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
@@ -75,7 +73,7 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     else {
         return;
     };
-    if *value != BigInt::from(0) {
+    if *value != Int::Small(0) {
         return;
     };
 

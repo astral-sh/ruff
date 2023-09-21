@@ -1,12 +1,12 @@
 use std::cmp::Ordering;
 
-use num_bigint::{BigInt, Sign};
+use log::warn;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, CmpOp, Constant, ElifElseClause, Expr, StmtIf};
+use ruff_python_ast::{self as ast, CmpOp, Constant, ElifElseClause, Expr, Int, StmtIf};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::autofix::edits::delete_stmt;
@@ -88,7 +88,9 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
         match comparison {
             Expr::Tuple(ast::ExprTuple { elts, .. }) => match op {
                 CmpOp::Lt | CmpOp::LtE => {
-                    let version = extract_version(elts);
+                    let Some(version) = extract_version(elts) else {
+                        return;
+                    };
                     let target = checker.settings.target_version;
                     if compare_version(&version, target, op == &CmpOp::LtE) {
                         let mut diagnostic =
@@ -102,7 +104,9 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                     }
                 }
                 CmpOp::Gt | CmpOp::GtE => {
-                    let version = extract_version(elts);
+                    let Some(version) = extract_version(elts) else {
+                        return;
+                    };
                     let target = checker.settings.target_version;
                     if compare_version(&version, target, op == &CmpOp::GtE) {
                         let mut diagnostic =
@@ -118,12 +122,12 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                 _ => {}
             },
             Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(number),
+                value: Constant::Int(int),
                 ..
             }) => {
                 if op == &CmpOp::Eq {
-                    match bigint_to_u32(number) {
-                        2 => {
+                    match int {
+                        Int::Small(2) => {
                             let mut diagnostic =
                                 Diagnostic::new(OutdatedVersionBlock, branch.test.range());
                             if checker.patch(diagnostic.kind.rule()) {
@@ -135,7 +139,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                             }
                             checker.diagnostics.push(diagnostic);
                         }
-                        3 => {
+                        Int::Small(3) => {
                             let mut diagnostic =
                                 Diagnostic::new(OutdatedVersionBlock, branch.test.range());
                             if checker.patch(diagnostic.kind.rule()) {
@@ -156,7 +160,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
 }
 
 /// Returns true if the `target_version` is always less than the [`PythonVersion`].
-fn compare_version(target_version: &[u32], py_version: PythonVersion, or_equal: bool) -> bool {
+fn compare_version(target_version: &[isize], py_version: PythonVersion, or_equal: bool) -> bool {
     let mut target_version_iter = target_version.iter();
 
     let Some(if_major) = target_version_iter.next() else {
@@ -165,7 +169,7 @@ fn compare_version(target_version: &[u32], py_version: PythonVersion, or_equal: 
 
     let (py_major, py_minor) = py_version.as_tuple();
 
-    match if_major.cmp(&py_major.into()) {
+    match if_major.cmp(&(py_major as isize)) {
         Ordering::Less => true,
         Ordering::Greater => false,
         Ordering::Equal => {
@@ -353,31 +357,29 @@ fn fix_always_true_branch(
     }
 }
 
-/// Converts a `BigInt` to a `u32`. If the number is negative, it will return 0.
-fn bigint_to_u32(number: &BigInt) -> u32 {
-    let the_number = number.to_u32_digits();
-    match the_number.0 {
-        Sign::Minus | Sign::NoSign => 0,
-        Sign::Plus => *the_number.1.first().unwrap(),
-    }
-}
-
 /// Gets the version from the tuple
-fn extract_version(elts: &[Expr]) -> Vec<u32> {
-    let mut version: Vec<u32> = vec![];
+fn extract_version(elts: &[Expr]) -> Option<Vec<isize>> {
+    let mut version: Vec<isize> = vec![];
     for elt in elts {
-        if let Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(item),
+        let Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(int),
             ..
         }) = &elt
-        {
-            let number = bigint_to_u32(item);
-            version.push(number);
-        } else {
-            return version;
+        else {
+            return None;
+        };
+
+        match int {
+            Int::Small(int) => {
+                version.push(*int);
+            }
+            Int::Big(int) => {
+                warn!("Unsupported version number: {}", int);
+                return None;
+            }
         }
     }
-    version
+    Some(version)
 }
 
 #[cfg(test)]
@@ -399,7 +401,7 @@ mod tests {
     #[test_case(PythonVersion::Py310, &[3, 11], true, false; "compare-3.11")]
     fn test_compare_version(
         version: PythonVersion,
-        version_vec: &[u32],
+        version_vec: &[isize],
         or_equal: bool,
         expected: bool,
     ) {

@@ -6,10 +6,10 @@ expression: trace
   - StmtExpr
     - ExprCompare
       - ExprConstant
-        - Int(4)
+        - Int(Small(4))
       - Lt
       - ExprName
       - Lt
       - ExprConstant
-        - Int(5)
+        - Int(Small(5))
 

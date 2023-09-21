@@ -26,8 +26,6 @@ is-macro = { version = "0.3.0" }
 itertools = { version = "0.11.0" }
 log = { version = "0.4.17" }
 memchr = "2.6.3"
-num-bigint = { version = "0.4.3" }
-num-traits = { version = "0.2.15" }
 once_cell = { version = "1.17.1" }
 path-absolutize = { version = "3.1.1" }
 proc-macro2 = { version = "1.0.67" }

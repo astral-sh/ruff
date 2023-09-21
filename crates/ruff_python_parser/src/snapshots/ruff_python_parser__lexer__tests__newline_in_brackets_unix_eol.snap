@@ -27,7 +27,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 1,
+            value: Small(
+                1,
+            ),
         },
         11..12,
     ),
@@ -37,7 +39,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 2,
+            value: Small(
+                2,
+            ),
         },
         13..14,
     ),
@@ -55,7 +59,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 3,
+            value: Small(
+                3,
+            ),
         },
         17..18,
     ),
@@ -69,7 +75,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 4,
+            value: Small(
+                4,
+            ),
         },
         20..21,
     ),
@@ -99,7 +107,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 5,
+            value: Small(
+                5,
+            ),
         },
         28..29,
     ),
@@ -113,7 +123,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 6,
+            value: Small(
+                6,
+            ),
         },
         31..32,
     ),
@@ -123,7 +135,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 7,
+            value: Small(
+                7,
+            ),
         },
         35..36,
     ),

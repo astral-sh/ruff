@@ -19,7 +19,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 4..13,
                     value: Int(
-                        123456789,
+                        Small(
+                            123456789,
+                        ),
                     ),
                 },
             ),
@@ -41,7 +43,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 18..24,
                     value: Int(
-                        123456,
+                        Small(
+                            123456,
+                        ),
                     ),
                 },
             ),
@@ -285,7 +289,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 200..207,
                     value: Int(
-                        727756,
+                        Small(
+                            727756,
+                        ),
                     ),
                 },
             ),
@@ -307,7 +313,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 212..218,
                     value: Int(
-                        11,
+                        Small(
+                            11,
+                        ),
                     ),
                 },
             ),
@@ -329,7 +337,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 223..228,
                     value: Int(
-                        511,
+                        Small(
+                            511,
+                        ),
                     ),
                 },
             ),
@@ -373,7 +383,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 249..254,
                     value: Int(
-                        10000,
+                        Small(
+                            10000,
+                        ),
                     ),
                 },
             ),
@@ -395,7 +407,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 259..265,
                     value: Int(
-                        133333,
+                        Small(
+                            133333,
+                        ),
                     ),
                 },
             ),

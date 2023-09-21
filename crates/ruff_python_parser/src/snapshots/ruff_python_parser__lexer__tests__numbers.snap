@@ -5,37 +5,49 @@ expression: lex_source(source)
 [
     (
         Int {
-            value: 47,
+            value: Small(
+                47,
+            ),
         },
         0..4,
     ),
     (
         Int {
-            value: 10,
+            value: Small(
+                10,
+            ),
         },
         5..9,
     ),
     (
         Int {
-            value: 13,
+            value: Small(
+                13,
+            ),
         },
         10..16,
     ),
     (
         Int {
-            value: 0,
+            value: Small(
+                0,
+            ),
         },
         17..18,
     ),
     (
         Int {
-            value: 123,
+            value: Small(
+                123,
+            ),
         },
         19..22,
     ),
     (
         Int {
-            value: 1234567890,
+            value: Small(
+                1234567890,
+            ),
         },
         23..36,
     ),

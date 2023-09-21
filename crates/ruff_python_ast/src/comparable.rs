@@ -15,9 +15,22 @@
 //! an implicit concatenation of string literals, as these expressions are considered to
 //! have the same shape in that they evaluate to the same value.
 
-use num_bigint::BigInt;
-
 use crate as ast;
+
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+pub enum ComparableInt<'a> {
+    Small(isize),
+    Big(&'a str),
+}
+
+impl<'a> From<&'a ast::Int> for ComparableInt<'a> {
+    fn from(int: &'a ast::Int) -> Self {
+        match int {
+            ast::Int::Small(value) => Self::Small(*value),
+            ast::Int::Big(value) => Self::Big(value),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableBoolOp {
@@ -334,7 +347,7 @@ pub enum ComparableConstant<'a> {
     Bool(&'a bool),
     Str { value: &'a str, unicode: bool },
     Bytes(&'a [u8]),
-    Int(&'a BigInt),
+    Int(ComparableInt<'a>),
     Tuple(Vec<ComparableConstant<'a>>),
     Float(u64),
     Complex { real: u64, imag: u64 },
@@ -362,7 +375,7 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
                 // the bytes were implicitly concatenated).
                 implicit_concatenated: _,
             }) => Self::Bytes(value),
-            ast::Constant::Int(value) => Self::Int(value),
+            ast::Constant::Int(value) => Self::Int(value.into()),
             ast::Constant::Float(value) => Self::Float(value.to_bits()),
             ast::Constant::Complex { real, imag } => Self::Complex {
                 real: real.to_bits(),

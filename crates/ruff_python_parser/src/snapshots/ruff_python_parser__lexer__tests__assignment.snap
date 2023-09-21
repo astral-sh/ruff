@@ -15,7 +15,9 @@ expression: lex_source(source)
     ),
     (
         Int {
-            value: 99,
+            value: Small(
+                99,
+            ),
         },
         13..15,
     ),
@@ -25,7 +27,9 @@ expression: lex_source(source)
     ),
     (
         Int {
-            value: 2,
+            value: Small(
+                2,
+            ),
         },
         18..19,
     ),
@@ -35,7 +39,9 @@ expression: lex_source(source)
     ),
     (
         Int {
-            value: 0,
+            value: Small(
+                0,
+            ),
         },
         20..21,
     ),

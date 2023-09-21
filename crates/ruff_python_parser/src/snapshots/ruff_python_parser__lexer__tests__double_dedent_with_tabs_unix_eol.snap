@@ -65,7 +65,9 @@ expression: double_dedent_with_tabs_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 99,
+            value: Small(
+                99,
+            ),
         },
         29..31,
     ),

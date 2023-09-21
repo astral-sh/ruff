@@ -1,11 +1,9 @@
 use std::fmt;
 
-use num_traits::Zero;
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Constant, Expr};
+use ruff_python_ast::{Arguments, Constant, Expr, Int};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -160,15 +158,13 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 // there's no clear fix.
                 let start = arguments.find_argument("start", 1);
                 if start.map_or(true, |start| {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Int(value),
-                        ..
-                    }) = start
-                    {
-                        value.is_zero()
-                    } else {
-                        false
-                    }
+                    matches!(
+                        start,
+                        Expr::Constant(ast::ExprConstant {
+                            value: Constant::Int(Int::Small(0)),
+                            ..
+                        })
+                    )
                 }) {
                     let replace_iter = Edit::range_replacement(
                         generate_range_len_call(sequence, checker.generator()),

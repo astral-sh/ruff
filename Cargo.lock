@@ -1455,27 +1455,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-bigint"
-version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "608e7659b5c3d7cba262d894801b9ec9d00de989e8a82bd4bef91d08da45cdc0"
-dependencies = [
- "autocfg",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-integer"
-version = "0.1.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
-dependencies = [
- "autocfg",
- "num-traits",
-]
-
-[[package]]
 name = "num-traits"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2206,8 +2185,6 @@ dependencies = [
  "log",
  "memchr",
  "natord",
- "num-bigint",
- "num-traits",
  "once_cell",
  "path-absolutize",
  "pathdiff",
@@ -2290,8 +2267,6 @@ dependencies = [
  "is-macro",
  "itertools 0.11.0",
  "memchr",
- "num-bigint",
- "num-traits",
  "once_cell",
  "ruff_python_parser",
  "ruff_python_trivia",
@@ -2368,7 +2343,6 @@ dependencies = [
  "is-macro",
  "itertools 0.11.0",
  "lexical-parse-float",
- "num-traits",
  "rand",
  "unic-ucd-category",
 ]
@@ -2383,8 +2357,6 @@ dependencies = [
  "itertools 0.11.0",
  "lalrpop",
  "lalrpop-util",
- "num-bigint",
- "num-traits",
  "ruff_python_ast",
  "ruff_text_size",
  "rustc-hash",
@@ -2410,7 +2382,6 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.4.0",
  "is-macro",
- "num-traits",
  "ruff_index",
  "ruff_python_ast",
  "ruff_python_parser",

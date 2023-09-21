@@ -1,8 +1,6 @@
-use num_traits::ToPrimitive;
-use ruff_python_ast::{self as ast, Constant, Expr, UnaryOp};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Constant, Expr, Int};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -45,26 +43,17 @@ impl Violation for PairwiseOverZipped {
 
 #[derive(Debug)]
 struct SliceInfo {
-    arg_name: String,
-    slice_start: Option<i64>,
+    id: String,
+    slice_start: Option<isize>,
 }
 
-impl SliceInfo {
-    pub(crate) fn new(arg_name: String, slice_start: Option<i64>) -> Self {
-        Self {
-            arg_name,
-            slice_start,
-        }
-    }
-}
-
-/// Return the argument name, lower bound, and  upper bound for an expression, if it's a slice.
+/// Return the argument name, lower bound, and upper bound for an expression, if it's a slice.
 fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return None;
     };
 
-    let Expr::Name(ast::ExprName { id: arg_id, .. }) = value.as_ref() else {
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
         return None;
     };
 
@@ -74,44 +63,35 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 
     // Avoid false positives for slices with a step.
     if let Some(step) = step {
-        if let Some(step) = to_bound(step) {
-            if step != 1 {
-                return None;
-            }
-        } else {
+        if !matches!(
+            step.as_ref(),
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Int(Int::Small(1)),
+                ..
+            })
+        ) {
             return None;
         }
     }
 
-    Some(SliceInfo::new(
-        arg_id.to_string(),
-        lower.as_ref().and_then(|expr| to_bound(expr)),
-    ))
-}
-
-fn to_bound(expr: &Expr) -> Option<i64> {
-    match expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(value),
-            ..
-        }) => value.to_i64(),
-        Expr::UnaryOp(ast::ExprUnaryOp {
-            op: UnaryOp::USub | UnaryOp::Invert,
-            operand,
+    // If the slice start is a non-constant, we can't be sure that it's successive.
+    let slice_start = if let Some(lower) = lower.as_ref() {
+        let Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(Int::Small(slice_start)),
             range: _,
-        }) => {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(value),
-                ..
-            }) = operand.as_ref()
-            {
-                value.to_i64().map(|v| -v)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
+        }) = lower.as_ref()
+        else {
+            return None;
+        };
+        Some(*slice_start)
+    } else {
+        None
+    };
+
+    Some(SliceInfo {
+        id: id.to_string(),
+        slice_start,
+    })
 }
 
 /// RUF007
@@ -121,9 +101,9 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
     };
 
     // Require exactly two positional arguments.
-    if args.len() != 2 {
+    let [first, second] = args else {
         return;
-    }
+    };
 
     // Require the function to be the builtin `zip`.
     if !(id == "zip" && checker.semantic().is_builtin(id)) {
@@ -132,25 +112,28 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
 
     // Allow the first argument to be a `Name` or `Subscript`.
     let Some(first_arg_info) = ({
-        if let Expr::Name(ast::ExprName { id, .. }) = &args[0] {
-            Some(SliceInfo::new(id.to_string(), None))
+        if let Expr::Name(ast::ExprName { id, .. }) = first {
+            Some(SliceInfo {
+                id: id.to_string(),
+                slice_start: None,
+            })
         } else {
-            match_slice_info(&args[0])
+            match_slice_info(first)
         }
     }) else {
         return;
     };
 
     // Require second argument to be a `Subscript`.
-    if !args[1].is_subscript_expr() {
+    if !second.is_subscript_expr() {
         return;
     }
-    let Some(second_arg_info) = match_slice_info(&args[1]) else {
+    let Some(second_arg_info) = match_slice_info(second) else {
         return;
     };
 
     // Verify that the arguments match the same name.
-    if first_arg_info.arg_name != second_arg_info.arg_name {
+    if first_arg_info.id != second_arg_info.id {
         return;
     }
 

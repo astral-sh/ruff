@@ -1,11 +1,10 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 use itertools::Itertools;
+
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
-
-use num_bigint::BigInt;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -2578,13 +2577,36 @@ impl Ranged for Identifier {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Int {
+    /// A "small" number that can be represented as an `isize`. This exists as an optimization to
+    /// avoid allocating for the common case.
+    ///
+    /// `isize` matches the limitations of Python's `sys.maxsize`, in that it's 2^63 - 1 on 64-bit
+    /// systems, and 2^31 - 1 on 32-bit systems. (Python allows you to define integers larger than
+    /// `sys.maxsize`, but it seems convenient to choose a limit here that has some meaning in
+    /// Python.)
+    Small(isize),
+    /// A "large" number that cannot be represented as an `isize`.
+    Big(String),
+}
+
+impl std::fmt::Display for Int {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Int::Small(i) => write!(f, "{i}"),
+            Int::Big(s) => write!(f, "{s}"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Constant {
     None,
     Bool(bool),
     Str(StringConstant),
     Bytes(BytesConstant),
-    Int(BigInt),
+    Int(Int),
     Float(f64),
     Complex { real: f64, imag: f64 },
     Ellipsis,

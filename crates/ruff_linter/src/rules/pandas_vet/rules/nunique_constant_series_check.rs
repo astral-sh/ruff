@@ -1,9 +1,7 @@
-use num_traits::One;
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, CmpOp, Constant, Expr, Int};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -80,7 +78,13 @@ pub(crate) fn nunique_constant_series_check(
     }
 
     // Right should be the integer 1.
-    if !is_constant_one(right) {
+    if !matches!(
+        right,
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(Int::Small(1)),
+            range: _,
+        })
+    ) {
         return;
     }
 
@@ -109,15 +113,4 @@ pub(crate) fn nunique_constant_series_check(
         PandasNuniqueConstantSeriesCheck,
         expr.range(),
     ));
-}
-
-/// Return `true` if an [`Expr`] is a constant `1`.
-fn is_constant_one(expr: &Expr) -> bool {
-    match expr {
-        Expr::Constant(constant) => match &constant.value {
-            Constant::Int(int) => int.is_one(),
-            _ => false,
-        },
-        _ => false,
-    }
 }

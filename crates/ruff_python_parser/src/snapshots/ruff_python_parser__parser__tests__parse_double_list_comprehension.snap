@@ -82,7 +82,9 @@ ListComp(
                                     ExprConstant {
                                         range: 36..37,
                                         value: Int(
-                                            5,
+                                            Small(
+                                                5,
+                                            ),
                                         ),
                                     },
                                 ),
@@ -107,7 +109,9 @@ ListComp(
                                     ExprConstant {
                                         range: 45..47,
                                         value: Int(
-                                            10,
+                                            Small(
+                                                10,
+                                            ),
                                         ),
                                     },
                                 ),

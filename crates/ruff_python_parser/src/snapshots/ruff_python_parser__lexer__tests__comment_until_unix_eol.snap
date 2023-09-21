@@ -5,7 +5,9 @@ expression: comment_until_eol(UNIX_EOL)
 [
     (
         Int {
-            value: 123,
+            value: Small(
+                123,
+            ),
         },
         0..3,
     ),
@@ -21,7 +23,9 @@ expression: comment_until_eol(UNIX_EOL)
     ),
     (
         Int {
-            value: 456,
+            value: Small(
+                456,
+            ),
         },
         11..14,
     ),

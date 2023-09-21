@@ -39,7 +39,9 @@ expression: indentation_with_eol(WINDOWS_EOL)
     ),
     (
         Int {
-            value: 99,
+            value: Small(
+                99,
+            ),
         },
         23..25,
     ),

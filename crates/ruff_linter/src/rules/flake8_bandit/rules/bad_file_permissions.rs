@@ -1,9 +1,7 @@
-use num_traits::ToPrimitive;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::{self as ast, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Constant, Expr, Int, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -36,7 +34,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[violation]
 pub struct BadFilePermissions {
-    mask: u16,
+    mask: isize,
 }
 
 impl Violation for BadFilePermissions {
@@ -55,10 +53,10 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "chmod"]))
     {
         if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
-            if let Some(int_value) = int_value(mode_arg, checker.semantic()) {
-                if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
+            if let Some(mask) = int_value(mode_arg, checker.semantic()) {
+                if (mask & WRITE_WORLD > 0) || (mask & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(
-                        BadFilePermissions { mask: int_value },
+                        BadFilePermissions { mask },
                         mode_arg.range(),
                     ));
                 }
@@ -67,10 +65,10 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
     }
 }
 
-const WRITE_WORLD: u16 = 0o2;
-const EXECUTE_GROUP: u16 = 0o10;
+const WRITE_WORLD: isize = 0o2;
+const EXECUTE_GROUP: isize = 0o10;
 
-fn py_stat(call_path: &CallPath) -> Option<u16> {
+fn py_stat(call_path: &CallPath) -> Option<isize> {
     match call_path.as_slice() {
         ["stat", "ST_MODE"] => Some(0o0),
         ["stat", "S_IFDOOR"] => Some(0o0),
@@ -113,12 +111,12 @@ fn py_stat(call_path: &CallPath) -> Option<u16> {
     }
 }
 
-fn int_value(expr: &Expr, semantic: &SemanticModel) -> Option<u16> {
+fn int_value(expr: &Expr, semantic: &SemanticModel) -> Option<isize> {
     match expr {
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(value),
+            value: Constant::Int(Int::Small(value)),
             ..
-        }) => value.to_u16(),
+        }) => Some(*value),
         Expr::Attribute(_) => semantic.resolve_call_path(expr).as_ref().and_then(py_stat),
         Expr::BinOp(ast::ExprBinOp {
             left,

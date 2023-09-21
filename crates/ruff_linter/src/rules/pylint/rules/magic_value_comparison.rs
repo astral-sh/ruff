@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Constant, Expr, UnaryOp};
+use ruff_python_ast::{self as ast, Constant, Expr, Int, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -83,7 +83,7 @@ fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
         Constant::Str(ast::StringConstant { value, .. }) => {
             !matches!(value.as_str(), "" | "__main__")
         }
-        Constant::Int(value) => !matches!(value.try_into(), Ok(0 | 1)),
+        Constant::Int(value) => !matches!(value, Int::Small(0 | 1)),
         Constant::Bytes(_) => true,
         Constant::Float(_) => true,
         Constant::Complex { .. } => true,

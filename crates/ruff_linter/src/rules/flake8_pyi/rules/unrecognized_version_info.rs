@@ -1,10 +1,7 @@
-use num_bigint::BigInt;
-use num_traits::{One, Zero};
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::{self as ast, CmpOp, Constant, Expr, Int};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -249,18 +246,18 @@ impl ExpectedComparator {
                     ..
                 }) = upper.as_ref()
                 {
-                    if *upper == BigInt::one() {
+                    if *upper == Int::Small(1) {
                         return Some(ExpectedComparator::MajorTuple);
                     }
-                    if *upper == BigInt::from(2) {
+                    if *upper == Int::Small(2) {
                         return Some(ExpectedComparator::MajorMinorTuple);
                     }
                 }
             }
             Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(n),
+                value: Constant::Int(Int::Small(0)),
                 ..
-            }) if n.is_zero() => {
+            }) => {
                 return Some(ExpectedComparator::MajorDigit);
             }
             _ => (),

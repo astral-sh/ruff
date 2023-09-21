@@ -38,7 +38,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 7..8,
                                 value: Int(
-                                    4,
+                                    Small(
+                                        4,
+                                    ),
                                 ),
                             },
                         ),
@@ -46,7 +48,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ExprConstant {
                                 range: 10..11,
                                 value: Int(
-                                    5,
+                                    Small(
+                                        5,
+                                    ),
                                 ),
                             },
                         ),

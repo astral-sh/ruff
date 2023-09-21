@@ -10,10 +10,10 @@ expression: trace
         - ExprName
         - PatternMatchValue
           - ExprConstant
-            - Int(0)
+            - Int(Small(0))
         - PatternMatchValue
           - ExprConstant
-            - Int(0)
+            - Int(Small(0))
       - StmtExpr
         - ExprConstant
           - Ellipsis
@@ -22,13 +22,13 @@ expression: trace
         - ExprName
         - PatternMatchValue
           - ExprConstant
-            - Int(0)
+            - Int(Small(0))
         - PatternMatchValue
           - ExprConstant
-            - Int(0)
+            - Int(Small(0))
         - PatternMatchValue
           - ExprConstant
-            - Int(0)
+            - Int(Small(0))
       - StmtExpr
         - ExprConstant
           - Ellipsis
