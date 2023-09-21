@@ -1,3 +1,4 @@
+use std::iter;
 use std::str::FromStr;
 use thiserror::Error;
 use tracing::{warn, Level};
@@ -294,7 +295,31 @@ pub fn format_module_range<'a>(
                     parent_body = &body;
                 }
             }
-            // | Stmt::If(StmtIf { body, .. })
+            Stmt::If(StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                if range.start() < body.first().unwrap().start()
+                    || range.end()
+                        > elif_else_clauses
+                            .last()
+                            .map(|clause| clause.body.last().unwrap().end())
+                            .unwrap_or(body.lsa)
+                {
+                    break in_range;
+                } else if let Some(body) = iter::once(body)
+                    .chain(elif_else_clauses.iter().map(|clause| clause.body))
+                    .find(|body| {
+                        body.first().unwrap().start() <= range.start()
+                            && range.end() <= body.last().unwrap().end()
+                    })
+                {
+                    in_range = body.clone();
+                } else {
+                    break in_range;
+                }
+            }
             // | Stmt::StmtTry(ast::StmtTry { body, .. })
             // | Stmt::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler { body, .. })
             // | Stmt::ElifElseClause(ast::ElifElseClause { body, .. }) => &body,
