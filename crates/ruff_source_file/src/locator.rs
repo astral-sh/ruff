@@ -449,6 +449,92 @@ impl<'a> Locator<'a> {
         }
     }
 
+    /// Compute the byte offset from language server protocol zero-indexed row and utf-16 column
+    /// indices.
+    ///
+    /// It's possible to negotiate the text encoding with the LSP client, but the default that must
+    /// always be supported and that we currently use is utf-16.
+    ///
+    /// We get row and column from the LSP. E.g.
+    /// ```text
+    /// a=(1,2,)
+    /// b=(3,4,)
+    ///   ^
+    /// c=(5,6,)
+    /// ```
+    /// has coordinates `1:2`. Note that indices are computed in utf-16, e.g.
+    /// ```text
+    /// "안녕"
+    ///    ^
+    /// ```
+    /// where the first syllable is a single character (two bytes), we get `0:2`, while for
+    /// ```text
+    /// "감기"
+    ///    ^
+    /// ```
+    /// where the first syllable is three characters (three times two bytes), we get `0:4`. But for
+    /// ```text
+    /// 豆腐
+    ///   ^
+    /// ```
+    /// we get `0:2` because `豆` is two characters (4 bytes) in utf-16.
+    ///
+    /// ```rust
+    /// # use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+    /// # use ruff_source_file::Locator;
+    ///
+    /// let source = "a=(1,2,)\nb=(3,4,)";
+    /// let locator = Locator::new(source);
+    /// let offset = locator.convert_row_and_column_utf16(1, 2).unwrap();
+    /// assert_eq!(&source[TextRange::new(offset, source.text_len())], "(3,4,)");
+    ///
+    /// let source = "a=(1,2,)\n'안녕'";
+    /// let locator = Locator::new(source);
+    /// let offset = locator.convert_row_and_column_utf16(1, 2).unwrap();
+    /// assert_eq!(&source[TextRange::new(offset, source.text_len())], "녕'");
+    ///
+    /// let source = "a=(1,2,)\n'감기'";
+    /// let locator = Locator::new(source);
+    /// let offset = locator.convert_row_and_column_utf16(1, 4).unwrap();
+    /// assert_eq!(&source[TextRange::new(offset, source.text_len())], "기'");
+    ///
+    /// let source = "a=(1,2,)\n'豆腐'";
+    /// let locator = Locator::new(source);
+    /// let offset = locator.convert_row_and_column_utf16(1, 2).unwrap();
+    /// assert_eq!(&source[TextRange::new(offset, source.text_len())], "腐'");
+    /// ```
+    pub fn convert_row_and_column_utf16(&self, row: usize, column: usize) -> Option<TextSize> {
+        let line_start = *self.to_index().line_starts().get(row)?;
+        let next_line_start = self
+            .to_index()
+            .line_starts()
+            .get(row + 1)
+            .copied()
+            .unwrap_or(self.contents.text_len());
+        let line_contents = &self.contents[TextRange::from(line_start..next_line_start)];
+
+        let mut len_bytes = TextSize::default();
+        let mut len_utf16 = 0;
+        for char in line_contents
+            .chars()
+            // Since the range goes to the next line start, `line_contents` contains the line
+            // break
+            .take_while(|c| *c != '\n' && *c != '\r')
+        {
+            // This check must be first for the 0 column case
+            if len_utf16 >= column {
+                break;
+            }
+            len_bytes += char.text_len();
+            len_utf16 += char.len_utf16();
+        }
+        if len_utf16 != column {
+            return None;
+        }
+
+        Some(line_start + len_bytes)
+    }
+
     /// Take the source code between the given [`TextRange`].
     #[inline]
     pub fn slice<T: Ranged>(&self, ranged: T) -> &'a str {
