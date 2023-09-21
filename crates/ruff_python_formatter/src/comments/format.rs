@@ -308,7 +308,14 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
             NodeLevel::TopLevel => match self.lines {
                 0 | 1 => write!(f, [hard_line_break()]),
                 2 => write!(f, [empty_line()]),
-                _ => write!(f, [empty_line(), empty_line()]),
+                _ => match f.options().source_type() {
+                    PySourceType::Stub => {
+                        write!(f, [empty_line()])
+                    }
+                    PySourceType::Python | PySourceType::Ipynb => {
+                        write!(f, [empty_line(), empty_line()])
+                    }
+                },
             },
 
             NodeLevel::CompoundStatement => match self.lines {
