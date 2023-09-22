@@ -56,3 +56,12 @@ def func():
 
 
     x = 1
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7604
+import os
+
+# Defaults for arguments are defined here
+# args.threshold = None;
+
+
+logger = logging.getLogger("FastProject")
