@@ -15,8 +15,8 @@ mod rule_code_prefix;
 mod rule_namespace;
 mod violation;
 
-#[proc_macro_derive(ConfigurationOptions, attributes(option, doc, option_group))]
-pub fn derive_config(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(OptionsMetadata, attributes(option, doc, option_group))]
+pub fn derive_options_metadata(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     config::derive_impl(input)
