@@ -16,6 +16,12 @@ pub(crate) fn generate() -> String {
 fn generate_set(output: &mut String, set: &Set) {
     writeln!(output, "### {title}\n", title = set.title()).unwrap();
 
+    if let Some(documentation) = set.metadata().documentation() {
+        output.push_str(documentation);
+        output.push('\n');
+        output.push('\n');
+    }
+
     let mut visitor = CollectOptionsVisitor::default();
     set.metadata().record(&mut visitor);
 

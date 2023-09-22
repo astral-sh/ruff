@@ -16,6 +16,10 @@ pub trait OptionsMetadata {
     /// Visits the options metadata of this object by calling `visit` for each option.
     fn record(visit: &mut dyn Visit);
 
+    fn documentation() -> Option<&'static str> {
+        None
+    }
+
     /// Returns the extracted metadata.
     fn metadata() -> OptionSet
     where
@@ -51,6 +55,7 @@ impl Display for OptionEntry {
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct OptionSet {
     record: fn(&mut dyn Visit),
+    doc: fn() -> Option<&'static str>,
 }
 
 impl OptionSet {
@@ -58,13 +63,21 @@ impl OptionSet {
     where
         T: OptionsMetadata + 'static,
     {
-        Self { record: T::record }
+        Self {
+            record: T::record,
+            doc: T::documentation,
+        }
     }
 
     /// Visits the options in this set by calling `visit` for each option.
     pub fn record(&self, visit: &mut dyn Visit) {
         let record = self.record;
         record(visit);
+    }
+
+    pub fn documentation(&self) -> Option<&'static str> {
+        let documentation = self.doc;
+        documentation()
     }
 
     /// Returns `true` if this set has an option that resolves to `name`.

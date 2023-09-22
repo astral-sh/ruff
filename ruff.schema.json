@@ -1163,6 +1163,7 @@
       "additionalProperties": false
     },
     "FormatOptions": {
+      "description": "Experimental: Configures how `ruff format` formats your code.\n\nPlease provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).",
       "type": "object",
       "properties": {
         "indent-style": {
