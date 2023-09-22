@@ -2412,8 +2412,15 @@ impl OptionsMetadata for FormatOrOutputFormat {
     fn record(visit: &mut dyn Visit) {
         FormatOptions::record(visit);
     }
+
+    fn documentation() -> Option<&'static str> {
+        FormatOptions::documentation()
+    }
 }
 
+/// Experimental: Configures how `ruff format` formats your code.
+///
+/// Please provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
