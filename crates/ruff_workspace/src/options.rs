@@ -7,6 +7,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
+use crate::options_base::{OptionsMetadata, Visit};
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
@@ -2399,15 +2400,17 @@ pub enum FormatOrOutputFormat {
 }
 
 impl FormatOrOutputFormat {
-    pub const fn metadata() -> crate::options_base::OptionGroup {
-        FormatOptions::metadata()
-    }
-
     pub const fn as_output_format(&self) -> Option<SerializationFormat> {
         match self {
             FormatOrOutputFormat::Format(_) => None,
             FormatOrOutputFormat::OutputFormat(format) => Some(*format),
         }
+    }
+}
+
+impl OptionsMetadata for FormatOrOutputFormat {
+    fn record(visit: &mut dyn Visit) {
+        FormatOptions::record(visit);
     }
 }
 

@@ -9,6 +9,7 @@ use ruff_diagnostics::AutofixKind;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_workspace::options::Options;
+use ruff_workspace::options_base::OptionsMetadata;
 
 const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
@@ -104,10 +105,7 @@ pub(crate) fn generate() -> String {
             table_out.push('\n');
         }
 
-        if Options::metadata()
-            .iter()
-            .any(|(name, _)| name == &linter.name())
-        {
+        if Options::metadata().has(linter.name()) {
             table_out.push_str(&format!(
                 "For related settings, see [{}](settings.md#{}).",
                 linter.name(),

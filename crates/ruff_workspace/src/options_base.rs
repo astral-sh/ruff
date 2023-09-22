@@ -1,167 +1,295 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
-#[derive(Debug, Eq, PartialEq)]
+/// Visits [`OptionsMetadata`].
+///
+/// An instance of [`Visit`] represents the logic for inspecting an object's options metadata.
+pub trait Visit {
+    /// Visits an [`OptionField`] value named `name`.
+    fn record_field(&mut self, name: &str, field: OptionField);
+
+    /// Visits an [`OptionSet`] value named `name`.
+    fn record_set(&mut self, name: &str, group: OptionSet);
+}
+
+/// Returns metadata for its options.
+pub trait OptionsMetadata {
+    /// Visits the options metadata of this object by calling `visit` for each option.
+    fn record(visit: &mut dyn Visit);
+
+    /// Returns the extracted metadata.
+    fn metadata() -> OptionSet
+    where
+        Self: Sized + 'static,
+    {
+        OptionSet::of::<Self>()
+    }
+}
+
+/// Metadata of an option that can either be a [`OptionField`] or [`OptionSet`].
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum OptionEntry {
+    /// A single option.
     Field(OptionField),
-    Group(OptionGroup),
+
+    /// A set of options
+    Set(OptionSet),
 }
 
 impl Display for OptionEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            OptionEntry::Field(field) => field.fmt(f),
-            OptionEntry::Group(group) => group.fmt(f),
+            OptionEntry::Set(set) => std::fmt::Display::fmt(set, f),
+            OptionEntry::Field(field) => std::fmt::Display::fmt(&field, f),
         }
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct OptionGroup(&'static [(&'static str, OptionEntry)]);
+/// A set of options.
+///
+/// It extracts the options by calling the [`OptionsMetadata::record`] of a type implementing
+/// [`OptionsMetadata`].
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct OptionSet {
+    record: fn(&mut dyn Visit),
+}
 
-impl OptionGroup {
-    pub const fn new(options: &'static [(&'static str, OptionEntry)]) -> Self {
-        Self(options)
+impl OptionSet {
+    pub fn of<T>() -> Self
+    where
+        T: OptionsMetadata + 'static,
+    {
+        Self { record: T::record }
     }
 
-    pub fn iter(&self) -> std::slice::Iter<(&str, OptionEntry)> {
-        self.into_iter()
+    /// Visits the options in this set by calling `visit` for each option.
+    pub fn record(&self, visit: &mut dyn Visit) {
+        let record = self.record;
+        record(visit);
     }
 
-    /// Get an option entry by its fully-qualified name
-    /// (e.g. `foo.bar` refers to the `bar` option in the `foo` group).
+    /// Returns `true` if this set has an option that resolves to `name`.
+    ///
+    /// The name can be separated by `.` to find a nested option.
     ///
     /// ## Examples
     ///
-    /// ### Find a direct child
+    /// ### Test for the existence of a child option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionGroup, OptionEntry, OptionField};
+    /// # use ruff_workspace::options_base::{OptionField, OptionsMetadata, Visit};
     ///
-    /// const OPTIONS: [(&'static str, OptionEntry); 2] = [
-    ///     ("ignore_names", OptionEntry::Field(OptionField {
-    ///         doc: "ignore_doc",
-    ///         default: "ignore_default",
-    ///         value_type: "value_type",
-    ///         example: "ignore code"
-    ///     })),
+    /// struct WithOptions;
     ///
-    ///     ("global_names", OptionEntry::Field(OptionField {
-    ///         doc: "global_doc",
-    ///         default: "global_default",
-    ///         value_type: "value_type",
-    ///         example: "global code"
-    ///     }))
-    /// ];
-    ///
-    /// let group = OptionGroup::new(&OPTIONS);
-    ///
-    /// let ignore_names = group.get("ignore_names");
-    ///
-    /// match ignore_names {
-    ///     None => panic!("Expect option 'ignore_names' to be Some"),
-    ///     Some(OptionEntry::Group(group)) => panic!("Expected 'ignore_names' to be a field but found group {}", group),
-    ///     Some(OptionEntry::Field(field)) => {
-    ///         assert_eq!("ignore_doc", field.doc);
+    /// impl OptionsMetadata for WithOptions {
+    ///     fn record(visit: &mut dyn Visit) {
+    ///         visit.record_field("ignore-git-ignore", OptionField {
+    ///             doc: "Whether Ruff should respect the gitignore file",
+    ///             default: "false",
+    ///             value_type: "bool",
+    ///             example: "",
+    ///         });
     ///     }
     /// }
     ///
-    /// assert_eq!(None, group.get("not_existing_option"));
+    /// assert!(WithOptions::metadata().has("ignore-git-ignore"));
+    /// assert!(!WithOptions::metadata().has("does-not-exist"));
     /// ```
-    ///
-    /// ### Find a nested options
+    /// ### Test for the existence of a nested option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionGroup, OptionEntry, OptionField};
+    /// # use ruff_workspace::options_base::{OptionField, OptionsMetadata, Visit};
     ///
-    /// const IGNORE_OPTIONS: [(&'static str, OptionEntry); 2] = [
-    ///     ("names", OptionEntry::Field(OptionField {
-    ///         doc: "ignore_name_doc",
-    ///         default: "ignore_name_default",
-    ///         value_type: "value_type",
-    ///         example: "ignore name code"
-    ///     })),
+    /// struct Root;
     ///
-    ///     ("extensions", OptionEntry::Field(OptionField {
-    ///         doc: "ignore_extensions_doc",
-    ///         default: "ignore_extensions_default",
-    ///         value_type: "value_type",
-    ///         example: "ignore extensions code"
-    ///     }))
-    /// ];
+    /// impl OptionsMetadata for Root {
+    ///     fn record(visit: &mut dyn Visit) {
+    ///         visit.record_field("ignore-git-ignore", OptionField {
+    ///             doc: "Whether Ruff should respect the gitignore file",
+    ///             default: "false",
+    ///             value_type: "bool",
+    ///             example: "",
+    ///         });
     ///
-    /// const OPTIONS: [(&'static str, OptionEntry); 2] = [
-    ///     ("ignore", OptionEntry::Group(OptionGroup::new(&IGNORE_OPTIONS))),
-    ///
-    ///     ("global_names", OptionEntry::Field(OptionField {
-    ///         doc: "global_doc",
-    ///         default: "global_default",
-    ///         value_type: "value_type",
-    ///         example: "global code"
-    ///     }))
-    /// ];
-    ///
-    /// let group = OptionGroup::new(&OPTIONS);
-    ///
-    /// let ignore_names = group.get("ignore.names");
-    ///
-    /// match ignore_names {
-    ///     None => panic!("Expect option 'ignore.names' to be Some"),
-    ///     Some(OptionEntry::Group(group)) => panic!("Expected 'ignore_names' to be a field but found group {}", group),
-    ///     Some(OptionEntry::Field(field)) => {
-    ///         assert_eq!("ignore_name_doc", field.doc);
+    ///         visit.record_set("format", Nested::metadata());
     ///     }
     /// }
+    ///
+    /// struct Nested;
+    ///
+    /// impl OptionsMetadata for Nested {
+    ///     fn record(visit: &mut dyn Visit) {
+    ///         visit.record_field("hard-tabs", OptionField {
+    ///             doc: "Use hard tabs for indentation and spaces for alignment.",
+    ///             default: "false",
+    ///             value_type: "bool",
+    ///             example: "",
+    ///         });
+    ///     }
+    /// }
+    ///
+    /// assert!(Root::metadata().has("format.hard-tabs"));
+    /// assert!(!Root::metadata().has("format.spaces"));
+    /// assert!(!Root::metadata().has("lint.hard-tabs"));
     /// ```
-    pub fn get(&self, name: &str) -> Option<&OptionEntry> {
-        let mut parts = name.split('.').peekable();
+    pub fn has(&self, name: &str) -> bool {
+        self.find(name).is_some()
+    }
 
-        let mut options = self.iter();
+    /// Returns `Some` if this set has an option that resolves to `name` and `None` otherwise.
+    ///
+    /// The name can be separated by `.` to find a nested option.
+    ///
+    /// ## Examples
+    ///
+    /// ### Find a child option
+    ///
+    /// ```rust
+    /// # use ruff_workspace::options_base::{OptionEntry, OptionField, OptionsMetadata, Visit};
+    ///
+    /// struct WithOptions;
+    ///
+    /// static IGNORE_GIT_IGNORE: OptionField = OptionField {
+    ///     doc: "Whether Ruff should respect the gitignore file",
+    ///     default: "false",
+    ///     value_type: "bool",
+    ///     example: "",
+    ///  };
+    ///
+    /// impl OptionsMetadata for WithOptions {
+    ///     fn record(visit: &mut dyn Visit) {
+    ///         visit.record_field("ignore-git-ignore", IGNORE_GIT_IGNORE.clone());
+    ///     }
+    /// }
+    ///
+    /// assert_eq!(WithOptions::metadata().find("ignore-git-ignore"), Some(OptionEntry::Field(IGNORE_GIT_IGNORE.clone())));
+    /// assert_eq!(WithOptions::metadata().find("does-not-exist"), None);
+    /// ```
+    /// ### Find a nested option
+    ///
+    /// ```rust
+    /// # use ruff_workspace::options_base::{OptionEntry, OptionField, OptionsMetadata, Visit};
+    ///
+    /// static HARD_TABS: OptionField = OptionField {
+    ///     doc: "Use hard tabs for indentation and spaces for alignment.",
+    ///     default: "false",
+    ///     value_type: "bool",
+    ///     example: "",
+    /// };
+    ///
+    /// struct Root;
+    ///
+    /// impl OptionsMetadata for Root {
+    ///     fn record(visit: &mut dyn Visit) {
+    ///         visit.record_field("ignore-git-ignore", OptionField {
+    ///             doc: "Whether Ruff should respect the gitignore file",
+    ///             default: "false",
+    ///             value_type: "bool",
+    ///             example: "",
+    ///         });
+    ///
+    ///         visit.record_set("format", Nested::metadata());
+    ///     }
+    /// }
+    ///
+    /// struct Nested;
+    ///
+    /// impl OptionsMetadata for Nested {
+    ///     fn record(visit: &mut dyn Visit) {
+    ///         visit.record_field("hard-tabs", HARD_TABS.clone());
+    ///     }
+    /// }
+    ///
+    /// assert_eq!(Root::metadata().find("format.hard-tabs"), Some(OptionEntry::Field(HARD_TABS.clone())));
+    /// assert_eq!(Root::metadata().find("format"), Some(OptionEntry::Set(Nested::metadata())));
+    /// assert_eq!(Root::metadata().find("format.spaces"), None);
+    /// assert_eq!(Root::metadata().find("lint.hard-tabs"), None);
+    /// ```
+    pub fn find(&self, name: &str) -> Option<OptionEntry> {
+        struct FindOptionVisitor<'a> {
+            option: Option<OptionEntry>,
+            parts: std::str::Split<'a, char>,
+            needle: &'a str,
+        }
 
-        loop {
-            let part = parts.next()?;
+        impl Visit for FindOptionVisitor<'_> {
+            fn record_set(&mut self, name: &str, set: OptionSet) {
+                if self.option.is_none() && name == self.needle {
+                    if let Some(next) = self.parts.next() {
+                        self.needle = next;
+                        set.record(self);
+                    } else {
+                        self.option = Some(OptionEntry::Set(set));
+                    }
+                }
+            }
 
-            let (_, field) = options.find(|(name, _)| *name == part)?;
-
-            match (parts.peek(), field) {
-                (None, field) => return Some(field),
-                (Some(..), OptionEntry::Field(..)) => return None,
-                (Some(..), OptionEntry::Group(group)) => {
-                    options = group.iter();
+            fn record_field(&mut self, name: &str, field: OptionField) {
+                if self.option.is_none() && name == self.needle {
+                    if self.parts.next().is_none() {
+                        self.option = Some(OptionEntry::Field(field));
+                    }
                 }
             }
         }
-    }
-}
 
-impl<'a> IntoIterator for &'a OptionGroup {
-    type IntoIter = std::slice::Iter<'a, (&'a str, OptionEntry)>;
-    type Item = &'a (&'a str, OptionEntry);
+        let mut parts = name.split('.');
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
+        if let Some(first) = parts.next() {
+            let mut visitor = FindOptionVisitor {
+                parts,
+                needle: first,
+                option: None,
+            };
 
-impl IntoIterator for OptionGroup {
-    type IntoIter = std::slice::Iter<'static, (&'static str, OptionEntry)>;
-    type Item = &'static (&'static str, OptionEntry);
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl Display for OptionGroup {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for (name, _) in self {
-            writeln!(f, "{name}")?;
+            self.record(&mut visitor);
+            visitor.option
+        } else {
+            None
         }
-
-        Ok(())
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+/// Visitor that writes out the names of all fields and sets.
+struct DisplayVisitor<'fmt, 'buf> {
+    f: &'fmt mut Formatter<'buf>,
+    result: std::fmt::Result,
+}
+
+impl<'fmt, 'buf> DisplayVisitor<'fmt, 'buf> {
+    fn new(f: &'fmt mut Formatter<'buf>) -> Self {
+        Self { f, result: Ok(()) }
+    }
+
+    fn finish(self) -> std::fmt::Result {
+        self.result
+    }
+}
+
+impl Visit for DisplayVisitor<'_, '_> {
+    fn record_set(&mut self, name: &str, _: OptionSet) {
+        self.result = self.result.and_then(|_| writeln!(self.f, "{name}"));
+    }
+
+    fn record_field(&mut self, name: &str, _: OptionField) {
+        self.result = self.result.and_then(|_| writeln!(self.f, "{name}"));
+    }
+}
+
+impl Display for OptionSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut visitor = DisplayVisitor::new(f);
+        self.record(&mut visitor);
+        visitor.finish()
+    }
+}
+
+impl Debug for OptionSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct OptionField {
     pub doc: &'static str,
     pub default: &'static str,

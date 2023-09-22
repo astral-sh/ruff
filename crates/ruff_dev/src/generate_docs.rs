@@ -11,6 +11,7 @@ use strum::IntoEnumIterator;
 use ruff_diagnostics::AutofixKind;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_workspace::options::Options;
+use ruff_workspace::options_base::OptionsMetadata;
 
 use crate::ROOT_DIR;
 
@@ -96,10 +97,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
             if let Some(rest) = line.strip_prefix("- `") {
                 let option = rest.trim_end().trim_end_matches('`');
 
-                assert!(
-                    Options::metadata().get(option).is_some(),
-                    "unknown option {option}"
-                );
+                assert!(Options::metadata().has(option), "unknown option {option}");
 
                 let anchor = option.replace('.', "-");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));
