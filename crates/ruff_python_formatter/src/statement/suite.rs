@@ -190,7 +190,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // a leading comment.
                 match self.kind {
                     SuiteKind::TopLevel => {
-                        match lines_after_ignoring_trivia(preceding.end(), source) {
+                        let end = if let Some(last_trailing) = preceding_comments.trailing.last() {
+                            last_trailing.end()
+                        } else {
+                            preceding.end()
+                        };
+                        match lines_after(end, source) {
                             0..=2 => empty_line().fmt(f)?,
                             _ => match source_type {
                                 PySourceType::Stub => {
