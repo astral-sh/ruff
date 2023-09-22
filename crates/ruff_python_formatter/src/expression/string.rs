@@ -780,21 +780,22 @@ fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> 
     let preferred_quote = style.as_char();
     let opposite_quote = style.invert().as_char();
 
-    let mut chars = input.char_indices();
+    let mut chars = input.char_indices().peekable();
 
     let is_raw = prefix.is_raw_string();
     let is_fstring = prefix.is_fstring();
-    let mut in_formatted_value = false;
+    let mut formatted_value_nesting = 0u32;
 
     while let Some((index, c)) = chars.next() {
         if is_fstring && matches!(c, '{' | '}') {
-            if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
-                if next == c {
-                    // Skip over the second character of the double braces
-                    chars.next();
-                } else {
-                    in_formatted_value = c == '{';
-                }
+            if chars.peek().copied().is_some_and(|(_, next)| next == c) {
+                // Skip over the second character of the double braces
+                chars.next();
+            } else if c == '{' {
+                formatted_value_nesting += 1;
+            } else {
+                // Safe to assume that `c == '}'` here because of the matched pattern above
+                formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
             }
             continue;
         }
@@ -802,7 +803,7 @@ fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> 
             output.push_str(&input[last_index..index]);
 
             // Skip over the '\r' character, keep the `\n`
-            if input.as_bytes().get(index + 1).copied() == Some(b'\n') {
+            if chars.peek().copied().is_some_and(|(_, next)| next == '\n') {
                 chars.next();
             }
             // Replace the `\r` with a `\n`
@@ -813,9 +814,9 @@ fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> 
             last_index = index + '\r'.len_utf8();
         } else if !quotes.triple && !is_raw {
             if c == '\\' {
-                if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
+                if let Some((_, next)) = chars.peek().copied() {
                     #[allow(clippy::if_same_then_else)]
-                    if next == opposite_quote && !in_formatted_value {
+                    if next == opposite_quote && formatted_value_nesting == 0 {
                         // Remove the escape by ending before the backslash and starting again with the quote
                         chars.next();
                         output.push_str(&input[last_index..index]);
@@ -828,7 +829,7 @@ fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> 
                         chars.next();
                     }
                 }
-            } else if c == preferred_quote && !in_formatted_value {
+            } else if c == preferred_quote && formatted_value_nesting == 0 {
                 // Escape the quote
                 output.push_str(&input[last_index..index]);
                 output.push('\\');
