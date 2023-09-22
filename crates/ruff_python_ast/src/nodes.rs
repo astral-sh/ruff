@@ -6,6 +6,7 @@ use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
 
+use crate::int;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
@@ -2577,209 +2578,13 @@ impl Ranged for Identifier {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Number {
-    /// A "small" number that can be represented as an `i64`.
-    Small(i64),
-    /// A "large" number that cannot be represented as an `i64`.
-    Big(Box<str>),
-}
-
-impl std::fmt::Display for Number {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Number::Small(value) => write!(f, "{value}"),
-            Number::Big(value) => write!(f, "{value}"),
-        }
-    }
-}
-
-/// A Python integer literal. Represents both small (fits in an `i64`) and large integers.
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Int(Number);
-
-impl Int {
-    pub const ZERO: Int = Int(Number::Small(0));
-    pub const ONE: Int = Int(Number::Small(1));
-    pub const TWO: Int = Int(Number::Small(2));
-    pub const THREE: Int = Int(Number::Small(3));
-
-    /// Create an [`Int`] to represent a value that can be represented as an `i64`.
-    fn small(value: i64) -> Self {
-        Self(Number::Small(value))
-    }
-
-    /// Create an [`Int`] to represent a value that cannot be represented as an `i64`.
-    fn big(value: impl Into<Box<str>>) -> Self {
-        Self(Number::Big(value.into()))
-    }
-
-    /// Parse an [`Int`] from a string.
-    pub fn parse(s: &str) -> Result<Self, std::num::ParseIntError> {
-        match s.parse::<i64>() {
-            Ok(value) => Ok(Int::small(value)),
-            Err(err) => {
-                if matches!(
-                    err.kind(),
-                    std::num::IntErrorKind::PosOverflow | std::num::IntErrorKind::NegOverflow
-                ) {
-                    Ok(Int::big(s))
-                } else {
-                    Err(err)
-                }
-            }
-        }
-    }
-
-    /// Parse an [`Int`] from a string with a given radix.
-    pub fn parse_from_radix(s: &str, radix: u32) -> Result<Self, std::num::ParseIntError> {
-        match i64::from_str_radix(s, radix) {
-            Ok(value) => Ok(Int::small(value)),
-            Err(err) => {
-                if matches!(
-                    err.kind(),
-                    std::num::IntErrorKind::PosOverflow | std::num::IntErrorKind::NegOverflow
-                ) {
-                    Ok(Int::big(s))
-                } else {
-                    Err(err)
-                }
-            }
-        }
-    }
-
-    /// Return the [`Int`] as an u8, if it can be represented as that data type.
-    pub fn as_u8(&self) -> Option<u8> {
-        match &self.0 {
-            Number::Small(small) => u8::try_from(*small).ok(),
-            Number::Big(_) => None,
-        }
-    }
-
-    /// Return the [`Int`] as an u16, if it can be represented as that data type.
-    pub fn as_u16(&self) -> Option<u16> {
-        match &self.0 {
-            Number::Small(small) => u16::try_from(*small).ok(),
-            Number::Big(_) => None,
-        }
-    }
-
-    /// Return the [`Int`] as an u32, if it can be represented as that data type.
-    pub fn as_u32(&self) -> Option<u32> {
-        match &self.0 {
-            Number::Small(small) => u32::try_from(*small).ok(),
-            Number::Big(_) => None,
-        }
-    }
-
-    /// Return the [`Int`] as an i8, if it can be represented as that data type.
-    pub fn as_i8(&self) -> Option<i8> {
-        match &self.0 {
-            Number::Small(small) => i8::try_from(*small).ok(),
-            Number::Big(_) => None,
-        }
-    }
-
-    /// Return the [`Int`] as an i16, if it can be represented as that data type.
-    pub fn as_i16(&self) -> Option<i16> {
-        match &self.0 {
-            Number::Small(small) => i16::try_from(*small).ok(),
-            Number::Big(_) => None,
-        }
-    }
-
-    /// Return the [`Int`] as an i32, if it can be represented as that data type.
-    pub fn as_i32(&self) -> Option<i32> {
-        match &self.0 {
-            Number::Small(small) => i32::try_from(*small).ok(),
-            Number::Big(_) => None,
-        }
-    }
-
-    /// Return the [`Int`] as an i64, if it can be represented as that data type.
-    pub fn as_i64(&self) -> Option<i64> {
-        match &self.0 {
-            Number::Small(small) => Some(*small),
-            Number::Big(_) => None,
-        }
-    }
-
-    /// Return the [`Int`] as an isize, if it can be represented as that data type.
-    pub fn as_isize(&self) -> Option<isize> {
-        match &self.0 {
-            Number::Small(small) => isize::try_from(*small).ok(),
-            Number::Big(_) => None,
-        }
-    }
-}
-
-impl std::fmt::Display for Int {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl Debug for Int {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
-    }
-}
-
-impl PartialEq<u8> for Int {
-    fn eq(&self, other: &u8) -> bool {
-        self.as_u8() == Some(*other)
-    }
-}
-
-impl PartialEq<u16> for Int {
-    fn eq(&self, other: &u16) -> bool {
-        self.as_u16() == Some(*other)
-    }
-}
-
-impl PartialEq<u32> for Int {
-    fn eq(&self, other: &u32) -> bool {
-        self.as_u32() == Some(*other)
-    }
-}
-
-impl PartialEq<i8> for Int {
-    fn eq(&self, other: &i8) -> bool {
-        self.as_i8() == Some(*other)
-    }
-}
-
-impl PartialEq<i16> for Int {
-    fn eq(&self, other: &i16) -> bool {
-        self.as_i16() == Some(*other)
-    }
-}
-
-impl PartialEq<i32> for Int {
-    fn eq(&self, other: &i32) -> bool {
-        self.as_i32() == Some(*other)
-    }
-}
-
-impl PartialEq<i64> for Int {
-    fn eq(&self, other: &i64) -> bool {
-        self.as_i64() == Some(*other)
-    }
-}
-
-impl PartialEq<isize> for Int {
-    fn eq(&self, other: &isize) -> bool {
-        self.as_isize() == Some(*other)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Constant {
     None,
     Bool(bool),
     Str(StringConstant),
     Bytes(BytesConstant),
-    Int(Int),
+    Int(int::Int),
     Float(f64),
     Complex { real: f64, imag: f64 },
     Ellipsis,

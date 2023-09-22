@@ -9,12 +9,6 @@ use crate::autofix::edits::{pad, remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Reason {
-    BytesLiteral,
-    DefaultArgument,
-}
-
 /// ## What it does
 /// Checks for unnecessary calls to `encode` as UTF-8.
 ///
@@ -54,6 +48,12 @@ impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
             Reason::DefaultArgument => "Remove unnecessary `encoding` argument".to_string(),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Reason {
+    BytesLiteral,
+    DefaultArgument,
 }
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];

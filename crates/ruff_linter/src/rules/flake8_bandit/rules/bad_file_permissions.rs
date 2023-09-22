@@ -1,3 +1,5 @@
+use anyhow::Result;
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
@@ -34,15 +36,26 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[violation]
 pub struct BadFilePermissions {
-    mask: i64,
+    reason: Reason,
 }
 
 impl Violation for BadFilePermissions {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadFilePermissions { mask } = self;
-        format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory")
+        let BadFilePermissions { reason } = self;
+        match reason {
+            Reason::Permissive(mask) => {
+                format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory")
+            }
+            Reason::Invalid => format!("`os.chmod` setting an invalid mask on file or directory"),
+        }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Reason {
+    Permissive(u16),
+    Invalid,
 }
 
 /// S103
@@ -53,10 +66,26 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "chmod"]))
     {
         if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
-            if let Some(mask) = int_value(mode_arg, checker.semantic()) {
-                if (mask & WRITE_WORLD > 0) || (mask & EXECUTE_GROUP > 0) {
+            match parse_mask(mode_arg, checker.semantic()) {
+                // The mask couldn't be determined (e.g., it's dynamic).
+                Ok(None) => {}
+                // The mask is a valid integer value -- check for overly permissive permissions.
+                Ok(Some(mask)) => {
+                    if (mask & WRITE_WORLD > 0) || (mask & EXECUTE_GROUP > 0) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            BadFilePermissions {
+                                reason: Reason::Permissive(mask),
+                            },
+                            mode_arg.range(),
+                        ));
+                    }
+                }
+                // The mask is an invalid integer value (i.e., it's out of range).
+                Err(_) => {
                     checker.diagnostics.push(Diagnostic::new(
-                        BadFilePermissions { mask },
+                        BadFilePermissions {
+                            reason: Reason::Invalid,
+                        },
                         mode_arg.range(),
                     ));
                 }
@@ -65,10 +94,10 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
     }
 }
 
-const WRITE_WORLD: i64 = 0o2;
-const EXECUTE_GROUP: i64 = 0o10;
+const WRITE_WORLD: u16 = 0o2;
+const EXECUTE_GROUP: u16 = 0o10;
 
-fn py_stat(call_path: &CallPath) -> Option<i64> {
+fn py_stat(call_path: &CallPath) -> Option<u16> {
     match call_path.as_slice() {
         ["stat", "ST_MODE"] => Some(0o0),
         ["stat", "S_IFDOOR"] => Some(0o0),
@@ -111,28 +140,37 @@ fn py_stat(call_path: &CallPath) -> Option<i64> {
     }
 }
 
-fn int_value(expr: &Expr, semantic: &SemanticModel) -> Option<i64> {
+/// Return the mask value as a `u16`, if it can be determined. Returns an error if the mask is
+/// an integer value, but that value is out of range.
+fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> Result<Option<u16>> {
     match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(int),
             ..
-        }) => int.as_i64(),
-        Expr::Attribute(_) => semantic.resolve_call_path(expr).as_ref().and_then(py_stat),
+        }) => match int.as_u16() {
+            Some(value) => Ok(Some(value)),
+            None => anyhow::bail!("int value out of range"),
+        },
+        Expr::Attribute(_) => Ok(semantic.resolve_call_path(expr).as_ref().and_then(py_stat)),
         Expr::BinOp(ast::ExprBinOp {
             left,
             op,
             right,
             range: _,
         }) => {
-            let left_value = int_value(left, semantic)?;
-            let right_value = int_value(right, semantic)?;
-            match op {
+            let Some(left_value) = parse_mask(left, semantic)? else {
+                return Ok(None);
+            };
+            let Some(right_value) = parse_mask(right, semantic)? else {
+                return Ok(None);
+            };
+            Ok(match op {
                 Operator::BitAnd => Some(left_value & right_value),
                 Operator::BitOr => Some(left_value | right_value),
                 Operator::BitXor => Some(left_value ^ right_value),
                 _ => None,
-            }
+            })
         }
-        _ => None,
+        _ => Ok(None),
     }
 }

@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Int};
+use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -45,7 +45,7 @@ impl From<LiteralType> for Constant {
                 value: Vec::new(),
                 implicit_concatenated: false,
             }),
-            LiteralType::Int => Constant::Int(Int::ZERO),
+            LiteralType::Int => Constant::Int(0.into()),
             LiteralType::Float => Constant::Float(0.0),
             LiteralType::Bool => Constant::Bool(false),
         }

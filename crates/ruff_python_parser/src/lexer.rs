@@ -264,7 +264,7 @@ impl<'source> Lexer<'source> {
         let mut number = LexedText::new(self.offset(), self.source);
         self.radix_run(&mut number, radix);
 
-        let value = match Int::parse_from_radix(number.as_str(), radix.as_u32()) {
+        let value = match Int::from_str_radix(number.as_str(), radix.as_u32()) {
             Ok(int) => int,
             Err(err) => {
                 return Err(LexicalError {
@@ -343,7 +343,7 @@ impl<'source> Lexer<'source> {
                 let imag = f64::from_str(number.as_str()).unwrap();
                 Ok(Tok::Complex { real: 0.0, imag })
             } else {
-                let value = match Int::parse(number.as_str()) {
+                let value = match Int::from_str(number.as_str()) {
                     Ok(value) => {
                         if start_is_zero && value.as_u8() != Some(0) {
                             // Leading zeros in decimal integer literals are not permitted.

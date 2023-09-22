@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::call_path::CallPath;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, Int, MatchCase, Pattern, Stmt, TypeParam,
+    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -1072,7 +1072,7 @@ impl Truthiness {
                 Constant::None => Some(false),
                 Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
                 Constant::Bytes(bytes) => Some(!bytes.is_empty()),
-                Constant::Int(int) => Some(int != &Int::ZERO),
+                Constant::Int(int) => Some(*int != 0),
                 Constant::Float(float) => Some(*float != 0.0),
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
@@ -1189,15 +1189,15 @@ mod tests {
             ctx: ExprContext::Load,
         });
         let constant_one = Expr::Constant(ExprConstant {
-            value: Constant::Int(Int::ONE),
+            value: Constant::Int(1.into()),
             range: TextRange::default(),
         });
         let constant_two = Expr::Constant(ExprConstant {
-            value: Constant::Int(Int::TWO),
+            value: Constant::Int(2.into()),
             range: TextRange::default(),
         });
         let constant_three = Expr::Constant(ExprConstant {
-            value: Constant::Int(Int::THREE),
+            value: Constant::Int(3.into()),
             range: TextRange::default(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
