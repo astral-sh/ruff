@@ -44,7 +44,7 @@ impl<'a> Cursor<'a> {
         self.chars.clone().next_back().unwrap_or(EOF_CHAR)
     }
 
-    // SAFETY: THe `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
+    // SAFETY: The `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
     #[allow(clippy::cast_possible_truncation)]
     pub fn text_len(&self) -> TextSize {
         TextSize::new(self.chars.as_str().len() as u32)

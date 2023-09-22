@@ -466,7 +466,7 @@ pub struct StmtImportFrom {
     pub range: TextRange,
     pub module: Option<Identifier>,
     pub names: Vec<Alias>,
-    pub level: Option<Int>,
+    pub level: Option<u32>,
 }
 
 impl From<StmtImportFrom> for Stmt {
@@ -2135,6 +2135,15 @@ impl Parameters {
         }
         false
     }
+
+    /// Returns `true` if the [`Parameters`] is empty.
+    pub fn is_empty(&self) -> bool {
+        self.posonlyargs.is_empty()
+            && self.args.is_empty()
+            && self.kwonlyargs.is_empty()
+            && self.vararg.is_none()
+            && self.kwarg.is_none()
+    }
 }
 
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
@@ -2566,35 +2575,6 @@ impl From<Identifier> for String {
 impl Ranged for Identifier {
     fn range(&self) -> TextRange {
         self.range
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Int(u32);
-
-impl Int {
-    pub fn new(i: u32) -> Self {
-        Self(i)
-    }
-    pub fn to_u32(&self) -> u32 {
-        self.0
-    }
-    pub fn to_usize(&self) -> usize {
-        self.0 as _
-    }
-}
-
-impl std::cmp::PartialEq<u32> for Int {
-    #[inline]
-    fn eq(&self, other: &u32) -> bool {
-        self.0 == *other
-    }
-}
-
-impl std::cmp::PartialEq<usize> for Int {
-    #[inline]
-    fn eq(&self, other: &usize) -> bool {
-        self.0 as usize == *other
     }
 }
 

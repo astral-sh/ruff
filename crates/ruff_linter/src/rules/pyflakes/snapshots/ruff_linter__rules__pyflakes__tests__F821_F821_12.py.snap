@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_12.py:20:28: F821 Undefined name `os`
+   |
+20 | def f(x: Callable[[VarArg("os")], None]):  # F821
+   |                            ^^ F821
+21 |     pass
+   |
+
+F821_12.py:25:14: F821 Undefined name `Baz`
+   |
+24 | f(Callable[["Bar"], None])
+25 | f(Callable[["Baz"], None])
+   |              ^^^ F821
+   |
+
+

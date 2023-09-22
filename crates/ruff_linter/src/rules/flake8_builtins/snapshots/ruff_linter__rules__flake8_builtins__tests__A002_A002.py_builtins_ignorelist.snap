@@ -1,0 +1,54 @@
+---
+source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+---
+A002.py:1:11: A002 Argument `str` is shadowing a Python builtin
+  |
+1 | def func1(str, /, type, *complex, Exception, **getattr):
+  |           ^^^ A002
+2 |     pass
+  |
+
+A002.py:1:19: A002 Argument `type` is shadowing a Python builtin
+  |
+1 | def func1(str, /, type, *complex, Exception, **getattr):
+  |                   ^^^^ A002
+2 |     pass
+  |
+
+A002.py:1:26: A002 Argument `complex` is shadowing a Python builtin
+  |
+1 | def func1(str, /, type, *complex, Exception, **getattr):
+  |                          ^^^^^^^ A002
+2 |     pass
+  |
+
+A002.py:1:35: A002 Argument `Exception` is shadowing a Python builtin
+  |
+1 | def func1(str, /, type, *complex, Exception, **getattr):
+  |                                   ^^^^^^^^^ A002
+2 |     pass
+  |
+
+A002.py:1:48: A002 Argument `getattr` is shadowing a Python builtin
+  |
+1 | def func1(str, /, type, *complex, Exception, **getattr):
+  |                                                ^^^^^^^ A002
+2 |     pass
+  |
+
+A002.py:5:17: A002 Argument `bytes` is shadowing a Python builtin
+  |
+5 | async def func2(bytes):
+  |                 ^^^^^ A002
+6 |     pass
+  |
+
+A002.py:11:16: A002 Argument `float` is shadowing a Python builtin
+   |
+ 9 |     pass
+10 | 
+11 | map([], lambda float: ...)
+   |                ^^^^^ A002
+   |
+
+

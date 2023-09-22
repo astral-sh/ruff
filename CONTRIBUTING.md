@@ -112,11 +112,11 @@ Ruff is structured as a monorepo with a [flat crate structure](https://matklad.g
 such that all crates are contained in a flat `crates` directory.
 
 The vast majority of the code, including all lint rules, lives in the `ruff` crate (located at
-`crates/ruff`). As a contributor, that's the crate that'll be most relevant to you.
+`crates/ruff_linter`). As a contributor, that's the crate that'll be most relevant to you.
 
 At time of writing, the repository includes the following crates:
 
-- `crates/ruff`: library crate containing all lint rules and the core logic for running them.
+- `crates/ruff_linter`: library crate containing all lint rules and the core logic for running them.
     If you're working on a rule, this is the crate for you.
 - `crates/ruff_benchmark`: binary crate for running micro-benchmarks.
 - `crates/ruff_cache`: library crate for caching lint results.
@@ -153,7 +153,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention)
     (e.g., `AssertFalse`, as in, "allow `assert False`").
 
-1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/assert_false.rs`).
+1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
     `#[violation]` to see examples.
@@ -162,21 +162,21 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
     an `ast::StmtAssert` node).
 
-1. Define the logic for invoking the diagnostic in `crates/ruff/src/checkers/ast/analyze` (for
-    AST-based rules), `crates/ruff/src/checkers/tokens.rs` (for token-based rules),
-    `crates/ruff/src/checkers/physical_lines.rs` (for text-based rules),
-    `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based rules), etc. For AST-based rules,
+1. Define the logic for invoking the diagnostic in `crates/ruff_linter/src/checkers/ast/analyze` (for
+    AST-based rules), `crates/ruff_linter/src/checkers/tokens.rs` (for token-based rules),
+    `crates/ruff_linter/src/checkers/physical_lines.rs` (for text-based rules),
+    `crates/ruff_linter/src/checkers/filesystem.rs` (for filesystem-based rules), etc. For AST-based rules,
     you'll likely want to modify `analyze/statement.rs` (if your rule is based on analyzing
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff/src/codes.rs` (e.g., `B011`).
+1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
 1. Update the generated files (documentation and generated code).
 
-To trigger the violation, you'll likely want to augment the logic in `crates/ruff/src/checkers/ast.rs`
+To trigger the violation, you'll likely want to augment the logic in `crates/ruff_linter/src/checkers/ast.rs`
 to call your new function at the appropriate time and with the appropriate inputs. The `Checker`
 defined therein is a Python AST visitor, which iterates over the AST, building up a semantic model,
 and calling out to lint rule analyzer functions as it goes.
@@ -221,7 +221,7 @@ Ruff's output for each fixture, which you can then commit alongside your changes
 
 Once you've completed the code for the rule itself, you can define tests with the following steps:
 
-1. Add a Python file to `crates/ruff/resources/test/fixtures/[linter]` that contains the code you
+1. Add a Python file to `crates/ruff_linter/resources/test/fixtures/[linter]` that contains the code you
     want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
     examples of both violations and non-violations.
 
@@ -230,16 +230,16 @@ Once you've completed the code for the rule itself, you can define tests with th
     For example, if you're adding a new rule named `E402`, you would run:
 
     ```shell
-    cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402
+    cargo run -p ruff_cli -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402
     ```
 
     **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
     you activate it by adding `--select ${rule_code}` to the command.
 
-1. Add the test to the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. If you're contributing
+1. Add the test to the relevant `crates/ruff_linter/src/rules/[linter]/mod.rs` file. If you're contributing
     a rule to a pre-existing set, you should be able to find a similar example to pattern-match
     against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
-    e.g., `crates/ruff/src/rules/flake8_bugbear/mod.rs`)
+    e.g., `crates/ruff_linter/src/rules/flake8_bugbear/mod.rs`)
 
 1. Run `cargo test`. Your test will fail, but you'll be prompted to follow-up
     with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
@@ -251,25 +251,24 @@ Once you've completed the code for the rule itself, you can define tests with th
 
 Ruff's user-facing settings live in a few different places.
 
-First, the command-line options are defined via the `Cli` struct in `crates/ruff/src/cli.rs`.
+First, the command-line options are defined via the `Args` struct in `crates/ruff_cli/src/args.rs`.
 
-Second, the `pyproject.toml` options are defined in `crates/ruff/src/settings/options.rs` (via the
-`Options` struct), `crates/ruff/src/settings/configuration.rs` (via the `Configuration` struct), and
-`crates/ruff/src/settings/mod.rs` (via the `Settings` struct). These represent, respectively: the
-schema used to parse the `pyproject.toml` file; an internal, intermediate representation; and the
-final, internal representation used to power Ruff.
+Second, the `pyproject.toml` options are defined in `crates/ruff_workspace/src/options.rs` (via the
+`Options` struct), `crates/ruff_workspace/src/configuration.rs` (via the `Configuration` struct),
+and `crates/ruff_workspace/src/settings.rs` (via the `Settings` struct), which then includes
+the `LinterSettings` struct as a field.
+
+These represent, respectively: the schema used to parse the `pyproject.toml` file; an internal,
+intermediate representation; and the final, internal representation used to power Ruff.
 
 To add a new configuration option, you'll likely want to modify these latter few files (along with
-`cli.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
+`arg.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
 `dummy_variable_rgx`, which defines a regular expression to match against acceptable unused
 variables (e.g., `_`).
 
 Note that plugin-specific configuration options are defined in their own modules (e.g.,
-`crates/ruff/src/flake8_unused_arguments/settings.rs`).
-
-You may also want to add the new configuration option to the `flake8-to-ruff` tool, which is
-responsible for converting `flake8` configuration files to Ruff's TOML format. This logic
-lives in `crates/ruff/src/flake8_to_ruff/converter.rs`.
+`Settings` in `crates/ruff_linter/src/flake8_unused_arguments/settings.rs` coupled with
+`Flake8UnusedArgumentsOptions` in `crates/ruff_workspace/src/options.rs`).
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
@@ -362,46 +361,46 @@ First, clone [CPython](https://github.com/python/cpython). It's a large and dive
 which makes it a good target for benchmarking.
 
 ```shell
-git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
+git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter/resources/test/cpython
 ```
 
 To benchmark the release build:
 
 ```shell
 cargo build --release && hyperfine --warmup 10 \
-  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache -e" \
-  "./target/release/ruff ./crates/ruff/resources/test/cpython/ -e"
+  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
+  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ -e"
 
-Benchmark 1: ./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache
+Benchmark 1: ./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache
   Time (mean ± σ):     293.8 ms ±   3.2 ms    [User: 2384.6 ms, System: 90.3 ms]
   Range (min … max):   289.9 ms … 301.6 ms    10 runs
 
-Benchmark 2: ./target/release/ruff ./crates/ruff/resources/test/cpython/
+Benchmark 2: ./target/release/ruff ./crates/ruff_linter/resources/test/cpython/
   Time (mean ± σ):      48.0 ms ±   3.1 ms    [User: 65.2 ms, System: 124.7 ms]
   Range (min … max):    45.0 ms …  66.7 ms    62 runs
 
 Summary
-  './target/release/ruff ./crates/ruff/resources/test/cpython/' ran
-    6.12 ± 0.41 times faster than './target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache'
+  './target/release/ruff ./crates/ruff_linter/resources/test/cpython/' ran
+    6.12 ± 0.41 times faster than './target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache'
 ```
 
 To benchmark against the ecosystem's existing tools:
 
 ```shell
 hyperfine --ignore-failure --warmup 5 \
-  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache" \
-  "pyflakes crates/ruff/resources/test/cpython" \
+  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
+  "pyflakes crates/ruff_linter/resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
-  "pycodestyle crates/ruff/resources/test/cpython" \
-  "flake8 crates/ruff/resources/test/cpython"
+  "pycodestyle crates/ruff_linter/resources/test/cpython" \
+  "flake8 crates/ruff_linter/resources/test/cpython"
 
-Benchmark 1: ./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache
+Benchmark 1: ./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache
   Time (mean ± σ):     294.3 ms ±   3.3 ms    [User: 2467.5 ms, System: 89.6 ms]
   Range (min … max):   291.1 ms … 302.8 ms    10 runs
 
   Warning: Ignoring non-zero exit code.
 
-Benchmark 2: pyflakes crates/ruff/resources/test/cpython
+Benchmark 2: pyflakes crates/ruff_linter/resources/test/cpython
   Time (mean ± σ):     15.786 s ±  0.143 s    [User: 15.560 s, System: 0.214 s]
   Range (min … max):   15.640 s … 16.157 s    10 runs
 
@@ -411,31 +410,31 @@ Benchmark 3: autoflake --recursive --expand-star-imports --remove-all-unused-imp
   Time (mean ± σ):      6.175 s ±  0.169 s    [User: 54.102 s, System: 1.057 s]
   Range (min … max):    5.950 s …  6.391 s    10 runs
 
-Benchmark 4: pycodestyle crates/ruff/resources/test/cpython
+Benchmark 4: pycodestyle crates/ruff_linter/resources/test/cpython
   Time (mean ± σ):     46.921 s ±  0.508 s    [User: 46.699 s, System: 0.202 s]
   Range (min … max):   46.171 s … 47.863 s    10 runs
 
   Warning: Ignoring non-zero exit code.
 
-Benchmark 5: flake8 crates/ruff/resources/test/cpython
+Benchmark 5: flake8 crates/ruff_linter/resources/test/cpython
   Time (mean ± σ):     12.260 s ±  0.321 s    [User: 102.934 s, System: 1.230 s]
   Range (min … max):   11.848 s … 12.933 s    10 runs
 
   Warning: Ignoring non-zero exit code.
 
 Summary
-  './target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache' ran
+  './target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache' ran
    20.98 ± 0.62 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
-   41.66 ± 1.18 times faster than 'flake8 crates/ruff/resources/test/cpython'
-   53.64 ± 0.77 times faster than 'pyflakes crates/ruff/resources/test/cpython'
-  159.43 ± 2.48 times faster than 'pycodestyle crates/ruff/resources/test/cpython'
+   41.66 ± 1.18 times faster than 'flake8 crates/ruff_linter/resources/test/cpython'
+   53.64 ± 0.77 times faster than 'pyflakes crates/ruff_linter/resources/test/cpython'
+  159.43 ± 2.48 times faster than 'pycodestyle crates/ruff_linter/resources/test/cpython'
 ```
 
 To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
 
 ```shell
 cargo build --release && hyperfine --warmup 10 \
-  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache -e --select W505,E501"
+  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
 You can run `poetry install` from `./scripts/benchmarks` to create a working environment for the
@@ -468,10 +467,10 @@ rm Lib/test/bad_coding.py \
   Lib/test/test_typing.py
 ```
 
-Then, from `crates/ruff/resources/test/cpython`, run: `time pylint -j 0 -E $(git ls-files '*.py')`. This
+Then, from `crates/ruff_linter/resources/test/cpython`, run: `time pylint -j 0 -E $(git ls-files '*.py')`. This
 will execute Pylint with maximum parallelism and only report errors.
 
-To benchmark Pyupgrade, run the following from `crates/ruff/resources/test/cpython`:
+To benchmark Pyupgrade, run the following from `crates/ruff_linter/resources/test/cpython`:
 
 ```shell
 hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
@@ -719,8 +718,8 @@ Module {
 - `cargo dev generate-cli-help`, `cargo dev generate-docs` and `cargo dev generate-json-schema`:
     Update just `docs/configuration.md`, `docs/rules` and `ruff.schema.json` respectively.
 - `cargo dev generate-options`: Generate a markdown-compatible table of all `pyproject.toml`
-    options. Used for <https://beta.ruff.rs/docs/settings/>
-- `cargo dev generate-rules-table`: Generate a markdown-compatible table of all rules. Used for <https://beta.ruff.rs/docs/rules/>
+    options. Used for <https://docs.astral.sh/ruff/settings/>.
+- `cargo dev generate-rules-table`: Generate a markdown-compatible table of all rules. Used for <https://docs.astral.sh/ruff/rules/>.
 - `cargo dev round-trip <python file or jupyter notebook>`: Read a Python file or Jupyter Notebook,
     parse it, serialize the parsed representation and write it back. Used to check how good our
     representation is so that fixes don't rewrite irrelevant parts of a file.
@@ -778,7 +777,7 @@ To understand Ruff's import categorization system, we first need to define two c
 - "Package root": The top-most directory defining the Python package that includes a given Python
     file. To find the package root for a given Python file, traverse up its parent directories until
     you reach a parent directory that doesn't contain an `__init__.py` file (and isn't marked as
-    a [namespace package](https://beta.ruff.rs/docs/settings/#namespace-packages)); take the directory
+    a [namespace package](https://docs.astral.sh/ruff/settings/#namespace-packages)); take the directory
     just before that, i.e., the first directory in the package.
 
 For example, given:
@@ -867,7 +866,7 @@ There are three ways in which an import can be categorized as "first-party":
     package (e.g., `from foo import bar` or `import foo.bar`), they'll be classified as first-party
     automatically. This check is as simple as comparing the first segment of the current file's
     module path to the first segment of the import.
-1. **Source roots**: Ruff supports a `[src](https://beta.ruff.rs/docs/settings/#src)` setting, which
+1. **Source roots**: Ruff supports a `[src](https://docs.astral.sh/ruff/settings/#src)` setting, which
     sets the directories to scan when identifying first-party imports. The algorithm is
     straightforward: given an import, like `import foo`, iterate over the directories enumerated in
     the `src` setting and, for each directory, check for the existence of a subdirectory `foo` or a

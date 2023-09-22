@@ -1,8 +1,11 @@
 use ruff_formatter::prelude::tag::Condition;
-use ruff_formatter::{format_args, write, Argument, Arguments, FormatContext, FormatOptions};
+use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExpressionRef;
-use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{
+    first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
+};
 use ruff_text_size::Ranged;
 
 use crate::comments::{
@@ -21,33 +24,12 @@ pub(crate) enum OptionalParentheses {
     Always,
 
     /// Add parentheses if it helps to make this expression fit. Otherwise never add parentheses.
-    /// This mode should only be used for expressions that don't have their own split points, e.g. identifiers,
-    /// or constants.
+    /// This mode should only be used for expressions that don't have their own split points to the left, e.g. identifiers,
+    /// or constants, calls starting with an identifier, etc.
     BestFit,
 
     /// Never add parentheses. Use it for expressions that have their own parentheses or if the expression body always spans multiple lines (multiline strings).
     Never,
-}
-
-pub(super) fn should_use_best_fit<T>(value: T, context: &PyFormatContext) -> bool
-where
-    T: Ranged,
-{
-    let text_len = context.source()[value.range()].len();
-
-    // Only use best fits if:
-    // * The text is longer than 5 characters:
-    //   This is to align the behavior with `True` and `False`, that don't use best fits and are 5 characters long.
-    //   It allows to avoid [`OptionalParentheses::BestFit`] for most numbers and common identifiers like `self`.
-    //   The downside is that it can result in short values not being parenthesized if they exceed the line width.
-    //   This is considered an edge case not worth the performance penalty and IMO, breaking an identifier
-    //   of 5 characters to avoid it exceeding the line width by 1 reduces the readability.
-    // * The text is know to never fit: The text can never fit even when parenthesizing if it is longer
-    //   than the configured line width (minus indent).
-    text_len > 5
-        && text_len
-            <= context.options().line_width().value() as usize
-                - context.options().indent_width().value() as usize
 }
 
 pub(crate) trait NeedsParentheses {
@@ -100,7 +82,11 @@ pub enum Parentheses {
     Never,
 }
 
-pub(crate) fn is_expression_parenthesized(expr: ExpressionRef, contents: &str) -> bool {
+pub(crate) fn is_expression_parenthesized(
+    expr: ExpressionRef,
+    comment_ranges: &CommentRanges,
+    contents: &str,
+) -> bool {
     // First test if there's a closing parentheses because it tends to be cheaper.
     if matches!(
         first_non_trivia_token(expr.end(), contents),
@@ -109,11 +95,10 @@ pub(crate) fn is_expression_parenthesized(expr: ExpressionRef, contents: &str) -
             ..
         })
     ) {
-        let mut tokenizer =
-            SimpleTokenizer::up_to_without_back_comment(expr.start(), contents).skip_trivia();
-
         matches!(
-            tokenizer.next_back(),
+            BackwardsTokenizer::up_to(expr.start(), contents, comment_ranges)
+                .skip_trivia()
+                .next(),
             Some(SimpleToken {
                 kind: SimpleTokenKind::LParen,
                 ..
@@ -170,32 +155,34 @@ impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        let inner = format_with(|f| {
+        let current_level = f.context().node_level();
+
+        let content = format_with(|f| {
             group(&format_args![
-                token(self.left),
                 dangling_open_parenthesis_comments(self.comments),
-                soft_block_indent(&Arguments::from(&self.content)),
-                token(self.right)
+                soft_block_indent(&Arguments::from(&self.content))
             ])
             .fmt(f)
         });
 
-        let current_level = f.context().node_level();
+        let inner = format_with(|f| {
+            if let NodeLevel::Expression(Some(group_id)) = current_level {
+                // Use fits expanded if there's an enclosing group that adds the optional parentheses.
+                // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
+                write!(
+                    f,
+                    [fits_expanded(&content)
+                        .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
+                )
+            } else {
+                // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
+                content.fmt(f)
+            }
+        });
 
         let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-        if let NodeLevel::Expression(Some(group_id)) = current_level {
-            // Use fits expanded if there's an enclosing group that adds the optional parentheses.
-            // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
-            write!(
-                f,
-                [fits_expanded(&inner)
-                    .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
-            )
-        } else {
-            // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
-            write!(f, [inner])
-        }
+        write!(f, [token(self.left), inner, token(self.right)])
     }
 }
 
@@ -418,6 +405,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
 mod tests {
     use ruff_python_ast::ExpressionRef;
     use ruff_python_parser::parse_expression;
+    use ruff_python_trivia::CommentRanges;
 
     use crate::expression::parentheses::is_expression_parenthesized;
 
@@ -427,6 +415,7 @@ mod tests {
         let expr = parse_expression(expression, "<filename>").unwrap();
         assert!(!is_expression_parenthesized(
             ExpressionRef::from(&expr),
+            &CommentRanges::default(),
             expression
         ));
     }

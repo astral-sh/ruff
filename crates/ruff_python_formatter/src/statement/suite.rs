@@ -1,7 +1,7 @@
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, Stmt, Suite};
+use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, PySourceType, Stmt, Suite};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -192,7 +192,14 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     SuiteKind::TopLevel => {
                         match lines_after_ignoring_trivia(preceding.end(), source) {
                             0..=2 => empty_line().fmt(f)?,
-                            _ => write!(f, [empty_line(), empty_line()])?,
+                            _ => match source_type {
+                                PySourceType::Stub => {
+                                    empty_line().fmt(f)?;
+                                }
+                                PySourceType::Python | PySourceType::Ipynb => {
+                                    write!(f, [empty_line(), empty_line()])?;
+                                }
+                            },
                         }
                     }
                     SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
@@ -225,8 +232,15 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 match lines_before(start, source) {
                     0 | 1 => hard_line_break().fmt(f)?,
                     2 => empty_line().fmt(f)?,
-                    3.. => match self.kind {
-                        SuiteKind::TopLevel => write!(f, [empty_line(), empty_line()])?,
+                    _ => match self.kind {
+                        SuiteKind::TopLevel => match source_type {
+                            PySourceType::Stub => {
+                                empty_line().fmt(f)?;
+                            }
+                            PySourceType::Python | PySourceType::Ipynb => {
+                                write!(f, [empty_line(), empty_line()])?;
+                            }
+                        },
                         SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
                             empty_line().fmt(f)?;
                         }
@@ -280,7 +294,14 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     NodeLevel::TopLevel => match count_lines(end) {
                         0 | 1 => hard_line_break().fmt(f)?,
                         2 => empty_line().fmt(f)?,
-                        _ => write!(f, [empty_line(), empty_line()])?,
+                        _ => match source_type {
+                            PySourceType::Stub => {
+                                empty_line().fmt(f)?;
+                            }
+                            PySourceType::Python | PySourceType::Ipynb => {
+                                write!(f, [empty_line(), empty_line()])?;
+                            }
+                        },
                     },
                     NodeLevel::CompoundStatement => match count_lines(end) {
                         0 | 1 => hard_line_break().fmt(f)?,
@@ -561,6 +582,7 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
 mod tests {
     use ruff_formatter::format;
     use ruff_python_parser::parse_suite;
+    use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
     use crate::prelude::*;
@@ -591,7 +613,12 @@ def trailing_func():
 
         let statements = parse_suite(source, "test.py").unwrap();
 
-        let context = PyFormatContext::new(PyFormatOptions::default(), source, Comments::default());
+        let comment_ranges = CommentRanges::default();
+        let context = PyFormatContext::new(
+            PyFormatOptions::default(),
+            source,
+            Comments::from_ranges(&comment_ranges),
+        );
 
         let test_formatter =
             format_with(|f: &mut PyFormatter| statements.format().with_options(level).fmt(f));

@@ -35,15 +35,21 @@ impl Document {
         enum Enclosing<'a> {
             Group(&'a tag::Group),
             ConditionalGroup(&'a tag::ConditionalGroup),
-            FitsExpanded(&'a tag::FitsExpanded),
+            FitsExpanded {
+                tag: &'a tag::FitsExpanded,
+                expands_before: bool,
+            },
             BestFitting,
+            BestFitParenthesize {
+                expanded: bool,
+            },
         }
 
         fn expand_parent(enclosing: &[Enclosing]) {
             match enclosing.last() {
                 Some(Enclosing::Group(group)) => group.propagate_expand(),
                 Some(Enclosing::ConditionalGroup(group)) => group.propagate_expand(),
-                Some(Enclosing::FitsExpanded(fits_expanded)) => fits_expanded.propagate_expand(),
+                Some(Enclosing::FitsExpanded { tag, .. }) => tag.propagate_expand(),
                 _ => {}
             }
         }
@@ -64,6 +70,18 @@ impl Document {
                         Some(Enclosing::Group(group)) => !group.mode().is_flat(),
                         _ => false,
                     },
+                    FormatElement::Tag(Tag::StartBestFitParenthesize { .. }) => {
+                        enclosing.push(Enclosing::BestFitParenthesize { expanded: expands });
+                        expands = false;
+                        continue;
+                    }
+
+                    FormatElement::Tag(Tag::EndBestFitParenthesize) => {
+                        if let Some(Enclosing::BestFitParenthesize { expanded }) = enclosing.pop() {
+                            expands = expanded;
+                        }
+                        continue;
+                    }
                     FormatElement::Tag(Tag::StartConditionalGroup(group)) => {
                         enclosing.push(Enclosing::ConditionalGroup(group));
                         false
@@ -85,23 +103,24 @@ impl Document {
                     FormatElement::BestFitting { variants, mode: _ } => {
                         enclosing.push(Enclosing::BestFitting);
 
-                        for variant in variants {
-                            propagate_expands(variant, enclosing, checked_interned);
-                        }
-
-                        // Best fitting acts as a boundary
-                        expands = false;
+                        propagate_expands(variants, enclosing, checked_interned);
                         enclosing.pop();
                         continue;
                     }
                     FormatElement::Tag(Tag::StartFitsExpanded(fits_expanded)) => {
-                        enclosing.push(Enclosing::FitsExpanded(fits_expanded));
+                        enclosing.push(Enclosing::FitsExpanded {
+                            tag: fits_expanded,
+                            expands_before: expands,
+                        });
                         false
                     }
                     FormatElement::Tag(Tag::EndFitsExpanded) => {
-                        enclosing.pop();
-                        // Fits expanded acts as a boundary
-                        expands = false;
+                        if let Some(Enclosing::FitsExpanded { expands_before, .. }) =
+                            enclosing.pop()
+                        {
+                            expands = expands_before;
+                        }
+
                         continue;
                     }
                     FormatElement::Text {
@@ -338,14 +357,20 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                 }
 
                 FormatElement::BestFitting { variants, mode } => {
-                    write!(f, [token("best_fitting([")])?;
+                    write!(f, [token("best_fitting(")])?;
+
+                    if *mode != BestFittingMode::FirstLine {
+                        write!(f, [text(&std::format!("mode: {mode:?}, "), None)])?;
+                    }
+
+                    write!(f, [token("[")])?;
                     f.write_elements([
                         FormatElement::Tag(StartIndent),
                         FormatElement::Line(LineMode::Hard),
                     ]);
 
                     for variant in variants {
-                        write!(f, [&**variant, hard_line_break()])?;
+                        write!(f, [variant, hard_line_break()])?;
                     }
 
                     f.write_elements([
@@ -353,13 +378,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         FormatElement::Line(LineMode::Hard),
                     ]);
 
-                    write!(f, [token("]")])?;
-
-                    if *mode != BestFittingMode::FirstLine {
-                        write!(f, [text(&std::format!(", mode: {mode:?}"), None),])?;
-                    }
-
-                    write!(f, [token(")")])?;
+                    write!(f, [token("])")])?;
                 }
 
                 FormatElement::Interned(interned) => {
@@ -499,6 +518,21 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             }
                         }
 
+                        StartBestFitParenthesize { id } => {
+                            write!(f, [token("best_fit_parenthesize(")])?;
+
+                            if let Some(group_id) = id {
+                                write!(
+                                    f,
+                                    [
+                                        text(&std::format!("\"{group_id:?}\""), None),
+                                        token(","),
+                                        space(),
+                                    ]
+                                )?;
+                            }
+                        }
+
                         StartConditionalGroup(group) => {
                             write!(
                                 f,
@@ -594,10 +628,10 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             }
                         }
 
-                        StartEntry => {
+                        StartEntry | StartBestFittingEntry { .. } => {
                             // handled after the match for all start tags
                         }
-                        EndEntry => write!(f, [ContentArrayEnd])?,
+                        EndEntry | EndBestFittingEntry => write!(f, [ContentArrayEnd])?,
 
                         EndFill
                         | EndLabelled
@@ -607,6 +641,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         | EndIndent
                         | EndGroup
                         | EndConditionalGroup
+                        | EndBestFitParenthesize
                         | EndLineSuffix
                         | EndDedent
                         | EndFitsExpanded

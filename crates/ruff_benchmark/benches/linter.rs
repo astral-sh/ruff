@@ -1,12 +1,12 @@
-use ruff::linter::lint_only;
-use ruff::settings::rule_table::RuleTable;
-use ruff::settings::{flags, Settings};
-use ruff::source_kind::SourceKind;
-use ruff::{registry::Rule, RuleSelector};
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
 };
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
+use ruff_linter::linter::lint_only;
+use ruff_linter::settings::rule_table::RuleTable;
+use ruff_linter::settings::{flags, LinterSettings};
+use ruff_linter::source_kind::SourceKind;
+use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
 
 #[cfg(target_os = "windows")]
@@ -41,7 +41,7 @@ fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     ])
 }
 
-fn benchmark_linter(mut group: BenchmarkGroup, settings: &Settings) {
+fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
     let test_cases = create_test_cases().unwrap();
 
     for case in test_cases {
@@ -75,7 +75,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &Settings) {
 
 fn benchmark_default_rules(criterion: &mut Criterion) {
     let group = criterion.benchmark_group("linter/default-rules");
-    benchmark_linter(group, &Settings::default());
+    benchmark_linter(group, &LinterSettings::default());
 }
 
 fn benchmark_all_rules(criterion: &mut Criterion) {
@@ -85,9 +85,9 @@ fn benchmark_all_rules(criterion: &mut Criterion) {
     rules.disable(Rule::ShebangMissingExecutableFile);
     rules.disable(Rule::ShebangNotExecutable);
 
-    let settings = Settings {
+    let settings = LinterSettings {
         rules,
-        ..Settings::default()
+        ..LinterSettings::default()
     };
 
     let group = criterion.benchmark_group("linter/all-rules");

@@ -28,8 +28,8 @@ theme:
 repo_url: https://github.com/astral-sh/ruff
 repo_name: ruff
 site_author: charliermarsh
-site_url: https://beta.ruff.rs/docs/
-site_dir: site/docs
+site_url: https://docs.astral.sh/ruff/
+site_dir: site/ruff
 markdown_extensions:
   - toc:
       permalink: "#"
@@ -51,6 +51,8 @@ plugins:
   - search
 extra_css:
   - stylesheets/extra.css
+not_in_nav: |
+  /rules/*
 extra:
   analytics:
     provider: fathom

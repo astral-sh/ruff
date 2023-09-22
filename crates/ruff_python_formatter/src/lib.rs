@@ -5,9 +5,10 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::Mod;
-use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+use ruff_python_index::CommentRangesBuilder;
 use ruff_python_parser::lexer::{lex, LexicalError};
 use ruff_python_parser::{parse_tokens, Mode, ParseError};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::comments::{
@@ -16,6 +17,7 @@ use crate::comments::{
 pub use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
 use crate::verbatim::suppressed_node;
+pub use settings::FormatterSettings;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -28,6 +30,7 @@ mod options;
 pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
+mod settings;
 pub(crate) mod statement;
 pub(crate) mod type_param;
 mod verbatim;
@@ -120,7 +123,7 @@ impl From<ParseError> for FormatModuleError {
     }
 }
 
-#[tracing::instrument(level=Level::TRACE, skip_all)]
+#[tracing::instrument(level = Level::TRACE, skip_all)]
 pub fn format_module(
     contents: &str,
     options: PyFormatOptions,
@@ -216,12 +219,14 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-(header.timecnt * 5  # Transition times and types
-  + header.typecnt * 6  # Local time type records
-  + header.charcnt  # Time zone designations
-  + header.leapcnt * 8  # Leap second records
-  + header.isstdcnt  # Standard/wall indicators
-  + header.isutcnt)  # UT/local indicators
+def main() -> None:
+    if True:
+        some_very_long_variable_name_abcdefghijk = Foo()
+        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
+            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
+            == "This is a very long string abcdefghijk"
+        ]
+
 "#;
         // Tokenize once
         let mut tokens = Vec::new();

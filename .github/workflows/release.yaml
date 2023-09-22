@@ -419,18 +419,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha }}
-      - name: Check tag consistency
-        run: |
-          version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
-          if [ "${{ inputs.tag }}" != "${version}" ]; then
-            echo "The input tag does not match the version from pyproject.toml:" >&2
-            echo "${{ inputs.tag }}" >&2
-            echo "${version}" >&2
-            exit 1
-          else
-            echo "Releasing ${version}"
-          fi
+          ref: main # We checkout the main branch to check for the commit
       - name: Check main branch
         if: ${{ inputs.sha }}
         run: |
@@ -440,17 +429,18 @@ jobs:
             echo "The specified sha is not on the main branch" >&2
             exit 1
           fi
-      - name: Check SHA consistency
-        if: ${{ inputs.sha }}
+      - name: Check tag consistency
         run: |
-          git_sha=$(git rev-parse HEAD)
-          if [ "${{ inputs.sha }}" != "${git_sha}" ]; then
-            echo "The specified sha does not match the git checkout" >&2
-            echo "${{ inputs.sha }}" >&2
-            echo "${git_sha}" >&2
+          # Switch to the commit we want to release
+          git checkout ${{ inputs.sha }}
+          version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
+          if [ "${{ inputs.tag }}" != "${version}" ]; then
+            echo "The input tag does not match the version from pyproject.toml:" >&2
+            echo "${{ inputs.tag }}" >&2
+            echo "${version}" >&2
             exit 1
           else
-            echo "Releasing ${git_sha}"
+            echo "Releasing ${version}"
           fi
 
   upload-release:

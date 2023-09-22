@@ -174,6 +174,75 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::Group, args.with_print_mode(print_mode));
             }
 
+            FormatElement::Tag(StartBestFitParenthesize { id }) => {
+                const OPEN_PAREN: FormatElement = FormatElement::Token { text: "(" };
+                const INDENT: FormatElement = FormatElement::Tag(Tag::StartIndent);
+                const HARD_LINE_BREAK: FormatElement = FormatElement::Line(LineMode::Hard);
+
+                let fits_flat = self.flat_group_print_mode(
+                    TagKind::BestFitParenthesize,
+                    *id,
+                    args,
+                    queue,
+                    stack,
+                )? == PrintMode::Flat;
+
+                let print_mode = if fits_flat {
+                    PrintMode::Flat
+                } else {
+                    // Test if the content fits in expanded mode. If not, prefer avoiding the parentheses
+                    // over parenthesizing the expression.
+                    if let Some(id) = id {
+                        self.state
+                            .group_modes
+                            .insert_print_mode(*id, PrintMode::Expanded);
+                    }
+
+                    stack.push(
+                        TagKind::BestFitParenthesize,
+                        args.with_measure_mode(MeasureMode::AllLines),
+                    );
+
+                    queue.extend_back(&[OPEN_PAREN, INDENT, HARD_LINE_BREAK]);
+                    let fits_expanded = self.fits(queue, stack)?;
+                    queue.pop_slice();
+                    stack.pop(TagKind::BestFitParenthesize)?;
+
+                    if fits_expanded {
+                        PrintMode::Expanded
+                    } else {
+                        PrintMode::Flat
+                    }
+                };
+
+                if let Some(id) = id {
+                    self.state.group_modes.insert_print_mode(*id, print_mode);
+                }
+
+                if print_mode.is_expanded() {
+                    // Parenthesize the content. The `EndIndent` is handled inside of the `EndBestFitParenthesize`
+                    queue.extend_back(&[OPEN_PAREN, INDENT, HARD_LINE_BREAK]);
+                }
+
+                stack.push(
+                    TagKind::BestFitParenthesize,
+                    args.with_print_mode(print_mode),
+                );
+            }
+
+            FormatElement::Tag(EndBestFitParenthesize) => {
+                if args.mode().is_expanded() {
+                    const HARD_LINE_BREAK: FormatElement = FormatElement::Line(LineMode::Hard);
+                    const CLOSE_PAREN: FormatElement = FormatElement::Token { text: ")" };
+
+                    // Finish the indent and print the hardline break and closing parentheses.
+                    stack.pop(TagKind::Indent)?;
+                    queue.extend_back(&[HARD_LINE_BREAK, CLOSE_PAREN]);
+                }
+
+                stack.pop(TagKind::BestFitParenthesize)?;
+            }
+
             FormatElement::Tag(StartConditionalGroup(group)) => {
                 let condition = group.condition();
                 let expected_mode = match condition.group_id {
@@ -288,7 +357,9 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::FitsExpanded, args);
             }
 
-            FormatElement::Tag(tag @ (StartLabelled(_) | StartEntry)) => {
+            FormatElement::Tag(
+                tag @ (StartLabelled(_) | StartEntry | StartBestFittingEntry { .. }),
+            ) => {
                 stack.push(tag.kind(), args);
             }
 
@@ -305,6 +376,7 @@ impl<'a> Printer<'a> {
                 | EndFitsExpanded
                 | EndVerbatim
                 | EndLineSuffix
+                | EndBestFittingEntry
                 | EndFill),
             ) => {
                 stack.pop(tag.kind())?;
@@ -495,47 +567,64 @@ impl<'a> Printer<'a> {
 
         if args.mode().is_flat() && self.state.measured_group_fits {
             queue.extend_back(variants.most_flat());
-            self.print_entry(queue, stack, args)
+            self.print_entry(queue, stack, args, TagKind::BestFittingEntry)
         } else {
             self.state.measured_group_fits = true;
-            let normal_variants = &variants[..variants.len() - 1];
+            let mut variants_iter = variants.into_iter();
+            let mut current = variants_iter.next().unwrap();
 
-            for variant in normal_variants {
+            for next in variants_iter {
                 // Test if this variant fits and if so, use it. Otherwise try the next
                 // variant.
 
                 // Try to fit only the first variant on a single line
-                if !matches!(variant.first(), Some(&FormatElement::Tag(Tag::StartEntry))) {
-                    return invalid_start_tag(TagKind::Entry, variant.first());
+                if !matches!(
+                    current.first(),
+                    Some(&FormatElement::Tag(Tag::StartBestFittingEntry))
+                ) {
+                    return invalid_start_tag(TagKind::BestFittingEntry, current.first());
                 }
 
                 // Skip the first element because we want to override the args for the entry and the
                 // args must be popped from the stack as soon as it sees the matching end entry.
-                let content = &variant[1..];
+                let content = &current[1..];
 
                 let entry_args = args
                     .with_print_mode(PrintMode::Flat)
                     .with_measure_mode(MeasureMode::from(mode));
 
                 queue.extend_back(content);
-                stack.push(TagKind::Entry, entry_args);
+                stack.push(TagKind::BestFittingEntry, entry_args);
                 let variant_fits = self.fits(queue, stack)?;
-                stack.pop(TagKind::Entry)?;
+                stack.pop(TagKind::BestFittingEntry)?;
 
                 // Remove the content slice because printing needs the variant WITH the start entry
                 let popped_slice = queue.pop_slice();
                 debug_assert_eq!(popped_slice, Some(content));
 
                 if variant_fits {
-                    queue.extend_back(variant);
-                    return self.print_entry(queue, stack, args.with_print_mode(PrintMode::Flat));
+                    queue.extend_back(current);
+                    return self.print_entry(
+                        queue,
+                        stack,
+                        args.with_print_mode(PrintMode::Flat),
+                        TagKind::BestFittingEntry,
+                    );
                 }
+
+                current = next;
             }
 
+            // At this stage current is the most expanded.
+
             // No variant fits, take the last (most expanded) as fallback
-            let most_expanded = variants.most_expanded();
-            queue.extend_back(most_expanded);
-            self.print_entry(queue, stack, args.with_print_mode(PrintMode::Expanded))
+            queue.extend_back(current);
+            self.print_entry(
+                queue,
+                stack,
+                args.with_print_mode(PrintMode::Expanded),
+                TagKind::BestFittingEntry,
+            )
         }
     }
 
@@ -686,7 +775,7 @@ impl<'a> Printer<'a> {
         stack: &mut PrintCallStack,
         args: PrintElementArgs,
     ) -> PrintResult<()> {
-        self.print_entry(queue, stack, args)
+        self.print_entry(queue, stack, args, TagKind::Entry)
     }
 
     /// Semantic alias for [`Self::print_entry`] for fill separators.
@@ -696,7 +785,7 @@ impl<'a> Printer<'a> {
         stack: &mut PrintCallStack,
         args: PrintElementArgs,
     ) -> PrintResult<()> {
-        self.print_entry(queue, stack, args)
+        self.print_entry(queue, stack, args, TagKind::Entry)
     }
 
     /// Fully print an element (print the element itself and all its descendants)
@@ -708,32 +797,31 @@ impl<'a> Printer<'a> {
         queue: &mut PrintQueue<'a>,
         stack: &mut PrintCallStack,
         args: PrintElementArgs,
+        kind: TagKind,
     ) -> PrintResult<()> {
         let start_entry = queue.top();
 
-        if !matches!(start_entry, Some(&FormatElement::Tag(Tag::StartEntry))) {
-            return invalid_start_tag(TagKind::Entry, start_entry);
+        if queue
+            .pop()
+            .is_some_and(|start| start.tag_kind() == Some(kind))
+        {
+            stack.push(kind, args);
+        } else {
+            return invalid_start_tag(kind, start_entry);
         }
 
-        let mut depth = 0;
+        let mut depth = 1u32;
 
         while let Some(element) = queue.pop() {
             match element {
-                FormatElement::Tag(Tag::StartEntry) => {
-                    // Handle the start of the first element by pushing the args on the stack.
-                    if depth == 0 {
-                        depth = 1;
-                        stack.push(TagKind::Entry, args);
-                        continue;
-                    }
-
+                FormatElement::Tag(Tag::StartEntry | Tag::StartBestFittingEntry) => {
                     depth += 1;
                 }
-                FormatElement::Tag(Tag::EndEntry) => {
+                FormatElement::Tag(end_tag @ (Tag::EndEntry | Tag::EndBestFittingEntry)) => {
                     depth -= 1;
                     // Reached the end entry, pop the entry from the stack and return.
                     if depth == 0 {
-                        stack.pop(TagKind::Entry)?;
+                        stack.pop(end_tag.kind())?;
                         return Ok(());
                     }
                 }
@@ -745,7 +833,7 @@ impl<'a> Printer<'a> {
             self.print_element(stack, queue, element)?;
         }
 
-        invalid_end_tag(TagKind::Entry, stack.top_kind())
+        invalid_end_tag(kind, stack.top_kind())
     }
 
     fn print_char(&mut self, char: char) {
@@ -1095,7 +1183,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                 // line break should be printed as regular line break
                                 return Ok(Fits::Yes);
                             }
-                            MeasureMode::AllLines => {
+                            MeasureMode::AllLines | MeasureMode::AllLinesAllowTextOverflow => {
                                 // Continue measuring on the next line
                                 self.state.line_width = 0;
                                 self.state.pending_indent = args.indention();
@@ -1148,11 +1236,14 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     PrintMode::Expanded => (variants.most_expanded(), args),
                 };
 
-                if !matches!(slice.first(), Some(FormatElement::Tag(Tag::StartEntry))) {
-                    return invalid_start_tag(TagKind::Entry, slice.first());
+                if !matches!(
+                    slice.first(),
+                    Some(FormatElement::Tag(Tag::StartBestFittingEntry))
+                ) {
+                    return invalid_start_tag(TagKind::BestFittingEntry, slice.first());
                 }
 
-                self.stack.push(TagKind::Entry, args);
+                self.stack.push(TagKind::BestFittingEntry, args);
                 self.queue.extend_back(&slice[1..]);
             }
 
@@ -1180,6 +1271,38 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::Tag(StartGroup(group)) => {
                 return Ok(self.fits_group(TagKind::Group, group.mode(), group.id(), args));
+            }
+
+            FormatElement::Tag(StartBestFitParenthesize { id }) => {
+                if let Some(id) = id {
+                    self.printer
+                        .state
+                        .group_modes
+                        .insert_print_mode(*id, args.mode());
+                }
+
+                // Don't use the parenthesized with indent layout even when measuring expanded mode similar to `BestFitting`.
+                // This is to expand the left and not right after the `(` parentheses (it is okay to expand after the content that it wraps).
+                self.stack.push(TagKind::BestFitParenthesize, args);
+            }
+
+            FormatElement::Tag(EndBestFitParenthesize) => {
+                // If this is the end tag of the outer most parentheses for which we measure if it fits,
+                // pop the indent.
+                if args.mode().is_expanded() && self.stack.top_kind() == Some(TagKind::Indent) {
+                    self.stack.pop(TagKind::Indent).unwrap();
+                    let unindented = self.stack.pop(TagKind::BestFitParenthesize)?;
+
+                    // There's a hard line break after the indent but don't return `Fits::Yes` here
+                    // to ensure any trailing comments (that, unfortunately, are attached to the statement and not the expression)
+                    // fit too.
+                    self.state.line_width = 0;
+                    self.state.pending_indent = unindented.indention();
+
+                    return Ok(self.fits_text(Text::Token(")"), unindented));
+                }
+
+                self.stack.pop(TagKind::BestFitParenthesize)?;
             }
 
             FormatElement::Tag(StartConditionalGroup(group)) => {
@@ -1231,9 +1354,11 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
 
             FormatElement::Tag(StartLineSuffix { reserved_width }) => {
-                self.state.line_width += reserved_width;
-                if self.state.line_width > self.options().line_width.into() {
-                    return Ok(Fits::No);
+                if *reserved_width > 0 {
+                    self.state.line_width += reserved_width;
+                    if self.state.line_width > self.options().line_width.into() {
+                        return Ok(Fits::No);
+                    }
                 }
                 self.queue.skip_content(TagKind::LineSuffix);
                 self.state.has_line_suffix = true;
@@ -1247,37 +1372,51 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 condition,
                 propagate_expand,
             })) => {
-                let condition_met = match condition {
-                    Some(condition) => {
-                        let group_mode = match condition.group_id {
-                            Some(group_id) => self.group_modes().get_print_mode(group_id)?,
-                            None => args.mode(),
+                match args.mode() {
+                    PrintMode::Expanded => {
+                        // As usual, nothing to measure
+                        self.stack.push(TagKind::FitsExpanded, args);
+                    }
+                    PrintMode::Flat => {
+                        let condition_met = match condition {
+                            Some(condition) => {
+                                let group_mode = match condition.group_id {
+                                    Some(group_id) => {
+                                        self.group_modes().get_print_mode(group_id)?
+                                    }
+                                    None => args.mode(),
+                                };
+
+                                condition.mode == group_mode
+                            }
+                            None => true,
                         };
 
-                        condition.mode == group_mode
-                    }
-                    None => true,
-                };
+                        if condition_met {
+                            // Measure in fully expanded mode and allow overflows
+                            self.stack.push(
+                                TagKind::FitsExpanded,
+                                args.with_measure_mode(MeasureMode::AllLinesAllowTextOverflow)
+                                    .with_print_mode(PrintMode::Expanded),
+                            );
+                        } else {
+                            if propagate_expand.get() {
+                                return Ok(Fits::No);
+                            }
 
-                if condition_met {
-                    // Measure in fully expanded mode.
-                    self.stack.push(
-                        TagKind::FitsExpanded,
-                        args.with_print_mode(PrintMode::Expanded)
-                            .with_measure_mode(MeasureMode::AllLines),
-                    );
-                } else {
-                    if propagate_expand.get() && args.mode().is_flat() {
-                        return Ok(Fits::No);
+                            // As usual
+                            self.stack.push(TagKind::FitsExpanded, args);
+                        }
                     }
-
-                    // As usual
-                    self.stack.push(TagKind::FitsExpanded, args);
                 }
             }
 
             FormatElement::Tag(
-                tag @ (StartFill | StartVerbatim(_) | StartLabelled(_) | StartEntry),
+                tag @ (StartFill
+                | StartVerbatim(_)
+                | StartLabelled(_)
+                | StartEntry
+                | StartBestFittingEntry { .. }),
             ) => {
                 self.stack.push(tag.kind(), args);
             }
@@ -1294,6 +1433,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 | EndAlign
                 | EndDedent
                 | EndIndent
+                | EndBestFittingEntry
                 | EndFitsExpanded),
             ) => {
                 self.stack.pop(tag.kind())?;
@@ -1354,7 +1494,8 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                 }
                                 match args.measure_mode() {
                                     MeasureMode::FirstLine => return Fits::Yes,
-                                    MeasureMode::AllLines => {
+                                    MeasureMode::AllLines
+                                    | MeasureMode::AllLinesAllowTextOverflow => {
                                         self.state.line_width = 0;
                                         continue;
                                     }
@@ -1370,7 +1511,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
         }
 
-        if self.state.line_width > self.options().line_width.into() {
+        if self.state.line_width > self.options().line_width.into()
+            && !args.measure_mode().allows_text_overflow()
+        {
             return Fits::No;
         }
 
@@ -1473,6 +1616,17 @@ enum MeasureMode {
     /// The content only fits if none of the lines exceed the print width. Lines are terminated by either
     /// a hard line break or a soft line break in [`PrintMode::Expanded`].
     AllLines,
+
+    /// Measures all lines and allows lines to exceed the configured line width. Useful when it only matters
+    /// whether the content *before* and *after* fits.
+    AllLinesAllowTextOverflow,
+}
+
+impl MeasureMode {
+    /// Returns `true` if this mode allows text exceeding the configured line width.
+    const fn allows_text_overflow(self) -> bool {
+        matches!(self, MeasureMode::AllLinesAllowTextOverflow)
+    }
 }
 
 impl From<BestFittingMode> for MeasureMode {

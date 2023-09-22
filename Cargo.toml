@@ -5,8 +5,8 @@ resolver = "2"
 [workspace.package]
 edition = "2021"
 rust-version = "1.71"
-homepage = "https://beta.ruff.rs/docs"
-documentation = "https://beta.ruff.rs/docs"
+homepage = "https://docs.astral.sh/ruff"
+documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 license = "MIT"
@@ -14,16 +14,16 @@ license = "MIT"
 [workspace.dependencies]
 anyhow = { version = "1.0.69" }
 bitflags = { version = "2.3.1" }
-chrono = { version = "0.4.30", default-features = false, features = ["clock"] }
-clap = { version = "4.4.3", features = ["derive"] }
+chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
+clap = { version = "4.4.4", features = ["derive"] }
 colored = { version = "2.0.0" }
 filetime = { version = "0.2.20" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.10" }
 ignore = { version = "0.4.20" }
-insta = { version = "1.31.0", feature = ["filters", "glob"] }
+insta = { version = "1.32.0", feature = ["filters", "glob"] }
 is-macro = { version = "0.3.0" }
-itertools = { version = "0.10.5" }
+itertools = { version = "0.11.0" }
 log = { version = "0.4.17" }
 memchr = "2.6.3"
 num-bigint = { version = "0.4.3" }
@@ -34,24 +34,24 @@ proc-macro2 = { version = "1.0.67" }
 quote = { version = "1.0.23" }
 regex = { version = "1.9.5" }
 rustc-hash = { version = "1.1.0" }
-schemars = { version = "0.8.12" }
+schemars = { version = "0.8.15" }
 serde = { version = "1.0.152", features = ["derive"] }
-serde_json = { version = "1.0.106" }
+serde_json = { version = "1.0.107" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1", features = ["inline"] }
-smallvec = { version = "1.10.0" }
+smallvec = { version = "1.11.1" }
 static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
 strum_macros = { version = "0.25.2" }
-syn = { version = "2.0.33" }
-test-case = { version = "3.0.0" }
+syn = { version = "2.0.37" }
+test-case = { version = "3.2.1" }
 thiserror = { version = "1.0.48" }
 toml = { version = "0.7.8" }
 tracing = "0.1.37"
 tracing-indicatif = "0.3.4"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
-unicode-ident = "1.0.11"
-unicode-width = "0.1.10"
+unicode-ident = "1.0.12"
+unicode-width = "0.1.11"
 uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 wsl = { version = "0.1.0" }
 

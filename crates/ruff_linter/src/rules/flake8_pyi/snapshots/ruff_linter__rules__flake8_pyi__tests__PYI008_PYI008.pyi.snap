@@ -1,0 +1,14 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI008.pyi:3:20: PYI008 Unrecognized platform `linus`
+  |
+1 | import sys
+2 | 
+3 | if sys.platform == "linus": ...  # Error: PYI008 Unrecognized platform `linus`
+  |                    ^^^^^^^ PYI008
+4 | 
+5 | if sys.platform != "linux": ...  # OK
+  |
+
+

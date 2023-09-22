@@ -18,7 +18,6 @@ use imara_diff::{diff, Algorithm};
 use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use ruff::line_width::LineLength;
 use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
@@ -29,11 +28,11 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use ruff::logging::LogLevel;
-use ruff::settings::types::{FilePattern, FilePatternSet};
 use ruff_cli::args::{FormatCommand, LogLevelArgs};
 use ruff_cli::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
+use ruff_linter::logging::LogLevel;
+use ruff_linter::settings::types::{FilePattern, FilePatternSet};
 use ruff_python_formatter::{
     format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
 };
@@ -60,7 +59,7 @@ fn ruff_check_paths(
         cli.stdin_filename.as_deref(),
     )?;
     // We don't want to format pyproject.toml
-    pyproject_config.settings.lib.include = FilePatternSet::try_from_vec(vec![
+    pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
     ])
@@ -550,8 +549,9 @@ fn format_dir_entry(
 
     let settings = resolver.resolve(&path, pyproject_config);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
-    if settings.line_length != LineLength::default() {
-        options = options.with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
+    // TODO(micha) use formatter settings instead
+    if settings.formatter.line_width != LineWidth::default() {
+        options = options.with_line_width(settings.formatter.line_width);
     }
 
     // Handle panics (mostly in `debug_assert!`)

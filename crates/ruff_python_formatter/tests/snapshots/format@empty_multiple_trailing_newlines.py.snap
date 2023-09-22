@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/empty_multiple_trailing_newlines.py
+---
+## Input
+```py
+
+
+
+```
+
+## Output
+```py
+
+```
+
+
+

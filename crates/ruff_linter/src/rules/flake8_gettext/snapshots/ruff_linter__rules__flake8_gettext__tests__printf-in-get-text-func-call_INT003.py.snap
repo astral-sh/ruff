@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/flake8_gettext/mod.rs
+---
+INT003.py:1:3: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+  |
+1 | _("%s" % "line")
+  |   ^^^^^^^^^^^^^ INT003
+  |
+
+

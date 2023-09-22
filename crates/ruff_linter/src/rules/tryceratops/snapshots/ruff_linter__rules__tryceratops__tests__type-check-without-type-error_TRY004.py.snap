@@ -1,0 +1,299 @@
+---
+source: crates/ruff_linter/src/rules/tryceratops/mod.rs
+---
+TRY004.py:12:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+10 |         pass
+11 |     else:
+12 |         raise Exception("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:19:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+17 |         pass
+18 |     else:
+19 |         raise Exception("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:30:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+28 |         pass
+29 |     else:
+30 |         raise Exception("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:37:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+35 |         pass
+36 |     else:
+37 |         raise Exception("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:44:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+42 |         pass
+43 |     else:
+44 |         raise ArithmeticError("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:51:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+49 |         pass
+50 |     else:
+51 |         raise AssertionError("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:58:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+56 |         pass
+57 |     else:
+58 |         raise AttributeError("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:65:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+63 |         pass
+64 |     else:
+65 |         raise BufferError  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:72:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+70 |         pass
+71 |     else:
+72 |         raise EOFError("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:79:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+77 |         pass
+78 |     else:
+79 |         raise ImportError("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:86:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+84 |         pass
+85 |     else:
+86 |         raise LookupError("...")  # should be typeerror
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+   |
+
+TRY004.py:95:9: TRY004 Prefer `TypeError` exception for invalid type
+   |
+93 |           # should be typeerror
+94 |           # not multiline is on purpose for fix
+95 |           raise MemoryError(
+   |  _________^
+96 | |             "..."
+97 | |         )
+   | |_________^ TRY004
+   |
+
+TRY004.py:104:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+102 |         pass
+103 |     else:
+104 |         raise NameError("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:111:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+109 |         pass
+110 |     else:
+111 |         raise ReferenceError("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:118:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+116 |         pass
+117 |     else:
+118 |         raise RuntimeError("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:125:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+123 |         pass
+124 |     else:
+125 |         raise SyntaxError("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:132:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+130 |         pass
+131 |     else:
+132 |         raise SystemError("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:139:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+137 |         pass
+138 |     else:
+139 |         raise ValueError("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:146:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+144 |         pass
+145 |     else:
+146 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:153:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+151 |         pass
+152 |     else:
+153 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:160:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+158 |         pass
+159 |     else:
+160 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:167:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+165 |         pass
+166 |     else:
+167 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:174:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+172 |         pass
+173 |     else:
+174 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:181:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+179 |         pass
+180 |     else:
+181 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:188:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+186 |         pass
+187 |     else:
+188 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:195:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+193 |         pass
+194 |     else:
+195 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:202:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+200 |         pass
+201 |     else:
+202 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:209:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+207 |         pass
+208 |     else:
+209 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:216:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+214 |         pass
+215 |     else:
+216 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:223:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+221 |         pass
+222 |     else:
+223 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:230:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+228 |         pass
+229 |     elif isinstance(arg2, int):
+230 |         raise Exception("...")  # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:239:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+237 |         pass
+238 |     else:
+239 |         raise Exception("...")   # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:276:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+274 | def check_body(some_args):
+275 |     if isinstance(some_args, int):
+276 |         raise ValueError("...") # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:286:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+284 | def multiple_elifs(some_args):
+285 |     if not isinstance(some_args, int):
+286 |         raise ValueError("...") # should be typerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+287 |     elif some_args < 3:
+288 |         raise ValueError("...")  # this is ok
+    |
+
+TRY004.py:297:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+295 | def multiple_ifs(some_args):
+296 |     if not isinstance(some_args, int):
+297 |         raise ValueError("...") # should be typerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+298 |     else:
+299 |         if some_args < 3:
+    |
+
+TRY004.py:316:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+314 |         return "CronExpression"
+315 |     else:
+316 |         raise Exception(f"Unknown object type: {obj.__class__.__name__}")
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+

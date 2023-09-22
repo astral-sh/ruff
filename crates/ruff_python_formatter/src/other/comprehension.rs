@@ -56,16 +56,14 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
             [
                 token("for"),
                 trailing_comments(before_target_comments),
-                group(&format_args!(
-                    Spacer(target),
-                    ExprTupleWithoutParentheses(target),
-                    in_spacer,
-                    leading_comments(before_in_comments),
-                    token("in"),
-                    trailing_comments(trailing_in_comments),
-                    Spacer(iter),
-                    iter.format(),
-                )),
+                Spacer(target),
+                ExprTupleWithoutParentheses(target),
+                in_spacer,
+                leading_comments(before_in_comments),
+                token("in"),
+                trailing_comments(trailing_in_comments),
+                Spacer(iter),
+                iter.format(),
             ]
         )?;
         if !ifs.is_empty() {
@@ -79,18 +77,18 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                             dangling_if_comments
                                 .partition_point(|comment| comment.line_position().is_own_line()),
                         );
-                    joiner.entry(&group(&format_args!(
+                    joiner.entry(&format_args!(
                         leading_comments(own_line_if_comments),
                         token("if"),
                         trailing_comments(end_of_line_if_comments),
                         Spacer(if_case),
                         if_case.format(),
-                    )));
+                    ));
                 }
                 joiner.finish()
             });
 
-            write!(f, [soft_line_break_or_space(), group(&joined)])?;
+            write!(f, [soft_line_break_or_space(), joined])?;
         }
         Ok(())
     }

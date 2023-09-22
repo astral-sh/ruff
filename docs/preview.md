@@ -45,4 +45,4 @@ preview = true
 
 Or, if you provided the `--preview` CLI flag.
 
-To see which rules are currently in preview, visit the [rules reference](https://beta.ruff.rs/docs/rules/).
+To see which rules are currently in preview, visit the [rules reference](rules.md).

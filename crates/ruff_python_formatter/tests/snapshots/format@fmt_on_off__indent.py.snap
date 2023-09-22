@@ -14,6 +14,7 @@ line-width              = 88
 indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
 ```py
@@ -27,6 +28,7 @@ line-width              = 88
 indent-width            = 1
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
 ```py
@@ -40,6 +42,7 @@ line-width              = 88
 indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
 ```py
