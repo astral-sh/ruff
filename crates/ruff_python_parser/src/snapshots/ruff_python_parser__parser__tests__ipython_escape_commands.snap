@@ -225,9 +225,7 @@ Module(
                                         ExprConstant {
                                             range: 726..727,
                                             value: Int(
-                                                Small(
-                                                    5,
-                                                ),
+                                                5,
                                             ),
                                         },
                                     ),

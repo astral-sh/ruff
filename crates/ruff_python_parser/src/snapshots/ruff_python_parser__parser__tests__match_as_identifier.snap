@@ -631,9 +631,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprConstant {
                             range: 520..521,
                             value: Int(
-                                Small(
-                                    1,
-                                ),
+                                1,
                             ),
                         },
                     ),
@@ -669,9 +667,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ExprConstant {
                                     range: 550..551,
                                     value: Int(
-                                        Small(
-                                            1,
-                                        ),
+                                        1,
                                     ),
                                 },
                             ),
@@ -695,9 +691,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ExprConstant {
                                     range: 567..568,
                                     value: Int(
-                                        Small(
-                                            2,
-                                        ),
+                                        2,
                                     ),
                                 },
                             ),
@@ -814,9 +808,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 ExprConstant {
                                                     range: 632..634,
                                                     value: Int(
-                                                        Small(
-                                                            12,
-                                                        ),
+                                                        12,
                                                     ),
                                                 },
                                             ),

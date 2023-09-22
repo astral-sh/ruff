@@ -39,9 +39,7 @@ expression: indentation_with_eol(MAC_EOL)
     ),
     (
         Int {
-            value: Small(
-                99,
-            ),
+            value: 99,
         },
         22..24,
     ),

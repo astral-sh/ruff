@@ -83,7 +83,7 @@ fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
         Constant::Str(ast::StringConstant { value, .. }) => {
             !matches!(value.as_str(), "" | "__main__")
         }
-        Constant::Int(value) => !matches!(value, Int::Small(0 | 1)),
+        Constant::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
         Constant::Bytes(_) => true,
         Constant::Float(_) => true,
         Constant::Complex { .. } => true,

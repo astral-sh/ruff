@@ -42,9 +42,7 @@ Ok(
                                                 ExprConstant {
                                                     range: 12..14,
                                                     value: Int(
-                                                        Small(
-                                                            20,
-                                                        ),
+                                                        20,
                                                     ),
                                                 },
                                             ),
@@ -65,9 +63,7 @@ Ok(
                                                 ExprConstant {
                                                     range: 18..20,
                                                     value: Int(
-                                                        Small(
-                                                            30,
-                                                        ),
+                                                        30,
                                                     ),
                                                 },
                                             ),
@@ -83,9 +79,7 @@ Ok(
                             ExprConstant {
                                 range: 22..23,
                                 value: Int(
-                                    Small(
-                                        1,
-                                    ),
+                                    1,
                                 ),
                             },
                         ),

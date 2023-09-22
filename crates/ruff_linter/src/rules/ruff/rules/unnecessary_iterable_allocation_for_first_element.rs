@@ -111,7 +111,7 @@ fn is_head_slice(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(Int::Small(0)),
+            value: Constant::Int(Int::ZERO),
             ..
         })
     )

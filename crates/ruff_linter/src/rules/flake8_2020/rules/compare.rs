@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr, Int};
+use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -235,7 +235,7 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
                 ..
             }) = slice.as_ref()
             {
-                if *i == Int::Small(0) {
+                if *i == 0 {
                     if let (
                         [CmpOp::Eq | CmpOp::NotEq],
                         [Expr::Constant(ast::ExprConstant {
@@ -244,13 +244,13 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
                         })],
                     ) = (ops, comparators)
                     {
-                        if *n == Int::Small(3) && checker.enabled(Rule::SysVersionInfo0Eq3) {
+                        if *n == 3 && checker.enabled(Rule::SysVersionInfo0Eq3) {
                             checker
                                 .diagnostics
                                 .push(Diagnostic::new(SysVersionInfo0Eq3, left.range()));
                         }
                     }
-                } else if *i == Int::Small(1) {
+                } else if *i == 1 {
                     if let (
                         [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
                         [Expr::Constant(ast::ExprConstant {

@@ -1072,7 +1072,7 @@ impl Truthiness {
                 Constant::None => Some(false),
                 Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
                 Constant::Bytes(bytes) => Some(!bytes.is_empty()),
-                Constant::Int(int) => Some(!matches!(int, Int::Small(0))),
+                Constant::Int(int) => Some(int != &Int::ZERO),
                 Constant::Float(float) => Some(*float != 0.0),
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
@@ -1189,15 +1189,15 @@ mod tests {
             ctx: ExprContext::Load,
         });
         let constant_one = Expr::Constant(ExprConstant {
-            value: Constant::Int(Int::Small(1)),
+            value: Constant::Int(Int::ONE),
             range: TextRange::default(),
         });
         let constant_two = Expr::Constant(ExprConstant {
-            value: Constant::Int(Int::Small(2)),
+            value: Constant::Int(Int::TWO),
             range: TextRange::default(),
         });
         let constant_three = Expr::Constant(ExprConstant {
-            value: Constant::Int(Int::Small(3)),
+            value: Constant::Int(Int::THREE),
             range: TextRange::default(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
@@ -1239,7 +1239,7 @@ mod tests {
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
         let bound = Expr::Constant(ExprConstant {
-            value: Constant::Int(Int::Small(1)),
+            value: Constant::Int(Int::ONE),
             range: TextRange::default(),
         });
 

@@ -246,16 +246,16 @@ impl ExpectedComparator {
                     ..
                 }) = upper.as_ref()
                 {
-                    if *upper == Int::Small(1) {
+                    if *upper == 1 {
                         return Some(ExpectedComparator::MajorTuple);
                     }
-                    if *upper == Int::Small(2) {
+                    if *upper == 2 {
                         return Some(ExpectedComparator::MajorMinorTuple);
                     }
                 }
             }
             Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(Int::Small(0)),
+                value: Constant::Int(Int::ZERO),
                 ..
             }) => {
                 return Some(ExpectedComparator::MajorDigit);

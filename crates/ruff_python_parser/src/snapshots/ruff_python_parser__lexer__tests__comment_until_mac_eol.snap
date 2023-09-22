@@ -5,9 +5,7 @@ expression: comment_until_eol(MAC_EOL)
 [
     (
         Int {
-            value: Small(
-                123,
-            ),
+            value: 123,
         },
         0..3,
     ),
@@ -23,9 +21,7 @@ expression: comment_until_eol(MAC_EOL)
     ),
     (
         Int {
-            value: Small(
-                456,
-            ),
+            value: 456,
         },
         11..14,
     ),

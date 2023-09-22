@@ -44,7 +44,7 @@ impl Violation for PairwiseOverZipped {
 #[derive(Debug)]
 struct SliceInfo {
     id: String,
-    slice_start: Option<isize>,
+    slice_start: Option<i32>,
 }
 
 /// Return the argument name, lower bound, and upper bound for an expression, if it's a slice.
@@ -66,7 +66,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
         if !matches!(
             step.as_ref(),
             Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(Int::Small(1)),
+                value: Constant::Int(Int::ONE),
                 ..
             })
         ) {
@@ -77,13 +77,18 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
     // If the slice start is a non-constant, we can't be sure that it's successive.
     let slice_start = if let Some(lower) = lower.as_ref() {
         let Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(Int::Small(slice_start)),
+            value: Constant::Int(int),
             range: _,
         }) = lower.as_ref()
         else {
             return None;
         };
-        Some(*slice_start)
+
+        let Some(slice_start) = int.as_i32() else {
+            return None;
+        };
+
+        Some(slice_start)
     } else {
         None
     };

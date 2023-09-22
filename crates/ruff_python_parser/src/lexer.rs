@@ -29,8 +29,7 @@
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::iter::FusedIterator;
-use std::num::IntErrorKind;
-use std::{char, cmp::Ordering, isize, str::FromStr};
+use std::{char, cmp::Ordering, str::FromStr};
 
 use unicode_ident::{is_xid_continue, is_xid_start};
 
@@ -265,20 +264,13 @@ impl<'source> Lexer<'source> {
         let mut number = LexedText::new(self.offset(), self.source);
         self.radix_run(&mut number, radix);
 
-        let value = match isize::from_str_radix(number.as_str(), radix.as_u32()) {
-            Ok(int) => Int::Small(int),
+        let value = match Int::parse_from_radix(number.as_str(), radix.as_u32()) {
+            Ok(int) => int,
             Err(err) => {
-                if matches!(
-                    err.kind(),
-                    IntErrorKind::PosOverflow | IntErrorKind::NegOverflow
-                ) {
-                    Int::Big(number.as_str().to_string())
-                } else {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError(format!("{err:?}")),
-                        location: self.token_range().start(),
-                    });
-                }
+                return Err(LexicalError {
+                    error: LexicalErrorType::OtherError(format!("{err:?}")),
+                    location: self.token_range().start(),
+                });
             }
         };
         Ok(Tok::Int { value })
@@ -351,36 +343,22 @@ impl<'source> Lexer<'source> {
                 let imag = f64::from_str(number.as_str()).unwrap();
                 Ok(Tok::Complex { real: 0.0, imag })
             } else {
-                let value = match number.as_str().parse::<isize>() {
+                let value = match Int::parse(number.as_str()) {
                     Ok(value) => {
-                        if start_is_zero && value != 0 {
-                            // leading zeros in decimal integer literals are not permitted
+                        if start_is_zero && value.as_u8() != Some(0) {
+                            // Leading zeros in decimal integer literals are not permitted.
                             return Err(LexicalError {
                                 error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
                                 location: self.token_range().start(),
                             });
                         }
-                        Int::Small(value)
+                        value
                     }
                     Err(err) => {
-                        if matches!(
-                            err.kind(),
-                            IntErrorKind::PosOverflow | IntErrorKind::NegOverflow
-                        ) {
-                            if start_is_zero {
-                                // leading zeros in decimal integer literals are not permitted
-                                return Err(LexicalError {
-                                    error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
-                                    location: self.token_range().start(),
-                                });
-                            }
-                            Int::Big(number.as_str().to_string())
-                        } else {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
-                                location: self.token_range().start(),
-                            });
-                        }
+                        return Err(LexicalError {
+                            error: LexicalErrorType::OtherError(format!("{err:?}")),
+                            location: self.token_range().start(),
+                        })
                     }
                 };
                 Ok(Tok::Int { value })
@@ -1484,8 +1462,27 @@ def f(arg=%timeit a = b):
 
     #[test]
     fn test_numbers() {
-        let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j";
+        let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000";
         assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_invalid_leading_zero_small() {
+        let source = "025";
+
+        let lexer = lex(source, Mode::Module);
+        let tokens = lexer.collect::<Result<Vec<_>, LexicalError>>();
+        assert_debug_snapshot!(tokens);
+    }
+
+    #[test]
+    fn test_invalid_leading_zero_big() {
+        let source =
+            "0252222222222222522222222222225222222222222252222222222222522222222222225222222222222";
+
+        let lexer = lex(source, Mode::Module);
+        let tokens = lexer.collect::<Result<Vec<_>, LexicalError>>();
+        assert_debug_snapshot!(tokens);
     }
 
     #[test]

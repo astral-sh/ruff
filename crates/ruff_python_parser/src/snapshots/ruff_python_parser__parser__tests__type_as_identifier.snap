@@ -631,9 +631,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprConstant {
                             range: 492..493,
                             value: Int(
-                                Small(
-                                    1,
-                                ),
+                                1,
                             ),
                         },
                     ),
@@ -748,9 +746,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 ExprConstant {
                                                     range: 547..549,
                                                     value: Int(
-                                                        Small(
-                                                            12,
-                                                        ),
+                                                        12,
                                                     ),
                                                 },
                                             ),
@@ -928,9 +924,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 624..625,
                     value: Int(
-                        Small(
-                            1,
-                        ),
+                        1,
                     ),
                 },
             ),
@@ -959,9 +953,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 637..638,
                     value: Int(
-                        Small(
-                            1,
-                        ),
+                        1,
                     ),
                 },
             ),
@@ -990,9 +982,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprConstant {
                     range: 650..651,
                     value: Int(
-                        Small(
-                            1,
-                        ),
+                        1,
                     ),
                 },
             ),

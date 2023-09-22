@@ -161,7 +161,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                     matches!(
                         start,
                         Expr::Constant(ast::ExprConstant {
-                            value: Constant::Int(Int::Small(0)),
+                            value: Constant::Int(Int::ZERO),
                             ..
                         })
                     )

@@ -8,10 +8,10 @@ expression: trace
       - Parameter
       - Parameter
       - ExprConstant
-        - Int(Small(34))
+        - Int(34)
       - Parameter
       - ExprConstant
-        - Int(Small(20))
+        - Int(20)
       - Parameter
     - StmtPass
 

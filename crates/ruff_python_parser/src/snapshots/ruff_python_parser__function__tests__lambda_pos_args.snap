@@ -61,9 +61,7 @@ Ok(
                             ExprConstant {
                                 range: 16..17,
                                 value: Int(
-                                    Small(
-                                        1,
-                                    ),
+                                    1,
                                 ),
                             },
                         ),

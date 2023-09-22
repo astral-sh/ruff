@@ -33,9 +33,7 @@ expression: parse_ast
                             ExprConstant {
                                 range: 7..8,
                                 value: Int(
-                                    Small(
-                                        1,
-                                    ),
+                                    1,
                                 ),
                             },
                         ),
@@ -43,9 +41,7 @@ expression: parse_ast
                             ExprConstant {
                                 range: 10..11,
                                 value: Int(
-                                    Small(
-                                        2,
-                                    ),
+                                    2,
                                 ),
                             },
                         ),
@@ -53,9 +49,7 @@ expression: parse_ast
                             ExprConstant {
                                 range: 13..14,
                                 value: Int(
-                                    Small(
-                                        3,
-                                    ),
+                                    3,
                                 ),
                             },
                         ),

@@ -10,9 +10,7 @@ expression: parse_ast
                 ExprConstant {
                     range: 3..4,
                     value: Int(
-                        Small(
-                            1,
-                        ),
+                        1,
                     ),
                 },
             ),
@@ -24,9 +22,7 @@ expression: parse_ast
                             ExprConstant {
                                 range: 6..8,
                                 value: Int(
-                                    Small(
-                                        10,
-                                    ),
+                                    10,
                                 ),
                             },
                         ),
@@ -41,9 +37,7 @@ expression: parse_ast
                             ExprConstant {
                                 range: 14..15,
                                 value: Int(
-                                    Small(
-                                        2,
-                                    ),
+                                    2,
                                 ),
                             },
                         ),
@@ -56,9 +50,7 @@ expression: parse_ast
                                     ExprConstant {
                                         range: 17..19,
                                         value: Int(
-                                            Small(
-                                                20,
-                                            ),
+                                            20,
                                         ),
                                     },
                                 ),
@@ -77,9 +69,7 @@ expression: parse_ast
                                     ExprConstant {
                                         range: 26..28,
                                         value: Int(
-                                            Small(
-                                                30,
-                                            ),
+                                            30,
                                         ),
                                     },
                                 ),

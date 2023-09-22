@@ -1,7 +1,5 @@
 use std::cmp::Ordering;
 
-use log::warn;
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
@@ -126,8 +124,8 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                 ..
             }) => {
                 if op == &CmpOp::Eq {
-                    match int {
-                        Int::Small(2) => {
+                    match *int {
+                        Int::TWO => {
                             let mut diagnostic =
                                 Diagnostic::new(OutdatedVersionBlock, branch.test.range());
                             if checker.patch(diagnostic.kind.rule()) {
@@ -139,7 +137,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                             }
                             checker.diagnostics.push(diagnostic);
                         }
-                        Int::Small(3) => {
+                        Int::THREE => {
                             let mut diagnostic =
                                 Diagnostic::new(OutdatedVersionBlock, branch.test.range());
                             if checker.patch(diagnostic.kind.rule()) {
@@ -160,7 +158,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
 }
 
 /// Returns true if the `target_version` is always less than the [`PythonVersion`].
-fn compare_version(target_version: &[isize], py_version: PythonVersion, or_equal: bool) -> bool {
+fn compare_version(target_version: &[i64], py_version: PythonVersion, or_equal: bool) -> bool {
     let mut target_version_iter = target_version.iter();
 
     let Some(if_major) = target_version_iter.next() else {
@@ -169,7 +167,7 @@ fn compare_version(target_version: &[isize], py_version: PythonVersion, or_equal
 
     let (py_major, py_minor) = py_version.as_tuple();
 
-    match if_major.cmp(&(py_major as isize)) {
+    match if_major.cmp(&i64::from(py_major)) {
         Ordering::Less => true,
         Ordering::Greater => false,
         Ordering::Equal => {
@@ -358,8 +356,8 @@ fn fix_always_true_branch(
 }
 
 /// Gets the version from the tuple
-fn extract_version(elts: &[Expr]) -> Option<Vec<isize>> {
-    let mut version: Vec<isize> = vec![];
+fn extract_version(elts: &[Expr]) -> Option<Vec<i64>> {
+    let mut version: Vec<i64> = vec![];
     for elt in elts {
         let Expr::Constant(ast::ExprConstant {
             value: Constant::Int(int),
@@ -368,16 +366,7 @@ fn extract_version(elts: &[Expr]) -> Option<Vec<isize>> {
         else {
             return None;
         };
-
-        match int {
-            Int::Small(int) => {
-                version.push(*int);
-            }
-            Int::Big(int) => {
-                warn!("Unsupported version number: {}", int);
-                return None;
-            }
-        }
+        version.push(int.as_i64()?);
     }
     Some(version)
 }
@@ -401,7 +390,7 @@ mod tests {
     #[test_case(PythonVersion::Py310, &[3, 11], true, false; "compare-3.11")]
     fn test_compare_version(
         version: PythonVersion,
-        version_vec: &[isize],
+        version_vec: &[i64],
         or_equal: bool,
         expected: bool,
     ) {

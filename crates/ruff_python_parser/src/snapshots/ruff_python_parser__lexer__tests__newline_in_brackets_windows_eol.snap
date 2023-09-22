@@ -27,9 +27,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
     ),
     (
         Int {
-            value: Small(
-                1,
-            ),
+            value: 1,
         },
         13..14,
     ),
@@ -39,9 +37,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
     ),
     (
         Int {
-            value: Small(
-                2,
-            ),
+            value: 2,
         },
         15..16,
     ),
@@ -59,9 +55,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
     ),
     (
         Int {
-            value: Small(
-                3,
-            ),
+            value: 3,
         },
         20..21,
     ),
@@ -75,9 +69,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
     ),
     (
         Int {
-            value: Small(
-                4,
-            ),
+            value: 4,
         },
         24..25,
     ),
@@ -107,9 +99,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
     ),
     (
         Int {
-            value: Small(
-                5,
-            ),
+            value: 5,
         },
         34..35,
     ),
@@ -123,9 +113,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
     ),
     (
         Int {
-            value: Small(
-                6,
-            ),
+            value: 6,
         },
         38..39,
     ),
@@ -135,9 +123,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
     ),
     (
         Int {
-            value: Small(
-                7,
-            ),
+            value: 7,
         },
         43..44,
     ),

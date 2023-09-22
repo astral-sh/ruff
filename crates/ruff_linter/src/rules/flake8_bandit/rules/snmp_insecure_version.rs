@@ -53,7 +53,7 @@ pub(crate) fn snmp_insecure_version(checker: &mut Checker, call: &ast::ExprCall)
             if matches!(
                 keyword.value,
                 Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(Int::Small(0 | 1)),
+                    value: Constant::Int(Int::ZERO | Int::ONE),
                     ..
                 })
             ) {

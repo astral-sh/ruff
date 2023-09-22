@@ -20,9 +20,7 @@ Subscript(
                         ExprConstant {
                             range: 2..3,
                             value: Int(
-                                Small(
-                                    1,
-                                ),
+                                1,
                             ),
                         },
                     ),
@@ -32,9 +30,7 @@ Subscript(
                         ExprConstant {
                             range: 4..5,
                             value: Int(
-                                Small(
-                                    2,
-                                ),
+                                2,
                             ),
                         },
                     ),
@@ -44,9 +40,7 @@ Subscript(
                         ExprConstant {
                             range: 6..7,
                             value: Int(
-                                Small(
-                                    3,
-                                ),
+                                3,
                             ),
                         },
                     ),

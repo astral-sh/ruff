@@ -45,9 +45,7 @@ expression: parse_ast
                                     ExprConstant {
                                         range: 30..31,
                                         value: Int(
-                                            Small(
-                                                2,
-                                            ),
+                                            2,
                                         ),
                                     },
                                 ),

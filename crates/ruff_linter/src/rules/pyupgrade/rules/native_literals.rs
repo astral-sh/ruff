@@ -45,7 +45,7 @@ impl From<LiteralType> for Constant {
                 value: Vec::new(),
                 implicit_concatenated: false,
             }),
-            LiteralType::Int => Constant::Int(Int::Small(0)),
+            LiteralType::Int => Constant::Int(Int::ZERO),
             LiteralType::Float => Constant::Float(0.0),
             LiteralType::Bool => Constant::Bool(false),
         }

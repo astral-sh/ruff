@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::{self as ast, Constant, Expr, Int, Operator};
+use ruff_python_ast::{self as ast, Constant, Expr, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -34,7 +34,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[violation]
 pub struct BadFilePermissions {
-    mask: isize,
+    mask: i64,
 }
 
 impl Violation for BadFilePermissions {
@@ -65,10 +65,10 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
     }
 }
 
-const WRITE_WORLD: isize = 0o2;
-const EXECUTE_GROUP: isize = 0o10;
+const WRITE_WORLD: i64 = 0o2;
+const EXECUTE_GROUP: i64 = 0o10;
 
-fn py_stat(call_path: &CallPath) -> Option<isize> {
+fn py_stat(call_path: &CallPath) -> Option<i64> {
     match call_path.as_slice() {
         ["stat", "ST_MODE"] => Some(0o0),
         ["stat", "S_IFDOOR"] => Some(0o0),
@@ -111,12 +111,12 @@ fn py_stat(call_path: &CallPath) -> Option<isize> {
     }
 }
 
-fn int_value(expr: &Expr, semantic: &SemanticModel) -> Option<isize> {
+fn int_value(expr: &Expr, semantic: &SemanticModel) -> Option<i64> {
     match expr {
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(Int::Small(value)),
+            value: Constant::Int(int),
             ..
-        }) => Some(*value),
+        }) => int.as_i64(),
         Expr::Attribute(_) => semantic.resolve_call_path(expr).as_ref().and_then(py_stat),
         Expr::BinOp(ast::ExprBinOp {
             left,

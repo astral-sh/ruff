@@ -73,7 +73,7 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     else {
         return;
     };
-    if *value != Int::Small(0) {
+    if *value != Int::ZERO {
         return;
     };
 

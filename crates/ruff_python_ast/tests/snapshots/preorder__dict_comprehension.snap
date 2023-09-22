@@ -10,7 +10,7 @@ expression: trace
         - ExprName
         - Pow
         - ExprConstant
-          - Int(Small(2))
+          - Int(2)
       - Comprehension
         - ExprName
         - ExprName

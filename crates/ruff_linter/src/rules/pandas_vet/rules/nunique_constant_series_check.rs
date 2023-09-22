@@ -81,7 +81,7 @@ pub(crate) fn nunique_constant_series_check(
     if !matches!(
         right,
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(Int::Small(1)),
+            value: Constant::Int(Int::ONE),
             range: _,
         })
     ) {
