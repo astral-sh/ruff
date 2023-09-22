@@ -138,6 +138,14 @@ impl<'a> FormatString<'a> {
 
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        // TODO(dhruvmanila): With PEP 701, comments can be inside f-strings.
+        // This is to mark all of those comments as formatted but we need to
+        // figure out how to handle them.
+        if matches!(self.string, AnyString::FString(_)) {
+            f.context()
+                .comments()
+                .mark_verbatim_node_comments_formatted(self.string.into());
+        }
         let locator = f.context().locator();
         match self.layout {
             StringLayout::Default => {
@@ -163,6 +171,60 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
                 FormatStringContinuation::new(self.string).fmt(f)
             }
         }
+    }
+}
+
+/// A builder for the f-string range.
+///
+/// For now, this is limited to the outermost f-string and doesn't support
+/// nested f-strings.
+#[derive(Debug, Default)]
+struct FStringRangeBuilder {
+    start_location: TextSize,
+    end_location: TextSize,
+    nesting: u32,
+}
+
+impl FStringRangeBuilder {
+    fn visit_token(&mut self, token: &Tok, range: TextRange) {
+        match token {
+            Tok::FStringStart => {
+                if self.nesting == 0 {
+                    self.start_location = range.start();
+                }
+                self.nesting += 1;
+            }
+            Tok::FStringEnd => {
+                // We can assume that this will never overflow because we know
+                // that the program once parsed to a valid AST which means that
+                // the start and end tokens for f-strings are balanced.
+                self.nesting -= 1;
+                if self.nesting == 0 {
+                    self.end_location = range.end();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Returns `true` if the lexer is currently inside of a f-string.
+    ///
+    /// It'll return `false` once the `FStringEnd` token for the outermost
+    /// f-string is visited.
+    const fn in_fstring(&self) -> bool {
+        self.nesting > 0
+    }
+
+    /// Returns the complete range of the previously visited f-string.
+    ///
+    /// This method should only be called once the lexer is outside of any
+    /// f-string otherwise it might return an invalid range.
+    ///
+    /// It doesn't consume the builder because there can be multiple f-strings
+    /// throughout the source code.
+    fn finish(&self) -> TextRange {
+        debug_assert!(!self.in_fstring());
+        TextRange::new(self.start_location, self.end_location)
     }
 }
 
@@ -195,6 +257,10 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         // because this is a black preview style.
         let lexer = lex_starts_at(string_content, Mode::Expression, string_range.start());
 
+        // The lexer emits multiple tokens for a single f-string literal. Each token
+        // will have it's own range but we require the complete range of the f-string.
+        let mut fstring_range_builder = FStringRangeBuilder::default();
+
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for token in lexer {
@@ -226,8 +292,31 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                 }
             };
 
+            fstring_range_builder.visit_token(&token, token_range);
+
+            // We need to ignore all the tokens within the f-string as there can
+            // be `String` tokens inside it as well. For example,
+            //
+            // ```python
+            // f"foo {'bar'} foo"
+            // #      ^^^^^
+            // #      Ignore any logic for this `String` token
+            // ```
+            //
+            // Here, we're interested in the complete f-string, not the individual
+            // tokens inside it.
+            if fstring_range_builder.in_fstring() {
+                continue;
+            }
+
             match token {
-                Tok::String { .. } => {
+                Tok::String { .. } | Tok::FStringEnd => {
+                    let token_range = if token.is_f_string_end() {
+                        fstring_range_builder.finish()
+                    } else {
+                        token_range
+                    };
+
                     // ```python
                     // (
                     //      "a"
