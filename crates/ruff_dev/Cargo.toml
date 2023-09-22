@@ -28,7 +28,7 @@ ruff_workspace = { path = "../ruff_workspace", features = ["schemars"]}
 anyhow = { workspace = true }
 clap = { workspace = true }
 ignore = { workspace = true }
-indicatif = "0.17.5"
+indicatif = "0.17.7"
 itertools = { workspace = true }
 libcst = { workspace = true }
 once_cell = { workspace = true }
