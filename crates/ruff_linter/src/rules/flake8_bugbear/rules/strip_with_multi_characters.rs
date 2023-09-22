@@ -21,14 +21,25 @@ use crate::checkers::ast::Checker;
 /// `str.removesuffix` to remove an exact prefix or suffix from a string,
 /// respectively, which should be preferred when possible.
 ///
+/// ## Known problems
+/// As a heuristic, this rule only flags multi-character strings that contain
+/// duplicate characters. This allows usages like `.strip("xyz")`, which
+/// removes all occurrences of the characters `x`, `y`, and `z` from the
+/// leading and trailing ends of the string, but not `.strip("foo")`.
+///
+/// The use of unique, multi-character strings may be intentional and
+/// consistent with the intent of `.strip()`, `.lstrip()`, or `.rstrip()`,
+/// while the use of duplicate-character strings is very likely to be a
+/// mistake.
+///
 /// ## Example
 /// ```python
-/// "abcba".strip("ab")  # "c"
+/// "text.txt".strip(".txt")  # "ex"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// "abcba".removeprefix("ab").removesuffix("ba")  # "c"
+/// "text.txt".removesuffix(".txt")  # "text"
 /// ```
 ///
 /// ## References
@@ -39,7 +50,7 @@ pub struct StripWithMultiCharacters;
 impl Violation for StripWithMultiCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `.strip()` with multi-character strings is misleading the reader")
+        format!("Using `.strip()` with multi-character strings is misleading")
     }
 }
 
@@ -65,8 +76,7 @@ pub(crate) fn strip_with_multi_characters(
         return;
     };
 
-    let num_chars = value.chars().count();
-    if num_chars > 1 && num_chars != value.chars().unique().count() {
+    if value.chars().count() > 1 && !value.chars().all_unique() {
         checker
             .diagnostics
             .push(Diagnostic::new(StripWithMultiCharacters, expr.range()));
