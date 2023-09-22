@@ -88,10 +88,33 @@ pub fn lines_after(offset: TextSize, code: &str) -> u32 {
     newlines
 }
 
+/// Counts the empty lines after `offset`, ignoring any trailing trivia: end-of-line comments,
+/// own-line comments, and any intermediary newlines.
+pub fn lines_after_ignoring_trivia(offset: TextSize, code: &str) -> u32 {
+    let mut newlines = 0u32;
+    for token in SimpleTokenizer::starts_at(offset, code) {
+        match token.kind() {
+            SimpleTokenKind::Newline => {
+                newlines += 1;
+            }
+            SimpleTokenKind::Whitespace => {}
+            // If we see a comment, reset the newlines counter.
+            SimpleTokenKind::Comment => {
+                newlines = 0;
+            }
+            // As soon as we see a non-trivia token, we're done.
+            _ => {
+                break;
+            }
+        }
+    }
+    newlines
+}
+
 /// Counts the empty lines after `offset`, ignoring any trailing trivia on the same line as
 /// `offset`.
 #[allow(clippy::cast_possible_truncation)]
-pub fn lines_after_ignoring_trivia(offset: TextSize, code: &str) -> u32 {
+pub fn lines_after_ignoring_end_of_line_trivia(offset: TextSize, code: &str) -> u32 {
     // SAFETY: We don't support files greater than 4GB, so casting to u32 is safe.
     SimpleTokenizer::starts_at(offset, code)
         .skip_while(|token| token.kind != SimpleTokenKind::Newline && token.kind.is_trivia())

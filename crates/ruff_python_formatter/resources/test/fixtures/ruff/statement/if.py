@@ -207,6 +207,31 @@ if True:
 else:
     pass
 
+if True:
+    if True:
+        pass
+    else:
+        pass
+        # a
+
+        # b
+        # c
+
+else:
+    pass
+
+if True:
+    if True:
+        pass
+    else:
+        pass
+
+        # b
+        # c
+
+else:
+    pass
+
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7602
 if True:
