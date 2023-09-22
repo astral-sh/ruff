@@ -168,10 +168,11 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
         // figure out how to handle them. Note that this needs to be done only
         // after the f-string is formatted, so only for all the non-formatted
         // comments.
-        if matches!(self.string, AnyString::FString(_)) {
-            f.context()
-                .comments()
-                .mark_verbatim_node_comments_formatted(self.string.into());
+        if let AnyString::FString(fstring) = self.string {
+            let comments = f.context().comments();
+            fstring.values.iter().for_each(|value| {
+                comments.mark_verbatim_node_comments_formatted(value.into());
+            });
         }
         result
     }
