@@ -5,8 +5,8 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
-use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff_diagnostics::AutofixKind;
+use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
 

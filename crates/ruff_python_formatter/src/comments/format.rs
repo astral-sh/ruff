@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::PySourceType;
-use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
+use ruff_python_trivia::{lines_after, lines_before};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::{CommentLinePosition, SourceComment};
@@ -86,17 +86,26 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
         if let Some(first_leading) = self.comments.first() {
             // Leading comments only preserves the lines after the comment but not before.
             // Insert the necessary lines.
-            if lines_before(first_leading.start(), f.context().source()) > 1 {
-                write!(f, [empty_line()])?;
-            }
+            write!(
+                f,
+                [empty_lines(lines_before(
+                    first_leading.start(),
+                    f.context().source()
+                ))]
+            )?;
 
             write!(f, [leading_comments(self.comments)])?;
         } else if let Some(last_preceding) = self.last_node {
             // The leading comments formatting ensures that it preserves the right amount of lines after
             // We need to take care of this ourselves, if there's no leading `else` comment.
-            if lines_after_ignoring_trivia(last_preceding.end(), f.context().source()) > 1 {
-                write!(f, [empty_line()])?;
-            }
+            let end = if let Some(last_trailing) =
+                f.context().comments().trailing(last_preceding).last()
+            {
+                last_trailing.end()
+            } else {
+                last_preceding.end()
+            };
+            write!(f, [empty_lines(lines_after(end, f.context().source()))])?;
         }
 
         Ok(())
@@ -299,7 +308,14 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
             NodeLevel::TopLevel => match self.lines {
                 0 | 1 => write!(f, [hard_line_break()]),
                 2 => write!(f, [empty_line()]),
-                _ => write!(f, [empty_line(), empty_line()]),
+                _ => match f.options().source_type() {
+                    PySourceType::Stub => {
+                        write!(f, [empty_line()])
+                    }
+                    PySourceType::Python | PySourceType::Ipynb => {
+                        write!(f, [empty_line(), empty_line()])
+                    }
+                },
             },
 
             NodeLevel::CompoundStatement => match self.lines {

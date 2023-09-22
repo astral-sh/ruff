@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
+---
+YTT201.py:7:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+  |
+5 | PY3 = sys.version_info[0] >= 3
+6 | 
+7 | PY3 = sys.version_info[0] == 3
+  |       ^^^^^^^^^^^^^^^^^^^ YTT201
+8 | PY3 = version_info[0] == 3
+9 | PY2 = sys.version_info[0] != 3
+  |
+
+YTT201.py:8:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+   |
+ 7 | PY3 = sys.version_info[0] == 3
+ 8 | PY3 = version_info[0] == 3
+   |       ^^^^^^^^^^^^^^^ YTT201
+ 9 | PY2 = sys.version_info[0] != 3
+10 | PY2 = version_info[0] != 3
+   |
+
+YTT201.py:9:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+   |
+ 7 | PY3 = sys.version_info[0] == 3
+ 8 | PY3 = version_info[0] == 3
+ 9 | PY2 = sys.version_info[0] != 3
+   |       ^^^^^^^^^^^^^^^^^^^ YTT201
+10 | PY2 = version_info[0] != 3
+   |
+
+YTT201.py:10:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+   |
+ 8 | PY3 = version_info[0] == 3
+ 9 | PY2 = sys.version_info[0] != 3
+10 | PY2 = version_info[0] != 3
+   |       ^^^^^^^^^^^^^^^ YTT201
+   |
+
+

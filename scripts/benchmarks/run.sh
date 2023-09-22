@@ -5,4 +5,4 @@
 ###
 
 cargo build --release && hyperfine --ignore-failure --warmup 10 \
-  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache"
+  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache"

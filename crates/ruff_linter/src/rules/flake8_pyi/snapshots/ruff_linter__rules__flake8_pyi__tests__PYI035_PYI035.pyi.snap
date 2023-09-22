@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI035.pyi:1:1: PYI035 `__all__` in a stub file must have a value, as it has the same semantics as `__all__` at runtime
+  |
+1 | __all__: list[str]  # Error: PYI035
+  | ^^^^^^^^^^^^^^^^^^ PYI035
+2 | 
+3 | __all__: list[str] = ["foo"]
+  |
+
+PYI035.pyi:7:5: PYI035 `__match_args__` in a stub file must have a value, as it has the same semantics as `__match_args__` at runtime
+  |
+5 | class Foo:
+6 |     __all__: list[str]
+7 |     __match_args__: tuple[str, ...]  # Error: PYI035
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI035
+8 |     __slots__: tuple[str, ...]  # Error: PYI035
+  |
+
+PYI035.pyi:8:5: PYI035 `__slots__` in a stub file must have a value, as it has the same semantics as `__slots__` at runtime
+   |
+ 6 |     __all__: list[str]
+ 7 |     __match_args__: tuple[str, ...]  # Error: PYI035
+ 8 |     __slots__: tuple[str, ...]  # Error: PYI035
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI035
+ 9 | 
+10 | class Bar:
+   |
+
+

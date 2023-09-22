@@ -3,17 +3,17 @@ use std::str::FromStr;
 
 use itertools::Itertools;
 
-use ruff::line_width::LineLength;
-use ruff::registry::Linter;
-use ruff::rule_selector::RuleSelector;
-use ruff::rules::flake8_pytest_style::types::{
+use ruff_linter::line_width::LineLength;
+use ruff_linter::registry::Linter;
+use ruff_linter::rule_selector::RuleSelector;
+use ruff_linter::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
-use ruff::rules::flake8_quotes::settings::Quote;
-use ruff::rules::flake8_tidy_imports::settings::Strictness;
-use ruff::rules::pydocstyle::settings::Convention;
-use ruff::settings::types::PythonVersion;
-use ruff::warn_user;
+use ruff_linter::rules::flake8_quotes::settings::Quote;
+use ruff_linter::rules::flake8_tidy_imports::settings::Strictness;
+use ruff_linter::rules::pydocstyle::settings::Convention;
+use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::warn_user;
 use ruff_workspace::options::{
     Flake8AnnotationsOptions, Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ErrMsgOptions,
     Flake8PytestStyleOptions, Flake8QuotesOptions, Flake8TidyImportsOptions, McCabeOptions,
@@ -458,12 +458,12 @@ mod tests {
     use pep440_rs::VersionSpecifiers;
 
     use pretty_assertions::assert_eq;
-    use ruff::line_width::LineLength;
-    use ruff::registry::Linter;
-    use ruff::rule_selector::RuleSelector;
-    use ruff::rules::flake8_quotes;
-    use ruff::rules::pydocstyle::settings::Convention;
-    use ruff::settings::types::PythonVersion;
+    use ruff_linter::line_width::LineLength;
+    use ruff_linter::registry::Linter;
+    use ruff_linter::rule_selector::RuleSelector;
+    use ruff_linter::rules::flake8_quotes;
+    use ruff_linter::rules::pydocstyle::settings::Convention;
+    use ruff_linter::settings::types::PythonVersion;
     use ruff_workspace::options::{Flake8QuotesOptions, Options, PydocstyleOptions};
     use ruff_workspace::pyproject::Pyproject;
 

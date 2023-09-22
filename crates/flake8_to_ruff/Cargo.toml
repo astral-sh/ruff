@@ -1,6 +1,6 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.289"
+version = "0.0.290"
 description = """
 Convert Flake8 configuration files to Ruff configuration files.
 """
@@ -13,7 +13,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff = { path = "../ruff", default-features = false }
+ruff_linter = { path = "../ruff_linter", default-features = false }
 ruff_workspace = { path = "../ruff_workspace" }
 
 anyhow = { workspace = true }

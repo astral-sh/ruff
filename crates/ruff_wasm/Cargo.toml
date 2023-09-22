@@ -18,7 +18,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-ruff = { path = "../ruff" }
+ruff_linter = { path = "../ruff_linter" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_codegen = { path = "../ruff_python_codegen" }
@@ -28,6 +28,7 @@ ruff_python_index = { path = "../ruff_python_index" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_source_file = { path = "../ruff_source_file" }
 ruff_text_size = { path = "../ruff_text_size" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_workspace = { path = "../ruff_workspace" }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }

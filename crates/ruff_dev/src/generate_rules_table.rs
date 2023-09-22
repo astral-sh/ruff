@@ -1,13 +1,13 @@
 //! Generate a Markdown-compatible table of supported lint rules.
 //!
-//! Used for <https://beta.ruff.rs/docs/rules/>.
+//! Used for <https://docs.astral.sh/ruff/rules/>.
 
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 
-use ruff::registry::{Linter, Rule, RuleNamespace};
-use ruff::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_diagnostics::AutofixKind;
+use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_workspace::options::Options;
 
 const FIX_SYMBOL: &str = "🛠️";
@@ -61,7 +61,7 @@ pub(crate) fn generate() -> String {
     table_out.push('\n');
 
     table_out.push_str(&format!(
-        "The {PREVIEW_SYMBOL} emoji indicates that a rule in [\"preview\"](../faq/#what-is-preview)."
+        "The {PREVIEW_SYMBOL} emoji indicates that a rule in [\"preview\"](faq.md#what-is-preview)."
     ));
     table_out.push('\n');
     table_out.push('\n');

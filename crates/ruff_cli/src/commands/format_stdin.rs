@@ -1,23 +1,21 @@
 use std::io::{stdout, Write};
-use std::num::NonZeroU16;
 use std::path::Path;
 
 use anyhow::Result;
 use log::warn;
-use ruff::settings::types::PreviewMode;
-use ruff_formatter::LineWidth;
 
+use ruff_python_ast::PySourceType;
 use ruff_python_formatter::{format_module, PyFormatOptions};
 use ruff_workspace::resolver::python_file_at_path;
 
-use crate::args::{FormatArguments, Overrides};
+use crate::args::{CliOverrides, FormatArguments};
 use crate::commands::format::{FormatCommandError, FormatCommandResult, FormatMode};
 use crate::resolve::resolve;
 use crate::stdin::read_from_stdin;
 use crate::ExitStatus;
 
 /// Run the formatter over a single file, read from `stdin`.
-pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &Overrides) -> Result<ExitStatus> {
+pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> Result<ExitStatus> {
     let pyproject_config = resolve(
         cli.isolated,
         cli.config.as_deref(),
@@ -39,17 +37,10 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &Overrides) -> Resu
     // Format the file.
     let path = cli.stdin_filename.as_deref();
 
-    let preview = match pyproject_config.settings.lib.preview {
-        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
-        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
-    };
-    let line_length = pyproject_config.settings.lib.line_length;
-
-    let options = path
-        .map(PyFormatOptions::from_extension)
-        .unwrap_or_default()
-        .with_line_width(LineWidth::from(NonZeroU16::from(line_length)))
-        .with_preview(preview);
+    let options = pyproject_config
+        .settings
+        .formatter
+        .to_format_options(path.map(PySourceType::from).unwrap_or_default());
 
     match format_source(path, options, mode) {
         Ok(result) => match mode {
@@ -80,15 +71,16 @@ fn format_source(
     let formatted = format_module(&unformatted, options)
         .map_err(|err| FormatCommandError::FormatModule(path.map(Path::to_path_buf), err))?;
     let formatted = formatted.as_code();
+
+    if mode.is_write() {
+        stdout()
+            .lock()
+            .write_all(formatted.as_bytes())
+            .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
+    }
     if formatted.len() == unformatted.len() && formatted == unformatted {
         Ok(FormatCommandResult::Unchanged)
     } else {
-        if mode.is_write() {
-            stdout()
-                .lock()
-                .write_all(formatted.as_bytes())
-                .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
-        }
         Ok(FormatCommandResult::Formatted)
     }
 }

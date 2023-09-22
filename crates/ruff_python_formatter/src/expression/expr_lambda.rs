@@ -1,6 +1,7 @@
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprLambda;
+use ruff_text_size::Ranged;
 
 use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -24,28 +25,40 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         write!(f, [token("lambda")])?;
 
         if let Some(parameters) = parameters {
+            // In this context, a dangling comment can either be a comment between the `lambda` the
+            // parameters, or a comment between the parameters and the body.
+            let (dangling_before_parameters, dangling_after_parameters) = dangling
+                .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
+
+            if dangling_before_parameters.is_empty() {
+                write!(f, [space()])?;
+            } else {
+                write!(f, [dangling_comments(dangling_before_parameters)])?;
+            }
+
             write!(
                 f,
-                [
-                    space(),
-                    parameters
-                        .format()
-                        .with_options(ParametersParentheses::Never),
-                ]
+                [parameters
+                    .format()
+                    .with_options(ParametersParentheses::Never)]
             )?;
-        }
 
-        write!(f, [token(":")])?;
+            write!(f, [token(":")])?;
 
-        if dangling.is_empty() {
-            write!(f, [space()])?;
+            if dangling_after_parameters.is_empty() {
+                write!(f, [space()])?;
+            } else {
+                write!(f, [dangling_comments(dangling_after_parameters)])?;
+            }
         } else {
-            write!(f, [dangling_comments(dangling)])?;
-        }
+            write!(f, [token(":")])?;
 
-        // Insert hard line break if body has leading comment to ensure consistent formatting
-        if comments.has_leading(body.as_ref()) {
-            write!(f, [hard_line_break()])?;
+            // In this context, a dangling comment is a comment between the `lambda` and the body.
+            if dangling.is_empty() {
+                write!(f, [space()])?;
+            } else {
+                write!(f, [dangling_comments(dangling)])?;
+            }
         }
 
         write!(f, [body.format()])
@@ -64,9 +77,13 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 impl NeedsParentheses for ExprLambda {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }

@@ -13,7 +13,9 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff = { path = "../ruff" }
+ruff_linter = { path = "../ruff_linter" }
+ruff_formatter = { path = "../ruff_formatter" }
+ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_cache = { path = "../ruff_cache" }
 ruff_macros = { path = "../ruff_macros" }
 
@@ -25,6 +27,7 @@ itertools = { workspace = true }
 log = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
+once_cell = { workspace = true }
 path-absolutize = { workspace = true }
 pep440_rs = { version = "0.3.1", features = ["serde"] }
 regex = { workspace = true }

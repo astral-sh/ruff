@@ -84,7 +84,21 @@ fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
     });
 
     if let Some(indent_range) = indent_range {
-        let whitespace = locator.slice(*indent_range);
+        let mut whitespace = locator.slice(*indent_range);
+        // https://docs.python.org/3/reference/lexical_analysis.html#indentation
+        // > A formfeed character may be present at the start of the line; it will be ignored for
+        // > the indentation calculations above. Formfeed characters occurring elsewhere in the
+        // > leading whitespace have an undefined effect (for instance, they may reset the space
+        // > count to zero).
+        // So there's UB in python lexer -.-
+        // In practice, they just reset the indentation:
+        // https://github.com/python/cpython/blob/df8b3a46a7aa369f246a09ffd11ceedf1d34e921/Parser/tokenizer.c#L1819-L1821
+        // https://github.com/astral-sh/ruff/blob/a41bb2733fe75a71f4cf6d4bb21e659fc4630b30/crates/ruff_python_parser/src/lexer.rs#L664-L667
+        // We also reset the indentation when we see a formfeed character.
+        // See also https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458825
+        if let Some((_before, after)) = whitespace.rsplit_once('\x0C') {
+            whitespace = after;
+        }
 
         Indentation(whitespace.to_string())
     } else {
@@ -227,6 +241,19 @@ x = (
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).indentation(),
             &Indentation::default()
+        );
+
+        // formfeed indent, see `detect_indention` comment.
+        let contents = r#"
+class FormFeedIndent:
+   def __init__(self, a=[]):
+        print(a)
+"#;
+        let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).indentation(),
+            &Indentation(" ".to_string())
         );
     }
 

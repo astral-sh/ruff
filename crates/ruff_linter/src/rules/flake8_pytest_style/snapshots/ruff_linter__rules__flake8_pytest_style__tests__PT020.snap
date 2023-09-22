@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT020.py:14:1: PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+   |
+14 | @pytest.yield_fixture()
+   | ^^^^^^^^^^^^^^^^^^^^^^^ PT020
+15 | def error_without_parens():
+16 |     return 0
+   |
+
+PT020.py:19:1: PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+   |
+19 | @pytest.yield_fixture
+   | ^^^^^^^^^^^^^^^^^^^^^ PT020
+20 | def error_with_parens():
+21 |     return 0
+   |
+
+

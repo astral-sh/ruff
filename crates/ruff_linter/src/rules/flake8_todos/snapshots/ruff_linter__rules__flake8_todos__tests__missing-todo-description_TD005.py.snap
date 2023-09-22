@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+---
+TD005.py:4:3: TD005 Missing issue description after `TODO`
+  |
+2 | # TODO(evanrittenhouse): this has text, while the errors do not
+3 | # T005 - errors
+4 | # TODO(evanrittenhouse):
+  |   ^^^^ TD005
+5 | # TODO(evanrittenhouse)
+6 | # FIXME
+  |
+
+TD005.py:5:3: TD005 Missing issue description after `TODO`
+  |
+3 | # T005 - errors
+4 | # TODO(evanrittenhouse):
+5 | # TODO(evanrittenhouse)
+  |   ^^^^ TD005
+6 | # FIXME
+7 | # foo # TODO
+  |
+
+TD005.py:6:3: TD005 Missing issue description after `TODO`
+  |
+4 | # TODO(evanrittenhouse):
+5 | # TODO(evanrittenhouse)
+6 | # FIXME
+  |   ^^^^^ TD005
+7 | # foo # TODO
+  |
+
+TD005.py:7:9: TD005 Missing issue description after `TODO`
+  |
+5 | # TODO(evanrittenhouse)
+6 | # FIXME
+7 | # foo # TODO
+  |         ^^^^ TD005
+  |
+
+

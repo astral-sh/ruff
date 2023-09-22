@@ -376,3 +376,11 @@ def f(  # first
 def this_is_unusual() -> (please := no): ...
 
 def this_is_unusual(x) -> (please := no): ...
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7465
+try:
+    def test():
+        pass
+    #comment
+except ImportError:
+    pass

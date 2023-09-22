@@ -1,0 +1,318 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+type_name_incorrect_variance.py:5:5: PLC0105 `TypeVar` name "T" does not reflect its covariance; consider renaming it to "T_co"
+  |
+3 | # Errors.
+4 | 
+5 | T = TypeVar("T", covariant=True)
+  |     ^^^^^^^ PLC0105
+6 | T = TypeVar("T", covariant=True, contravariant=False)
+7 | T = TypeVar("T", contravariant=True)
+  |
+
+type_name_incorrect_variance.py:6:5: PLC0105 `TypeVar` name "T" does not reflect its covariance; consider renaming it to "T_co"
+  |
+5 | T = TypeVar("T", covariant=True)
+6 | T = TypeVar("T", covariant=True, contravariant=False)
+  |     ^^^^^^^ PLC0105
+7 | T = TypeVar("T", contravariant=True)
+8 | T = TypeVar("T", covariant=False, contravariant=True)
+  |
+
+type_name_incorrect_variance.py:7:5: PLC0105 `TypeVar` name "T" does not reflect its contravariance; consider renaming it to "T_contra"
+  |
+5 | T = TypeVar("T", covariant=True)
+6 | T = TypeVar("T", covariant=True, contravariant=False)
+7 | T = TypeVar("T", contravariant=True)
+  |     ^^^^^^^ PLC0105
+8 | T = TypeVar("T", covariant=False, contravariant=True)
+9 | P = ParamSpec("P", covariant=True)
+  |
+
+type_name_incorrect_variance.py:8:5: PLC0105 `TypeVar` name "T" does not reflect its contravariance; consider renaming it to "T_contra"
+   |
+ 6 | T = TypeVar("T", covariant=True, contravariant=False)
+ 7 | T = TypeVar("T", contravariant=True)
+ 8 | T = TypeVar("T", covariant=False, contravariant=True)
+   |     ^^^^^^^ PLC0105
+ 9 | P = ParamSpec("P", covariant=True)
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
+   |
+
+type_name_incorrect_variance.py:9:5: PLC0105 `ParamSpec` name "P" does not reflect its covariance; consider renaming it to "P_co"
+   |
+ 7 | T = TypeVar("T", contravariant=True)
+ 8 | T = TypeVar("T", covariant=False, contravariant=True)
+ 9 | P = ParamSpec("P", covariant=True)
+   |     ^^^^^^^^^ PLC0105
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
+11 | P = ParamSpec("P", contravariant=True)
+   |
+
+type_name_incorrect_variance.py:10:5: PLC0105 `ParamSpec` name "P" does not reflect its covariance; consider renaming it to "P_co"
+   |
+ 8 | T = TypeVar("T", covariant=False, contravariant=True)
+ 9 | P = ParamSpec("P", covariant=True)
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
+   |     ^^^^^^^^^ PLC0105
+11 | P = ParamSpec("P", contravariant=True)
+12 | P = ParamSpec("P", covariant=False, contravariant=True)
+   |
+
+type_name_incorrect_variance.py:11:5: PLC0105 `ParamSpec` name "P" does not reflect its contravariance; consider renaming it to "P_contra"
+   |
+ 9 | P = ParamSpec("P", covariant=True)
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
+11 | P = ParamSpec("P", contravariant=True)
+   |     ^^^^^^^^^ PLC0105
+12 | P = ParamSpec("P", covariant=False, contravariant=True)
+   |
+
+type_name_incorrect_variance.py:12:5: PLC0105 `ParamSpec` name "P" does not reflect its contravariance; consider renaming it to "P_contra"
+   |
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
+11 | P = ParamSpec("P", contravariant=True)
+12 | P = ParamSpec("P", covariant=False, contravariant=True)
+   |     ^^^^^^^^^ PLC0105
+13 | 
+14 | T_co = TypeVar("T_co")
+   |
+
+type_name_incorrect_variance.py:14:8: PLC0105 `TypeVar` name "T_co" does not reflect its invariance; consider renaming it to "T"
+   |
+12 | P = ParamSpec("P", covariant=False, contravariant=True)
+13 | 
+14 | T_co = TypeVar("T_co")
+   |        ^^^^^^^ PLC0105
+15 | T_co = TypeVar("T_co", covariant=False)
+16 | T_co = TypeVar("T_co", contravariant=False)
+   |
+
+type_name_incorrect_variance.py:15:8: PLC0105 `TypeVar` name "T_co" does not reflect its invariance; consider renaming it to "T"
+   |
+14 | T_co = TypeVar("T_co")
+15 | T_co = TypeVar("T_co", covariant=False)
+   |        ^^^^^^^ PLC0105
+16 | T_co = TypeVar("T_co", contravariant=False)
+17 | T_co = TypeVar("T_co", covariant=False, contravariant=False)
+   |
+
+type_name_incorrect_variance.py:16:8: PLC0105 `TypeVar` name "T_co" does not reflect its invariance; consider renaming it to "T"
+   |
+14 | T_co = TypeVar("T_co")
+15 | T_co = TypeVar("T_co", covariant=False)
+16 | T_co = TypeVar("T_co", contravariant=False)
+   |        ^^^^^^^ PLC0105
+17 | T_co = TypeVar("T_co", covariant=False, contravariant=False)
+18 | T_co = TypeVar("T_co", contravariant=True)
+   |
+
+type_name_incorrect_variance.py:17:8: PLC0105 `TypeVar` name "T_co" does not reflect its invariance; consider renaming it to "T"
+   |
+15 | T_co = TypeVar("T_co", covariant=False)
+16 | T_co = TypeVar("T_co", contravariant=False)
+17 | T_co = TypeVar("T_co", covariant=False, contravariant=False)
+   |        ^^^^^^^ PLC0105
+18 | T_co = TypeVar("T_co", contravariant=True)
+19 | T_co = TypeVar("T_co", covariant=False, contravariant=True)
+   |
+
+type_name_incorrect_variance.py:18:8: PLC0105 `TypeVar` name "T_co" does not reflect its contravariance; consider renaming it to "T_contra"
+   |
+16 | T_co = TypeVar("T_co", contravariant=False)
+17 | T_co = TypeVar("T_co", covariant=False, contravariant=False)
+18 | T_co = TypeVar("T_co", contravariant=True)
+   |        ^^^^^^^ PLC0105
+19 | T_co = TypeVar("T_co", covariant=False, contravariant=True)
+20 | P_co = ParamSpec("P_co")
+   |
+
+type_name_incorrect_variance.py:19:8: PLC0105 `TypeVar` name "T_co" does not reflect its contravariance; consider renaming it to "T_contra"
+   |
+17 | T_co = TypeVar("T_co", covariant=False, contravariant=False)
+18 | T_co = TypeVar("T_co", contravariant=True)
+19 | T_co = TypeVar("T_co", covariant=False, contravariant=True)
+   |        ^^^^^^^ PLC0105
+20 | P_co = ParamSpec("P_co")
+21 | P_co = ParamSpec("P_co", covariant=False)
+   |
+
+type_name_incorrect_variance.py:20:8: PLC0105 `ParamSpec` name "P_co" does not reflect its invariance; consider renaming it to "P"
+   |
+18 | T_co = TypeVar("T_co", contravariant=True)
+19 | T_co = TypeVar("T_co", covariant=False, contravariant=True)
+20 | P_co = ParamSpec("P_co")
+   |        ^^^^^^^^^ PLC0105
+21 | P_co = ParamSpec("P_co", covariant=False)
+22 | P_co = ParamSpec("P_co", contravariant=False)
+   |
+
+type_name_incorrect_variance.py:21:8: PLC0105 `ParamSpec` name "P_co" does not reflect its invariance; consider renaming it to "P"
+   |
+19 | T_co = TypeVar("T_co", covariant=False, contravariant=True)
+20 | P_co = ParamSpec("P_co")
+21 | P_co = ParamSpec("P_co", covariant=False)
+   |        ^^^^^^^^^ PLC0105
+22 | P_co = ParamSpec("P_co", contravariant=False)
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
+   |
+
+type_name_incorrect_variance.py:22:8: PLC0105 `ParamSpec` name "P_co" does not reflect its invariance; consider renaming it to "P"
+   |
+20 | P_co = ParamSpec("P_co")
+21 | P_co = ParamSpec("P_co", covariant=False)
+22 | P_co = ParamSpec("P_co", contravariant=False)
+   |        ^^^^^^^^^ PLC0105
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
+24 | P_co = ParamSpec("P_co", contravariant=True)
+   |
+
+type_name_incorrect_variance.py:23:8: PLC0105 `ParamSpec` name "P_co" does not reflect its invariance; consider renaming it to "P"
+   |
+21 | P_co = ParamSpec("P_co", covariant=False)
+22 | P_co = ParamSpec("P_co", contravariant=False)
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
+   |        ^^^^^^^^^ PLC0105
+24 | P_co = ParamSpec("P_co", contravariant=True)
+25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
+   |
+
+type_name_incorrect_variance.py:24:8: PLC0105 `ParamSpec` name "P_co" does not reflect its contravariance; consider renaming it to "P_contra"
+   |
+22 | P_co = ParamSpec("P_co", contravariant=False)
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
+24 | P_co = ParamSpec("P_co", contravariant=True)
+   |        ^^^^^^^^^ PLC0105
+25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
+   |
+
+type_name_incorrect_variance.py:25:8: PLC0105 `ParamSpec` name "P_co" does not reflect its contravariance; consider renaming it to "P_contra"
+   |
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
+24 | P_co = ParamSpec("P_co", contravariant=True)
+25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
+   |        ^^^^^^^^^ PLC0105
+26 | 
+27 | T_contra = TypeVar("T_contra")
+   |
+
+type_name_incorrect_variance.py:27:12: PLC0105 `TypeVar` name "T_contra" does not reflect its invariance; consider renaming it to "T"
+   |
+25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
+26 | 
+27 | T_contra = TypeVar("T_contra")
+   |            ^^^^^^^ PLC0105
+28 | T_contra = TypeVar("T_contra", covariant=False)
+29 | T_contra = TypeVar("T_contra", contravariant=False)
+   |
+
+type_name_incorrect_variance.py:28:12: PLC0105 `TypeVar` name "T_contra" does not reflect its invariance; consider renaming it to "T"
+   |
+27 | T_contra = TypeVar("T_contra")
+28 | T_contra = TypeVar("T_contra", covariant=False)
+   |            ^^^^^^^ PLC0105
+29 | T_contra = TypeVar("T_contra", contravariant=False)
+30 | T_contra = TypeVar("T_contra", covariant=False, contravariant=False)
+   |
+
+type_name_incorrect_variance.py:29:12: PLC0105 `TypeVar` name "T_contra" does not reflect its invariance; consider renaming it to "T"
+   |
+27 | T_contra = TypeVar("T_contra")
+28 | T_contra = TypeVar("T_contra", covariant=False)
+29 | T_contra = TypeVar("T_contra", contravariant=False)
+   |            ^^^^^^^ PLC0105
+30 | T_contra = TypeVar("T_contra", covariant=False, contravariant=False)
+31 | T_contra = TypeVar("T_contra", covariant=True)
+   |
+
+type_name_incorrect_variance.py:30:12: PLC0105 `TypeVar` name "T_contra" does not reflect its invariance; consider renaming it to "T"
+   |
+28 | T_contra = TypeVar("T_contra", covariant=False)
+29 | T_contra = TypeVar("T_contra", contravariant=False)
+30 | T_contra = TypeVar("T_contra", covariant=False, contravariant=False)
+   |            ^^^^^^^ PLC0105
+31 | T_contra = TypeVar("T_contra", covariant=True)
+32 | T_contra = TypeVar("T_contra", covariant=True, contravariant=False)
+   |
+
+type_name_incorrect_variance.py:31:12: PLC0105 `TypeVar` name "T_contra" does not reflect its covariance; consider renaming it to "T_co"
+   |
+29 | T_contra = TypeVar("T_contra", contravariant=False)
+30 | T_contra = TypeVar("T_contra", covariant=False, contravariant=False)
+31 | T_contra = TypeVar("T_contra", covariant=True)
+   |            ^^^^^^^ PLC0105
+32 | T_contra = TypeVar("T_contra", covariant=True, contravariant=False)
+33 | P_contra = ParamSpec("P_contra")
+   |
+
+type_name_incorrect_variance.py:32:12: PLC0105 `TypeVar` name "T_contra" does not reflect its covariance; consider renaming it to "T_co"
+   |
+30 | T_contra = TypeVar("T_contra", covariant=False, contravariant=False)
+31 | T_contra = TypeVar("T_contra", covariant=True)
+32 | T_contra = TypeVar("T_contra", covariant=True, contravariant=False)
+   |            ^^^^^^^ PLC0105
+33 | P_contra = ParamSpec("P_contra")
+34 | P_contra = ParamSpec("P_contra", covariant=False)
+   |
+
+type_name_incorrect_variance.py:33:12: PLC0105 `ParamSpec` name "P_contra" does not reflect its invariance; consider renaming it to "P"
+   |
+31 | T_contra = TypeVar("T_contra", covariant=True)
+32 | T_contra = TypeVar("T_contra", covariant=True, contravariant=False)
+33 | P_contra = ParamSpec("P_contra")
+   |            ^^^^^^^^^ PLC0105
+34 | P_contra = ParamSpec("P_contra", covariant=False)
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
+   |
+
+type_name_incorrect_variance.py:34:12: PLC0105 `ParamSpec` name "P_contra" does not reflect its invariance; consider renaming it to "P"
+   |
+32 | T_contra = TypeVar("T_contra", covariant=True, contravariant=False)
+33 | P_contra = ParamSpec("P_contra")
+34 | P_contra = ParamSpec("P_contra", covariant=False)
+   |            ^^^^^^^^^ PLC0105
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
+   |
+
+type_name_incorrect_variance.py:35:12: PLC0105 `ParamSpec` name "P_contra" does not reflect its invariance; consider renaming it to "P"
+   |
+33 | P_contra = ParamSpec("P_contra")
+34 | P_contra = ParamSpec("P_contra", covariant=False)
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
+   |            ^^^^^^^^^ PLC0105
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
+37 | P_contra = ParamSpec("P_contra", covariant=True)
+   |
+
+type_name_incorrect_variance.py:36:12: PLC0105 `ParamSpec` name "P_contra" does not reflect its invariance; consider renaming it to "P"
+   |
+34 | P_contra = ParamSpec("P_contra", covariant=False)
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
+   |            ^^^^^^^^^ PLC0105
+37 | P_contra = ParamSpec("P_contra", covariant=True)
+38 | P_contra = ParamSpec("P_contra", covariant=True, contravariant=False)
+   |
+
+type_name_incorrect_variance.py:37:12: PLC0105 `ParamSpec` name "P_contra" does not reflect its covariance; consider renaming it to "P_co"
+   |
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
+37 | P_contra = ParamSpec("P_contra", covariant=True)
+   |            ^^^^^^^^^ PLC0105
+38 | P_contra = ParamSpec("P_contra", covariant=True, contravariant=False)
+   |
+
+type_name_incorrect_variance.py:38:12: PLC0105 `ParamSpec` name "P_contra" does not reflect its covariance; consider renaming it to "P_co"
+   |
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
+37 | P_contra = ParamSpec("P_contra", covariant=True)
+38 | P_contra = ParamSpec("P_contra", covariant=True, contravariant=False)
+   |            ^^^^^^^^^ PLC0105
+39 | 
+40 | # Non-errors.
+   |
+
+

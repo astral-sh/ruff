@@ -1,8 +1,0 @@
----
-source: crates/ruff/src/rules/pydocstyle/mod.rs
----
-D100_pub.py:1:1: D100 Missing docstring in public module
- |
- |
-
-

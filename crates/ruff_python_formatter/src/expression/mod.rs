@@ -3,12 +3,13 @@ use std::cmp::Ordering;
 use itertools::Itertools;
 
 use ruff_formatter::{
-    format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+    write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
+use ruff_python_trivia::CommentRanges;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::leading_comments;
@@ -103,9 +104,11 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         });
 
         let parenthesize = match parentheses {
-            Parentheses::Preserve => {
-                is_expression_parenthesized(expression.into(), f.context().source())
-            }
+            Parentheses::Preserve => is_expression_parenthesized(
+                expression.into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            ),
             Parentheses::Always => true,
             // Fluent style means we already have parentheses
             Parentheses::Never => false,
@@ -186,10 +189,15 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
 
         let comments = f.context().comments();
         let preserve_parentheses = parenthesize.is_optional()
-            && is_expression_parenthesized((*expression).into(), f.context().source());
+            && is_expression_parenthesized(
+                (*expression).into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            );
 
-        let has_comments =
-            comments.has_leading(*expression) || comments.has_trailing_own_line(*expression);
+        let node_comments = comments.leading_dangling_trailing(*expression);
+
+        let has_comments = node_comments.has_leading() || node_comments.has_trailing_own_line();
 
         // If the expression has comments, we always want to preserve the parentheses. This also
         // ensures that we correctly handle parenthesized comments, and don't need to worry about
@@ -238,53 +246,16 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
                 Parenthesize::IfBreaks => {
-                    let group_id = f.group_id("optional_parentheses");
-                    let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
-                    let mut format_expression = expression
-                        .format()
-                        .with_options(Parentheses::Never)
-                        .memoized();
-
-                    // Don't use best fitting if it is known that the expression can never fit
-                    if format_expression.inspect(f)?.will_break() {
-                        // The group here is necessary because `format_expression` may contain IR elements
-                        // that refer to the group id
-                        group(&format_args![
-                            token("("),
-                            soft_block_indent(&format_expression),
-                            token(")")
-                        ])
-                        .with_group_id(Some(group_id))
-                        .fmt(f)
+                    if node_comments.has_trailing() {
+                        expression.format().with_options(Parentheses::Always).fmt(f)
                     } else {
-                        // Only add parentheses if it makes the expression fit on the line.
-                        // Using the flat version as the most expanded version gives a left-to-right splitting behavior
-                        // which differs from when using regular groups, because they split right-to-left.
-                        best_fitting![
-                            // ---------------------------------------------------------------------
-                            // Variant 1:
-                            // Try to fit the expression without any parentheses
-                            group(&format_expression).with_group_id(Some(group_id)),
-                            // ---------------------------------------------------------------------
-                            // Variant 2:
-                            // Try to fit the expression by adding parentheses and indenting the expression.
-                            group(&format_args![
-                                token("("),
-                                soft_block_indent(&format_expression),
-                                token(")")
-                            ])
-                            .with_group_id(Some(group_id))
-                            .should_expand(true),
-                            // ---------------------------------------------------------------------
-                            // Variant 3: Fallback, no parentheses
-                            // Expression doesn't fit regardless of adding the parentheses. Remove the parentheses again.
-                            group(&format_expression)
-                                .with_group_id(Some(group_id))
-                                .should_expand(true)
-                        ]
-                        // Measure all lines, to avoid that the printer decides that this fits right after hitting
-                        // the `(`.
-                        .with_mode(BestFittingMode::AllLines)
+                        // The group id is necessary because the nested expressions may reference it.
+                        let group_id = f.group_id("optional_parentheses");
+                        let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
+                        ruff_formatter::prelude::best_fit_parenthesize(
+                            &expression.format().with_options(Parentheses::Never),
+                        )
+                        .with_group_id(Some(group_id))
                         .fmt(f)
                     }
                 }
@@ -581,7 +552,11 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
         self.last = Some(expr);
 
         // Rule only applies for non-parenthesized expressions.
-        if is_expression_parenthesized(expr.into(), self.context.source()) {
+        if is_expression_parenthesized(
+            expr.into(),
+            self.context.comments().ranges(),
+            self.context.source(),
+        ) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
@@ -635,7 +610,11 @@ pub enum CallChainLayout {
 }
 
 impl CallChainLayout {
-    pub(crate) fn from_expression(mut expr: ExpressionRef, source: &str) -> Self {
+    pub(crate) fn from_expression(
+        mut expr: ExpressionRef,
+        comment_ranges: &CommentRanges,
+        source: &str,
+    ) -> Self {
         let mut attributes_after_parentheses = 0;
         loop {
             match expr {
@@ -646,7 +625,7 @@ impl CallChainLayout {
                     // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
-                    if is_expression_parenthesized(value.into(), source) {
+                    if is_expression_parenthesized(value.into(), comment_ranges, source) {
                         // `(a).b`. We preserve these parentheses so don't recurse
                         attributes_after_parentheses += 1;
                         break;
@@ -674,7 +653,7 @@ impl CallChainLayout {
                     // f2 = (a).w().t(1,)
                     //       ^ expr
                     // ```
-                    if is_expression_parenthesized(expr, source) {
+                    if is_expression_parenthesized(expr, comment_ranges, source) {
                         attributes_after_parentheses += 1;
                     }
 
@@ -683,7 +662,7 @@ impl CallChainLayout {
             }
 
             // We preserve these parentheses so don't recurse
-            if is_expression_parenthesized(expr, source) {
+            if is_expression_parenthesized(expr, comment_ranges, source) {
                 break;
             }
         }
@@ -704,7 +683,11 @@ impl CallChainLayout {
         match self {
             CallChainLayout::Default => {
                 if f.context().node_level().is_parenthesized() {
-                    CallChainLayout::from_expression(item.into(), f.context().source())
+                    CallChainLayout::from_expression(
+                        item.into(),
+                        f.context().comments().ranges(),
+                        f.context().source(),
+                    )
                 } else {
                     CallChainLayout::NonFluent
                 }
@@ -745,7 +728,7 @@ fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<OwnParenthe
 
     // Otherwise, if the node lacks parentheses (e.g., `(1)`) or only contains empty parentheses
     // (e.g., `([])`), we need to check for surrounding parentheses.
-    if is_expression_parenthesized(expr.into(), context.source()) {
+    if is_expression_parenthesized(expr.into(), context.comments().ranges(), context.source()) {
         return Some(OwnParentheses::NonEmpty);
     }
 

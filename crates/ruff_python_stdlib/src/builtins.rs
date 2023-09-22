@@ -167,6 +167,7 @@ pub const MAGIC_GLOBALS: &[&str] = &[
     "WindowsError",
     "__annotations__",
     "__builtins__",
+    "__cached__",
     "__file__",
 ];
 

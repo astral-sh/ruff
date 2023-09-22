@@ -1,0 +1,294 @@
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_trivia::{indentation_at_offset, PythonWhitespace};
+use ruff_source_file::{Line, UniversalNewlineIterator};
+use ruff_text_size::Ranged;
+use ruff_text_size::{TextLen, TextRange};
+
+use crate::checkers::ast::Checker;
+use crate::docstrings::Docstring;
+use crate::registry::{AsRule, Rule};
+
+/// ## What it does
+/// Checks for docstrings on class definitions that are not preceded by a
+/// blank line.
+///
+/// ## Why is this bad?
+/// Use a blank line to separate the docstring from the class definition, for
+/// consistency.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is disabled when using the `google`,
+/// `numpy`, and `pep257` conventions.
+///
+/// For an alternative, see [D211].
+///
+/// ## Example
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class PhotoMetadata:
+///
+///     """Metadata about a photo."""
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
+#[violation]
+pub struct OneBlankLineBeforeClass;
+
+impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("1 blank line required before class docstring")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Insert 1 blank line before class docstring".to_string()
+    }
+}
+
+/// ## What it does
+/// Checks for class methods that are not separated from the class's docstring
+/// by a blank line.
+///
+/// ## Why is this bad?
+/// [PEP 257] recommends the use of a blank line to separate a class's
+/// docstring its methods.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is enabled when using the `google`
+/// convention, and disabled when using the `numpy` and `pep257` conventions.
+///
+/// ## Example
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+///     def __init__(self, file: Path):
+///         ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+///
+///     def __init__(self, file: Path):
+///         ...
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
+#[violation]
+pub struct OneBlankLineAfterClass;
+
+impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("1 blank line required after class docstring")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Insert 1 blank line after class docstring".to_string()
+    }
+}
+
+/// ## What it does
+/// Checks for docstrings on class definitions that are preceded by a blank
+/// line.
+///
+/// ## Why is this bad?
+/// Avoid introducing any blank lines between a class definition and its
+/// docstring, for consistency.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is enabled when using the `google`,
+/// `numpy`, and `pep257` conventions.
+///
+/// For an alternative, see [D203].
+///
+/// ## Example
+/// ```python
+/// class PhotoMetadata:
+///
+///     """Metadata about a photo."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// [D203]: https://docs.astral.sh/ruff/rules/one-blank-line-before-class
+#[violation]
+pub struct BlankLineBeforeClass;
+
+impl AlwaysAutofixableViolation for BlankLineBeforeClass {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("No blank lines allowed before class docstring")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove blank line(s) before class docstring".to_string()
+    }
+}
+
+/// D203, D204, D211
+pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
+    let Some(class) = docstring.definition.as_class_def() else {
+        return;
+    };
+
+    // Special-case: the docstring is on the same line as the class. For example:
+    // ```python
+    // class PhotoMetadata: """Metadata about a photo."""
+    // ```
+    let between_range = TextRange::new(class.start(), docstring.start());
+    if !checker.locator().contains_line_break(between_range) {
+        return;
+    }
+
+    if checker.enabled(Rule::OneBlankLineBeforeClass) || checker.enabled(Rule::BlankLineBeforeClass)
+    {
+        let mut lines = UniversalNewlineIterator::with_offset(
+            checker.locator().slice(between_range),
+            between_range.start(),
+        )
+        .rev();
+
+        let mut blank_lines_before = 0usize;
+        let mut blank_lines_start = lines.next().map(|line| line.start()).unwrap_or_default();
+
+        for line in lines {
+            if line.trim().is_empty() {
+                blank_lines_before += 1;
+                blank_lines_start = line.start();
+            } else {
+                break;
+            }
+        }
+
+        if checker.enabled(Rule::BlankLineBeforeClass) {
+            if blank_lines_before != 0 {
+                let mut diagnostic = Diagnostic::new(BlankLineBeforeClass, docstring.range());
+                if checker.patch(diagnostic.kind.rule()) {
+                    // Delete the blank line before the class.
+                    diagnostic.set_fix(Fix::automatic(Edit::deletion(
+                        blank_lines_start,
+                        docstring.start() - docstring.indentation.text_len(),
+                    )));
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::OneBlankLineBeforeClass) {
+            if blank_lines_before != 1 {
+                let mut diagnostic = Diagnostic::new(OneBlankLineBeforeClass, docstring.range());
+                if checker.patch(diagnostic.kind.rule()) {
+                    // Insert one blank line before the class.
+                    diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                        checker.stylist().line_ending().to_string(),
+                        blank_lines_start,
+                        docstring.start() - docstring.indentation.text_len(),
+                    )));
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    if checker.enabled(Rule::OneBlankLineAfterClass) {
+        let class_after_docstring_range = TextRange::new(docstring.end(), class.end());
+        let class_after_docstring = checker.locator().slice(class_after_docstring_range);
+        let mut lines = UniversalNewlineIterator::with_offset(
+            class_after_docstring,
+            class_after_docstring_range.start(),
+        );
+
+        // If the class is empty except for comments, we don't need to insert a newline between
+        // docstring and no content
+        let all_blank_after = lines.clone().all(|line| {
+            line.trim_whitespace().is_empty() || line.trim_whitespace_start().starts_with('#')
+        });
+        if all_blank_after {
+            return;
+        }
+
+        let first_line = lines.next();
+        let mut replacement_start = first_line.as_ref().map(Line::start).unwrap_or_default();
+
+        // Edge case: There is trailing end-of-line content after the docstring, either a statement
+        // separated by a semicolon or a comment.
+        if let Some(first_line) = &first_line {
+            let trailing = first_line.as_str().trim_whitespace_start();
+            if let Some(next_statement) = trailing.strip_prefix(';') {
+                let indentation = indentation_at_offset(docstring.start(), checker.locator())
+                    .expect("Own line docstring must have indentation");
+                let mut diagnostic = Diagnostic::new(OneBlankLineAfterClass, docstring.range());
+                if checker.patch(diagnostic.kind.rule()) {
+                    let line_ending = checker.stylist().line_ending().as_str();
+                    // We have to trim the whitespace twice, once before the semicolon above and
+                    // once after the semicolon here, or we get invalid indents:
+                    // ```rust
+                    // class Priority:
+                    //     """Has priorities"""   ;   priorities=1
+                    // ```
+                    let next_statement = next_statement.trim_whitespace_start();
+                    diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                        line_ending.to_string() + line_ending + indentation + next_statement,
+                        replacement_start,
+                        first_line.end(),
+                    )));
+                }
+                checker.diagnostics.push(diagnostic);
+                return;
+            } else if trailing.starts_with('#') {
+                // Keep the end-of-line comment, start counting empty lines after it
+                replacement_start = first_line.end();
+            }
+        }
+
+        let mut blank_lines_after = 0usize;
+        let mut blank_lines_end = first_line.as_ref().map_or(docstring.end(), Line::end);
+
+        for line in lines {
+            if line.trim_whitespace().is_empty() {
+                blank_lines_end = line.end();
+                blank_lines_after += 1;
+            } else {
+                break;
+            }
+        }
+
+        if blank_lines_after != 1 {
+            let mut diagnostic = Diagnostic::new(OneBlankLineAfterClass, docstring.range());
+            if checker.patch(diagnostic.kind.rule()) {
+                // Insert a blank line before the class (replacing any existing lines).
+                diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                    checker.stylist().line_ending().to_string(),
+                    replacement_start,
+                    blank_lines_end,
+                )));
+            }
+            checker.diagnostics.push(diagnostic);
+        }
+    }
+}

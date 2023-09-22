@@ -102,7 +102,7 @@ on-save by adding `"editor.formatOnSave": true` to your `settings.json`:
 
 ### Configuration
 
-The Ruff formatter respects Ruff's [`line-length`](https://beta.ruff.rs/docs/settings/#line-length)
+The Ruff formatter respects Ruff's [`line-length`](https://docs.astral.sh/ruff/settings/#line-length)
 setting, which can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as in:
 
 ```console
@@ -305,3 +305,21 @@ import os
 
 import sys
 ```
+
+### Parentheses around awaited collections are not preserved
+
+Black preserves parentheses around awaited collections:
+
+```python
+await ([1, 2, 3])
+```
+
+Ruff will instead remove them:
+
+```python
+await [1, 2, 3]
+```
+
+This is more consistent to the formatting of other awaited expressions: Ruff and Black both
+remove parentheses around, e.g., `await (1)`, only retaining them when syntactically required,
+as in, e.g., `await (x := 1)`.

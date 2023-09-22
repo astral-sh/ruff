@@ -3,7 +3,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprName;
 
 use crate::comments::SourceComment;
-use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -38,13 +38,9 @@ impl NeedsParentheses for ExprName {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
-        context: &PyFormatContext,
+        _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if should_use_best_fit(self, context) {
-            OptionalParentheses::BestFit
-        } else {
-            OptionalParentheses::Never
-        }
+        OptionalParentheses::BestFit
     }
 }
 

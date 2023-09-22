@@ -104,6 +104,110 @@ if True: print("a") # 1
 elif True: print("b") # 2
 else: print("c") # 3
 
+# Regression test for: https://github.com/astral-sh/ruff/issues/7465
+if True:
+    pass
+
+    # comment
+else:
+    pass
+
+if True:
+    pass
+
+    # comment
+
+else:
+    pass
+
+if True:
+    pass
+    # comment
+
+else:
+    pass
+
+if True:
+    pass
+    # comment
+else:
+    pass
+
+if True:
+    pass  # comment
+else:
+    pass
+
+if True:
+    pass
+
+    # comment
+
+else:
+    pass
+
+if True:
+    pass
+
+    # comment
+
+
+else:
+    pass
+
+if True:
+    pass
+
+    # comment
+
+
+
+else:
+    pass
+
+if True:
+    if True:
+        pass
+        # comment
+
+    else:
+        pass
+else:
+    pass
+
+if True:
+    if True:
+        pass
+        # comment
+
+
+    else:
+        pass
+else:
+    pass
+
+if True:
+    pass
+# comment
+else:
+    pass
+
+if True:
+    pass
+
+# comment
+else:
+    pass
+
+if True:
+    pass
+
+
+# comment
+else:
+    pass
+
+
 # Regression test for https://github.com/astral-sh/ruff/issues/5337
 if parent_body:
     if current_body:

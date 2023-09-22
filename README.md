@@ -8,7 +8,7 @@
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
 
-[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
+[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
 An extremely fast Python linter, written in Rust.
 
@@ -30,13 +30,13 @@ An extremely fast Python linter, written in Rust.
 - 🤝 Python 3.11 compatibility
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [600 built-in rules](https://beta.ruff.rs/docs/rules/)
-- ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
+- 📏 Over [700 built-in rules](https://docs.astral.sh/ruff/rules/)
+- ⚖️ [Near-parity](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8) with the
     built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party [editor integrations](https://beta.ruff.rs/docs/editor-integrations/) for
+- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/editor-integrations/) for
     [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
-- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
+- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
@@ -98,7 +98,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
 
 ## Table of Contents
 
-For more, see the [documentation](https://beta.ruff.rs/docs/).
+For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 1. [Getting Started](#getting-started)
 1. [Configuration](#configuration)
@@ -111,7 +111,7 @@ For more, see the [documentation](https://beta.ruff.rs/docs/).
 
 ## Getting Started
 
-For more, see the [documentation](https://beta.ruff.rs/docs/).
+For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 ### Installation
 
@@ -122,7 +122,7 @@ pip install ruff
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
-and with [a variety of other package managers](https://beta.ruff.rs/docs/installation/).
+and with [a variety of other package managers](https://docs.astral.sh/ruff/installation/).
 
 ### Usage
 
@@ -140,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.289
+  rev: v0.0.290
   hooks:
     - id: ruff
 ```
@@ -165,7 +165,7 @@ jobs:
 ### Configuration
 
 Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (see:
-[_Configuration_](https://beta.ruff.rs/docs/configuration/), or [_Settings_](https://beta.ruff.rs/docs/settings/)
+[_Configuration_](https://docs.astral.sh/ruff/configuration/), or [_Settings_](https://docs.astral.sh/ruff/settings/)
 for a complete list of all configuration options).
 
 If left unspecified, the default configuration is equivalent to:
@@ -233,12 +233,12 @@ linting command.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 600 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 700 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
 By default, Ruff enables Flake8's `E` and `F` rules. Ruff supports all rules from the `F` category,
-and a [subset](https://beta.ruff.rs/docs/rules/#error-e) of the `E` category, omitting those
+and a [subset](https://docs.astral.sh/ruff/rules/#error-e) of the `E` category, omitting those
 stylistic rules made obsolete by the use of an autoformatter, like
 [Black](https://github.com/psf/black).
 
@@ -304,12 +304,12 @@ quality tools, including:
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)
 
-For a complete enumeration of the supported rules, see [_Rules_](https://beta.ruff.rs/docs/rules/).
+For a complete enumeration of the supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
 
 ## Contributing
 
 Contributions are welcome and highly appreciated. To get started, check out the
-[**contributing guidelines**](https://beta.ruff.rs/docs/contributing/).
+[**contributing guidelines**](https://docs.astral.sh/ruff/contributing/).
 
 You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
