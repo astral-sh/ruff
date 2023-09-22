@@ -43,6 +43,7 @@ insta = { workspace = true, features = ["glob"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
+indoc = "2.0.4"
 
 [[test]]
 name = "ruff_python_formatter_fixtures"

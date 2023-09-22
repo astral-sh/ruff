@@ -2322,6 +2322,7 @@ dependencies = [
  "bitflags 2.4.0",
  "clap",
  "countme",
+ "indoc",
  "insta",
  "itertools 0.11.0",
  "memchr",
