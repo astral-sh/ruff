@@ -1,4 +1,12 @@
+use std::collections::BTreeSet;
+use std::hash::BuildHasherDefault;
+
 use regex::Regex;
+use ruff_formatter::IndentStyle;
+use rustc_hash::{FxHashMap, FxHashSet};
+use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
+
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
@@ -19,11 +27,9 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, ConfigurationOptions};
-use rustc_hash::{FxHashMap, FxHashSet};
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
-use std::hash::BuildHasherDefault;
-use strum::IntoEnumIterator;
+use ruff_python_formatter::QuoteStyle;
+
+use crate::settings::LineEnding;
 
 #[derive(Debug, PartialEq, Eq, Default, ConfigurationOptions, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -251,17 +257,6 @@ pub struct Options {
         "#
     )]
     pub fixable: Option<Vec<RuleSelector>>,
-
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
-    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
-    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
-    ///
-    /// This option has been **deprecated** in favor of `output-format`
-    /// to avoid ambiguity with Ruff's upcoming formatter.
-    #[cfg_attr(feature = "schemars", schemars(skip))]
-    pub format: Option<SerializationFormat>,
 
     /// The style in which violation messages should be formatted: `"text"`
     /// (default), `"grouped"` (group messages by file), `"json"`
@@ -680,6 +675,20 @@ pub struct Options {
     /// Options for the `pyupgrade` plugin.
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
+
+    /// Options to configure the code formatting.
+    ///
+    /// Previously:
+    /// The style in which violation messages should be formatted: `"text"`
+    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
+    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
+    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
+    ///
+    /// This option has been **deprecated** in favor of `output-format`
+    /// to avoid ambiguity with Ruff's upcoming formatter.
+    #[option_group]
+    pub format: Option<FormatOrOutputFormat>,
 
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
@@ -2381,10 +2390,129 @@ impl PyUpgradeOptions {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum FormatOrOutputFormat {
+    Format(FormatOptions),
+    OutputFormat(SerializationFormat),
+}
+
+impl FormatOrOutputFormat {
+    pub const fn metadata() -> crate::options_base::OptionGroup {
+        FormatOptions::metadata()
+    }
+
+    pub const fn as_output_format(&self) -> Option<SerializationFormat> {
+        match self {
+            FormatOrOutputFormat::Format(_) => None,
+            FormatOrOutputFormat::OutputFormat(format) => Some(*format),
+        }
+    }
+}
+
+#[derive(
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct FormatOptions {
+    /// Whether to enable the unstable preview style formatting.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview style formatting
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
+
+    /// Whether to use 4 spaces or hard tabs for indenting code.
+    ///
+    /// Defaults to 4 spaces. We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.
+    #[option(
+        default = "space",
+        value_type = r#""space" | "tab""#,
+        example = r#"
+            # Use tabs instead of 4 space indentation
+            indent-style = "tab"
+        "#
+    )]
+    pub indent_style: Option<IndentStyle>,
+
+    /// Whether to prefer single `'` or double `"` quotes for strings and docstrings.
+    ///
+    /// Ruff may deviate from this option if using the configured quotes would require more escaped quotes:
+    ///
+    /// ```python
+    /// a = "It's monday morning"
+    /// b = "a string without any quotes"
+    /// ```
+    ///
+    /// Ruff leaves `a` unchanged when using `quote-style = "single"` because it is otherwise
+    /// necessary to escape the `'` which leads to less readable code: `'It\'s monday morning'`.
+    /// Ruff changes the quotes of `b` to use single quotes.
+    #[option(
+        default = r#"double"#,
+        value_type = r#""double" | "single""#,
+        example = r#"
+            # Prefer single quotes over double quotes
+            quote-style = "single"
+        "#
+    )]
+    pub quote_style: Option<QuoteStyle>,
+
+    /// Ruff uses existing trailing commas as an indication that short lines should be left separate.
+    /// If this option is set to `true`, the magic trailing comma is ignored.
+    ///
+    /// For example, Ruff leaves the arguments separate even though
+    /// collapsing the arguments to a single line doesn't exceed the line width if `skip-magic-trailing-comma = false`:
+    ///
+    /// ```python
+    ///  # The arguments remain on separate lines because of the trailing comma after `b`
+    /// def test(
+    ///     a,
+    ///     b,
+    /// ): pass
+    /// ```
+    ///
+    /// Setting `skip-magic-trailing-comma = true` changes the formatting to:
+    ///
+    /// ```python
+    /// # The arguments remain on separate lines because of the trailing comma after `b`
+    /// def test(a, b):
+    ///     pass
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = r#"bool"#,
+        example = "skip-magic-trailing-comma = true"
+    )]
+    pub skip_magic_trailing_comma: Option<bool>,
+
+    /// The character Ruff uses at the end of a line.
+    ///
+    /// * `lf`: Line endings will be converted to `\n`. The default line ending on Unix.
+    /// * `cr-lf`: Line endings will be converted to `\r\n`. The default line ending on Windows.
+    /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.
+    /// * `native`: Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
+    #[option(
+        default = r#"lf"#,
+        value_type = r#""lf" | "crlf" | "auto" | "native""#,
+        example = r#"
+            # Automatically detect the line ending on a file per file basis.
+            quote-style = "auto"
+        "#
+    )]
+    pub line_ending: Option<LineEnding>,
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
+
+    use crate::options::Flake8SelfOptions;
 
     #[test]
     fn flake8_self_options() {

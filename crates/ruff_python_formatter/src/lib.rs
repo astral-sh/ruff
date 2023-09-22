@@ -17,7 +17,6 @@ use crate::comments::{
 pub use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
 use crate::verbatim::suppressed_node;
-pub use settings::FormatterSettings;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -30,7 +29,6 @@ mod options;
 pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
-mod settings;
 pub(crate) mod statement;
 pub(crate) mod type_param;
 mod verbatim;

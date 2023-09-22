@@ -37,7 +37,7 @@ impl OptionGroup {
     /// ```rust
     /// # use ruff_workspace::options_base::{OptionGroup, OptionEntry, OptionField};
     ///
-    /// const options: [(&'static str, OptionEntry); 2] = [
+    /// const OPTIONS: [(&'static str, OptionEntry); 2] = [
     ///     ("ignore_names", OptionEntry::Field(OptionField {
     ///         doc: "ignore_doc",
     ///         default: "ignore_default",
@@ -53,7 +53,7 @@ impl OptionGroup {
     ///     }))
     /// ];
     ///
-    /// let group = OptionGroup::new(&options);
+    /// let group = OptionGroup::new(&OPTIONS);
     ///
     /// let ignore_names = group.get("ignore_names");
     ///
@@ -73,7 +73,7 @@ impl OptionGroup {
     /// ```rust
     /// # use ruff_workspace::options_base::{OptionGroup, OptionEntry, OptionField};
     ///
-    /// const ignore_options: [(&'static str, OptionEntry); 2] = [
+    /// const IGNORE_OPTIONS: [(&'static str, OptionEntry); 2] = [
     ///     ("names", OptionEntry::Field(OptionField {
     ///         doc: "ignore_name_doc",
     ///         default: "ignore_name_default",
@@ -89,8 +89,8 @@ impl OptionGroup {
     ///     }))
     /// ];
     ///
-    /// const options: [(&'static str, OptionEntry); 2] = [
-    ///     ("ignore", OptionEntry::Group(OptionGroup::new(&ignore_options))),
+    /// const OPTIONS: [(&'static str, OptionEntry); 2] = [
+    ///     ("ignore", OptionEntry::Group(OptionGroup::new(&IGNORE_OPTIONS))),
     ///
     ///     ("global_names", OptionEntry::Field(OptionField {
     ///         doc: "global_doc",
@@ -100,7 +100,7 @@ impl OptionGroup {
     ///     }))
     /// ];
     ///
-    /// let group = OptionGroup::new(&options);
+    /// let group = OptionGroup::new(&OPTIONS);
     ///
     /// let ignore_names = group.get("ignore.names");
     ///

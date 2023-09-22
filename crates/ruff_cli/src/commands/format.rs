@@ -15,9 +15,9 @@ use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
-use ruff_source_file::{find_newline, LineEnding};
+use ruff_python_formatter::{format_module, FormatModuleError};
 use ruff_workspace::resolver::python_files_in_path;
+use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
 use crate::panic::{catch_unwind, PanicError};
@@ -73,15 +73,17 @@ pub(crate) fn format(
                     };
 
                     let resolved_settings = resolver.resolve(path, &pyproject_config);
-                    let options = resolved_settings.formatter.to_format_options(source_type);
-                    debug!("Formatting {} with {:?}", path.display(), options);
 
-                    Some(match catch_unwind(|| format_path(path, options, mode)) {
-                        Ok(inner) => inner,
-                        Err(error) => {
-                            Err(FormatCommandError::Panic(Some(path.to_path_buf()), error))
-                        }
-                    })
+                    Some(
+                        match catch_unwind(|| {
+                            format_path(path, &resolved_settings.formatter, source_type, mode)
+                        }) {
+                            Ok(inner) => inner,
+                            Err(error) => {
+                                Err(FormatCommandError::Panic(Some(path.to_path_buf()), error))
+                            }
+                        },
+                    )
                 }
                 Err(err) => Some(Err(FormatCommandError::Ignore(err))),
             }
@@ -139,19 +141,15 @@ pub(crate) fn format(
 #[tracing::instrument(skip_all, fields(path = %path.display()))]
 fn format_path(
     path: &Path,
-    options: PyFormatOptions,
+    settings: &FormatterSettings,
+    source_type: PySourceType,
     mode: FormatMode,
 ) -> Result<FormatCommandResult, FormatCommandError> {
     let unformatted = std::fs::read_to_string(path)
         .map_err(|err| FormatCommandError::Read(Some(path.to_path_buf()), err))?;
 
-    let line_ending = match find_newline(&unformatted) {
-        Some((_, LineEnding::Lf)) | None => ruff_formatter::printer::LineEnding::LineFeed,
-        Some((_, LineEnding::Cr)) => ruff_formatter::printer::LineEnding::CarriageReturn,
-        Some((_, LineEnding::CrLf)) => ruff_formatter::printer::LineEnding::CarriageReturnLineFeed,
-    };
-
-    let options = options.with_line_ending(line_ending);
+    let options = settings.to_format_options(source_type, &unformatted);
+    debug!("Formatting {} with {:?}", path.display(), options);
 
     let formatted = format_module(&unformatted, options)
         .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?;

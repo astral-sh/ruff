@@ -303,7 +303,7 @@ impl<'a> ParsedModule<'a> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
         let options = settings
             .formatter
-            .to_format_options(PySourceType::default());
+            .to_format_options(PySourceType::default(), self.source_code);
 
         format_node(
             &self.module,

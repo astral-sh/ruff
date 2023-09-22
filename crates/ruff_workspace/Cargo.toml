@@ -15,7 +15,9 @@ license = { workspace = true }
 [dependencies]
 ruff_linter = { path = "../ruff_linter" }
 ruff_formatter = { path = "../ruff_formatter" }
-ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_python_formatter = { path = "../ruff_python_formatter", features = ["serde"] }
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_source_file = { path = "../ruff_source_file" }
 ruff_cache = { path = "../ruff_cache" }
 ruff_macros = { path = "../ruff_macros" }
 
@@ -43,4 +45,6 @@ tempfile = "3.6.0"
 
 
 [features]
-schemars = [ "dep:schemars" ]
+schemars = [ "dep:schemars", "ruff_formatter/schemars", "ruff_python_formatter/schemars" ]
+
+default = []

@@ -5,8 +5,8 @@ use ruff_python_ast::PySourceType;
 use std::path::Path;
 use std::str::FromStr;
 
-/// Resolved options for formatting one individual file. This is different from [`crate::FormatterSettings`] which
-/// represents the formatting settings for multiple files (the whole project, a subdirectory, ...)
+/// Resolved options for formatting one individual file. The difference to `FormatterSettings`
+/// is that `FormatterSettings` stores the settings for multiple files (the entire project, a subdirectory, ..)
 #[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "serde",
@@ -185,6 +185,7 @@ impl FormatOptions for PyFormatOptions {
     derive(serde::Serialize, serde::Deserialize),
     serde(rename_all = "kebab-case")
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum QuoteStyle {
     Single,
     #[default]
