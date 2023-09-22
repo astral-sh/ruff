@@ -2512,7 +2512,7 @@ pub struct FormatOptions {
         value_type = r#""lf" | "crlf" | "auto" | "native""#,
         example = r#"
             # Automatically detect the line ending on a file per file basis.
-            quote-style = "auto"
+            line-ending = "auto"
         "#
     )]
     pub line_ending: Option<LineEnding>,
