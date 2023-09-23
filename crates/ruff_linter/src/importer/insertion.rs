@@ -64,7 +64,7 @@ impl<'a> Insertion<'a> {
             // Otherwise, advance to the next row.
             locator.full_line_end(location)
         } else {
-            TextSize::default()
+            locator.contents_start()
         };
 
         // Skip over commented lines, with whitespace separation.
