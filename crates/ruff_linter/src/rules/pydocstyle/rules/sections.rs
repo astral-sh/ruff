@@ -1440,16 +1440,17 @@ fn blanks_and_section_underline(
                         docstring.range(),
                     );
                     if checker.patch(diagnostic.kind.rule()) {
+                        // Replace the existing indentation with whitespace of the appropriate length.
                         let range = TextRange::at(
                             blank_lines_end,
                             leading_space.text_len() + TextSize::from(1),
                         );
-
-                        // Replace the existing indentation with whitespace of the appropriate length.
-                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                            clean_space(docstring.indentation),
-                            range,
-                        )));
+                        let contents = clean_space(docstring.indentation);
+                        diagnostic.set_fix(Fix::automatic(if contents.is_empty() {
+                            Edit::range_deletion(range)
+                        } else {
+                            Edit::range_replacement(contents, range)
+                        }));
                     };
                     checker.diagnostics.push(diagnostic);
                 }
