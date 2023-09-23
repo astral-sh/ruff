@@ -967,6 +967,22 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ExplicitFStringTypeConversion) {
                 ruff::rules::explicit_f_string_type_conversion(checker, expr, elements);
             }
+            for element in elements {
+                if let ast::FStringElement::Literal(ast::FStringLiteralElement { value, range }) =
+                    element
+                {
+                    if checker.enabled(Rule::HardcodedBindAllInterfaces) {
+                        if let Some(diagnostic) =
+                            flake8_bandit::rules::hardcoded_bind_all_interfaces(value, *range)
+                        {
+                            checker.diagnostics.push(diagnostic);
+                        }
+                    }
+                    if checker.enabled(Rule::HardcodedTempFile) {
+                        flake8_bandit::rules::hardcoded_tmp_directory(checker, *range, value);
+                    }
+                }
+            }
         }
         Expr::BinOp(ast::ExprBinOp {
             left,
@@ -1246,7 +1262,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::HardcodedTempFile) {
-                flake8_bandit::rules::hardcoded_tmp_directory(checker, expr, value);
+                flake8_bandit::rules::hardcoded_tmp_directory(checker, expr.range(), value);
             }
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 pyupgrade::rules::unicode_kind_prefix(checker, expr, value.unicode);
