@@ -13,6 +13,7 @@ print("", sep="", end="bar")
 print(sep="", end="bar")
 print("", "foo", sep="")
 print("foo", "", sep="")
+print("foo", "", "bar", sep="")
 
 # OK.
 
@@ -21,3 +22,7 @@ print("foo")
 print("", "")
 print("", "foo")
 print("foo", "")
+print("", "", sep=",")
+print("", "foo", sep=",")
+print("foo", "", sep=",")
+print("foo", "", "bar", "", sep=",")

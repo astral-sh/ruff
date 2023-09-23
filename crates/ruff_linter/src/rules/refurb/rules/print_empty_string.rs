@@ -93,15 +93,32 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
         if call.arguments.args.iter().all(is_const_empty_string)
             || (sep_value_is_empty_string && call.arguments.args.iter().any(is_const_empty_string))
         {
-            // Find the index of the `sep` keyword argument, if it exists.
-            let sep_index = call.arguments.keywords.iter().position(|keyword| {
-                keyword
-                    .arg
-                    .clone()
-                    .is_some_and(|arg| arg.to_string() == "sep")
-            });
+            let non_empty_string_args_count = call
+                .arguments
+                .args
+                .iter()
+                .filter(|arg| !is_const_empty_string(arg))
+                .count();
 
-            let suggestion = generate_suggestion(&call.clone(), sep_index, checker.generator());
+            let sep_index = if non_empty_string_args_count > 1 {
+                // If the call has more than one non-empty string positional
+                // argument, the `sep` keyword argument is NOT redundant.
+                None
+            } else {
+                // Find the index of the `sep` keyword argument, if it exists.
+                call.arguments.keywords.iter().position(|keyword| {
+                    keyword
+                        .arg
+                        .clone()
+                        .is_some_and(|arg| arg.to_string() == "sep")
+                })
+            };
+
+            let suggestion = if non_empty_string_args_count > 1 {
+                generate_suggestion(&call.clone(), None, checker.generator())
+            } else {
+                generate_suggestion(&call.clone(), sep_index, checker.generator())
+            };
 
             let mut diagnostic = Diagnostic::new(
                 PrintEmptyString {
