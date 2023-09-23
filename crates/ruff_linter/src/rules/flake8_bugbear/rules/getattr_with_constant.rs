@@ -64,6 +64,9 @@ pub(crate) fn getattr_with_constant(
     let [obj, arg] = args else {
         return;
     };
+    if obj.is_starred_expr() {
+        return;
+    }
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(ast::StringConstant { value, .. }),
         ..
@@ -75,6 +78,9 @@ pub(crate) fn getattr_with_constant(
         return;
     }
     if is_mangled_private(value) {
+        return;
+    }
+    if !checker.semantic().is_builtin("getattr") {
         return;
     }
 

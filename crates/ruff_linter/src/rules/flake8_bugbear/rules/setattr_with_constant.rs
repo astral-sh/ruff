@@ -78,6 +78,9 @@ pub(crate) fn setattr_with_constant(
     let [obj, name, value] = args else {
         return;
     };
+    if obj.is_starred_expr() {
+        return;
+    }
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(name),
         ..
@@ -91,6 +94,10 @@ pub(crate) fn setattr_with_constant(
     if is_mangled_private(name) {
         return;
     }
+    if !checker.semantic().is_builtin("setattr") {
+        return;
+    }
+
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `Stmt::Expr`).

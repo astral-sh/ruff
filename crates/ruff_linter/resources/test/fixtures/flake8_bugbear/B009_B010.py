@@ -56,3 +56,7 @@ setattr(foo.bar, r"baz", None)
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
 assert getattr(func, '_rpc')is True
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1732387247
+getattr(*foo, "bar")
+setattr(*foo, "bar", None)
