@@ -39,7 +39,7 @@ FURB105.py:4:1: FURB105 [*] Called `print` with an empty string and a redundant 
   4 |+print()
 5 5 | print("", end="bar")
 6 6 | print("", sep=",", end="bar")
-7 7 | 
+7 7 | print(sep="")
 
 FURB105.py:5:1: FURB105 [*] Called `print` with an empty string, use `print(end="bar")` instead
   |
@@ -48,6 +48,7 @@ FURB105.py:5:1: FURB105 [*] Called `print` with an empty string, use `print(end=
 5 | print("", end="bar")
   | ^^^^^^^^^^^^^^^^^^^^ FURB105
 6 | print("", sep=",", end="bar")
+7 | print(sep="")
   |
   = help: Remove empty string positional argument
 
@@ -58,8 +59,8 @@ FURB105.py:5:1: FURB105 [*] Called `print` with an empty string, use `print(end=
 5   |-print("", end="bar")
   5 |+print(end="bar")
 6 6 | print("", sep=",", end="bar")
-7 7 | 
-8 8 | # OK.
+7 7 | print(sep="")
+8 8 | print("", sep="")
 
 FURB105.py:6:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="bar")` instead
   |
@@ -67,8 +68,8 @@ FURB105.py:6:1: FURB105 [*] Called `print` with an empty string and a redundant 
 5 | print("", end="bar")
 6 | print("", sep=",", end="bar")
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
-7 | 
-8 | # OK.
+7 | print(sep="")
+8 | print("", sep="")
   |
   = help: Remove empty string positional argument and redundant separator
 
@@ -78,8 +79,154 @@ FURB105.py:6:1: FURB105 [*] Called `print` with an empty string and a redundant 
 5 5 | print("", end="bar")
 6   |-print("", sep=",", end="bar")
   6 |+print(end="bar")
-7 7 | 
-8 8 | # OK.
-9 9 | 
+7 7 | print(sep="")
+8 8 | print("", sep="")
+9 9 | print("", "", sep="")
+
+FURB105.py:7:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print()` instead
+  |
+5 | print("", end="bar")
+6 | print("", sep=",", end="bar")
+7 | print(sep="")
+  | ^^^^^^^^^^^^^ FURB105
+8 | print("", sep="")
+9 | print("", "", sep="")
+  |
+  = help: Remove empty string positional argument and redundant separator
+
+ℹ Suggested fix
+4 4 | print("", sep=",")
+5 5 | print("", end="bar")
+6 6 | print("", sep=",", end="bar")
+7   |-print(sep="")
+  7 |+print()
+8 8 | print("", sep="")
+9 9 | print("", "", sep="")
+10 10 | print("", "", sep="", end="")
+
+FURB105.py:8:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print()` instead
+   |
+ 6 | print("", sep=",", end="bar")
+ 7 | print(sep="")
+ 8 | print("", sep="")
+   | ^^^^^^^^^^^^^^^^^ FURB105
+ 9 | print("", "", sep="")
+10 | print("", "", sep="", end="")
+   |
+   = help: Remove empty string positional argument and redundant separator
+
+ℹ Suggested fix
+5 5 | print("", end="bar")
+6 6 | print("", sep=",", end="bar")
+7 7 | print(sep="")
+8   |-print("", sep="")
+  8 |+print()
+9 9 | print("", "", sep="")
+10 10 | print("", "", sep="", end="")
+11 11 | print("", "", sep="", end="bar")
+
+FURB105.py:9:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print()` instead
+   |
+ 7 | print(sep="")
+ 8 | print("", sep="")
+ 9 | print("", "", sep="")
+   | ^^^^^^^^^^^^^^^^^^^^^ FURB105
+10 | print("", "", sep="", end="")
+11 | print("", "", sep="", end="bar")
+   |
+   = help: Remove empty string positional argument and redundant separator
+
+ℹ Suggested fix
+6  6  | print("", sep=",", end="bar")
+7  7  | print(sep="")
+8  8  | print("", sep="")
+9     |-print("", "", sep="")
+   9  |+print()
+10 10 | print("", "", sep="", end="")
+11 11 | print("", "", sep="", end="bar")
+12 12 | print("", sep="", end="bar")
+
+FURB105.py:10:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="")` instead
+   |
+ 8 | print("", sep="")
+ 9 | print("", "", sep="")
+10 | print("", "", sep="", end="")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+11 | print("", "", sep="", end="bar")
+12 | print("", sep="", end="bar")
+   |
+   = help: Remove empty string positional argument and redundant separator
+
+ℹ Suggested fix
+7  7  | print(sep="")
+8  8  | print("", sep="")
+9  9  | print("", "", sep="")
+10    |-print("", "", sep="", end="")
+   10 |+print(end="")
+11 11 | print("", "", sep="", end="bar")
+12 12 | print("", sep="", end="bar")
+13 13 | print(sep="", end="bar")
+
+FURB105.py:11:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="bar")` instead
+   |
+ 9 | print("", "", sep="")
+10 | print("", "", sep="", end="")
+11 | print("", "", sep="", end="bar")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+12 | print("", sep="", end="bar")
+13 | print(sep="", end="bar")
+   |
+   = help: Remove empty string positional argument and redundant separator
+
+ℹ Suggested fix
+8  8  | print("", sep="")
+9  9  | print("", "", sep="")
+10 10 | print("", "", sep="", end="")
+11    |-print("", "", sep="", end="bar")
+   11 |+print(end="bar")
+12 12 | print("", sep="", end="bar")
+13 13 | print(sep="", end="bar")
+14 14 | 
+
+FURB105.py:12:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="bar")` instead
+   |
+10 | print("", "", sep="", end="")
+11 | print("", "", sep="", end="bar")
+12 | print("", sep="", end="bar")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+13 | print(sep="", end="bar")
+   |
+   = help: Remove empty string positional argument and redundant separator
+
+ℹ Suggested fix
+9  9  | print("", "", sep="")
+10 10 | print("", "", sep="", end="")
+11 11 | print("", "", sep="", end="bar")
+12    |-print("", sep="", end="bar")
+   12 |+print(end="bar")
+13 13 | print(sep="", end="bar")
+14 14 | 
+15 15 | # OK.
+
+FURB105.py:13:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="bar")` instead
+   |
+11 | print("", "", sep="", end="bar")
+12 | print("", sep="", end="bar")
+13 | print(sep="", end="bar")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+14 | 
+15 | # OK.
+   |
+   = help: Remove empty string positional argument and redundant separator
+
+ℹ Suggested fix
+10 10 | print("", "", sep="", end="")
+11 11 | print("", "", sep="", end="bar")
+12 12 | print("", sep="", end="bar")
+13    |-print(sep="", end="bar")
+   13 |+print(end="bar")
+14 14 | 
+15 15 | # OK.
+16 16 | 
 
 
