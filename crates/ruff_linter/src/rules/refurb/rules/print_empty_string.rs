@@ -70,16 +70,21 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
         .as_ref()
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "print"]))
     {
-        // Check if the `sep` keyword argument is an empty string.
-        let sep_value_is_empty_string = call
-            .arguments
-            .find_keyword("sep")
-            .map_or(false, |keyword| is_const_empty_string(&keyword.value));
+        // For performance reasons, defer assignment to until we know that we
+        // need to check if the separator is an empty string.
+        let mut sep_value_is_empty_string = false;
 
-        // If the print call does not have precisely one positional argument,
-        // do not trigger unless the `sep` keyword argument is an empty string.
-        if call.arguments.args.len() != 1 && !sep_value_is_empty_string {
-            return;
+        // If the call does not have only one positional argument, check if the
+        // `sep` keyword argument is an empty string; if it is not an empty
+        // string, don't trigger.
+        if call.arguments.args.len() != 1 {
+            sep_value_is_empty_string = call
+                .arguments
+                .find_keyword("sep")
+                .map_or(false, |keyword| is_const_empty_string(&keyword.value));
+            if !sep_value_is_empty_string {
+                return;
+            }
         }
 
         // Check if the positional arguments is are all empty strings, or if
