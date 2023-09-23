@@ -11,6 +11,8 @@ print("", "", sep="", end="")
 print("", "", sep="", end="bar")
 print("", sep="", end="bar")
 print(sep="", end="bar")
+print("", "foo", sep="")
+print("foo", "", sep="")
 
 # OK.
 
@@ -19,5 +21,3 @@ print("foo")
 print("", "")
 print("", "foo")
 print("foo", "")
-print("", "foo", sep="")
-print("foo", "", sep="")

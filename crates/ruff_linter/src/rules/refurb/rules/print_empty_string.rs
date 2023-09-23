@@ -63,34 +63,41 @@ impl Violation for PrintEmptyString {
 
 /// FURB105
 pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
+    // Check if the call is to the builtin `print` function.
     if checker
         .semantic()
         .resolve_call_path(&call.func)
         .as_ref()
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "print"]))
     {
-        // If the print call does not have precisely one positional argument,
-        // do not trigger (more than one positional empty string argument is
-        // not equivalent to no positional arguments due to the `sep` argument).
+        // Check if the `sep` keyword argument is an empty string.
         let sep_value_is_empty_string = call
             .arguments
             .find_keyword("sep")
             .map_or(false, |keyword| is_const_empty_string(&keyword.value));
 
+        // If the print call does not have precisely one positional argument,
+        // do not trigger unless the `sep` keyword argument is an empty string.
         if call.arguments.args.len() != 1 && !sep_value_is_empty_string {
             return;
         }
-        // Check if the positional arguments is are all empty string.
-        let is_empty = call.arguments.args.iter().all(is_const_empty_string);
 
-        if is_empty {
+        // Check if the positional arguments is are all empty strings, or if
+        // there are any empty strings and the `sep` keyword argument is also
+        // an empty string.
+        if call.arguments.args.iter().all(is_const_empty_string)
+            || (sep_value_is_empty_string && call.arguments.args.iter().any(is_const_empty_string))
+        {
+            // Find the index of the `sep` keyword argument, if it exists.
             let sep_index = call.arguments.keywords.iter().position(|keyword| {
                 keyword
                     .arg
                     .clone()
                     .is_some_and(|arg| arg.to_string() == "sep")
             });
+
             let suggestion = generate_suggestion(&call.clone(), sep_index, checker.generator());
+
             let mut diagnostic = Diagnostic::new(
                 PrintEmptyString {
                     suggestion: suggestion.clone(),
@@ -98,6 +105,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                 },
                 call.range(),
             );
+
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::suggested(Edit::replacement(
                     suggestion,
@@ -105,6 +113,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                     call.end(),
                 )));
             }
+
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -122,19 +131,26 @@ fn is_const_empty_string(expr: &Expr) -> bool {
 }
 
 /// Generate a suggestion to replace a `print` call with `print` call with no
-/// positional arguments, and no `sep` keyword argument.
+/// empty string positional arguments, and no `sep` keyword argument.
 fn generate_suggestion(
     call: &ast::ExprCall,
     sep_index: Option<usize>,
     generator: Generator,
 ) -> String {
+    // Clone the call so that we can mutate it.
     let mut suggestion = call.clone();
-    // Remove all positional arguments.
-    suggestion.arguments.args.clear();
+
+    // Remove all empty string positional arguments.
+    suggestion
+        .arguments
+        .args
+        .retain(|arg| !is_const_empty_string(arg));
+
     // If there is a `sep` keyword argument, remove it too (the separator is
     // not needed if there are no objects to separate) by finding its index.
     if let Some(index) = sep_index {
         suggestion.arguments.keywords.remove(index);
     }
+
     generator.expr(&suggestion.into())
 }
