@@ -165,7 +165,7 @@ RUF015.py:35:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over singl
 37 37 | # RUF015
 38 38 | list(range(10))[0]
 
-RUF015.py:38:1: RUF015 [*] Prefer `next(range(10))` over single element slice
+RUF015.py:38:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
    |
 37 | # RUF015
 38 | list(range(10))[0]
@@ -173,14 +173,14 @@ RUF015.py:38:1: RUF015 [*] Prefer `next(range(10))` over single element slice
 39 | list(x.y)[0]
 40 | list(x["y"])[0]
    |
-   = help: Replace with `next(range(10))`
+   = help: Replace with `next(iter(range(10)))`
 
 ℹ Suggested fix
 35 35 | [i + j for i in x for j in y][0]
 36 36 | 
 37 37 | # RUF015
 38    |-list(range(10))[0]
-   38 |+next(range(10))
+   38 |+next(iter(range(10)))
 39 39 | list(x.y)[0]
 40 40 | list(x["y"])[0]
 41 41 | [*range(10)][0]
@@ -227,7 +227,7 @@ RUF015.py:40:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
 42 42 | [*x.y][0]
 43 43 | [*x["y"]][0]
 
-RUF015.py:41:1: RUF015 [*] Prefer `next(range(10))` over single element slice
+RUF015.py:41:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
    |
 39 | list(x.y)[0]
 40 | list(x["y"])[0]
@@ -236,14 +236,14 @@ RUF015.py:41:1: RUF015 [*] Prefer `next(range(10))` over single element slice
 42 | [*x.y][0]
 43 | [*x["y"]][0]
    |
-   = help: Replace with `next(range(10))`
+   = help: Replace with `next(iter(range(10)))`
 
 ℹ Suggested fix
 38 38 | list(range(10))[0]
 39 39 | list(x.y)[0]
 40 40 | list(x["y"])[0]
 41    |-[*range(10)][0]
-   41 |+next(range(10))
+   41 |+next(iter(range(10)))
 42 42 | [*x.y][0]
 43 43 | [*x["y"]][0]
 44 44 | 
