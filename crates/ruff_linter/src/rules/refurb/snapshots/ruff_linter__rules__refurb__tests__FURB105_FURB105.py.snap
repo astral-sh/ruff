@@ -1,0 +1,85 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB105.py:3:1: FURB105 [*] Called `print` with an empty string, use `print()` instead
+  |
+1 | # Errors.
+2 | 
+3 | print("")
+  | ^^^^^^^^^ FURB105
+4 | print("", sep=",")
+5 | print("", end="bar")
+  |
+  = help: Remove empty string positional argument
+
+ℹ Suggested fix
+1 1 | # Errors.
+2 2 | 
+3   |-print("")
+  3 |+print()
+4 4 | print("", sep=",")
+5 5 | print("", end="bar")
+6 6 | print("", sep=",", end="bar")
+
+FURB105.py:4:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print()` instead
+  |
+3 | print("")
+4 | print("", sep=",")
+  | ^^^^^^^^^^^^^^^^^^ FURB105
+5 | print("", end="bar")
+6 | print("", sep=",", end="bar")
+  |
+  = help: Remove empty string positional argument and redundant separator
+
+ℹ Suggested fix
+1 1 | # Errors.
+2 2 | 
+3 3 | print("")
+4   |-print("", sep=",")
+  4 |+print()
+5 5 | print("", end="bar")
+6 6 | print("", sep=",", end="bar")
+7 7 | 
+
+FURB105.py:5:1: FURB105 [*] Called `print` with an empty string, use `print(end="bar")` instead
+  |
+3 | print("")
+4 | print("", sep=",")
+5 | print("", end="bar")
+  | ^^^^^^^^^^^^^^^^^^^^ FURB105
+6 | print("", sep=",", end="bar")
+  |
+  = help: Remove empty string positional argument
+
+ℹ Suggested fix
+2 2 | 
+3 3 | print("")
+4 4 | print("", sep=",")
+5   |-print("", end="bar")
+  5 |+print(end="bar")
+6 6 | print("", sep=",", end="bar")
+7 7 | 
+8 8 | # OK.
+
+FURB105.py:6:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="bar")` instead
+  |
+4 | print("", sep=",")
+5 | print("", end="bar")
+6 | print("", sep=",", end="bar")
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+7 | 
+8 | # OK.
+  |
+  = help: Remove empty string positional argument and redundant separator
+
+ℹ Suggested fix
+3 3 | print("")
+4 4 | print("", sep=",")
+5 5 | print("", end="bar")
+6   |-print("", sep=",", end="bar")
+  6 |+print(end="bar")
+7 7 | 
+8 8 | # OK.
+9 9 | 
+
+
