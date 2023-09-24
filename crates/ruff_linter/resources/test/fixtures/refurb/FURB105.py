@@ -17,6 +17,7 @@ print("foo", "", "bar", sep="")
 print("", *args)
 print("", *args, sep="")
 print("", **kwargs)
+print(sep="\t")
 
 # OK.
 
