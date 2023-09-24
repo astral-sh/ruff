@@ -1,8 +1,9 @@
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Constant};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -42,32 +43,35 @@ impl AlwaysAutofixableViolation for StringOrBytesTooLong {
 }
 
 /// PYI053
-pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, node: AnyNodeRef) {
     // Ignore docstrings.
     if is_docstring_stmt(checker.semantic().current_statement()) {
         return;
     }
 
-    let length = match expr {
-        Expr::Constant(ast::ExprConstant {
+    let length = match node {
+        AnyNodeRef::ExprConstant(ast::ExprConstant {
             value: Constant::Str(s),
             ..
         }) => s.chars().count(),
-        Expr::Constant(ast::ExprConstant {
+        AnyNodeRef::ExprConstant(ast::ExprConstant {
             value: Constant::Bytes(bytes),
             ..
         }) => bytes.len(),
+        AnyNodeRef::FStringLiteralElement(ast::FStringLiteralElement { value, .. }) => {
+            value.chars().count()
+        }
         _ => return,
     };
     if length <= 50 {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, expr.range());
+    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, node.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             "...".to_string(),
-            expr.range(),
+            node.range(),
         )));
     }
     checker.diagnostics.push(diagnostic);

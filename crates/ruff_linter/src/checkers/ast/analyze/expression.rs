@@ -3,6 +3,7 @@ use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
 use ruff_diagnostics::Diagnostic;
 
+use ruff_python_ast::node::AstNode;
 use ruff_python_ast::types::Node;
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::ScopeKind;
@@ -968,8 +969,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::explicit_f_string_type_conversion(checker, expr, elements);
             }
             for element in elements {
-                if let ast::FStringElement::Literal(ast::FStringLiteralElement { value, range }) =
-                    element
+                if let ast::FStringElement::Literal(
+                    literal_element @ ast::FStringLiteralElement { value, range },
+                ) = element
                 {
                     if checker.enabled(Rule::HardcodedBindAllInterfaces) {
                         if let Some(diagnostic) =
@@ -980,6 +982,15 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::HardcodedTempFile) {
                         flake8_bandit::rules::hardcoded_tmp_directory(checker, *range, value);
+                    }
+
+                    if checker.source_type.is_stub() {
+                        if checker.enabled(Rule::StringOrBytesTooLong) {
+                            flake8_pyi::rules::string_or_bytes_too_long(
+                                checker,
+                                literal_element.as_any_node_ref(),
+                            );
+                        }
                     }
                 }
             }
@@ -1242,18 +1253,22 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pyi::rules::numeric_literal_too_long(checker, expr);
             }
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bytes(_),
-            range: _,
-        }) => {
+        Expr::Constant(
+            constant @ ast::ExprConstant {
+                value: Constant::Bytes(_),
+                range: _,
+            },
+        ) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::StringOrBytesTooLong) {
-                flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
+                flake8_pyi::rules::string_or_bytes_too_long(checker, constant.as_any_node_ref());
             }
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(value),
-            range: _,
-        }) => {
+        Expr::Constant(
+            constant @ ast::ExprConstant {
+                value: Constant::Str(value),
+                range: _,
+            },
+        ) => {
             if checker.enabled(Rule::HardcodedBindAllInterfaces) {
                 if let Some(diagnostic) =
                     flake8_bandit::rules::hardcoded_bind_all_interfaces(value, expr.range())
@@ -1269,7 +1284,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StringOrBytesTooLong) {
-                    flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
+                    flake8_pyi::rules::string_or_bytes_too_long(
+                        checker,
+                        constant.as_any_node_ref(),
+                    );
                 }
             }
         }
