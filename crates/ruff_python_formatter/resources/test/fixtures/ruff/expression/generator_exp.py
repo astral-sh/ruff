@@ -52,3 +52,20 @@ a = (
 aaaaaaaaaaaaaaaaaaaaa = (
     o for o in self.registry.values if o.__class__ is not ModelAdmin
 )
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7623
+tuple(
+    0  # comment
+    for x in y
+)
+
+tuple(
+    (0  # comment
+    for x in y)
+)
+
+tuple(
+    (  # comment
+        0 for x in y
+    )
+)
