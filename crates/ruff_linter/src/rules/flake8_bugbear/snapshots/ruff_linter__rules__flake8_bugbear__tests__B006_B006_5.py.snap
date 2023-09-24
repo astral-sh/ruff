@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B006_imports.py:1:49: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:1:49: B006 [*] Do not use mutable data structures for argument defaults
   |
 1 | def import_module_wrong(value: dict[str, str] = {}):
   |                                                 ^^ B006
@@ -19,7 +19,7 @@ B006_imports.py:1:49: B006 [*] Do not use mutable data structures for argument d
 4 6 | 
 5 7 | def import_module_with_values_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:5:61: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:5:61: B006 [*] Do not use mutable data structures for argument defaults
   |
 5 | def import_module_with_values_wrong(value: dict[str, str] = {}):
   |                                                             ^^ B006
@@ -40,7 +40,7 @@ B006_imports.py:5:61: B006 [*] Do not use mutable data structures for argument d
 8 10 |     return 2
 9 11 | 
 
-B006_imports.py:11:50: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:11:50: B006 [*] Do not use mutable data structures for argument defaults
    |
 11 | def import_modules_wrong(value: dict[str, str] = {}):
    |                                                  ^^ B006
@@ -64,7 +64,7 @@ B006_imports.py:11:50: B006 [*] Do not use mutable data structures for argument 
 16 18 | 
 17 19 | def from_import_module_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:17:54: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:17:54: B006 [*] Do not use mutable data structures for argument defaults
    |
 17 | def from_import_module_wrong(value: dict[str, str] = {}):
    |                                                      ^^ B006
@@ -85,7 +85,7 @@ B006_imports.py:17:54: B006 [*] Do not use mutable data structures for argument 
 20 22 | 
 21 23 | def from_imports_module_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:21:55: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:21:55: B006 [*] Do not use mutable data structures for argument defaults
    |
 21 | def from_imports_module_wrong(value: dict[str, str] = {}):
    |                                                       ^^ B006
@@ -108,7 +108,7 @@ B006_imports.py:21:55: B006 [*] Do not use mutable data structures for argument 
 25 27 | 
 26 28 | def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:26:66: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:26:66: B006 [*] Do not use mutable data structures for argument defaults
    |
 26 | def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
    |                                                                  ^^ B006
@@ -131,7 +131,7 @@ B006_imports.py:26:66: B006 [*] Do not use mutable data structures for argument 
 30 32 | 
 31 33 | def import_docstring_module_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:31:59: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:31:59: B006 [*] Do not use mutable data structures for argument defaults
    |
 31 | def import_docstring_module_wrong(value: dict[str, str] = {}):
    |                                                           ^^ B006
@@ -154,7 +154,7 @@ B006_imports.py:31:59: B006 [*] Do not use mutable data structures for argument 
 35 37 | 
 36 38 | def import_module_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:36:49: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:36:49: B006 [*] Do not use mutable data structures for argument defaults
    |
 36 | def import_module_wrong(value: dict[str, str] = {}):
    |                                                 ^^ B006
@@ -175,7 +175,7 @@ B006_imports.py:36:49: B006 [*] Do not use mutable data structures for argument 
 39 41 | 
 40 42 | def import_module_with_values_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:40:61: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:40:61: B006 [*] Do not use mutable data structures for argument defaults
    |
 40 | def import_module_with_values_wrong(value: dict[str, str] = {}):
    |                                                             ^^ B006
@@ -196,7 +196,7 @@ B006_imports.py:40:61: B006 [*] Do not use mutable data structures for argument 
 43 45 |     return 2
 44 46 | 
 
-B006_imports.py:46:50: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:46:50: B006 [*] Do not use mutable data structures for argument defaults
    |
 46 | def import_modules_wrong(value: dict[str, str] = {}):
    |                                                  ^^ B006
@@ -220,7 +220,7 @@ B006_imports.py:46:50: B006 [*] Do not use mutable data structures for argument 
 51 53 | 
 52 54 | def from_import_module_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:52:54: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:52:54: B006 [*] Do not use mutable data structures for argument defaults
    |
 52 | def from_import_module_wrong(value: dict[str, str] = {}):
    |                                                      ^^ B006
@@ -241,7 +241,7 @@ B006_imports.py:52:54: B006 [*] Do not use mutable data structures for argument 
 55 57 | 
 56 58 | def from_imports_module_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:56:55: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:56:55: B006 [*] Do not use mutable data structures for argument defaults
    |
 56 | def from_imports_module_wrong(value: dict[str, str] = {}):
    |                                                       ^^ B006
@@ -264,7 +264,7 @@ B006_imports.py:56:55: B006 [*] Do not use mutable data structures for argument 
 60 62 | 
 61 63 | def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:61:66: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:61:66: B006 [*] Do not use mutable data structures for argument defaults
    |
 61 | def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
    |                                                                  ^^ B006
@@ -287,7 +287,7 @@ B006_imports.py:61:66: B006 [*] Do not use mutable data structures for argument 
 65 67 | 
 66 68 | def import_docstring_module_wrong(value: dict[str, str] = {}):
 
-B006_imports.py:66:59: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:66:59: B006 [*] Do not use mutable data structures for argument defaults
    |
 66 | def import_docstring_module_wrong(value: dict[str, str] = {}):
    |                                                           ^^ B006
