@@ -1656,7 +1656,7 @@ def f(arg=%timeit a = b):
     // This test case is to just make sure that the lexer doesn't go into
     // infinite loop on invalid input.
     #[test]
-    fn test_infite_loop() {
+    fn test_infinite_loop() {
         let source = "[1";
         let _ = lex(source, Mode::Module).collect::<Vec<_>>();
     }
