@@ -577,85 +577,81 @@ fn check_input_from_argfile() -> Result<()> {
 
 #[test]
 fn display_different_safety_levels() -> Result<()> {
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
-
     // `--fix` should only apply safe fixes, but should tell the user about `--fix --unsafe` if
     // there are remaining unsafe fixes.
-    let output = cmd
+    // TODO: this should be a failure but we don't have a way to track that
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args([
             "-",
-            "--format",
-            "text",
+            "--output-format=text",
             "--isolated",
             "--select",
             "F601,UP034",
+            "--no-cache",
         ])
-        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
-        .assert()
-        .failure();
-    assert_eq!(
-        str::from_utf8(&output.get_output().stdout)?,
-        r#"-:1:14: F601 [*] Dictionary key literal `'a'` repeated
--:2:7: UP034 [*] Avoid extraneous parentheses
-Found 2 errors.
-[*] 1 potentially fixable with the --fix option.
-[*] 2 potentially fixable with the --fix --unsafe options.
-"#
-    );
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 1 potentially fixable with the --fix option.
+    [*] 2 potentially fixable with the --fix-suggested option.
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }
 
 #[test]
 fn display_unsafe_fixes_remain() -> Result<()> {
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
-
-    let output = cmd
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["-", "--format", "text", "--isolated", "--select", "F601"])
-        .write_stdin("x = {'a': 1, 'a': 1}\n")
-        .assert()
-        .failure();
-    assert_eq!(
-        str::from_utf8(&output.get_output().stdout)?,
-        r#"-:1:14: F601 [*] Dictionary key literal `'a'` repeated
-Found 1 error.
-[*] 1 potentially fixable with the --fix-suggested option.
-"#
-    );
+        .pass_stdin("x = {'a': 1, 'a': 1}\n"),
+        @r###"
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    Found 1 error.
+    [*] 1 potentially fixable with the --fix-suggested option.
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }
 
 #[test]
 fn fix_applies_safe_fixes_only() -> Result<()> {
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
-
     // `--fix` should only apply safe fixes. Since we're runnnig in `stdin` mode, output shouldn't
     // be printed.
-    let output = cmd
-        .args([
-            "-",
-            "--format",
-            "text",
-            "--isolated",
-            "--select",
-            "F601,UP034",
-            "--fix",
-        ])
-        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
-        .assert()
-        .failure();
-    assert_eq!(
-        str::from_utf8(&output.get_output().stdout)?,
-        "x = {'a': 1, 'a': 1}\nprint('foo')\n"
-    );
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--format",
+                "text",
+                "--isolated",
+                "--select",
+                "F601,UP034",
+                "--fix",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: true
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}\nprint('foo')\n
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }
 
 #[test]
 fn fix_applies_all_fixes() -> Result<()> {
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
 
     // `--fix --unsafe` should apply both safe and unsafe fixes.
     let output = cmd
@@ -669,7 +665,7 @@ fn fix_applies_all_fixes() -> Result<()> {
             "--fix",
             "--fix-suggested",
         ])
-        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
         .assert()
         .success();
     assert_eq!(
@@ -682,7 +678,7 @@ fn fix_applies_all_fixes() -> Result<()> {
 
 #[test]
 fn diff_diffs_all_fixes() -> Result<()> {
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
 
     // `--fix --unsafe` should apply both safe and unsafe fixes.
     let output = cmd
@@ -696,7 +692,7 @@ fn diff_diffs_all_fixes() -> Result<()> {
             "--diff",
             "--fix-suggested",
         ])
-        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
         .assert()
         .failure();
     assert_eq!(
@@ -715,7 +711,7 @@ fn diff_diffs_all_fixes() -> Result<()> {
 
 #[test]
 fn diff_diffs_safe_fixes_only() -> Result<()> {
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
 
     // `--fix --unsafe` should apply both safe and unsafe fixes.
     let output = cmd
@@ -728,7 +724,7 @@ fn diff_diffs_safe_fixes_only() -> Result<()> {
             "F601,UP034",
             "--diff",
         ])
-        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
         .assert()
         .failure();
     assert_eq!(
@@ -746,7 +742,7 @@ fn diff_diffs_safe_fixes_only() -> Result<()> {
 
 #[test]
 fn fix_only_applies_all_fixes() -> Result<()> {
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
 
     // `--fix --unsafe` should apply both safe and unsafe fixes.
     let output = cmd
@@ -760,7 +756,7 @@ fn fix_only_applies_all_fixes() -> Result<()> {
             "--fix-only",
             "--fix-suggested",
         ])
-        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
         .assert()
         .success();
     assert_eq!(
@@ -773,7 +769,7 @@ fn fix_only_applies_all_fixes() -> Result<()> {
 
 #[test]
 fn fix_only_applies_safe_fixes_only() -> Result<()> {
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
 
     // `--fix --unsafe` should apply both safe and unsafe fixes.
     let output = cmd
@@ -786,7 +782,7 @@ fn fix_only_applies_safe_fixes_only() -> Result<()> {
             "F601,UP034",
             "--fix-only",
         ])
-        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
         .assert()
         .success();
     assert_eq!(

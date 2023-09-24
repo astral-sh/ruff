@@ -195,7 +195,7 @@ Options:
       --fix
           Attempt to automatically fix lint violations. Use `--no-fix` to disable
       --fix-suggested
-          Attempt to fix automatic and suggested lint violations. Implies `--fix`
+          Attempt to automatically fix both automatic and suggested lint violations
       --show-source
           Show violations with source code. Use `--no-show-source` to disable
       --show-fixes
@@ -218,8 +218,6 @@ Options:
           Enable preview mode; checks will include unstable rules and fixes. Use `--no-preview` to disable
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-      --fix--suggested
-          Attempt to automatically fix both automatic and suggested lint violations. Implies `--fix`
       --statistics
           Show counts for every rule with at least one violation
       --add-noqa

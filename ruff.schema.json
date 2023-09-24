@@ -120,7 +120,7 @@
       }
     },
     "fix": {
-      "description": "Enable autofix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags). This will only implement \"safe\" fixes Safe fixes are exactly what the developer wants and/or maintain the exact meaning of the existing code).",
+      "description": "Enable autofix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags). Only works on Automatic fixes.",
       "type": [
         "boolean",
         "null"
@@ -128,6 +128,13 @@
     },
     "fix-only": {
       "description": "Like `fix`, but disables reporting on leftover violation. Implies `fix`.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "fix-suggested": {
+      "description": "Enable autofix behavior for Automatic and Suggested fixes.",
       "type": [
         "boolean",
         "null"
@@ -619,13 +626,6 @@
       "items": {
         "$ref": "#/definitions/RuleSelector"
       }
-    },
-    "unsafe": {
-      "description": "Like `fix`, but will also implement \"unsafe\" fixes. Unsafe fixes are those which may not be exactly what you intend, but should still result in valid code. Implies `fix`.",
-      "type": [
-        "boolean",
-        "null"
-      ]
     }
   },
   "additionalProperties": false,
