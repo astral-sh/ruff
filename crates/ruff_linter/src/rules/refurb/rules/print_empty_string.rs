@@ -57,27 +57,22 @@ impl Violation for PrintEmptyString {
 
 /// FURB105
 pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
-    // Avoid flagging, e.g., `print("", "", **kwargs)`.
-    if call
-        .arguments
-        .keywords
-        .iter()
-        .any(|keyword| keyword.arg.is_none())
-    {
-        return;
-    }
-
     if checker
         .semantic()
         .resolve_call_path(&call.func)
         .as_ref()
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "print"]))
     {
-        // Ex) `print("", sep="")`
+        // Ex) `print("", sep="")` or `print("", "", **kwargs)`
         let empty_separator = call
             .arguments
             .find_keyword("sep")
-            .map_or(false, |keyword| is_empty_string(&keyword.value));
+            .map_or(false, |keyword| is_empty_string(&keyword.value))
+            && !call
+                .arguments
+                .keywords
+                .iter()
+                .any(|keyword| keyword.arg.is_none());
 
         // Avoid flagging, e.g., `print("", "", sep="sep")`
         if !empty_separator && call.arguments.args.len() != 1 {

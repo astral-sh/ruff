@@ -291,7 +291,7 @@ FURB105.py:16:1: FURB105 [*] Unnecessary empty string passed to `print`
    16 |+print("foo", "bar", sep="")
 17 17 | print("", *args)
 18 18 | print("", *args, sep="")
-19 19 | 
+19 19 | print("", **kwargs)
 
 FURB105.py:18:1: FURB105 [*] Unnecessary empty string passed to `print`
    |
@@ -299,8 +299,7 @@ FURB105.py:18:1: FURB105 [*] Unnecessary empty string passed to `print`
 17 | print("", *args)
 18 | print("", *args, sep="")
    | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
-19 | 
-20 | # OK.
+19 | print("", **kwargs)
    |
    = help: Remove empty string
 
@@ -310,8 +309,29 @@ FURB105.py:18:1: FURB105 [*] Unnecessary empty string passed to `print`
 17 17 | print("", *args)
 18    |-print("", *args, sep="")
    18 |+print(*args, sep="")
-19 19 | 
-20 20 | # OK.
-21 21 | 
+19 19 | print("", **kwargs)
+20 20 | 
+21 21 | # OK.
+
+FURB105.py:19:1: FURB105 [*] Unnecessary empty string passed to `print`
+   |
+17 | print("", *args)
+18 | print("", *args, sep="")
+19 | print("", **kwargs)
+   | ^^^^^^^^^^^^^^^^^^^ FURB105
+20 | 
+21 | # OK.
+   |
+   = help: Remove empty string
+
+ℹ Suggested fix
+16 16 | print("foo", "", "bar", sep="")
+17 17 | print("", *args)
+18 18 | print("", *args, sep="")
+19    |-print("", **kwargs)
+   19 |+print(**kwargs)
+20 20 | 
+21 21 | # OK.
+22 22 | 
 
 
