@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB105.py:3:1: FURB105 [*] Called `print` with an empty string, use `print()` instead
+FURB105.py:3:1: FURB105 [*] Unnecessary empty string passed to `print`
   |
 1 | # Errors.
 2 | 
@@ -10,7 +10,7 @@ FURB105.py:3:1: FURB105 [*] Called `print` with an empty string, use `print()` i
 4 | print("", sep=",")
 5 | print("", end="bar")
   |
-  = help: Remove empty string positional argument
+  = help: Remove empty string
 
 ℹ Suggested fix
 1 1 | # Errors.
@@ -21,7 +21,7 @@ FURB105.py:3:1: FURB105 [*] Called `print` with an empty string, use `print()` i
 5 5 | print("", end="bar")
 6 6 | print("", sep=",", end="bar")
 
-FURB105.py:4:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print()` instead
+FURB105.py:4:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
   |
 3 | print("")
 4 | print("", sep=",")
@@ -29,7 +29,7 @@ FURB105.py:4:1: FURB105 [*] Called `print` with an empty string and a redundant 
 5 | print("", end="bar")
 6 | print("", sep=",", end="bar")
   |
-  = help: Remove empty string positional argument and redundant separator
+  = help: Remove empty string and separator
 
 ℹ Suggested fix
 1 1 | # Errors.
@@ -41,7 +41,7 @@ FURB105.py:4:1: FURB105 [*] Called `print` with an empty string and a redundant 
 6 6 | print("", sep=",", end="bar")
 7 7 | print(sep="")
 
-FURB105.py:5:1: FURB105 [*] Called `print` with an empty string, use `print(end="bar")` instead
+FURB105.py:5:1: FURB105 [*] Unnecessary empty string passed to `print`
   |
 3 | print("")
 4 | print("", sep=",")
@@ -50,7 +50,7 @@ FURB105.py:5:1: FURB105 [*] Called `print` with an empty string, use `print(end=
 6 | print("", sep=",", end="bar")
 7 | print(sep="")
   |
-  = help: Remove empty string positional argument
+  = help: Remove empty string
 
 ℹ Suggested fix
 2 2 | 
@@ -62,7 +62,7 @@ FURB105.py:5:1: FURB105 [*] Called `print` with an empty string, use `print(end=
 7 7 | print(sep="")
 8 8 | print("", sep="")
 
-FURB105.py:6:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="bar")` instead
+FURB105.py:6:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
   |
 4 | print("", sep=",")
 5 | print("", end="bar")
@@ -71,7 +71,7 @@ FURB105.py:6:1: FURB105 [*] Called `print` with an empty string and a redundant 
 7 | print(sep="")
 8 | print("", sep="")
   |
-  = help: Remove empty string positional argument and redundant separator
+  = help: Remove empty string and separator
 
 ℹ Suggested fix
 3 3 | print("")
@@ -83,7 +83,7 @@ FURB105.py:6:1: FURB105 [*] Called `print` with an empty string and a redundant 
 8 8 | print("", sep="")
 9 9 | print("", "", sep="")
 
-FURB105.py:7:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print()` instead
+FURB105.py:7:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
   |
 5 | print("", end="bar")
 6 | print("", sep=",", end="bar")
@@ -92,7 +92,7 @@ FURB105.py:7:1: FURB105 [*] Called `print` with an empty string and a redundant 
 8 | print("", sep="")
 9 | print("", "", sep="")
   |
-  = help: Remove empty string positional argument and redundant separator
+  = help: Remove empty string and separator
 
 ℹ Suggested fix
 4 4 | print("", sep=",")
@@ -104,7 +104,7 @@ FURB105.py:7:1: FURB105 [*] Called `print` with an empty string and a redundant 
 9 9 | print("", "", sep="")
 10 10 | print("", "", sep="", end="")
 
-FURB105.py:8:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print()` instead
+FURB105.py:8:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
    |
  6 | print("", sep=",", end="bar")
  7 | print(sep="")
@@ -113,7 +113,7 @@ FURB105.py:8:1: FURB105 [*] Called `print` with an empty string and a redundant 
  9 | print("", "", sep="")
 10 | print("", "", sep="", end="")
    |
-   = help: Remove empty string positional argument and redundant separator
+   = help: Remove empty string and separator
 
 ℹ Suggested fix
 5 5 | print("", end="bar")
@@ -125,7 +125,7 @@ FURB105.py:8:1: FURB105 [*] Called `print` with an empty string and a redundant 
 10 10 | print("", "", sep="", end="")
 11 11 | print("", "", sep="", end="bar")
 
-FURB105.py:9:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print()` instead
+FURB105.py:9:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
    |
  7 | print(sep="")
  8 | print("", sep="")
@@ -134,7 +134,7 @@ FURB105.py:9:1: FURB105 [*] Called `print` with an empty string and a redundant 
 10 | print("", "", sep="", end="")
 11 | print("", "", sep="", end="bar")
    |
-   = help: Remove empty string positional argument and redundant separator
+   = help: Remove empty string and separator
 
 ℹ Suggested fix
 6  6  | print("", sep=",", end="bar")
@@ -146,7 +146,7 @@ FURB105.py:9:1: FURB105 [*] Called `print` with an empty string and a redundant 
 11 11 | print("", "", sep="", end="bar")
 12 12 | print("", sep="", end="bar")
 
-FURB105.py:10:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="")` instead
+FURB105.py:10:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
    |
  8 | print("", sep="")
  9 | print("", "", sep="")
@@ -155,7 +155,7 @@ FURB105.py:10:1: FURB105 [*] Called `print` with an empty string and a redundant
 11 | print("", "", sep="", end="bar")
 12 | print("", sep="", end="bar")
    |
-   = help: Remove empty string positional argument and redundant separator
+   = help: Remove empty string and separator
 
 ℹ Suggested fix
 7  7  | print(sep="")
@@ -167,7 +167,7 @@ FURB105.py:10:1: FURB105 [*] Called `print` with an empty string and a redundant
 12 12 | print("", sep="", end="bar")
 13 13 | print(sep="", end="bar")
 
-FURB105.py:11:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="bar")` instead
+FURB105.py:11:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
    |
  9 | print("", "", sep="")
 10 | print("", "", sep="", end="")
@@ -176,7 +176,7 @@ FURB105.py:11:1: FURB105 [*] Called `print` with an empty string and a redundant
 12 | print("", sep="", end="bar")
 13 | print(sep="", end="bar")
    |
-   = help: Remove empty string positional argument and redundant separator
+   = help: Remove empty string and separator
 
 ℹ Suggested fix
 8  8  | print("", sep="")
@@ -188,7 +188,7 @@ FURB105.py:11:1: FURB105 [*] Called `print` with an empty string and a redundant
 13 13 | print(sep="", end="bar")
 14 14 | print("", "foo", sep="")
 
-FURB105.py:12:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="bar")` instead
+FURB105.py:12:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
    |
 10 | print("", "", sep="", end="")
 11 | print("", "", sep="", end="bar")
@@ -197,7 +197,7 @@ FURB105.py:12:1: FURB105 [*] Called `print` with an empty string and a redundant
 13 | print(sep="", end="bar")
 14 | print("", "foo", sep="")
    |
-   = help: Remove empty string positional argument and redundant separator
+   = help: Remove empty string and separator
 
 ℹ Suggested fix
 9  9  | print("", "", sep="")
@@ -209,7 +209,7 @@ FURB105.py:12:1: FURB105 [*] Called `print` with an empty string and a redundant
 14 14 | print("", "foo", sep="")
 15 15 | print("foo", "", sep="")
 
-FURB105.py:13:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print(end="bar")` instead
+FURB105.py:13:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
    |
 11 | print("", "", sep="", end="bar")
 12 | print("", sep="", end="bar")
@@ -218,7 +218,7 @@ FURB105.py:13:1: FURB105 [*] Called `print` with an empty string and a redundant
 14 | print("", "foo", sep="")
 15 | print("foo", "", sep="")
    |
-   = help: Remove empty string positional argument and redundant separator
+   = help: Remove empty string and separator
 
 ℹ Suggested fix
 10 10 | print("", "", sep="", end="")
@@ -230,7 +230,7 @@ FURB105.py:13:1: FURB105 [*] Called `print` with an empty string and a redundant
 15 15 | print("foo", "", sep="")
 16 16 | print("foo", "", "bar", sep="")
 
-FURB105.py:14:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print("foo")` instead
+FURB105.py:14:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
    |
 12 | print("", sep="", end="bar")
 13 | print(sep="", end="bar")
@@ -239,7 +239,7 @@ FURB105.py:14:1: FURB105 [*] Called `print` with an empty string and a redundant
 15 | print("foo", "", sep="")
 16 | print("foo", "", "bar", sep="")
    |
-   = help: Remove empty string positional argument and redundant separator
+   = help: Remove empty string and separator
 
 ℹ Suggested fix
 11 11 | print("", "", sep="", end="bar")
@@ -249,17 +249,18 @@ FURB105.py:14:1: FURB105 [*] Called `print` with an empty string and a redundant
    14 |+print("foo")
 15 15 | print("foo", "", sep="")
 16 16 | print("foo", "", "bar", sep="")
-17 17 | 
+17 17 | print("", *args)
 
-FURB105.py:15:1: FURB105 [*] Called `print` with an empty string and a redundant separator, use `print("foo")` instead
+FURB105.py:15:1: FURB105 [*] Unnecessary empty string passed to `print` with redundant separator
    |
 13 | print(sep="", end="bar")
 14 | print("", "foo", sep="")
 15 | print("foo", "", sep="")
    | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
 16 | print("foo", "", "bar", sep="")
+17 | print("", *args)
    |
-   = help: Remove empty string positional argument and redundant separator
+   = help: Remove empty string and separator
 
 ℹ Suggested fix
 12 12 | print("", sep="", end="bar")
@@ -268,19 +269,19 @@ FURB105.py:15:1: FURB105 [*] Called `print` with an empty string and a redundant
 15    |-print("foo", "", sep="")
    15 |+print("foo")
 16 16 | print("foo", "", "bar", sep="")
-17 17 | 
-18 18 | # OK.
+17 17 | print("", *args)
+18 18 | print("", *args, sep="")
 
-FURB105.py:16:1: FURB105 [*] Called `print` with an empty string, use `print("foo", "bar", sep="")` instead
+FURB105.py:16:1: FURB105 [*] Unnecessary empty string passed to `print`
    |
 14 | print("", "foo", sep="")
 15 | print("foo", "", sep="")
 16 | print("foo", "", "bar", sep="")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
-17 | 
-18 | # OK.
+17 | print("", *args)
+18 | print("", *args, sep="")
    |
-   = help: Remove empty string positional argument
+   = help: Remove empty string
 
 ℹ Suggested fix
 13 13 | print(sep="", end="bar")
@@ -288,8 +289,29 @@ FURB105.py:16:1: FURB105 [*] Called `print` with an empty string, use `print("fo
 15 15 | print("foo", "", sep="")
 16    |-print("foo", "", "bar", sep="")
    16 |+print("foo", "bar", sep="")
-17 17 | 
-18 18 | # OK.
+17 17 | print("", *args)
+18 18 | print("", *args, sep="")
 19 19 | 
+
+FURB105.py:18:1: FURB105 [*] Unnecessary empty string passed to `print`
+   |
+16 | print("foo", "", "bar", sep="")
+17 | print("", *args)
+18 | print("", *args, sep="")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+19 | 
+20 | # OK.
+   |
+   = help: Remove empty string
+
+ℹ Suggested fix
+15 15 | print("foo", "", sep="")
+16 16 | print("foo", "", "bar", sep="")
+17 17 | print("", *args)
+18    |-print("", *args, sep="")
+   18 |+print(*args, sep="")
+19 19 | 
+20 20 | # OK.
+21 21 | 
 
 

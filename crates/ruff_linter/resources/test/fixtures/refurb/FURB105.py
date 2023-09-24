@@ -14,6 +14,8 @@ print(sep="", end="bar")
 print("", "foo", sep="")
 print("foo", "", sep="")
 print("foo", "", "bar", sep="")
+print("", *args)
+print("", *args, sep="")
 
 # OK.
 
@@ -26,3 +28,5 @@ print("", "", sep=",")
 print("", "foo", sep=",")
 print("foo", "", sep=",")
 print("foo", "", "bar", "", sep=",")
+print("", "", **kwargs)
+print("", **kwargs)

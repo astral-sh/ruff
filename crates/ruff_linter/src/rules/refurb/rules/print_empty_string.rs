@@ -29,8 +29,7 @@ use crate::registry::AsRule;
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[violation]
 pub struct PrintEmptyString {
-    suggestion: String,
-    redundant_sep: bool,
+    separator: Option<Separator>,
 }
 
 impl Violation for PrintEmptyString {
@@ -38,99 +37,93 @@ impl Violation for PrintEmptyString {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PrintEmptyString {
-            suggestion,
-            redundant_sep,
-        } = self;
-        if redundant_sep == &true {
-            format!(
-                "Called `print` with an empty string and a redundant separator, use `{suggestion}` instead",
-            )
-        } else {
-            format!("Called `print` with an empty string, use `{suggestion}` instead",)
+        let PrintEmptyString { separator } = self;
+        match separator {
+            None | Some(Separator::Retain) => format!("Unnecessary empty string passed to `print`"),
+            Some(Separator::Remove) => {
+                format!("Unnecessary empty string passed to `print` with redundant separator")
+            }
         }
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let PrintEmptyString { redundant_sep, .. } = self;
-        if redundant_sep == &true {
-            Some("Remove empty string positional argument and redundant separator".to_string())
-        } else {
-            Some("Remove empty string positional argument".to_string())
+        let PrintEmptyString { separator } = self;
+        match separator {
+            None | Some(Separator::Retain) => Some("Remove empty string".to_string()),
+            Some(Separator::Remove) => Some("Remove empty string and separator".to_string()),
         }
     }
 }
 
 /// FURB105
 pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
-    // Check if the call is to the builtin `print` function.
+    // Avoid flagging, e.g., `print("", "", **kwargs)`.
+    if call
+        .arguments
+        .keywords
+        .iter()
+        .any(|keyword| keyword.arg.is_none())
+    {
+        return;
+    }
+
     if checker
         .semantic()
         .resolve_call_path(&call.func)
         .as_ref()
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "print"]))
     {
-        // For performance reasons, defer assignment to until we know that we
-        // need to check if the separator is an empty string.
-        let mut sep_value_is_empty_string = false;
+        // Ex) `print("", sep="")`
+        let empty_separator = call
+            .arguments
+            .find_keyword("sep")
+            .map_or(false, |keyword| is_empty_string(&keyword.value));
 
-        // If the call does not have only one positional argument, check if the
-        // `sep` keyword argument is an empty string; if it is not an empty
-        // string, don't trigger.
-        if call.arguments.args.len() != 1 {
-            sep_value_is_empty_string = call
-                .arguments
-                .find_keyword("sep")
-                .map_or(false, |keyword| is_const_empty_string(&keyword.value));
-            if !sep_value_is_empty_string {
-                return;
-            }
+        // Avoid flagging, e.g., `print("", "", sep="sep")`
+        if !empty_separator && call.arguments.args.len() != 1 {
+            return;
         }
 
         // Check if the positional arguments is are all empty strings, or if
         // there are any empty strings and the `sep` keyword argument is also
         // an empty string.
-        if call.arguments.args.iter().all(is_const_empty_string)
-            || (sep_value_is_empty_string && call.arguments.args.iter().any(is_const_empty_string))
+        if call.arguments.args.iter().all(is_empty_string)
+            || (empty_separator && call.arguments.args.iter().any(is_empty_string))
         {
-            let non_empty_string_args_count = call
+            let separator = call
                 .arguments
-                .args
+                .keywords
                 .iter()
-                .filter(|arg| !is_const_empty_string(arg))
-                .count();
-
-            let sep_index = if non_empty_string_args_count > 1 {
-                // If the call has more than one non-empty string positional
-                // argument, the `sep` keyword argument is NOT redundant.
-                None
-            } else {
-                // Find the index of the `sep` keyword argument, if it exists.
-                call.arguments.keywords.iter().position(|keyword| {
+                .any(|keyword| {
                     keyword
                         .arg
-                        .clone()
-                        .is_some_and(|arg| arg.to_string() == "sep")
+                        .as_ref()
+                        .is_some_and(|arg| arg.as_str() == "sep")
                 })
-            };
+                .then(|| {
+                    let is_starred = call.arguments.args.iter().any(Expr::is_starred_expr);
+                    if is_starred {
+                        return Separator::Retain;
+                    }
 
-            let suggestion = if non_empty_string_args_count > 1 {
-                generate_suggestion(&call.clone(), None, checker.generator())
-            } else {
-                generate_suggestion(&call.clone(), sep_index, checker.generator())
-            };
+                    let non_empty = call
+                        .arguments
+                        .args
+                        .iter()
+                        .filter(|arg| !is_empty_string(arg))
+                        .count();
+                    if non_empty > 1 {
+                        return Separator::Retain;
+                    }
 
-            let mut diagnostic = Diagnostic::new(
-                PrintEmptyString {
-                    suggestion: suggestion.clone(),
-                    redundant_sep: sep_index.is_some(),
-                },
-                call.range(),
-            );
+                    Separator::Remove
+                });
+
+            let mut diagnostic = Diagnostic::new(PrintEmptyString { separator }, call.range());
 
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::suggested(Edit::replacement(
-                    suggestion,
+                    generate_suggestion(call, separator, checker.generator()),
                     call.start(),
                     call.end(),
                 )));
@@ -142,7 +135,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
 }
 
 /// Check if an expression is a constant empty string.
-fn is_const_empty_string(expr: &Expr) -> bool {
+fn is_empty_string(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::Constant(ast::ExprConstant {
@@ -152,27 +145,33 @@ fn is_const_empty_string(expr: &Expr) -> bool {
     )
 }
 
-/// Generate a suggestion to replace a `print` call with `print` call with no
-/// empty string positional arguments, and no `sep` keyword argument.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Separator {
+    Remove,
+    Retain,
+}
+
+/// Generate a suggestion to remove the empty string positional argument and
+/// the `sep` keyword argument, if it exists.
 fn generate_suggestion(
     call: &ast::ExprCall,
-    sep_index: Option<usize>,
+    separator: Option<Separator>,
     generator: Generator,
 ) -> String {
-    // Clone the call so that we can mutate it.
-    let mut suggestion = call.clone();
+    let mut call = call.clone();
 
     // Remove all empty string positional arguments.
-    suggestion
-        .arguments
-        .args
-        .retain(|arg| !is_const_empty_string(arg));
+    call.arguments.args.retain(|arg| !is_empty_string(arg));
 
-    // If there is a `sep` keyword argument, remove it too (the separator is
-    // not needed if there are no objects to separate) by finding its index.
-    if let Some(index) = sep_index {
-        suggestion.arguments.keywords.remove(index);
+    // Remove the `sep` keyword argument if it exists.
+    if separator == Some(Separator::Remove) {
+        call.arguments.keywords.retain(|keyword| {
+            keyword
+                .arg
+                .as_ref()
+                .map_or(true, |arg| arg.as_str() != "sep")
+        });
     }
 
-    generator.expr(&suggestion.into())
+    generator.expr(&call.into())
 }
