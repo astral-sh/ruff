@@ -1,3 +1,7 @@
+# Move mutable arguments below imports and docstrings
+# https://github.com/astral-sh/ruff/issues/7616
+
+
 def import_module_wrong(value: dict[str, str] = {}):
     import os
 
