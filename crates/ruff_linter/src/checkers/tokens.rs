@@ -6,6 +6,7 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
@@ -24,6 +25,7 @@ pub(crate) fn check_tokens(
     path: &Path,
     locator: &Locator,
     indexer: &Indexer,
+    stylist: &Stylist,
     settings: &LinterSettings,
     is_stub: bool,
 ) -> Vec<Diagnostic> {
@@ -192,6 +194,17 @@ pub(crate) fn check_tokens(
     }
 
     diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));
+
+    // Run the logical line-based rules.
+    if settings
+        .rules
+        .iter_enabled()
+        .any(|rule_code| rule_code.lint_source().is_logical_lines())
+    {
+        diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
+            &tokens, locator, stylist, settings,
+        ));
+    }
 
     diagnostics
 }

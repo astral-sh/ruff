@@ -105,6 +105,7 @@ pub fn check_path(
             path,
             locator,
             indexer,
+            stylist,
             settings,
             source_type.is_stub(),
         ));
@@ -117,17 +118,6 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
         diagnostics.extend(check_file_path(path, package, settings));
-    }
-
-    // Run the logical line-based rules.
-    if settings
-        .rules
-        .iter_enabled()
-        .any(|rule_code| rule_code.lint_source().is_logical_lines())
-    {
-        diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &tokens, locator, stylist, settings,
-        ));
     }
 
     // Run the AST-based rules.
