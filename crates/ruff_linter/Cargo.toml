@@ -60,7 +60,7 @@ regex = { workspace = true }
 result-like = { version = "0.4.6" }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
-semver = { version = "1.0.16" }
+semver = { version = "1.0.19" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
