@@ -556,10 +556,22 @@ impl<'source> Lexer<'source> {
     pub fn next_token(&mut self) -> LexResult {
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
         if let Some(indentation) = self.pending_indentation.take() {
-            if let Ok(Ordering::Greater) = self.indentations.current().try_compare(indentation) {
-                self.pending_indentation = Some(indentation);
-                self.indentations.pop();
-                return Ok((Tok::Dedent, TextRange::empty(self.offset())));
+            match self.indentations.current().try_compare(indentation) {
+                Ok(Ordering::Greater) => {
+                    self.pending_indentation = Some(indentation);
+                    let offset = self.offset();
+                    self.indentations.dedent_one(indentation).map_err(|_| {
+                        LexicalError::new(LexicalErrorType::IndentationError, offset)
+                    })?;
+                    return Ok((Tok::Dedent, TextRange::empty(offset)));
+                }
+                Ok(_) => {}
+                Err(_) => {
+                    return Err(LexicalError::new(
+                        LexicalErrorType::IndentationError,
+                        self.offset(),
+                    ));
+                }
             }
         }
 
@@ -690,8 +702,11 @@ impl<'source> Lexer<'source> {
         let token = match self.indentations.current().try_compare(indentation) {
             // Dedent
             Ok(Ordering::Greater) => {
-                self.indentations.pop();
                 self.pending_indentation = Some(indentation);
+
+                self.indentations.dedent_one(indentation).map_err(|_| {
+                    LexicalError::new(LexicalErrorType::IndentationError, self.offset())
+                })?;
 
                 Some((Tok::Dedent, TextRange::empty(self.offset())))
             }
@@ -700,7 +715,7 @@ impl<'source> Lexer<'source> {
 
             // Indent
             Ok(Ordering::Less) => {
-                self.indentations.push(indentation);
+                self.indentations.indent(indentation);
                 Some((Tok::Indent, self.token_range()))
             }
             Err(_) => {
@@ -732,7 +747,7 @@ impl<'source> Lexer<'source> {
             Ok((Tok::Newline, TextRange::empty(self.offset())))
         }
         // Next, flush the indentation stack to zero.
-        else if self.indentations.pop().is_some() {
+        else if self.indentations.dedent().is_some() {
             Ok((Tok::Dedent, TextRange::empty(self.offset())))
         } else {
             Ok((Tok::EndOfFile, TextRange::empty(self.offset())))
@@ -1677,5 +1692,17 @@ def f(arg=%timeit a = b):
             }
             result => panic!("Expected an error token but found {result:?}"),
         }
+    }
+
+    #[test]
+    fn tet_too_low_dedent() {
+        let tokens: Vec<_> = lex(
+            r#"if True:
+    pass
+  pass"#,
+            Mode::Module,
+        )
+        .collect();
+        assert_debug_snapshot!(tokens);
     }
 }
