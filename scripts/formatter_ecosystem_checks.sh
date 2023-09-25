@@ -64,7 +64,7 @@ git -C "$dir/cpython" checkout 1a1bfc28912a39b500c578e9f10a8a222638d411
 
 time cargo run --bin ruff_dev -- format-dev --stability-check \
   --error-file "$target/progress_projects_errors.txt" --log-file "$target/progress_projects_log.txt" --stats-file "$target/progress_projects_stats.txt" \
-  --files-with-errors 16 --multi-project "$dir" || (
+  --files-with-errors 15 --multi-project "$dir" || (
   echo "Ecosystem check failed"
   cat "$target/progress_projects_log.txt"
   exit 1
