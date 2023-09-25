@@ -192,6 +192,12 @@ fn move_initialization(
         } else if statement.is_import_stmt() || statement.is_import_from_stmt() {
             // If the statement in the function is an import, insert _after_ it.
             pos = locator.full_line_end(statement.end());
+            if pos == locator.text_len() {
+                // If the statement is at the end of the file, without a trailing newline, insert
+                // _after_ it with an extra newline.
+                content = format!("{}{}", stylist.line_ending().as_str(), content);
+                break;
+            }
         } else {
             break;
         };
