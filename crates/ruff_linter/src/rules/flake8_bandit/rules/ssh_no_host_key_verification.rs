@@ -42,6 +42,14 @@ impl Violation for SSHNoHostKeyVerification {
     }
 }
 
+fn extract_policy_argument(call: &ExprCall) -> Option<&Expr> {
+    return match call.arguments.find_argument("policy", 0) {
+        Some(Expr::Call(ExprCall { func, .. })) => Some(func.as_ref()),
+        Some(argument) => Some(argument),
+        _ => None,
+    };
+}
+
 /// S507
 pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
@@ -52,7 +60,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
         return;
     }
 
-    let Some(policy_argument) = call.arguments.find_argument("policy", 0) else {
+    let Some(policy_argument) = extract_policy_argument(call) else {
         return;
     };
 

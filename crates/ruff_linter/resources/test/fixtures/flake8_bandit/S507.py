@@ -12,6 +12,7 @@ ssh_client.set_missing_host_key_policy(foo)
 # Errors
 ssh_client.set_missing_host_key_policy(client.AutoAddPolicy)
 ssh_client.set_missing_host_key_policy(client.WarningPolicy)
+ssh_client.set_missing_host_key_policy(client.AutoAddPolicy())
 ssh_client.set_missing_host_key_policy(AutoAddPolicy)
 ssh_client.set_missing_host_key_policy(policy=client.AutoAddPolicy)
 ssh_client.set_missing_host_key_policy(policy=client.WarningPolicy)
