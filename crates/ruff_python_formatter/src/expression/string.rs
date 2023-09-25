@@ -138,16 +138,8 @@ impl<'a> FormatString<'a> {
 
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        // TODO(dhruvmanila): With PEP 701, comments can be inside f-strings.
-        // This is to mark all of those comments as formatted but we need to
-        // figure out how to handle them.
-        if matches!(self.string, AnyString::FString(_)) {
-            f.context()
-                .comments()
-                .mark_verbatim_node_comments_formatted(self.string.into());
-        }
         let locator = f.context().locator();
-        match self.layout {
+        let result = match self.layout {
             StringLayout::Default => {
                 if self.string.is_implicit_concatenated() {
                     in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
@@ -170,7 +162,19 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
             StringLayout::ImplicitConcatenatedStringInBinaryLike => {
                 FormatStringContinuation::new(self.string).fmt(f)
             }
+        };
+        // TODO(dhruvmanila): With PEP 701, comments can be inside f-strings.
+        // This is to mark all of those comments as formatted but we need to
+        // figure out how to handle them. Note that this needs to be done only
+        // after the f-string is formatted, so only for all the non-formatted
+        // comments.
+        if let AnyString::FString(fstring) = self.string {
+            let comments = f.context().comments();
+            fstring.values.iter().for_each(|value| {
+                comments.mark_verbatim_node_comments_formatted(value.into());
+            });
         }
+        result
     }
 }
 
@@ -435,11 +439,7 @@ impl StringPart {
             }
         };
 
-        let normalized = normalize_string(
-            locator.slice(self.content_range),
-            quotes,
-            self.prefix.is_raw_string(),
-        );
+        let normalized = normalize_string(locator.slice(self.content_range), quotes, self.prefix);
 
         NormalizedString {
             prefix: self.prefix,
@@ -530,6 +530,10 @@ impl StringPrefix {
 
     pub(super) const fn is_raw_string(self) -> bool {
         self.contains(StringPrefix::RAW) || self.contains(StringPrefix::RAW_UPPER)
+    }
+
+    pub(super) const fn is_fstring(self) -> bool {
+        self.contains(StringPrefix::F_STRING)
     }
 }
 
@@ -770,7 +774,7 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
 /// with the provided [`StringQuotes`] style.
 ///
 /// Returns the normalized string and whether it contains new lines.
-fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str> {
+fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -782,14 +786,30 @@ fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str>
     let preferred_quote = style.as_char();
     let opposite_quote = style.invert().as_char();
 
-    let mut chars = input.char_indices();
+    let mut chars = input.char_indices().peekable();
+
+    let is_raw = prefix.is_raw_string();
+    let is_fstring = prefix.is_fstring();
+    let mut formatted_value_nesting = 0u32;
 
     while let Some((index, c)) = chars.next() {
+        if is_fstring && matches!(c, '{' | '}') {
+            if chars.peek().copied().is_some_and(|(_, next)| next == c) {
+                // Skip over the second character of the double braces
+                chars.next();
+            } else if c == '{' {
+                formatted_value_nesting += 1;
+            } else {
+                // Safe to assume that `c == '}'` here because of the matched pattern above
+                formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+            }
+            continue;
+        }
         if c == '\r' {
             output.push_str(&input[last_index..index]);
 
             // Skip over the '\r' character, keep the `\n`
-            if input.as_bytes().get(index + 1).copied() == Some(b'\n') {
+            if chars.peek().copied().is_some_and(|(_, next)| next == '\n') {
                 chars.next();
             }
             // Replace the `\r` with a `\n`
@@ -800,9 +820,9 @@ fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str>
             last_index = index + '\r'.len_utf8();
         } else if !quotes.triple && !is_raw {
             if c == '\\' {
-                if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
+                if let Some((_, next)) = chars.peek().copied() {
                     #[allow(clippy::if_same_then_else)]
-                    if next == opposite_quote {
+                    if next == opposite_quote && formatted_value_nesting == 0 {
                         // Remove the escape by ending before the backslash and starting again with the quote
                         chars.next();
                         output.push_str(&input[last_index..index]);
@@ -815,7 +835,7 @@ fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str>
                         chars.next();
                     }
                 }
-            } else if c == preferred_quote {
+            } else if c == preferred_quote && formatted_value_nesting == 0 {
                 // Escape the quote
                 output.push_str(&input[last_index..index]);
                 output.push('\\');
