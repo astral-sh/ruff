@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Keyword};
 
 use ruff_diagnostics::Violation;
-use ruff_diagnostics::{AutofixKind, Diagnostic};
+use ruff_diagnostics::{Diagnostic, FixKind};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_text_size::Ranged;
@@ -44,14 +44,14 @@ use crate::rules::flake8_comprehensions::fixes;
 pub struct UnnecessaryComprehensionAnyAll;
 
 impl Violation for UnnecessaryComprehensionAnyAll {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary list comprehension.")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Remove unnecessary list comprehension".to_string())
     }
 }

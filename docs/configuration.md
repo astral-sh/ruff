@@ -17,7 +17,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
 select = ["E", "F"]
 ignore = []
 
-# Allow autofix for all enabled rules (when `--fix`) is provided.
+# Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
 unfixable = []
 
@@ -109,8 +109,8 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
 - Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
     you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
     extension.
-- By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
-    consider turning off autofix for specific rules or categories (see [_FAQ_](faq.md#ruff-tried-to-fix-something--but-it-broke-my-code)).
+- By default, Ruff's fixes are aggressive. If you find that it's too aggressive for your liking,
+    consider turning off fixes for specific rules or categories (see [_FAQ_](faq.md#ruff-tried-to-fix-something--but-it-broke-my-code)).
 
 ## Using `ruff.toml`
 
@@ -197,7 +197,7 @@ Options:
       --show-source
           Show violations with source code. Use `--no-show-source` to disable
       --show-fixes
-          Show an enumeration of all autofixed lint violations. Use `--no-show-fixes` to disable
+          Show an enumeration of all fixed lint violations. Use `--no-show-fixes` to disable
       --diff
           Avoid writing any fixed files back; instead, output a diff for each changed file to stdout. Implies `--fix-only`
   -w, --watch
@@ -239,9 +239,9 @@ Rule selection:
       --extend-per-file-ignores <EXTEND_PER_FILE_IGNORES>
           Like `--per-file-ignores`, but adds additional ignores on top of those already specified
       --fixable <RULE_CODE>
-          List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+          List of rule codes to treat as eligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`)
       --unfixable <RULE_CODE>
-          List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+          List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`)
       --extend-fixable <RULE_CODE>
           Like --fixable, but adds additional rule codes on top of those already specified
 
@@ -263,7 +263,7 @@ Miscellaneous:
   -e, --exit-zero
           Exit with status code "0", even upon detecting lint violations
       --exit-non-zero-on-fix
-          Exit with a non-zero status code if any files were modified via autofix, even if no lint violations remain
+          Exit with a non-zero status code if any files were modified via fix, even if no lint violations remain
 
 Log levels:
   -v, --verbose  Enable verbose logging
@@ -433,7 +433,7 @@ First, Ruff provides a special rule code, `RUF100`, to enforce that your `noqa` 
 (and thus suppressed). You can run `ruff check /path/to/file.py --extend-select RUF100` to flag
 unused `noqa` directives.
 
-Second, Ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
+Second, Ruff can _automatically remove_ unused `noqa` directives via its fix functionality.
 You can run `ruff check /path/to/file.py --extend-select RUF100 --fix` to automatically remove
 unused `noqa` directives.
 
@@ -474,7 +474,7 @@ Ruff supports two command-line flags that alter its exit code behavior:
 - `--exit-non-zero-on-fix` will cause Ruff to exit with a status code of `1` if violations were
     found, _even if_ all such violations were fixed automatically. Note that the use of
     `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
-    autofixing.
+    fixing.
 
 ## Shell autocompletion
 

@@ -5,7 +5,7 @@
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::AutofixKind;
+use ruff_diagnostics::FixKind;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_workspace::options::Options;
@@ -20,11 +20,11 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push_str("| ---- | ---- | ------- | ------: |");
     table_out.push('\n');
     for rule in rules {
-        let fix_token = match rule.autofixable() {
-            AutofixKind::Always | AutofixKind::Sometimes => {
+        let fix_token = match rule.fixable() {
+            FixKind::Always | FixKind::Sometimes => {
                 format!("<span style='opacity: 1'>{FIX_SYMBOL}</span>")
             }
-            AutofixKind::None => format!("<span style='opacity: 0.1'>{FIX_SYMBOL}</span>"),
+            FixKind::None => format!("<span style='opacity: 0.1'>{FIX_SYMBOL}</span>"),
         };
         let preview_token = if rule.is_preview() || rule.is_nursery() {
             format!("<span style='opacity: 1'>{PREVIEW_SYMBOL}</span>")

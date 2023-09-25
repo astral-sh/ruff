@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Stmt;
 use ruff_python_ast::{self as ast, Arguments, Expr};
@@ -38,13 +38,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnnecessaryListCast;
 
-impl AlwaysAutofixableViolation for UnnecessaryListCast {
+impl AlwaysFixableViolation for UnnecessaryListCast {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not cast an iterable to `list` before iterating over it")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove `list()` cast")
     }
 }

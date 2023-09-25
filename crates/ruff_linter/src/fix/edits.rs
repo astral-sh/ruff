@@ -1,4 +1,4 @@
-//! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
+//! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
 use anyhow::{Context, Result};
 
@@ -12,7 +12,7 @@ use ruff_python_trivia::{
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::autofix::codemods;
+use crate::fix::codemods;
 
 /// Return the `Fix` to use when deleting a `Stmt`.
 ///
@@ -293,7 +293,7 @@ mod tests {
     use ruff_source_file::Locator;
     use ruff_text_size::{Ranged, TextSize};
 
-    use crate::autofix::edits::{next_stmt_break, trailing_semicolon};
+    use crate::fix::edits::{next_stmt_break, trailing_semicolon};
 
     #[test]
     fn find_semicolon() -> Result<()> {

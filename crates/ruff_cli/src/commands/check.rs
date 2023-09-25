@@ -35,7 +35,7 @@ pub(crate) fn check(
     overrides: &CliOverrides,
     cache: flags::Cache,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -119,7 +119,7 @@ pub(crate) fn check(
                         }
                     });
 
-                    lint_path(path, package, &settings.linter, cache, noqa, autofix).map_err(|e| {
+                    lint_path(path, package, &settings.linter, cache, noqa, fix_mode).map_err(|e| {
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
@@ -198,10 +198,10 @@ fn lint_path(
     settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     let result = catch_unwind(|| {
-        crate::diagnostics::lint_path(path, package, settings, cache, noqa, autofix)
+        crate::diagnostics::lint_path(path, package, settings, cache, noqa, fix_mode)
     });
 
     match result {

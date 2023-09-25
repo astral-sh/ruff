@@ -6,7 +6,7 @@ use ruff_python_ast::{
 };
 use smallvec::SmallVec;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_semantic::SemanticModel;
@@ -49,7 +49,7 @@ pub struct BadExitAnnotation {
 }
 
 impl Violation for BadExitAnnotation {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -65,7 +65,7 @@ impl Violation for BadExitAnnotation {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         if matches!(self.error_kind, ErrorKind::StarArgsNotAnnotated) {
             Some("Annotate star-args with `object`".to_string())
         } else {

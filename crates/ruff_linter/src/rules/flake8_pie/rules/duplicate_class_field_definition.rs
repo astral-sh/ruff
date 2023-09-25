@@ -1,13 +1,13 @@
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
+use crate::fix;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -36,14 +36,14 @@ pub struct DuplicateClassFieldDefinition {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for DuplicateClassFieldDefinition {
+impl AlwaysFixableViolation for DuplicateClassFieldDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DuplicateClassFieldDefinition { name } = self;
         format!("Class field `{name}` is defined multiple times")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let DuplicateClassFieldDefinition { name } = self;
         format!("Remove duplicate field definition for `{name}`")
     }
@@ -80,12 +80,8 @@ pub(crate) fn duplicate_class_field_definition(checker: &mut Checker, body: &[St
                 stmt.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                let edit = autofix::edits::delete_stmt(
-                    stmt,
-                    Some(stmt),
-                    checker.locator(),
-                    checker.indexer(),
-                );
+                let edit =
+                    fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
                 diagnostic.set_fix(Fix::suggested(edit).isolate(Checker::isolation(Some(
                     checker.semantic().current_statement_id(),
                 ))));

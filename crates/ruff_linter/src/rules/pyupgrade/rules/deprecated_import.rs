@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
@@ -66,7 +66,7 @@ pub struct DeprecatedImport {
 }
 
 impl Violation for DeprecatedImport {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -87,7 +87,7 @@ impl Violation for DeprecatedImport {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         if let Deprecation::WithoutRename(WithoutRename { target, .. }) = &self.deprecation {
             Some(format!("Import from `{target}`"))
         } else {

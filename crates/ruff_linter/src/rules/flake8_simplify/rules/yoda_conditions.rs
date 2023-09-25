@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libcst_native::CompOp;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
 use ruff_python_codegen::Stylist;
@@ -9,11 +9,11 @@ use ruff_python_stdlib::str::{self};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::pad;
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
+use crate::fix::edits::pad;
+use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -52,7 +52,7 @@ pub struct YodaConditions {
 }
 
 impl Violation for YodaConditions {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -67,7 +67,7 @@ impl Violation for YodaConditions {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let YodaConditions { suggestion } = self;
         suggestion.as_ref().map(|suggestion| {
             if let Some(suggestion) = suggestion.full_display() {

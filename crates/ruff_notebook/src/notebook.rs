@@ -363,7 +363,7 @@ impl Notebook {
     /// Return the Jupyter notebook index.
     ///
     /// The index is built only once when required. This is only used to
-    /// report diagnostics, so by that time all of the autofixes must have
+    /// report diagnostics, so by that time all of the fixes must have
     /// been applied if `--fix` was passed.
     pub fn index(&self) -> &NotebookIndex {
         self.index.get_or_init(|| self.build_index())

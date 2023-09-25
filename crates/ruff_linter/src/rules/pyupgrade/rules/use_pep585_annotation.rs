@@ -1,6 +1,6 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::analyze::typing::ModuleMember;
@@ -56,7 +56,7 @@ pub struct NonPEP585Annotation {
 }
 
 impl Violation for NonPEP585Annotation {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -64,7 +64,7 @@ impl Violation for NonPEP585Annotation {
         format!("Use `{to}` instead of `{from}` for type annotation")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let NonPEP585Annotation { to, .. } = self;
         Some(format!("Replace with `{to}`"))
     }

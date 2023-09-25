@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
@@ -42,14 +42,14 @@ pub struct NoBlankLineBeforeFunction {
     num_lines: usize,
 }
 
-impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
+impl AlwaysFixableViolation for NoBlankLineBeforeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoBlankLineBeforeFunction { num_lines } = self;
         format!("No blank lines allowed before function docstring (found {num_lines})")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove blank line(s) before function docstring".to_string()
     }
 }
@@ -86,14 +86,14 @@ pub struct NoBlankLineAfterFunction {
     num_lines: usize,
 }
 
-impl AlwaysAutofixableViolation for NoBlankLineAfterFunction {
+impl AlwaysFixableViolation for NoBlankLineAfterFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoBlankLineAfterFunction { num_lines } = self;
         format!("No blank lines allowed after function docstring (found {num_lines})")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove blank line(s) after function docstring".to_string()
     }
 }

@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -48,7 +48,7 @@ pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     iterable: SourceCodeSnippet,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement {
+impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
@@ -56,7 +56,7 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
         format!("Prefer `next({iterable})` over single element slice")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
         let iterable = iterable.truncated_display();
         format!("Replace with `next({iterable})`")

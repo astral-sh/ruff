@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Constant, Expr};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_text_size::Ranged;
@@ -30,13 +30,13 @@ pub struct StringOrBytesTooLong;
 /// ```python
 /// def foo(arg: str = ...) -> None: ...
 /// ```
-impl AlwaysAutofixableViolation for StringOrBytesTooLong {
+impl AlwaysFixableViolation for StringOrBytesTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("String and bytes literals longer than 50 characters are not permitted")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `...`".to_string()
     }
 }

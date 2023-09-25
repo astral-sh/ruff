@@ -1,5 +1,5 @@
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
@@ -34,7 +34,7 @@ use crate::registry::AsRule;
 #[violation]
 pub struct GetAttrWithConstant;
 
-impl AlwaysAutofixableViolation for GetAttrWithConstant {
+impl AlwaysFixableViolation for GetAttrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -43,7 +43,7 @@ impl AlwaysAutofixableViolation for GetAttrWithConstant {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace `getattr` with attribute access".to_string()
     }
 }

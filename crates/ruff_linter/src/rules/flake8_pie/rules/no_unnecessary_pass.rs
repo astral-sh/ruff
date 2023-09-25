@@ -1,14 +1,14 @@
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::AlwaysAutofixableViolation;
+use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_text_size::Ranged;
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
+use crate::fix;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -38,13 +38,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnnecessaryPass;
 
-impl AlwaysAutofixableViolation for UnnecessaryPass {
+impl AlwaysFixableViolation for UnnecessaryPass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary `pass` statement")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove unnecessary `pass`".to_string()
     }
 }
@@ -70,7 +70,7 @@ pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
         let edit = if let Some(index) = trailing_comment_start_offset(second, checker.locator()) {
             Edit::range_deletion(second.range().add_end(index))
         } else {
-            autofix::edits::delete_stmt(second, None, checker.locator(), checker.indexer())
+            fix::edits::delete_stmt(second, None, checker.locator(), checker.indexer())
         };
         diagnostic.set_fix(Fix::automatic(edit));
     }

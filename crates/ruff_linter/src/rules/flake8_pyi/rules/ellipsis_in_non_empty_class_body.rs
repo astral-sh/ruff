@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Constant, Expr, ExprConstant, Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
+use crate::fix;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -31,14 +31,14 @@ use crate::registry::AsRule;
 pub struct EllipsisInNonEmptyClassBody;
 
 impl Violation for EllipsisInNonEmptyClassBody {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Non-empty class body must not contain `...`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Remove unnecessary `...`".to_string())
     }
 }
@@ -64,12 +64,8 @@ pub(crate) fn ellipsis_in_non_empty_class_body(checker: &mut Checker, body: &[St
         ) {
             let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
             if checker.patch(diagnostic.kind.rule()) {
-                let edit = autofix::edits::delete_stmt(
-                    stmt,
-                    Some(stmt),
-                    checker.locator(),
-                    checker.indexer(),
-                );
+                let edit =
+                    fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
                 diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(Some(
                     checker.semantic().current_statement_id(),
                 ))));

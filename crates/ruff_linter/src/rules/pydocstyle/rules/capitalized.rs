@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
@@ -36,7 +36,7 @@ pub struct FirstLineCapitalized {
     capitalized_word: String,
 }
 
-impl AlwaysAutofixableViolation for FirstLineCapitalized {
+impl AlwaysFixableViolation for FirstLineCapitalized {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -45,7 +45,7 @@ impl AlwaysAutofixableViolation for FirstLineCapitalized {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!(
             "Capitalize `{}` to `{}`",
             self.first_word, self.capitalized_word

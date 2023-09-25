@@ -1,6 +1,6 @@
 use ruff_python_ast::{Expr, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -29,13 +29,13 @@ use super::helpers;
 #[violation]
 pub struct UnnecessaryListComprehensionSet;
 
-impl AlwaysAutofixableViolation for UnnecessaryListComprehensionSet {
+impl AlwaysFixableViolation for UnnecessaryListComprehensionSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary `list` comprehension (rewrite as a `set` comprehension)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Rewrite as a `set` comprehension".to_string()
     }
 }

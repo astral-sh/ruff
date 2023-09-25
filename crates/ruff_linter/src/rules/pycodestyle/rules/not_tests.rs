@@ -1,5 +1,5 @@
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
@@ -30,13 +30,13 @@ use crate::rules::pycodestyle::helpers::generate_comparison;
 #[violation]
 pub struct NotInTest;
 
-impl AlwaysAutofixableViolation for NotInTest {
+impl AlwaysFixableViolation for NotInTest {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Test for membership should be `not in`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Convert to `not in`".to_string()
     }
 }
@@ -63,13 +63,13 @@ impl AlwaysAutofixableViolation for NotInTest {
 #[violation]
 pub struct NotIsTest;
 
-impl AlwaysAutofixableViolation for NotIsTest {
+impl AlwaysFixableViolation for NotIsTest {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Test for object identity should be `is not`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Convert to `is not`".to_string()
     }
 }

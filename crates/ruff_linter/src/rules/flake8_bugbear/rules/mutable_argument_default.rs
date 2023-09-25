@@ -1,5 +1,5 @@
 use ast::call_path::{from_qualified_name, CallPath};
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
@@ -64,14 +64,14 @@ use crate::registry::AsRule;
 pub struct MutableArgumentDefault;
 
 impl Violation for MutableArgumentDefault {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not use mutable data structures for argument defaults")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Replace with `None`; initialize within function"))
     }
 }

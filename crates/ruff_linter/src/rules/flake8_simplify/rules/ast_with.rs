@@ -1,7 +1,7 @@
 use log::error;
 
-use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -45,7 +45,7 @@ use super::fix_with;
 pub struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,7 +55,7 @@ impl Violation for MultipleWithStatements {
         )
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Combine `with` statements".to_string())
     }
 }

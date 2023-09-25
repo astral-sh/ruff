@@ -1,6 +1,6 @@
 use ruff_text_size::{TextLen, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
@@ -24,13 +24,13 @@ use ruff_source_file::Locator;
 #[violation]
 pub struct MissingNewlineAtEndOfFile;
 
-impl AlwaysAutofixableViolation for MissingNewlineAtEndOfFile {
+impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No newline at end of file")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add trailing newline".to_string()
     }
 }
@@ -39,7 +39,7 @@ impl AlwaysAutofixableViolation for MissingNewlineAtEndOfFile {
 pub(crate) fn no_newline_at_end_of_file(
     locator: &Locator,
     stylist: &Stylist,
-    autofix: bool,
+    fix: bool,
 ) -> Option<Diagnostic> {
     let source = locator.contents();
 
@@ -55,7 +55,7 @@ pub(crate) fn no_newline_at_end_of_file(
         let range = TextRange::empty(locator.contents().text_len());
 
         let mut diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
-        if autofix {
+        if fix {
             diagnostic.set_fix(Fix::automatic(Edit::insertion(
                 stylist.line_ending().to_string(),
                 range.start(),

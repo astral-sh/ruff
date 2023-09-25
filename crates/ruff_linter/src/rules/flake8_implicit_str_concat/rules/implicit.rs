@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_parser::lexer::LexResult;
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_source_file::Locator;
@@ -34,14 +34,14 @@ use crate::rules::flake8_implicit_str_concat::settings::Settings;
 pub struct SingleLineImplicitStringConcatenation;
 
 impl Violation for SingleLineImplicitStringConcatenation {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Implicitly concatenated string literals on one line")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Combine string literals".to_string())
     }
 }

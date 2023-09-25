@@ -2,7 +2,7 @@ use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{PySourceType, Stmt};
@@ -41,14 +41,14 @@ use super::super::{comments, format_imports};
 pub struct UnsortedImports;
 
 impl Violation for UnsortedImports {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Import block is un-sorted or un-formatted")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Organize imports".to_string())
     }
 }

@@ -12,7 +12,7 @@ changelog:
     - title: Rules
       labels:
         - rule
-        - autofix
+        - fix
     - title: Settings
       labels:
         - configuration

@@ -335,7 +335,7 @@ def foo():
     return x
 
 
-# Autofix cases
+# Fix cases
 def foo():
     a = 1
     b=a

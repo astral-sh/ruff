@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
@@ -287,14 +287,14 @@ pub struct MissingReturnTypeSpecialMethod {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
+impl AlwaysFixableViolation for MissingReturnTypeSpecialMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MissingReturnTypeSpecialMethod { name } = self;
         format!("Missing return type annotation for special method `{name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add `None` return type".to_string()
     }
 }

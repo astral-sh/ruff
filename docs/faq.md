@@ -436,14 +436,14 @@ For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) c
 
 ## Ruff tried to fix something — but it broke my code?
 
-Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
+Ruff's fixes are a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
 have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.
 
-In the future, Ruff will support enabling autofix behavior based on the safety of the patch.
+In the future, Ruff will support enabling fix behavior based on the safety of the patch.
 
-In the meantime, if you find that the autofix is too aggressive, you can disable it on a per-rule or
+In the meantime, if you find that the fixes are too aggressive, you can disable it on a per-rule or
 per-category basis using the [`unfixable`](settings.md#unfixable) mechanic.
-For example, to disable autofix for some possibly-unsafe rules, you could add the following to your
+For example, to disable the fix for some possibly-unsafe rules, you could add the following to your
 `pyproject.toml`:
 
 ```toml
@@ -451,7 +451,7 @@ For example, to disable autofix for some possibly-unsafe rules, you could add th
 unfixable = ["B", "SIM", "TRY", "RUF"]
 ```
 
-If you find a case where Ruff's autofix breaks your code, please file an Issue!
+If you find a case where Ruff's fix breaks your code, please file an Issue!
 
 ## How can I disable Ruff's color output?
 

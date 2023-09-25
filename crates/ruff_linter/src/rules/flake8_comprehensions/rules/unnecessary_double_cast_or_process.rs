@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableKeyword;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
@@ -49,14 +49,14 @@ pub struct UnnecessaryDoubleCastOrProcess {
     outer: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryDoubleCastOrProcess {
+impl AlwaysFixableViolation for UnnecessaryDoubleCastOrProcess {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryDoubleCastOrProcess { inner, outer } = self;
         format!("Unnecessary `{inner}` call within `{outer}()`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let UnnecessaryDoubleCastOrProcess { inner, .. } = self;
         format!("Remove the inner `{inner}` call")
     }
