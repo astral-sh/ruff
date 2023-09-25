@@ -65,3 +65,14 @@ import os
 
 
 logger = logging.getLogger("FastProject")
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7604
+import os
+# comment
+
+# comment
+
+
+# comment
+x = 1
+

@@ -2,7 +2,7 @@ use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWi
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, PySourceType, Stmt, Suite};
-use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
+use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
@@ -274,29 +274,20 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // * [`NodeLevel::CompoundStatement`]: Up to one empty line
                 // * [`NodeLevel::Expression`]: No empty lines
 
-                let count_lines = |offset| {
-                    // It's necessary to skip any trailing line comment because RustPython doesn't include trailing comments
-                    // in the node's range
-                    // ```python
-                    // a # The range of `a` ends right before this comment
-                    //
-                    // b
-                    // ```
-                    //
-                    // Simply using `lines_after` doesn't work if a statement has a trailing comment because
-                    // it then counts the lines between the statement and the trailing comment, which is
-                    // always 0. This is why it skips any trailing trivia (trivia that's on the same line)
-                    // and counts the lines after.
-                    lines_after(offset, source)
-                };
-
+                // It's necessary to skip any trailing line comment because our parser doesn't
+                // include trailing comments in the node's range:
+                // ```python
+                // a # The range of `a` ends right before this comment
+                //
+                // b
+                // ```
                 let end = preceding_comments
                     .trailing
                     .last()
                     .map_or(preceding.end(), |comment| comment.slice().end());
 
                 match node_level {
-                    NodeLevel::TopLevel => match count_lines(end) {
+                    NodeLevel::TopLevel => match lines_after(end, source) {
                         0 | 1 => hard_line_break().fmt(f)?,
                         2 => empty_line().fmt(f)?,
                         _ => match source_type {
@@ -308,7 +299,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                             }
                         },
                     },
-                    NodeLevel::CompoundStatement => match count_lines(end) {
+                    NodeLevel::CompoundStatement => match lines_after(end, source) {
                         0 | 1 => hard_line_break().fmt(f)?,
                         _ => empty_line().fmt(f)?,
                     },
@@ -379,7 +370,9 @@ fn stub_file_empty_lines(
             }
         }
         SuiteKind::Class | SuiteKind::Other | SuiteKind::Function => {
-            if empty_line_condition && lines_after_ignoring_trivia(preceding.end(), source) > 1 {
+            if empty_line_condition
+                && lines_after_ignoring_end_of_line_trivia(preceding.end(), source) > 1
+            {
                 empty_line().fmt(f)
             } else {
                 hard_line_break().fmt(f)

@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::PySourceType;
-use ruff_python_trivia::{lines_after, lines_before};
+use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::{CommentLinePosition, SourceComment};
@@ -96,16 +96,32 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
 
             write!(f, [leading_comments(self.comments)])?;
         } else if let Some(last_preceding) = self.last_node {
-            // The leading comments formatting ensures that it preserves the right amount of lines after
-            // We need to take care of this ourselves, if there's no leading `else` comment.
-            let end = if let Some(last_trailing) =
-                f.context().comments().trailing(last_preceding).last()
-            {
-                last_trailing.end()
-            } else {
-                last_preceding.end()
-            };
-            write!(f, [empty_lines(lines_after(end, f.context().source()))])?;
+            // The leading comments formatting ensures that it preserves the right amount of lines
+            // after We need to take care of this ourselves, if there's no leading `else` comment.
+            // Since the `last_node` could be a compound node, we need to skip _all_ trivia.
+            //
+            // For example, here, when formatting the `if` statement, the `last_node` (the `while`)
+            // would end at the end of `pass`, but we want to skip _all_ comments:
+            // ```python
+            // if True:
+            //     while True:
+            //         pass
+            //         # comment
+            //
+            //     # comment
+            // else:
+            //     ...
+            // ```
+            //
+            // `lines_after_ignoring_trivia` is safe here, as we _know_ that the `else` doesn't
+            // have any leading comments.
+            write!(
+                f,
+                [empty_lines(lines_after_ignoring_trivia(
+                    last_preceding.end(),
+                    f.context().source()
+                ))]
+            )?;
         }
 
         Ok(())
