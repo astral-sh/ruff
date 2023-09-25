@@ -274,7 +274,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // * [`NodeLevel::CompoundStatement`]: Up to one empty line
                 // * [`NodeLevel::Expression`]: No empty lines
 
-                // It's necessary to skip any trailing line comment because RustPython doesn't
+                // It's necessary to skip any trailing line comment because our parser doesn't
                 // include trailing comments in the node's range:
                 // ```python
                 // a # The range of `a` ends right before this comment
