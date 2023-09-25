@@ -71,6 +71,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
             matches!(
                 call_path.as_slice(),
                 ["paramiko", "client", "AutoAddPolicy" | "WarningPolicy"]
+                    | ["paramiko", "AutoAddPolicy" | "WarningPolicy"]
             )
         })
     {
@@ -78,7 +79,10 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
     }
 
     if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
-        matches!(call_path.as_slice(), ["paramiko", "client", "SSHClient"])
+        matches!(
+            call_path.as_slice(),
+            ["paramiko", "client", "SSHClient"] | ["paramiko", "SSHClient"]
+        )
     }) {
         checker.diagnostics.push(Diagnostic::new(
             SSHNoHostKeyVerification,
