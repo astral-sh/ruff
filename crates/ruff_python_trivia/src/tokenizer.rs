@@ -566,8 +566,10 @@ impl<'a> SimpleTokenizer<'a> {
                 kind
             }
 
-            ' ' | '\t' => {
-                self.cursor.eat_while(|c| matches!(c, ' ' | '\t'));
+            // Space, tab, or form feed. We ignore the true semantics of form feed, and treat it as
+            // whitespace.
+            ' ' | '\t' | '\x0C' => {
+                self.cursor.eat_while(|c| matches!(c, ' ' | '\t' | '\x0C'));
                 SimpleTokenKind::Whitespace
             }
 
@@ -837,10 +839,13 @@ impl<'a> BackwardsTokenizer<'a> {
         }
 
         let kind = match last {
-            // This may not be 100% correct because it will lex-out trailing whitespace from a comment
-            // as whitespace rather than being part of the token. This shouldn't matter for what we use the lexer for.
-            ' ' | '\t' => {
-                self.cursor.eat_back_while(|c| matches!(c, ' ' | '\t'));
+            // Space, tab, or form feed. We ignore the true semantics of form feed, and treat it as
+            // whitespace. Note that this will lex-out trailing whitespace from a comment as
+            // whitespace rather than as part of the comment token, but this shouldn't matter for
+            // our use case.
+            ' ' | '\t' | '\x0C' => {
+                self.cursor
+                    .eat_back_while(|c| matches!(c, ' ' | '\t' | '\x0C'));
                 SimpleTokenKind::Whitespace
             }
 
