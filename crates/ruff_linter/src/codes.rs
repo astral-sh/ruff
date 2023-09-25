@@ -83,6 +83,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         #[allow(deprecated)]
         (Pycodestyle, "E117") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::OverIndented),
         #[allow(deprecated)]
+        (Pycodestyle, "E122") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingOrOutdentedIndentation),
+        #[allow(deprecated)]
         (Pycodestyle, "E201") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceAfterOpenBracket),
         #[allow(deprecated)]
         (Pycodestyle, "E202") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceBeforeCloseBracket),

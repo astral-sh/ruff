@@ -7,10 +7,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
-    extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, space_after_comma, space_around_operator,
-    whitespace_around_keywords, whitespace_around_named_parameter_equals,
-    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
+    continuation_line_missing_indentation_or_outdented, extraneous_whitespace, indentation,
+    missing_whitespace, missing_whitespace_after_keyword, missing_whitespace_around_operator,
+    space_after_comma, space_around_operator, whitespace_around_keywords,
+    whitespace_around_named_parameter_equals, whitespace_before_comment,
+    whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::LinterSettings;
 
@@ -108,6 +109,13 @@ pub(crate) fn check_logical_lines(
         let indent_level = expand_indent(locator.slice(range));
 
         let indent_size = 4;
+
+        continuation_line_missing_indentation_or_outdented(
+            &mut context,
+            &line,
+            indent_char,
+            indent_size,
+        );
 
         for kind in indentation(
             &line,
