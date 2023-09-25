@@ -45,8 +45,6 @@ libcst = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
 natord = { version = "1.0.9" }
-num-bigint = { workspace = true }
-num-traits = { workspace = true }
 once_cell = { workspace = true }
 path-absolutize = { workspace = true, features = [
   "once_cell_cache",

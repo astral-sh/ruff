@@ -1,8 +1,7 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: eb535c9ae34baad8c940ef61dbbea0a7fec7baf3cd62af40837b2616f656f927
-use num_bigint::BigInt;
+// sha3: 8fa4c9e4c8c7df1e71b915249df9a6cd968890e1c6be3b3dc389ced5be3a3281
 use ruff_text_size::{Ranged, TextSize};
-use ruff_python_ast::{self as ast, IpyEscapeKind};
+use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
@@ -23,9 +22,8 @@ extern crate alloc;
 #[allow(non_snake_case, non_camel_case_types, unused_mut, unused_variables, unused_imports, unused_parens, clippy::all)]
 mod __parse__Top {
 
-    use num_bigint::BigInt;
     use ruff_text_size::{Ranged, TextSize};
-    use ruff_python_ast::{self as ast, IpyEscapeKind};
+    use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
     use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
@@ -48,7 +46,7 @@ mod __parse__Top {
         Variant0(token::Tok),
         Variant1((f64, f64)),
         Variant2(f64),
-        Variant3(BigInt),
+        Variant3(Int),
         Variant4((IpyEscapeKind, String)),
         Variant5(String),
         Variant6((String, StringKind, bool)),
@@ -17716,7 +17714,7 @@ mod __parse__Top {
     fn __pop_Variant3<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, BigInt, TextSize)
+    ) -> (TextSize, Int, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant3(__v), __r)) => (__l, __v, __r),
@@ -34480,7 +34478,7 @@ fn __action232<
 fn __action233<
 >(
     mode: Mode,
-    (_, value, _): (TextSize, BigInt, TextSize),
+    (_, value, _): (TextSize, Int, TextSize),
 ) -> ast::Constant
 {
     ast::Constant::Int(value)

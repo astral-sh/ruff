@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use num_traits::Zero;
 use smallvec::SmallVec;
 
 use ruff_text_size::{Ranged, TextRange};
@@ -1073,7 +1072,7 @@ impl Truthiness {
                 Constant::None => Some(false),
                 Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
                 Constant::Bytes(bytes) => Some(!bytes.is_empty()),
-                Constant::Int(int) => Some(!int.is_zero()),
+                Constant::Int(int) => Some(*int != 0),
                 Constant::Float(float) => Some(*float != 0.0),
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
@@ -1140,7 +1139,7 @@ mod tests {
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
     use crate::{
-        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
+        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Int, Stmt, StmtTypeAlias,
         TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
     };
 
@@ -1240,7 +1239,7 @@ mod tests {
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
         let bound = Expr::Constant(ExprConstant {
-            value: Constant::Int(1.into()),
+            value: Constant::Int(Int::ONE),
             range: TextRange::default(),
         });
 

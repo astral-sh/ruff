@@ -1,6 +1,6 @@
-use crate::Case;
-use num_traits::{Float, Zero};
 use std::f64;
+
+use crate::Case;
 
 pub fn parse_str(literal: &str) -> Option<f64> {
     parse_inner(literal.trim().as_bytes())
@@ -241,46 +241,6 @@ pub fn from_hex(s: &str) -> Option<f64> {
 
             hexf_parse::parse_hexf64(hex.as_str(), false).ok()
         }
-    }
-}
-
-pub fn to_hex(value: f64) -> String {
-    let (mantissa, exponent, sign) = value.integer_decode();
-    let sign_fmt = if sign < 0 { "-" } else { "" };
-    match value {
-        value if value.is_zero() => format!("{sign_fmt}0x0.0p+0"),
-        value if value.is_infinite() => format!("{sign_fmt}inf"),
-        value if value.is_nan() => "nan".to_owned(),
-        _ => {
-            const BITS: i16 = 52;
-            const FRACT_MASK: u64 = 0xf_ffff_ffff_ffff;
-            format!(
-                "{}{:#x}.{:013x}p{:+}",
-                sign_fmt,
-                mantissa >> BITS,
-                mantissa & FRACT_MASK,
-                exponent + BITS
-            )
-        }
-    }
-}
-
-#[test]
-#[allow(clippy::float_cmp)]
-fn test_to_hex() {
-    use rand::Rng;
-    for _ in 0..20000 {
-        let bytes = rand::thread_rng().gen::<[u64; 1]>();
-        let f = f64::from_bits(bytes[0]);
-        if !f.is_finite() {
-            continue;
-        }
-        let hex = to_hex(f);
-        // println!("{} -> {}", f, hex);
-        let roundtrip = hexf_parse::parse_hexf64(&hex, false).unwrap();
-        // println!("  -> {}", roundtrip);
-
-        assert_eq!(f, roundtrip, "{f} {hex} {roundtrip}");
     }
 }
 

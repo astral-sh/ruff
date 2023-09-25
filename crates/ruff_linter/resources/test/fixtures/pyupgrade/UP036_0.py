@@ -184,3 +184,15 @@ if sys.version_info < (3,12):
 
 if sys.version_info <= (3,12):
     print("py3")
+
+if sys.version_info <= (3,12):
+    print("py3")
+
+if sys.version_info == 10000000:
+    print("py3")
+
+if sys.version_info < (3,10000000):
+    print("py3")
+
+if sys.version_info <= (3,10000000):
+    print("py3")
