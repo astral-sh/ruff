@@ -863,7 +863,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::OsPathGetctime,
                 Rule::Glob,
             ]) {
-                flake8_use_pathlib::rules::replaceable_by_pathlib(checker, func);
+                flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
             if checker.enabled(Rule::PathConstructorCurrentDirectory) {
                 flake8_use_pathlib::rules::path_constructor_current_directory(checker, expr, func);
