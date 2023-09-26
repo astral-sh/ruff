@@ -44,9 +44,9 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            if rule.is_preview() {
+            if rule.is_preview() || rule.is_nursery() {
                 output.push_str(
-                    r#"This rule is in preview and is not stable. The `--preview` flag is required for use."#,
+                    r#"This rule is unstable and in [preview](../preview.md). The `--preview` flag is required for use."#,
                 );
                 output.push('\n');
                 output.push('\n');
