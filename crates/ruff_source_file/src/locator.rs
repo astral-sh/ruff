@@ -504,13 +504,7 @@ impl<'a> Locator<'a> {
     /// assert_eq!(&source[TextRange::new(offset, source.text_len())], "腐'");
     /// ```
     pub fn convert_row_and_column_utf16(&self, row: usize, column: usize) -> Option<TextSize> {
-        let line_start = *self.to_index().line_starts().get(row)?;
-        let next_line_start = self
-            .to_index()
-            .line_starts()
-            .get(row + 1)
-            .copied()
-            .unwrap_or(self.contents.text_len());
+        let line_range = *self.to_index().line_range(row)
         let line_contents = &self.contents[TextRange::from(line_start..next_line_start)];
 
         let mut len_bytes = TextSize::default();
