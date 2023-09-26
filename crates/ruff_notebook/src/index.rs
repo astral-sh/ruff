@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use ruff_source_file::OneIndexed;
+use ruff_source_file::{OneIndexed, SourceLocation};
 
 /// Jupyter Notebook indexing table
 ///
@@ -31,5 +31,18 @@ impl NotebookIndex {
     /// given row (1-based).
     pub fn cell_row(&self, row: OneIndexed) -> Option<OneIndexed> {
         self.row_to_row_in_cell.get(row.to_zero_indexed()).copied()
+    }
+
+    /// Translates the given source location based on the indexing table.
+    ///
+    /// This will translate the row/column in the concatenated source code
+    /// to the row/column in the Jupyter Notebook.
+    pub fn translate_location(&self, source_location: &SourceLocation) -> SourceLocation {
+        SourceLocation {
+            row: self
+                .cell_row(source_location.row)
+                .unwrap_or(OneIndexed::MIN),
+            column: source_location.column,
+        }
     }
 }
