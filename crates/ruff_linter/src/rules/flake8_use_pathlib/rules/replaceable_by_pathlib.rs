@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_python_ast::{Constant, ExprCall};
+use ruff_python_ast::{Constant, Expr, ExprCall, ExprConstant};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -91,28 +91,40 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                     // are set to non-default values.
                     // https://github.com/astral-sh/ruff/issues/7620
                     // Signature as of Python 3.11 (https://docs.python.org/3/library/functions.html#open):
-                    // ```
+                    // ```text
                     //      0     1         2             3              4            5
                     // open(file, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
                     //      6             7
                     //      closefd=True, opener=None)
                     //              ^^^^         ^^^^
                     // ```
+                    // For `pathlib` (https://docs.python.org/3/library/pathlib.html#pathlib.Path.open):
+                    // ```text
+                    // Path.open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
+                    // ```
                     if call
                         .arguments
                         .find_argument("closefd", 6)
                         .is_some_and(|expr| {
-                            !expr.as_constant_expr().is_some_and(|constant| {
-                                matches!(constant.value, Constant::Bool(true))
-                            })
+                            !matches!(
+                                expr,
+                                Expr::Constant(ExprConstant {
+                                    value: Constant::Bool(true),
+                                    ..
+                                })
+                            )
                         })
                         || call
                             .arguments
                             .find_argument("opener", 7)
                             .is_some_and(|expr| {
-                                !expr.as_constant_expr().is_some_and(|constant| {
-                                    matches!(constant.value, Constant::None)
-                                })
+                                !matches!(
+                                    expr,
+                                    Expr::Constant(ExprConstant {
+                                        value: Constant::None,
+                                        ..
+                                    })
+                                )
                             })
                     {
                         return None;

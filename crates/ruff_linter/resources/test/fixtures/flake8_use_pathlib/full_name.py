@@ -41,6 +41,6 @@ def opener(path, flags):
 
 open(p, closefd=False)
 open(p, opener=opener)
-open(p, mode='r', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 open(p, 'r', - 1, None, None, None, True, None)
 open(p, 'r', - 1, None, None, None, False, opener)
