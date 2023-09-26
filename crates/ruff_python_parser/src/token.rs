@@ -355,19 +355,19 @@ impl fmt::Display for Tok {
 /// The kind of string literal as described in the [String and Bytes literals]
 /// section of the Python reference.
 ///
+/// Note that f-strings are not included here, because as of [PEP 701] they
+/// emit different tokens than other string literals.
+///
 /// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+/// [PEP 701]: https://peps.python.org/pep-0701/
 #[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)] // TODO: is_macro::Is
 pub enum StringKind {
     /// A normal string literal with no prefix.
     String,
-    /// A f-string literal, with a `f` or `F` prefix.
-    FString,
     /// A byte string literal, with a `b` or `B` prefix.
     Bytes,
     /// A raw string literal, with a `r` or `R` prefix.
     RawString,
-    /// A raw f-string literal, with a `rf`/`fr` or `rF`/`Fr` or `Rf`/`fR` or `RF`/`FR` prefix.
-    RawFString,
     /// A raw byte string literal, with a `rb`/`br` or `rB`/`Br` or `Rb`/`bR` or `RB`/`BR` prefix.
     RawBytes,
     /// A unicode string literal, with a `u` or `U` prefix.
@@ -380,7 +380,6 @@ impl TryFrom<char> for StringKind {
     fn try_from(ch: char) -> Result<Self, String> {
         match ch {
             'r' | 'R' => Ok(StringKind::RawString),
-            'f' | 'F' => Ok(StringKind::FString),
             'u' | 'U' => Ok(StringKind::Unicode),
             'b' | 'B' => Ok(StringKind::Bytes),
             c => Err(format!("Unexpected string prefix: {c}")),
@@ -393,8 +392,6 @@ impl TryFrom<[char; 2]> for StringKind {
 
     fn try_from(chars: [char; 2]) -> Result<Self, String> {
         match chars {
-            ['r' | 'R', 'f' | 'F'] => Ok(StringKind::RawFString),
-            ['f' | 'F', 'r' | 'R'] => Ok(StringKind::RawFString),
             ['r' | 'R', 'b' | 'B'] => Ok(StringKind::RawBytes),
             ['b' | 'B', 'r' | 'R'] => Ok(StringKind::RawBytes),
             [c1, c2] => Err(format!("Unexpected string prefix: {c1}{c2}")),
@@ -404,13 +401,11 @@ impl TryFrom<[char; 2]> for StringKind {
 
 impl fmt::Display for StringKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use StringKind::{Bytes, FString, RawBytes, RawFString, RawString, String, Unicode};
+        use StringKind::{Bytes, RawBytes, RawString, String, Unicode};
         match self {
             String => f.write_str(""),
-            FString => f.write_str("f"),
             Bytes => f.write_str("b"),
             RawString => f.write_str("r"),
-            RawFString => f.write_str("rf"),
             RawBytes => f.write_str("rb"),
             Unicode => f.write_str("u"),
         }
@@ -419,17 +414,10 @@ impl fmt::Display for StringKind {
 
 impl StringKind {
     /// Returns true if the string is a raw string, i,e one of
-    /// [`StringKind::RawString`] or [`StringKind::RawFString`] or [`StringKind::RawBytes`].
+    /// [`StringKind::RawString`] or [`StringKind::RawBytes`].
     pub fn is_raw(&self) -> bool {
-        use StringKind::{RawBytes, RawFString, RawString};
-        matches!(self, RawString | RawFString | RawBytes)
-    }
-
-    /// Returns true if the string is an f-string, i,e one of
-    /// [`StringKind::FString`] or [`StringKind::RawFString`].
-    pub fn is_any_fstring(&self) -> bool {
-        use StringKind::{FString, RawFString};
-        matches!(self, FString | RawFString)
+        use StringKind::{RawBytes, RawString};
+        matches!(self, RawString | RawBytes)
     }
 
     /// Returns true if the string is a byte string, i,e one of
@@ -446,11 +434,11 @@ impl StringKind {
 
     /// Returns the number of characters in the prefix.
     pub fn prefix_len(&self) -> TextSize {
-        use StringKind::{Bytes, FString, RawBytes, RawFString, RawString, String, Unicode};
+        use StringKind::{Bytes, RawBytes, RawString, String, Unicode};
         let len = match self {
             String => 0,
-            RawString | FString | Unicode | Bytes => 1,
-            RawFString | RawBytes => 2,
+            RawString | Unicode | Bytes => 1,
+            RawBytes => 2,
         };
         len.into()
     }
