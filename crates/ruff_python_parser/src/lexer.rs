@@ -1954,6 +1954,7 @@ def f(arg=%timeit a = b):
         assert_debug_snapshot!(tokens);
     }
 
+    #[test]
     fn test_empty_fstrings() {
         let source = r#"f"" "" F"" f'' '' f"""""" f''''''"#;
         assert_debug_snapshot!(lex_source(source));
