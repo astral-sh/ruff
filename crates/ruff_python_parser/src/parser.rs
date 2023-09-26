@@ -18,7 +18,7 @@ use itertools::Itertools;
 pub(super) use lalrpop_util::ParseError as LalrpopError;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::lexer::{lex, lex_starts_at};
+use crate::lexer::{lex, lex_starts_at, Spanned};
 use crate::{
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
     python,
@@ -159,7 +159,7 @@ pub fn parse_expression_starts_at(
 /// let program = parse(source, Mode::Ipython, "<embedded>");
 /// assert!(program.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
+pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<Mod, ParseError> {
     parse_starts_at(source, mode, source_path, TextSize::default())
 }
 
@@ -191,7 +191,7 @@ pub fn parse_starts_at(
     mode: Mode,
     source_path: &str,
     offset: TextSize,
-) -> Result<ast::Mod, ParseError> {
+) -> Result<Mod, ParseError> {
     let lxr = lexer::lex_starts_at(source, mode, offset);
     parse_tokens(lxr, mode, source_path)
 }
@@ -215,7 +215,7 @@ pub fn parse_tokens(
     lxr: impl IntoIterator<Item = LexResult>,
     mode: Mode,
     source_path: &str,
-) -> Result<ast::Mod, ParseError> {
+) -> Result<Mod, ParseError> {
     let lxr = lxr.into_iter();
 
     parse_filtered_tokens(
@@ -225,19 +225,35 @@ pub fn parse_tokens(
     )
 }
 
+/// Parse tokens into an AST like [`parse_tokens`], but we already know all tokens are valid.
+pub fn parse_ok_tokens(
+    lxr: impl IntoIterator<Item = Spanned>,
+    mode: Mode,
+    source_path: &str,
+) -> Result<Mod, ParseError> {
+    let lxr = lxr
+        .into_iter()
+        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
+    let marker_token = (Tok::start_marker(mode), TextRange::default());
+    let lexer = iter::once(marker_token)
+        .chain(lxr)
+        .map(|(t, range)| (range.start(), t, range.end()));
+    python::TopParser::new()
+        .parse(mode, lexer)
+        .map_err(|e| parse_error_from_lalrpop(e, source_path))
+}
+
 fn parse_filtered_tokens(
     lxr: impl IntoIterator<Item = LexResult>,
     mode: Mode,
     source_path: &str,
-) -> Result<ast::Mod, ParseError> {
+) -> Result<Mod, ParseError> {
     let marker_token = (Tok::start_marker(mode), TextRange::default());
     let lexer = iter::once(Ok(marker_token)).chain(lxr);
     python::TopParser::new()
         .parse(
             mode,
-            lexer
-                .into_iter()
-                .map_ok(|(t, range)| (range.start(), t, range.end())),
+            lexer.map_ok(|(t, range)| (range.start(), t, range.end())),
         )
         .map_err(|e| parse_error_from_lalrpop(e, source_path))
 }
