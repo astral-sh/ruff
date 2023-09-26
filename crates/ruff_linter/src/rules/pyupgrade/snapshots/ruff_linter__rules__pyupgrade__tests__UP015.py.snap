@@ -733,16 +733,16 @@ UP015.py:59:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    59 |+with open(mode="rb", name="foo") as f:
 60 60 |     pass
 61 61 | 
-62 62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+62 62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
 UP015.py:62:1: UP015 [*] Unnecessary open mode parameters
    |
 60 |     pass
 61 | 
-62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
-64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
    |
    = help: Remove open mode parameters
 
@@ -750,151 +750,151 @@ UP015.py:62:1: UP015 [*] Unnecessary open mode parameters
 59 59 | with open(mode="Ub", name="foo") as f:
 60 60 |     pass
 61 61 | 
-62    |-open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-   62 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-63 63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
-64 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
-65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+62    |-open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   62 |+open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63 63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+64 64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
 UP015.py:63:1: UP015 [*] Unnecessary open mode parameters
    |
-62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
-65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
    = help: Remove open mode parameters
 
 ℹ Fix
 60 60 |     pass
 61 61 | 
-62 62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-63    |-open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
-   63 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-64 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
-65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+62 62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63    |-open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+   63 |+open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+64 64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
 
 UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
    |
-62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
-64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
    = help: Remove open mode parameters
 
 ℹ Fix
 61 61 | 
-62 62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-63 63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
-64    |-open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
-   64 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+62 62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63 63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+64    |-open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+   64 |+open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
-67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
 UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
    |
-63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
-64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
-65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 66 | 
-67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
    = help: Remove open mode parameters
 
 ℹ Fix
-62 62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-63 63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
-64 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
-65    |-open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-   65 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+62 62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63 63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+64 64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65    |-open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   65 |+open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
-67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-68 68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
 
 UP015.py:67:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
-65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 | 
-67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
-69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
    |
    = help: Replace with ""rb""
 
 ℹ Fix
-64 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
-65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+64 64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
-67    |-open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-   67 |+open(file="foo", mode="rb", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-68 68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
-69 69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
-70 70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+67    |-open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   67 |+open(file="foo", mode="rb", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+69 69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+70 70 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
 UP015.py:68:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
-67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
-70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+70 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
    = help: Replace with ""rb""
 
 ℹ Fix
-65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
-67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-68    |-open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
-   68 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode="rb")
-69 69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
-70 70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68    |-open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+   68 |+open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode="rb")
+69 69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+70 70 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 71 71 | 
 
 UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
-67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
-69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+70 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
    = help: Replace with ""rb""
 
 ℹ Fix
 66 66 | 
-67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-68 68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
-69    |-open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
-   69 |+open(file="foo", buffering=- 1, encoding=None, errors=None, mode="rb", newline=None, closefd=True, opener=None)
-70 70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+69    |-open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+   69 |+open(file="foo", buffering=-1, encoding=None, errors=None, mode="rb", newline=None, closefd=True, opener=None)
+70 70 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 71 71 | 
 72 72 | open = 1
 
 UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
-68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
-69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
-70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+70 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 71 | 
 72 | open = 1
    |
    = help: Replace with ""rb""
 
 ℹ Fix
-67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-68 68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
-69 69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
-70    |-open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-   70 |+open(mode="rb", file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+69 69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+70    |-open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   70 |+open(mode="rb", file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 71 71 | 
 72 72 | open = 1
 73 73 | open("foo", "U")
