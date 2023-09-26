@@ -1,9 +1,7 @@
-use crate::comments::format::empty_lines_before_trailing_comments;
 use ruff_formatter::write;
-use ruff_python_ast::{Parameters, StmtFunctionDef};
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::Ranged;
+use ruff_python_ast::StmtFunctionDef;
 
+use crate::comments::format::empty_lines_before_trailing_comments;
 use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
@@ -147,29 +145,30 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
                     [return_annotation.format().with_options(Parentheses::Always)]
                 )?;
             } else {
+                let parenthesize = if parameters.is_empty() && !comments.has(parameters.as_ref()) {
+                    // If the parameters are empty, add parentheses if the return annotation
+                    // breaks at all.
+                    Parenthesize::IfBreaksOrIfRequired
+                } else {
+                    // Otherwise, use our normal rules for parentheses, which allows us to break
+                    // like:
+                    // ```python
+                    // def f(
+                    //     x,
+                    // ) -> Tuple[
+                    //     int,
+                    //     int,
+                    // ]:
+                    //     ...
+                    // ```
+                    Parenthesize::IfBreaks
+                };
                 write!(
                     f,
                     [maybe_parenthesize_expression(
                         return_annotation,
                         item,
-                        if empty_parameters(parameters, f.context().source()) {
-                            // If the parameters are empty, add parentheses if the return annotation
-                            // breaks at all.
-                            Parenthesize::IfBreaksOrIfRequired
-                        } else {
-                            // Otherwise, use our normal rules for parentheses, which allows us to break
-                            // like:
-                            // ```python
-                            // def f(
-                            //     x,
-                            // ) -> Tuple[
-                            //     int,
-                            //     int,
-                            // ]:
-                            //     ...
-                            // ```
-                            Parenthesize::IfBreaks
-                        },
+                        parenthesize
                     )]
                 )?;
             }
@@ -178,26 +177,4 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
     });
 
     group(&format_inner).fmt(f)
-}
-
-/// Returns `true` if [`Parameters`] is empty (no parameters, no comments, etc.).
-fn empty_parameters(parameters: &Parameters, source: &str) -> bool {
-    let mut tokenizer = SimpleTokenizer::new(source, parameters.range())
-        .filter(|token| !matches!(token.kind, SimpleTokenKind::Whitespace));
-
-    let Some(lpar) = tokenizer.next() else {
-        return false;
-    };
-    if !matches!(lpar.kind, SimpleTokenKind::LParen) {
-        return false;
-    }
-
-    let Some(rpar) = tokenizer.next() else {
-        return false;
-    };
-    if !matches!(rpar.kind, SimpleTokenKind::RParen) {
-        return false;
-    }
-
-    true
 }

@@ -21,7 +21,6 @@ ruff_text_size = { path = "../ruff_text_size" }
 
 bitflags = { workspace = true }
 is-macro = { workspace = true }
-num-traits = { workspace = true }
 rustc-hash = { workspace = true }
 smallvec = { workspace = true }
 

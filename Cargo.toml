@@ -15,19 +15,17 @@ license = "MIT"
 anyhow = { version = "1.0.69" }
 bitflags = { version = "2.3.1" }
 chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
-clap = { version = "4.4.4", features = ["derive"] }
+clap = { version = "4.4.5", features = ["derive"] }
 colored = { version = "2.0.0" }
 filetime = { version = "0.2.20" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.10" }
 ignore = { version = "0.4.20" }
-insta = { version = "1.31.0", feature = ["filters", "glob"] }
+insta = { version = "1.32.0", feature = ["filters", "glob"] }
 is-macro = { version = "0.3.0" }
 itertools = { version = "0.11.0" }
 log = { version = "0.4.17" }
 memchr = "2.6.3"
-num-bigint = { version = "0.4.3" }
-num-traits = { version = "0.2.15" }
 once_cell = { version = "1.17.1" }
 path-absolutize = { version = "3.1.1" }
 proc-macro2 = { version = "1.0.67" }
@@ -39,7 +37,7 @@ serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.107" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1", features = ["inline"] }
-smallvec = { version = "1.10.0" }
+smallvec = { version = "1.11.1" }
 static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
 strum_macros = { version = "0.25.2" }

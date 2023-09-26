@@ -1,8 +1,7 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: e8f3229288c1a13387ea6041355e2d8fe9ab788fbc7229032d2de92beb675944
-use num_bigint::BigInt;
+// sha3: 8fa4c9e4c8c7df1e71b915249df9a6cd968890e1c6be3b3dc389ced5be3a3281
 use ruff_text_size::{Ranged, TextSize};
-use ruff_python_ast::{self as ast, IpyEscapeKind};
+use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
@@ -23,9 +22,8 @@ extern crate alloc;
 #[allow(non_snake_case, non_camel_case_types, unused_mut, unused_variables, unused_imports, unused_parens, clippy::all)]
 mod __parse__Top {
 
-    use num_bigint::BigInt;
     use ruff_text_size::{Ranged, TextSize};
-    use ruff_python_ast::{self as ast, IpyEscapeKind};
+    use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
     use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
@@ -48,7 +46,7 @@ mod __parse__Top {
         Variant0(token::Tok),
         Variant1((f64, f64)),
         Variant2(f64),
-        Variant3(BigInt),
+        Variant3(Int),
         Variant4((IpyEscapeKind, String)),
         Variant5(String),
         Variant6((String, StringKind, bool)),
@@ -117,9 +115,9 @@ mod __parse__Top {
         Variant69(core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>),
         Variant70(ast::Alias),
         Variant71(Vec<ast::Alias>),
-        Variant72(ast::Int),
-        Variant73(alloc::vec::Vec<ast::Int>),
-        Variant74((Option<ast::Int>, Option<ast::Identifier>)),
+        Variant72(u32),
+        Variant73(alloc::vec::Vec<u32>),
+        Variant74((Option<u32>, Option<ast::Identifier>)),
         Variant75(ast::MatchCase),
         Variant76(alloc::vec::Vec<ast::MatchCase>),
         Variant77(ast::PatternKeyword),
@@ -17596,7 +17594,7 @@ mod __parse__Top {
     fn __pop_Variant74<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (Option<ast::Int>, Option<ast::Identifier>), TextSize)
+    ) -> (TextSize, (Option<u32>, Option<ast::Identifier>), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant74(__v), __r)) => (__l, __v, __r),
@@ -17716,7 +17714,7 @@ mod __parse__Top {
     fn __pop_Variant3<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, BigInt, TextSize)
+    ) -> (TextSize, Int, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant3(__v), __r)) => (__l, __v, __r),
@@ -17973,16 +17971,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant73<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, alloc::vec::Vec<ast::Int>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant73(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant76<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18050,6 +18038,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant21(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant73<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, alloc::vec::Vec<u32>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant73(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18140,16 +18138,6 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant22(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant72<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::Int, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant72(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18520,6 +18508,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant0(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant72<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, u32, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant72(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -31464,7 +31462,7 @@ fn __action61<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, source, _): (TextSize, (Option<ast::Int>, Option<ast::Identifier>), TextSize),
+    (_, source, _): (TextSize, (Option<u32>, Option<ast::Identifier>), TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, names, _): (TextSize, Vec<ast::Alias>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
@@ -31488,12 +31486,12 @@ fn __action61<
 fn __action62<
 >(
     mode: Mode,
-    (_, dots, _): (TextSize, alloc::vec::Vec<ast::Int>, TextSize),
+    (_, dots, _): (TextSize, alloc::vec::Vec<u32>, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
-) -> (Option<ast::Int>, Option<ast::Identifier>)
+) -> (Option<u32>, Option<ast::Identifier>)
 {
     {
-        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), Some(name))
+        (Some(dots.iter().sum()), Some(name))
     }
 }
 
@@ -31502,11 +31500,11 @@ fn __action62<
 fn __action63<
 >(
     mode: Mode,
-    (_, dots, _): (TextSize, alloc::vec::Vec<ast::Int>, TextSize),
-) -> (Option<ast::Int>, Option<ast::Identifier>)
+    (_, dots, _): (TextSize, alloc::vec::Vec<u32>, TextSize),
+) -> (Option<u32>, Option<ast::Identifier>)
 {
     {
-        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), None)
+        (Some(dots.iter().sum()), None)
     }
 }
 
@@ -31516,9 +31514,9 @@ fn __action64<
 >(
     mode: Mode,
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Int
+) -> u32
 {
-    ast::Int::new(3)
+    3
 }
 
 #[allow(unused_variables)]
@@ -31527,9 +31525,9 @@ fn __action65<
 >(
     mode: Mode,
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Int
+) -> u32
 {
-    ast::Int::new(1)
+    1
 }
 
 #[allow(unused_variables)]
@@ -34480,7 +34478,7 @@ fn __action232<
 fn __action233<
 >(
     mode: Mode,
-    (_, value, _): (TextSize, BigInt, TextSize),
+    (_, value, _): (TextSize, Int, TextSize),
 ) -> ast::Constant
 {
     ast::Constant::Int(value)
@@ -36264,8 +36262,8 @@ fn __action364<
 fn __action365<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Int, TextSize),
-) -> alloc::vec::Vec<ast::Int>
+    (_, __0, _): (TextSize, u32, TextSize),
+) -> alloc::vec::Vec<u32>
 {
     alloc::vec![__0]
 }
@@ -36275,9 +36273,9 @@ fn __action365<
 fn __action366<
 >(
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::Int>, TextSize),
-    (_, e, _): (TextSize, ast::Int, TextSize),
-) -> alloc::vec::Vec<ast::Int>
+    (_, v, _): (TextSize, alloc::vec::Vec<u32>, TextSize),
+    (_, e, _): (TextSize, u32, TextSize),
+) -> alloc::vec::Vec<u32>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -36289,7 +36287,7 @@ fn __action367<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> alloc::vec::Vec<ast::Int>
+) -> alloc::vec::Vec<u32>
 {
     alloc::vec![]
 }
@@ -36299,8 +36297,8 @@ fn __action367<
 fn __action368<
 >(
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::Int>, TextSize),
-) -> alloc::vec::Vec<ast::Int>
+    (_, v, _): (TextSize, alloc::vec::Vec<u32>, TextSize),
+) -> alloc::vec::Vec<u32>
 {
     v
 }
@@ -45772,7 +45770,7 @@ fn __action806<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, (Option<ast::Int>, Option<ast::Identifier>), TextSize),
+    __1: (TextSize, (Option<u32>, Option<ast::Identifier>), TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Vec<ast::Alias>, TextSize),
     __4: (TextSize, TextSize, TextSize),
@@ -59644,7 +59642,7 @@ fn __action1299<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, (Option<ast::Int>, Option<ast::Identifier>), TextSize),
+    __1: (TextSize, (Option<u32>, Option<ast::Identifier>), TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Vec<ast::Alias>, TextSize),
 ) -> ast::Stmt
@@ -66376,7 +66374,7 @@ fn __action1542<
 >(
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-) -> (Option<ast::Int>, Option<ast::Identifier>)
+) -> (Option<u32>, Option<ast::Identifier>)
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -66398,9 +66396,9 @@ fn __action1542<
 fn __action1543<
 >(
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::Int>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<u32>, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-) -> (Option<ast::Int>, Option<ast::Identifier>)
+) -> (Option<u32>, Option<ast::Identifier>)
 {
     let __start0 = __0.0;
     let __end0 = __0.2;

@@ -281,5 +281,25 @@ UP024_0.py:105:11: UP024 [*] Replace aliased errors with `OSError`
 105     |-    except(IOError, OSError) as ex:
     105 |+    except OSError as ex:
 106 106 |         msg = 'Unable to query URL to get Owner ID: {u}\n{e}'.format(u=owner_id_url, e=ex)
+107 107 | 
+108 108 | 
+
+UP024_0.py:114:8: UP024 [*] Replace aliased errors with `OSError`
+    |
+112 | try:
+113 |     pass
+114 | except os.error:
+    |        ^^^^^^^^ UP024
+115 |     pass
+    |
+    = help: Replace `os.error` with builtin `OSError`
+
+ℹ Fix
+111 111 | 
+112 112 | try:
+113 113 |     pass
+114     |-except os.error:
+    114 |+except OSError:
+115 115 |     pass
 
 

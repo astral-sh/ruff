@@ -126,6 +126,15 @@ S103.py:22:25: S103 `os.chmod` setting a permissive mask `0o2` on file or direct
 21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK
 22 | os.chmod("/etc/passwd", stat.S_IWOTH)  # Error
    |                         ^^^^^^^^^^^^ S103
+23 | os.chmod("/etc/passwd", 0o100000000)  # Error
+   |
+
+S103.py:23:25: S103 `os.chmod` setting an invalid mask on file or directory
+   |
+21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK
+22 | os.chmod("/etc/passwd", stat.S_IWOTH)  # Error
+23 | os.chmod("/etc/passwd", 0o100000000)  # Error
+   |                         ^^^^^^^^^^^ S103
    |
 
 

@@ -86,17 +86,42 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
         if let Some(first_leading) = self.comments.first() {
             // Leading comments only preserves the lines after the comment but not before.
             // Insert the necessary lines.
-            if lines_before(first_leading.start(), f.context().source()) > 1 {
-                write!(f, [empty_line()])?;
-            }
+            write!(
+                f,
+                [empty_lines(lines_before(
+                    first_leading.start(),
+                    f.context().source()
+                ))]
+            )?;
 
             write!(f, [leading_comments(self.comments)])?;
         } else if let Some(last_preceding) = self.last_node {
-            // The leading comments formatting ensures that it preserves the right amount of lines after
-            // We need to take care of this ourselves, if there's no leading `else` comment.
-            if lines_after_ignoring_trivia(last_preceding.end(), f.context().source()) > 1 {
-                write!(f, [empty_line()])?;
-            }
+            // The leading comments formatting ensures that it preserves the right amount of lines
+            // after We need to take care of this ourselves, if there's no leading `else` comment.
+            // Since the `last_node` could be a compound node, we need to skip _all_ trivia.
+            //
+            // For example, here, when formatting the `if` statement, the `last_node` (the `while`)
+            // would end at the end of `pass`, but we want to skip _all_ comments:
+            // ```python
+            // if True:
+            //     while True:
+            //         pass
+            //         # comment
+            //
+            //     # comment
+            // else:
+            //     ...
+            // ```
+            //
+            // `lines_after_ignoring_trivia` is safe here, as we _know_ that the `else` doesn't
+            // have any leading comments.
+            write!(
+                f,
+                [empty_lines(lines_after_ignoring_trivia(
+                    last_preceding.end(),
+                    f.context().source()
+                ))]
+            )?;
         }
 
         Ok(())
@@ -299,7 +324,14 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
             NodeLevel::TopLevel => match self.lines {
                 0 | 1 => write!(f, [hard_line_break()]),
                 2 => write!(f, [empty_line()]),
-                _ => write!(f, [empty_line(), empty_line()]),
+                _ => match f.options().source_type() {
+                    PySourceType::Stub => {
+                        write!(f, [empty_line()])
+                    }
+                    PySourceType::Python | PySourceType::Ipynb => {
+                        write!(f, [empty_line(), empty_line()])
+                    }
+                },
             },
 
             NodeLevel::CompoundStatement => match self.lines {

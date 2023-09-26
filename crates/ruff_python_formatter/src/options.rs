@@ -1,9 +1,12 @@
 use ruff_formatter::printer::{LineEnding, PrinterOptions, SourceMapGeneration};
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
+use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
 use std::path::Path;
 use std::str::FromStr;
 
+/// Resolved options for formatting one individual file. The difference to `FormatterSettings`
+/// is that `FormatterSettings` stores the settings for multiple files (the entire project, a subdirectory, ..)
 #[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "serde",
@@ -176,12 +179,13 @@ impl FormatOptions for PyFormatOptions {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, CacheKey)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
     serde(rename_all = "kebab-case")
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum QuoteStyle {
     Single,
     #[default]
@@ -230,7 +234,7 @@ impl FromStr for QuoteStyle {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, CacheKey)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -261,7 +265,7 @@ impl FromStr for MagicTrailingComma {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum PreviewMode {

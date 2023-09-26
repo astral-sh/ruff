@@ -44,7 +44,7 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
                 level,
                 range: _,
             }) => {
-                let level = level.map_or(0, |level| level.to_usize());
+                let level = level.unwrap_or_default() as usize;
                 let module = if let Some(module) = module {
                     let module: &String = module.as_ref();
                     if level == 0 {
@@ -95,6 +95,7 @@ pub(crate) fn check_imports(
         tracker.visit_body(python_ast);
         tracker
     };
+
     let blocks: Vec<&Block> = tracker.iter().collect();
 
     // Enforce import rules.

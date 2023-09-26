@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Identifier, Int, Stmt};
+use ruff_python_ast::{self as ast, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -99,7 +99,7 @@ fn fix_banned_relative_import(
             TextRange::default(),
         )),
         names: names.clone(),
-        level: Some(Int::new(0)),
+        level: Some(0),
         range: TextRange::default(),
     };
     let content = generator.stmt(&node.into());

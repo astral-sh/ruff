@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall, Stmt, StmtAssign};
+use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -68,30 +69,12 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
         return;
     }
 
-    let Expr::Name(name) = value.as_ref() else {
-        return;
-    };
-
-    if let Some(binding_id) = checker.semantic().resolve_name(name) {
-        if let Some(Stmt::Assign(StmtAssign { value, .. })) = checker
-            .semantic()
-            .binding(binding_id)
-            .statement(checker.semantic())
-        {
-            if let Expr::Call(ExprCall { func, .. }) = value.as_ref() {
-                if checker
-                    .semantic()
-                    .resolve_call_path(func)
-                    .is_some_and(|call_path| {
-                        matches!(call_path.as_slice(), ["paramiko", "client", "SSHClient"])
-                    })
-                {
-                    checker.diagnostics.push(Diagnostic::new(
-                        SSHNoHostKeyVerification,
-                        policy_argument.range(),
-                    ));
-                }
-            }
-        }
-    };
+    if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
+        matches!(call_path.as_slice(), ["paramiko", "client", "SSHClient"])
+    }) {
+        checker.diagnostics.push(Diagnostic::new(
+            SSHNoHostKeyVerification,
+            policy_argument.range(),
+        ));
+    }
 }

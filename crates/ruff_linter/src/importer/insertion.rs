@@ -57,14 +57,14 @@ impl<'a> Insertion<'a> {
         let mut location = if let Some(location) = match_docstring_end(body) {
             // If the first token after the docstring is a semicolon, insert after the semicolon as
             // an inline statement.
-            if let Some(offset) = match_leading_semicolon(locator.after(location)) {
+            if let Some(offset) = match_semicolon(locator.after(location)) {
                 return Insertion::inline(" ", location.add(offset).add(TextSize::of(';')), ";");
             }
 
             // Otherwise, advance to the next row.
             locator.full_line_end(location)
         } else {
-            TextSize::default()
+            locator.contents_start()
         };
 
         // Skip over commented lines, with whitespace separation.
@@ -109,10 +109,14 @@ impl<'a> Insertion<'a> {
         stylist: &Stylist,
     ) -> Insertion<'static> {
         let location = stmt.end();
-        if let Some(offset) = match_leading_semicolon(locator.after(location)) {
+        if let Some(offset) = match_semicolon(locator.after(location)) {
             // If the first token after the statement is a semicolon, insert after the semicolon as
             // an inline statement.
             Insertion::inline(" ", location.add(offset).add(TextSize::of(';')), ";")
+        } else if match_continuation(locator.after(location)).is_some() {
+            // If the first token after the statement is a continuation, insert after the statement
+            // with a semicolon.
+            Insertion::inline("; ", location, "")
         } else {
             // Otherwise, insert on the next line.
             Insertion::own_line(
@@ -289,12 +293,24 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
     Some(stmt.end())
 }
 
-/// If a line starts with a semicolon, return its offset.
-fn match_leading_semicolon(s: &str) -> Option<TextSize> {
+/// If the next token is a semicolon, return its offset.
+fn match_semicolon(s: &str) -> Option<TextSize> {
     for (offset, c) in s.char_indices() {
         match c {
             ' ' | '\t' => continue,
             ';' => return Some(TextSize::try_from(offset).unwrap()),
+            _ => break,
+        }
+    }
+    None
+}
+
+/// If the next token is a continuation (`\`), return its offset.
+fn match_continuation(s: &str) -> Option<TextSize> {
+    for (offset, c) in s.char_indices() {
+        match c {
+            ' ' | '\t' => continue,
+            '\\' => return Some(TextSize::try_from(offset).unwrap()),
             _ => break,
         }
     }

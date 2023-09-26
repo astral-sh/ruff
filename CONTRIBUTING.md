@@ -251,25 +251,24 @@ Once you've completed the code for the rule itself, you can define tests with th
 
 Ruff's user-facing settings live in a few different places.
 
-First, the command-line options are defined via the `Cli` struct in `crates/ruff_linter/src/cli.rs`.
+First, the command-line options are defined via the `Args` struct in `crates/ruff_cli/src/args.rs`.
 
-Second, the `pyproject.toml` options are defined in `crates/ruff_linter/src/settings/options.rs` (via the
-`Options` struct), `crates/ruff_linter/src/settings/configuration.rs` (via the `Configuration` struct), and
-`crates/ruff_linter/src/settings/mod.rs` (via the `Settings` struct). These represent, respectively: the
-schema used to parse the `pyproject.toml` file; an internal, intermediate representation; and the
-final, internal representation used to power Ruff.
+Second, the `pyproject.toml` options are defined in `crates/ruff_workspace/src/options.rs` (via the
+`Options` struct), `crates/ruff_workspace/src/configuration.rs` (via the `Configuration` struct),
+and `crates/ruff_workspace/src/settings.rs` (via the `Settings` struct), which then includes
+the `LinterSettings` struct as a field.
+
+These represent, respectively: the schema used to parse the `pyproject.toml` file; an internal,
+intermediate representation; and the final, internal representation used to power Ruff.
 
 To add a new configuration option, you'll likely want to modify these latter few files (along with
-`cli.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
+`arg.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
 `dummy_variable_rgx`, which defines a regular expression to match against acceptable unused
 variables (e.g., `_`).
 
 Note that plugin-specific configuration options are defined in their own modules (e.g.,
-`crates/ruff_linter/src/flake8_unused_arguments/settings.rs`).
-
-You may also want to add the new configuration option to the `flake8-to-ruff` tool, which is
-responsible for converting `flake8` configuration files to Ruff's TOML format. This logic
-lives in `crates/ruff_linter/src/flake8_to_ruff/converter.rs`.
+`Settings` in `crates/ruff_linter/src/flake8_unused_arguments/settings.rs` coupled with
+`Flake8UnusedArgumentsOptions` in `crates/ruff_workspace/src/options.rs`).
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 

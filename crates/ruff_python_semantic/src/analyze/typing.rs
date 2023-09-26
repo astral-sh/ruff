@@ -1,14 +1,10 @@
 //! Analysis rules for the `typing` module.
 
-use num_traits::identities::Zero;
-use ruff_python_ast::{
-    self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters, Stmt,
-};
-
-use crate::analyze::type_inference::{PythonType, ResolvedPythonType};
-use crate::{Binding, BindingKind};
 use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::{is_const_false, map_subscript};
+use ruff_python_ast::{
+    self as ast, Constant, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt,
+};
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
@@ -17,7 +13,9 @@ use ruff_python_stdlib::typing::{
 };
 use ruff_text_size::Ranged;
 
+use crate::analyze::type_inference::{PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
+use crate::{Binding, BindingKind};
 
 #[derive(Copy, Clone)]
 pub enum Callable {
@@ -314,14 +312,14 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     }
 
     // Ex) `if 0:`
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
-        ..
-    }) = test.as_ref()
-    {
-        if value.is_zero() {
-            return true;
-        }
+    if matches!(
+        test.as_ref(),
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(Int::ZERO),
+            ..
+        })
+    ) {
+        return true;
     }
 
     // Ex) `if typing.TYPE_CHECKING:`
@@ -520,4 +518,37 @@ fn find_parameter<'a>(
         .chain(parameters.posonlyargs.iter())
         .chain(parameters.kwonlyargs.iter())
         .find(|arg| arg.parameter.name.range() == binding.range())
+}
+
+/// Return the [`CallPath`] of the value to which the given [`Expr`] is assigned, if any.
+///
+/// For example, given:
+/// ```python
+/// import asyncio
+///
+/// loop = asyncio.get_running_loop()
+/// loop.create_task(...)
+/// ```
+///
+/// This function will return `["asyncio", "get_running_loop"]` for the `loop` binding.
+pub fn resolve_assignment<'a>(
+    expr: &'a Expr,
+    semantic: &'a SemanticModel<'a>,
+) -> Option<CallPath<'a>> {
+    let name = expr.as_name_expr()?;
+    let binding_id = semantic.resolve_name(name)?;
+    let statement = semantic.binding(binding_id).statement(semantic)?;
+    match statement {
+        Stmt::Assign(ast::StmtAssign { value, .. }) => {
+            let ast::ExprCall { func, .. } = value.as_call_expr()?;
+            semantic.resolve_call_path(func)
+        }
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        }) => {
+            let ast::ExprCall { func, .. } = value.as_call_expr()?;
+            semantic.resolve_call_path(func)
+        }
+        _ => None,
+    }
 }

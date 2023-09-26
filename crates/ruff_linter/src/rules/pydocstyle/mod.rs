@@ -79,6 +79,7 @@ mod tests {
     #[test_case(Rule::SectionNameEndsInColon, Path::new("D.py"))]
     #[test_case(Rule::SectionNotOverIndented, Path::new("sections.py"))]
     #[test_case(Rule::SectionNotOverIndented, Path::new("D214_module.py"))]
+    #[test_case(Rule::SectionUnderlineNotOverIndented, Path::new("D215.py"))]
     #[test_case(Rule::SectionUnderlineAfterName, Path::new("sections.py"))]
     #[test_case(Rule::SectionUnderlineMatchesSectionLength, Path::new("sections.py"))]
     #[test_case(Rule::SectionUnderlineNotOverIndented, Path::new("sections.py"))]

@@ -1,8 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
 
-use num_bigint::BigInt;
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
@@ -47,7 +45,7 @@ impl From<LiteralType> for Constant {
                 value: Vec::new(),
                 implicit_concatenated: false,
             }),
-            LiteralType::Int => Constant::Int(BigInt::from(0)),
+            LiteralType::Int => Constant::Int(0.into()),
             LiteralType::Float => Constant::Float(0.0),
             LiteralType::Bool => Constant::Bool(false),
         }

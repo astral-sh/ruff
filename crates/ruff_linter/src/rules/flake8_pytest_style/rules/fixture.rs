@@ -764,7 +764,13 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
 }
 
 /// PT004, PT005, PT022
-fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &[Stmt]) {
+fn check_fixture_returns(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    name: &str,
+    body: &[Stmt],
+    returns: Option<&Expr>,
+) {
     let mut visitor = SkipFunctionsVisitor::default();
 
     for stmt in body {
@@ -795,27 +801,50 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
     }
 
     if checker.enabled(Rule::PytestUselessYieldFixture) {
-        if let Some(stmt) = body.last() {
-            if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
-                if value.is_yield_expr() {
-                    if visitor.yield_statements.len() == 1 {
-                        let mut diagnostic = Diagnostic::new(
-                            PytestUselessYieldFixture {
-                                name: name.to_string(),
-                            },
-                            stmt.range(),
-                        );
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                                "return".to_string(),
-                                TextRange::at(stmt.start(), "yield".text_len()),
-                            )));
-                        }
-                        checker.diagnostics.push(diagnostic);
-                    }
+        let Some(stmt) = body.last() else {
+            return;
+        };
+        let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+            return;
+        };
+        if !value.is_yield_expr() {
+            return;
+        }
+        if visitor.yield_statements.len() != 1 {
+            return;
+        }
+        let mut diagnostic = Diagnostic::new(
+            PytestUselessYieldFixture {
+                name: name.to_string(),
+            },
+            stmt.range(),
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            let yield_edit = Edit::range_replacement(
+                "return".to_string(),
+                TextRange::at(stmt.start(), "yield".text_len()),
+            );
+            let return_type_edit = returns.and_then(|returns| {
+                let ast::ExprSubscript { value, slice, .. } = returns.as_subscript_expr()?;
+                let ast::ExprTuple { elts, .. } = slice.as_tuple_expr()?;
+                let [first, ..] = elts.as_slice() else {
+                    return None;
+                };
+                if !checker.semantic().match_typing_expr(value, "Generator") {
+                    return None;
                 }
+                Some(Edit::range_replacement(
+                    checker.generator().expr(first),
+                    returns.range(),
+                ))
+            });
+            if let Some(return_type_edit) = return_type_edit {
+                diagnostic.set_fix(Fix::automatic_edits(yield_edit, [return_type_edit]));
+            } else {
+                diagnostic.set_fix(Fix::automatic(yield_edit));
             }
         }
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -910,6 +939,7 @@ pub(crate) fn fixture(
     stmt: &Stmt,
     name: &str,
     parameters: &Parameters,
+    returns: Option<&Expr>,
     decorators: &[Decorator],
     body: &[Stmt],
 ) {
@@ -933,7 +963,7 @@ pub(crate) fn fixture(
             || checker.enabled(Rule::PytestUselessYieldFixture))
             && !is_abstract(decorators, checker.semantic())
         {
-            check_fixture_returns(checker, stmt, name, body);
+            check_fixture_returns(checker, stmt, name, body, returns);
         }
 
         if checker.enabled(Rule::PytestFixtureFinalizerCallback) {

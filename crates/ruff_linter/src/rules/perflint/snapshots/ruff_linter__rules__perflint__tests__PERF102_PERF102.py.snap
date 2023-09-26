@@ -207,5 +207,25 @@ PERF102.py:100:31: PERF102 [*] When using only the values of a dict use the `val
 100     |-    for unused_name, value in some_dict.items():  # PERF102
     100 |+    for value in some_dict.values():  # PERF102
 101 101 |         print(value)
+102 102 | 
+103 103 | 
+
+PERF102.py:106:16: PERF102 [*] When using only the keys of a dict use the `keys()` method
+    |
+104 | # Regression test for: https://github.com/astral-sh/ruff/issues/7097
+105 | def _create_context(name_to_value):
+106 |     for(B,D)in A.items():
+    |                ^^^^^^^ PERF102
+107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
+    |
+    = help: Replace `.items()` with `.keys()`
+
+ℹ Suggested fix
+103 103 | 
+104 104 | # Regression test for: https://github.com/astral-sh/ruff/issues/7097
+105 105 | def _create_context(name_to_value):
+106     |-    for(B,D)in A.items():
+    106 |+    for B in A.keys():
+107 107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
 
 

@@ -358,7 +358,7 @@ where
                 range: _,
             }) => {
                 let module = module.as_deref();
-                let level = level.map(|level| level.to_u32());
+                let level = *level;
                 for alias in names {
                     if let Some("__future__") = module {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);

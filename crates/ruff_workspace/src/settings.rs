@@ -1,8 +1,12 @@
 use path_absolutize::path_dedot;
 use ruff_cache::cache_dir;
+use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
 use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFormat};
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
+use ruff_python_ast::PySourceType;
+use ruff_python_formatter::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
+use ruff_source_file::find_newline;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, CacheKey)]
@@ -23,6 +27,7 @@ pub struct Settings {
 
     pub file_resolver: FileResolverSettings,
     pub linter: LinterSettings,
+    pub formatter: FormatterSettings,
 }
 
 impl Default for Settings {
@@ -37,6 +42,7 @@ impl Default for Settings {
             show_source: false,
             linter: LinterSettings::new(project_root),
             file_resolver: FileResolverSettings::new(project_root),
+            formatter: FormatterSettings::default(),
         }
     }
 }
@@ -98,4 +104,89 @@ impl FileResolverSettings {
             include: FilePatternSet::try_from_iter(INCLUDE.iter().cloned()).unwrap(),
         }
     }
+}
+
+#[derive(CacheKey, Clone, Debug)]
+pub struct FormatterSettings {
+    pub preview: PreviewMode,
+
+    pub line_width: LineWidth,
+
+    pub indent_style: IndentStyle,
+
+    pub quote_style: QuoteStyle,
+
+    pub magic_trailing_comma: MagicTrailingComma,
+
+    pub line_ending: LineEnding,
+}
+
+impl FormatterSettings {
+    pub fn to_format_options(&self, source_type: PySourceType, source: &str) -> PyFormatOptions {
+        let line_ending = match self.line_ending {
+            LineEnding::Lf => ruff_formatter::printer::LineEnding::LineFeed,
+            LineEnding::CrLf => ruff_formatter::printer::LineEnding::CarriageReturnLineFeed,
+            #[cfg(target_os = "windows")]
+            LineEnding::Native => ruff_formatter::printer::LineEnding::CarriageReturnLineFeed,
+            #[cfg(not(target_os = "windows"))]
+            LineEnding::Native => ruff_formatter::printer::LineEnding::LineFeed,
+            LineEnding::Auto => match find_newline(source) {
+                Some((_, ruff_source_file::LineEnding::Lf)) => {
+                    ruff_formatter::printer::LineEnding::LineFeed
+                }
+                Some((_, ruff_source_file::LineEnding::CrLf)) => {
+                    ruff_formatter::printer::LineEnding::CarriageReturnLineFeed
+                }
+                Some((_, ruff_source_file::LineEnding::Cr)) => {
+                    ruff_formatter::printer::LineEnding::CarriageReturn
+                }
+                None => ruff_formatter::printer::LineEnding::LineFeed,
+            },
+        };
+
+        PyFormatOptions::from_source_type(source_type)
+            .with_indent_style(self.indent_style)
+            .with_quote_style(self.quote_style)
+            .with_magic_trailing_comma(self.magic_trailing_comma)
+            .with_preview(self.preview)
+            .with_line_ending(line_ending)
+            .with_line_width(self.line_width)
+    }
+}
+
+impl Default for FormatterSettings {
+    fn default() -> Self {
+        let default_options = PyFormatOptions::default();
+
+        Self {
+            preview: ruff_python_formatter::PreviewMode::Disabled,
+            line_width: default_options.line_width(),
+            line_ending: LineEnding::Lf,
+            indent_style: default_options.indent_style(),
+            quote_style: default_options.quote_style(),
+            magic_trailing_comma: default_options.magic_trailing_comma(),
+        }
+    }
+}
+
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum LineEnding {
+    ///  Line endings will be converted to `\n` as is common on Unix.
+    #[default]
+    Lf,
+
+    /// Line endings will be converted to `\r\n` as is common on Windows.
+    CrLf,
+
+    /// The newline style is detected automatically on a file per file basis.
+    /// Files with mixed line endings will be converted to the first detected line ending.
+    /// Defaults to [`LineEnding::Lf`] for a files that contain no line endings.
+    Auto,
+
+    /// Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
+    Native,
 }

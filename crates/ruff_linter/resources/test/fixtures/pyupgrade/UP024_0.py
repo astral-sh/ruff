@@ -104,3 +104,12 @@ def get_owner_id_from_mac_address():
         mac_address = get_primary_mac_address()
     except(IOError, OSError) as ex:
         msg = 'Unable to query URL to get Owner ID: {u}\n{e}'.format(u=owner_id_url, e=ex)
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7580
+import os
+
+try:
+    pass
+except os.error:
+    pass

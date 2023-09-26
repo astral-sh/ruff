@@ -31,11 +31,10 @@
 use std::iter::FusedIterator;
 use std::{char, cmp::Ordering, str::FromStr};
 
-use num_bigint::BigInt;
-use num_traits::{Num, Zero};
-use ruff_python_ast::IpyEscapeKind;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use unicode_ident::{is_xid_continue, is_xid_start};
+
+use ruff_python_ast::{Int, IpyEscapeKind};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::indentation::{Indentation, Indentations};
@@ -264,11 +263,16 @@ impl<'source> Lexer<'source> {
 
         let mut number = LexedText::new(self.offset(), self.source);
         self.radix_run(&mut number, radix);
-        let value =
-            BigInt::from_str_radix(number.as_str(), radix.as_u32()).map_err(|e| LexicalError {
-                error: LexicalErrorType::OtherError(format!("{e:?}")),
-                location: self.token_range().start(),
-            })?;
+
+        let value = match Int::from_str_radix(number.as_str(), radix.as_u32()) {
+            Ok(int) => int,
+            Err(err) => {
+                return Err(LexicalError {
+                    error: LexicalErrorType::OtherError(format!("{err:?}")),
+                    location: self.token_range().start(),
+                });
+            }
+        };
         Ok(Tok::Int { value })
     }
 
@@ -339,14 +343,24 @@ impl<'source> Lexer<'source> {
                 let imag = f64::from_str(number.as_str()).unwrap();
                 Ok(Tok::Complex { real: 0.0, imag })
             } else {
-                let value = number.as_str().parse::<BigInt>().unwrap();
-                if start_is_zero && !value.is_zero() {
-                    // leading zeros in decimal integer literals are not permitted
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
-                        location: self.token_range().start(),
-                    });
-                }
+                let value = match Int::from_str(number.as_str()) {
+                    Ok(value) => {
+                        if start_is_zero && value.as_u8() != Some(0) {
+                            // Leading zeros in decimal integer literals are not permitted.
+                            return Err(LexicalError {
+                                error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
+                                location: self.token_range().start(),
+                            });
+                        }
+                        value
+                    }
+                    Err(err) => {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::OtherError(format!("{err:?}")),
+                            location: self.token_range().start(),
+                        })
+                    }
+                };
                 Ok(Tok::Int { value })
             }
         }
@@ -556,10 +570,22 @@ impl<'source> Lexer<'source> {
     pub fn next_token(&mut self) -> LexResult {
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
         if let Some(indentation) = self.pending_indentation.take() {
-            if let Ok(Ordering::Greater) = self.indentations.current().try_compare(indentation) {
-                self.pending_indentation = Some(indentation);
-                self.indentations.pop();
-                return Ok((Tok::Dedent, TextRange::empty(self.offset())));
+            match self.indentations.current().try_compare(indentation) {
+                Ok(Ordering::Greater) => {
+                    self.pending_indentation = Some(indentation);
+                    let offset = self.offset();
+                    self.indentations.dedent_one(indentation).map_err(|_| {
+                        LexicalError::new(LexicalErrorType::IndentationError, offset)
+                    })?;
+                    return Ok((Tok::Dedent, TextRange::empty(offset)));
+                }
+                Ok(_) => {}
+                Err(_) => {
+                    return Err(LexicalError::new(
+                        LexicalErrorType::IndentationError,
+                        self.offset(),
+                    ));
+                }
             }
         }
 
@@ -690,8 +716,11 @@ impl<'source> Lexer<'source> {
         let token = match self.indentations.current().try_compare(indentation) {
             // Dedent
             Ok(Ordering::Greater) => {
-                self.indentations.pop();
                 self.pending_indentation = Some(indentation);
+
+                self.indentations.dedent_one(indentation).map_err(|_| {
+                    LexicalError::new(LexicalErrorType::IndentationError, self.offset())
+                })?;
 
                 Some((Tok::Dedent, TextRange::empty(self.offset())))
             }
@@ -700,7 +729,7 @@ impl<'source> Lexer<'source> {
 
             // Indent
             Ok(Ordering::Less) => {
-                self.indentations.push(indentation);
+                self.indentations.indent(indentation);
                 Some((Tok::Indent, self.token_range()))
             }
             Err(_) => {
@@ -732,7 +761,7 @@ impl<'source> Lexer<'source> {
             Ok((Tok::Newline, TextRange::empty(self.offset())))
         }
         // Next, flush the indentation stack to zero.
-        else if self.indentations.pop().is_some() {
+        else if self.indentations.dedent().is_some() {
             Ok((Tok::Dedent, TextRange::empty(self.offset())))
         } else {
             Ok((Tok::EndOfFile, TextRange::empty(self.offset())))
@@ -1433,8 +1462,27 @@ def f(arg=%timeit a = b):
 
     #[test]
     fn test_numbers() {
-        let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j";
+        let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000";
         assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_invalid_leading_zero_small() {
+        let source = "025";
+
+        let lexer = lex(source, Mode::Module);
+        let tokens = lexer.collect::<Result<Vec<_>, LexicalError>>();
+        assert_debug_snapshot!(tokens);
+    }
+
+    #[test]
+    fn test_invalid_leading_zero_big() {
+        let source =
+            "0252222222222222522222222222225222222222222252222222222222522222222222225222222222222";
+
+        let lexer = lex(source, Mode::Module);
+        let tokens = lexer.collect::<Result<Vec<_>, LexicalError>>();
+        assert_debug_snapshot!(tokens);
     }
 
     #[test]
@@ -1656,7 +1704,7 @@ def f(arg=%timeit a = b):
     // This test case is to just make sure that the lexer doesn't go into
     // infinite loop on invalid input.
     #[test]
-    fn test_infite_loop() {
+    fn test_infinite_loop() {
         let source = "[1";
         let _ = lex(source, Mode::Module).collect::<Vec<_>>();
     }
@@ -1677,5 +1725,17 @@ def f(arg=%timeit a = b):
             }
             result => panic!("Expected an error token but found {result:?}"),
         }
+    }
+
+    #[test]
+    fn tet_too_low_dedent() {
+        let tokens: Vec<_> = lex(
+            r#"if True:
+    pass
+  pass"#,
+            Mode::Module,
+        )
+        .collect();
+        assert_debug_snapshot!(tokens);
     }
 }

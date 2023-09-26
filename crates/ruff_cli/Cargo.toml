@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.290"
+version = "0.0.291"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -48,7 +48,7 @@ itoa = { version = "1.0.6" }
 log = { workspace = true }
 notify = { version = "6.1.1" }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
-rayon = { version = "1.7.0" }
+rayon = { version = "1.8.0" }
 regex = { workspace = true }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 rustc-hash = { workspace = true }

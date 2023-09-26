@@ -105,7 +105,7 @@ src = ["src"]
 
 ### Rule Selection
 
-Ruff supports [over 600 lint rules](rules.md) split across over 40 built-in plugins, but
+Ruff supports [over 700 lint rules](rules.md) split across over 50 built-in plugins, but
 determining the right set of rules will depend on your project's needs: some rules may be too
 strict, some are framework-specific, and so on.
 
@@ -247,7 +247,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.290
+  rev: v0.0.291
   hooks:
     - id: ruff
 ```

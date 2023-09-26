@@ -18,7 +18,6 @@ use imara_diff::{diff, Algorithm};
 use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use ruff_linter::line_width::LineLength;
 use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
@@ -35,7 +34,7 @@ use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_linter::logging::LogLevel;
 use ruff_linter::settings::types::{FilePattern, FilePatternSet};
 use ruff_python_formatter::{
-    format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
+    format_module_source, FormatModuleError, MagicTrailingComma, PyFormatOptions,
 };
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, Resolver};
 
@@ -550,11 +549,8 @@ fn format_dir_entry(
 
     let settings = resolver.resolve(&path, pyproject_config);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
-    // TODO(micha) use formatter settings instead
-    if settings.linter.line_length != LineLength::default() {
-        options = options.with_line_width(LineWidth::from(NonZeroU16::from(
-            settings.linter.line_length,
-        )));
+    if settings.formatter.line_width != LineWidth::default() {
+        options = options.with_line_width(settings.formatter.line_width);
     }
 
     // Handle panics (mostly in `debug_assert!`)
@@ -803,7 +799,7 @@ fn format_dev_file(
     let content = fs::read_to_string(input_path)?;
     #[cfg(not(debug_assertions))]
     let start = Instant::now();
-    let printed = match format_module(&content, options.clone()) {
+    let printed = match format_module_source(&content, options.clone()) {
         Ok(printed) => printed,
         Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
             return Err(CheckFileError::SyntaxErrorInInput(err));
@@ -830,7 +826,7 @@ fn format_dev_file(
     }
 
     if stability_check {
-        let reformatted = match format_module(formatted, options) {
+        let reformatted = match format_module_source(formatted, options) {
             Ok(reformatted) => reformatted,
             Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
                 return Err(CheckFileError::SyntaxErrorInOutput {
