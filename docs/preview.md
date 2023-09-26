@@ -46,3 +46,12 @@ preview = true
 Or, if you provided the `--preview` CLI flag.
 
 To see which rules are currently in preview, visit the [rules reference](rules.md).
+
+## Legacy behavior
+
+Before the preview mode was introduced, new rules were added in a "nursery" category that required selection of
+rules with their exact code.
+
+The nursery has been deprecated and all rules in the nursery are now considered to be in preview. For backwards
+compatibility, nursery rules are selectable with their exact codes without enabling preview mode but a warning will
+be displayed.
