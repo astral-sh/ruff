@@ -504,17 +504,13 @@ impl<'a> Locator<'a> {
     /// assert_eq!(&source[TextRange::new(offset, source.text_len())], "腐'");
     /// ```
     pub fn convert_row_and_column_utf16(&self, row: usize, column: usize) -> Option<TextSize> {
-        let line_range = *self.to_index().line_range(row)
-        let line_contents = &self.contents[TextRange::from(line_start..next_line_start)];
+        let line_range = self
+            .to_index()
+            .line_range(OneIndexed::from_zero_indexed(row), self.contents);
 
         let mut len_bytes = TextSize::default();
         let mut len_utf16 = 0;
-        for char in line_contents
-            .chars()
-            // Since the range goes to the next line start, `line_contents` contains the line
-            // break
-            .take_while(|c| *c != '\n' && *c != '\r')
-        {
+        for char in self.contents[line_range].chars() {
             // This check must be first for the 0 column case
             if len_utf16 >= column {
                 break;
@@ -526,7 +522,7 @@ impl<'a> Locator<'a> {
             return None;
         }
 
-        Some(line_start + len_bytes)
+        Some(line_range.start() + len_bytes)
     }
 
     /// Take the source code between the given [`TextRange`].
