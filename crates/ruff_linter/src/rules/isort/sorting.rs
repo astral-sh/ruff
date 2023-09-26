@@ -4,11 +4,9 @@ use std::collections::BTreeSet;
 
 use ruff_python_stdlib::str;
 
-use crate::rules::isort::types::Importable;
-
-use super::settings::RelativeImportsOrder;
+use super::settings::{RelativeImportsOrder, Settings};
 use super::types::EitherImport::{Import, ImportFrom};
-use super::types::{AliasData, EitherImport, ImportFromData};
+use super::types::{AliasData, EitherImport, ImportFromData, Importable};
 
 #[derive(PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum Prefix {
@@ -17,19 +15,14 @@ pub(crate) enum Prefix {
     Variables,
 }
 
-fn prefix(
-    name: &str,
-    classes: &BTreeSet<String>,
-    constants: &BTreeSet<String>,
-    variables: &BTreeSet<String>,
-) -> Prefix {
-    if constants.contains(name) {
+fn prefix(name: &str, settings: &Settings) -> Prefix {
+    if settings.constants.contains(name) {
         // Ex) `CONSTANT`
         Prefix::Constants
-    } else if classes.contains(name) {
+    } else if settings.classes.contains(name) {
         // Ex) `CLASS`
         Prefix::Classes
-    } else if variables.contains(name) {
+    } else if settings.variables.contains(name) {
         // Ex) `variable`
         Prefix::Variables
     } else if name.len() > 1 && str::is_cased_uppercase(name) {
@@ -52,15 +45,10 @@ fn cmp_force_to_top(name1: &str, name2: &str, force_to_top: &BTreeSet<String>) -
 }
 
 /// Compare two top-level modules.
-pub(crate) fn cmp_modules(
-    alias1: &AliasData,
-    alias2: &AliasData,
-    force_to_top: &BTreeSet<String>,
-    case_sensitive: bool,
-) -> Ordering {
-    cmp_force_to_top(alias1.name, alias2.name, force_to_top)
+pub(crate) fn cmp_modules(alias1: &AliasData, alias2: &AliasData, settings: &Settings) -> Ordering {
+    cmp_force_to_top(alias1.name, alias2.name, &settings.force_to_top)
         .then_with(|| {
-            if case_sensitive {
+            if settings.case_sensitive {
                 natord::compare(alias1.name, alias2.name)
             } else {
                 natord::compare_ignore_case(alias1.name, alias2.name)
@@ -76,27 +64,17 @@ pub(crate) fn cmp_modules(
 }
 
 /// Compare two member imports within `Stmt::ImportFrom` blocks.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn cmp_members(
-    alias1: &AliasData,
-    alias2: &AliasData,
-    order_by_type: bool,
-    classes: &BTreeSet<String>,
-    constants: &BTreeSet<String>,
-    variables: &BTreeSet<String>,
-    force_to_top: &BTreeSet<String>,
-    case_sensitive: bool,
-) -> Ordering {
+pub(crate) fn cmp_members(alias1: &AliasData, alias2: &AliasData, settings: &Settings) -> Ordering {
     match (alias1.name == "*", alias2.name == "*") {
         (true, false) => Ordering::Less,
         (false, true) => Ordering::Greater,
         _ => {
-            if order_by_type {
-                prefix(alias1.name, classes, constants, variables)
-                    .cmp(&prefix(alias2.name, classes, constants, variables))
-                    .then_with(|| cmp_modules(alias1, alias2, force_to_top, case_sensitive))
+            if settings.order_by_type {
+                prefix(alias1.name, settings)
+                    .cmp(&prefix(alias2.name, settings))
+                    .then_with(|| cmp_modules(alias1, alias2, settings))
             } else {
-                cmp_modules(alias1, alias2, force_to_top, case_sensitive)
+                cmp_modules(alias1, alias2, settings)
             }
         }
     }
@@ -123,20 +101,18 @@ pub(crate) fn cmp_levels(
 pub(crate) fn cmp_import_from(
     import_from1: &ImportFromData,
     import_from2: &ImportFromData,
-    relative_imports_order: RelativeImportsOrder,
-    force_to_top: &BTreeSet<String>,
-    case_sensitive: bool,
+    settings: &Settings,
 ) -> Ordering {
     cmp_levels(
         import_from1.level,
         import_from2.level,
-        relative_imports_order,
+        settings.relative_imports_order,
     )
     .then_with(|| {
         cmp_force_to_top(
             &import_from1.module_name(),
             &import_from2.module_name(),
-            force_to_top,
+            &settings.force_to_top,
         )
     })
     .then_with(|| match (&import_from1.module, import_from2.module) {
@@ -144,7 +120,7 @@ pub(crate) fn cmp_import_from(
         (None, Some(_)) => Ordering::Less,
         (Some(_), None) => Ordering::Greater,
         (Some(module1), Some(module2)) => {
-            if case_sensitive {
+            if settings.case_sensitive {
                 natord::compare(module1, module2)
             } else {
                 natord::compare_ignore_case(module1, module2)
@@ -157,11 +133,15 @@ pub(crate) fn cmp_import_from(
 fn cmp_import_import_from(
     import: &AliasData,
     import_from: &ImportFromData,
-    force_to_top: &BTreeSet<String>,
-    case_sensitive: bool,
+    settings: &Settings,
 ) -> Ordering {
-    cmp_force_to_top(import.name, &import_from.module_name(), force_to_top).then_with(|| {
-        if case_sensitive {
+    cmp_force_to_top(
+        import.name,
+        &import_from.module_name(),
+        &settings.force_to_top,
+    )
+    .then_with(|| {
+        if settings.case_sensitive {
             natord::compare(import.name, import_from.module.unwrap_or_default())
         } else {
             natord::compare_ignore_case(import.name, import_from.module.unwrap_or_default())
@@ -174,26 +154,18 @@ fn cmp_import_import_from(
 pub(crate) fn cmp_either_import(
     a: &EitherImport,
     b: &EitherImport,
-    relative_imports_order: RelativeImportsOrder,
-    force_to_top: &BTreeSet<String>,
-    case_sensitive: bool,
+    settings: &Settings,
 ) -> Ordering {
     match (a, b) {
-        (Import((alias1, _)), Import((alias2, _))) => {
-            cmp_modules(alias1, alias2, force_to_top, case_sensitive)
-        }
+        (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2, settings),
         (ImportFrom((import_from, ..)), Import((alias, _))) => {
-            cmp_import_import_from(alias, import_from, force_to_top, case_sensitive).reverse()
+            cmp_import_import_from(alias, import_from, settings).reverse()
         }
         (Import((alias, _)), ImportFrom((import_from, ..))) => {
-            cmp_import_import_from(alias, import_from, force_to_top, case_sensitive)
+            cmp_import_import_from(alias, import_from, settings)
         }
-        (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => cmp_import_from(
-            import_from1,
-            import_from2,
-            relative_imports_order,
-            force_to_top,
-            case_sensitive,
-        ),
+        (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => {
+            cmp_import_from(import_from1, import_from2, settings)
+        }
     }
 }
