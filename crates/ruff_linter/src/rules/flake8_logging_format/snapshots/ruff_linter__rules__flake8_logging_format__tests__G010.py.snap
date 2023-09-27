@@ -41,6 +41,7 @@ G010.py:8:8: G010 [*] Logging statement uses `warn` instead of `warning`
   8 |+logger.warning("Hello world!")
 9 9 | 
 10 10 | logging . warn("Hello World!")
+11 11 | 
 
 G010.py:10:11: G010 [*] Logging statement uses `warn` instead of `warning`
    |
@@ -48,6 +49,8 @@ G010.py:10:11: G010 [*] Logging statement uses `warn` instead of `warning`
  9 | 
 10 | logging . warn("Hello World!")
    |           ^^^^ G010
+11 | 
+12 | from logging import warn, warning, exception
    |
    = help: Convert to `warn`
 
@@ -57,5 +60,27 @@ G010.py:10:11: G010 [*] Logging statement uses `warn` instead of `warning`
 9  9  | 
 10    |-logging . warn("Hello World!")
    10 |+logging . warning("Hello World!")
+11 11 | 
+12 12 | from logging import warn, warning, exception
+13 13 | warn("foo")
+
+G010.py:13:1: G010 [*] Logging statement uses `warn` instead of `warning`
+   |
+12 | from logging import warn, warning, exception
+13 | warn("foo")
+   | ^^^^ G010
+14 | warning("foo")
+15 | exception("foo")
+   |
+   = help: Convert to `warn`
+
+ℹ Fix
+10 10 | logging . warn("Hello World!")
+11 11 | 
+12 12 | from logging import warn, warning, exception
+13    |-warn("foo")
+14 13 | warning("foo")
+   14 |+warning("foo")
+15 15 | exception("foo")
 
 

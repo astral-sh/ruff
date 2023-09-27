@@ -21,4 +21,24 @@ G201.py:13:13: G201 Logging `.exception(...)` should be used instead of `.error(
 15 | # OK
    |
 
+G201.py:28:5: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+   |
+26 |     pass
+27 | except:
+28 |     error("Hello World", exc_info=True)
+   |     ^^^^^ G201
+29 | 
+30 | try:
+   |
+
+G201.py:33:5: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+   |
+31 |     pass
+32 | except:
+33 |     error("Hello World", exc_info=sys.exc_info())
+   |     ^^^^^ G201
+34 | 
+35 | # OK
+   |
+
 
