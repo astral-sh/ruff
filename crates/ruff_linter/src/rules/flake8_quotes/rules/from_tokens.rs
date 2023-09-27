@@ -34,22 +34,22 @@ use super::super::settings::Quote;
 /// - `flake8-quotes.inline-quotes`
 #[violation]
 pub struct BadQuotesInlineString {
-    quote: Quote,
+    preferred_quote: Quote,
 }
 
 impl AlwaysFixableViolation for BadQuotesInlineString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadQuotesInlineString { quote } = self;
-        match quote {
+        let BadQuotesInlineString { preferred_quote } = self;
+        match preferred_quote {
             Quote::Double => format!("Single quotes found but double quotes preferred"),
             Quote::Single => format!("Double quotes found but single quotes preferred"),
         }
     }
 
     fn fix_title(&self) -> String {
-        let BadQuotesInlineString { quote } = self;
-        match quote {
+        let BadQuotesInlineString { preferred_quote } = self;
+        match preferred_quote {
             Quote::Double => "Replace single quotes with double quotes".to_string(),
             Quote::Single => "Replace double quotes with single quotes".to_string(),
         }
@@ -83,22 +83,22 @@ impl AlwaysFixableViolation for BadQuotesInlineString {
 /// - `flake8-quotes.multiline-quotes`
 #[violation]
 pub struct BadQuotesMultilineString {
-    quote: Quote,
+    preferred_quote: Quote,
 }
 
 impl AlwaysFixableViolation for BadQuotesMultilineString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadQuotesMultilineString { quote } = self;
-        match quote {
+        let BadQuotesMultilineString { preferred_quote } = self;
+        match preferred_quote {
             Quote::Double => format!("Single quote multiline found but double quotes preferred"),
             Quote::Single => format!("Double quote multiline found but single quotes preferred"),
         }
     }
 
     fn fix_title(&self) -> String {
-        let BadQuotesMultilineString { quote } = self;
-        match quote {
+        let BadQuotesMultilineString { preferred_quote } = self;
+        match preferred_quote {
             Quote::Double => "Replace single multiline quotes with double quotes".to_string(),
             Quote::Single => "Replace double multiline quotes with single quotes".to_string(),
         }
@@ -131,70 +131,25 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 /// - `flake8-quotes.docstring-quotes`
 #[violation]
 pub struct BadQuotesDocstring {
-    quote: Quote,
+    preferred_quote: Quote,
 }
 
 impl AlwaysFixableViolation for BadQuotesDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadQuotesDocstring { quote } = self;
-        match quote {
+        let BadQuotesDocstring { preferred_quote } = self;
+        match preferred_quote {
             Quote::Double => format!("Single quote docstring found but double quotes preferred"),
             Quote::Single => format!("Double quote docstring found but single quotes preferred"),
         }
     }
 
     fn fix_title(&self) -> String {
-        let BadQuotesDocstring { quote } = self;
-        match quote {
+        let BadQuotesDocstring { preferred_quote } = self;
+        match preferred_quote {
             Quote::Double => "Replace single quotes docstring with double quotes".to_string(),
             Quote::Single => "Replace double quotes docstring with single quotes".to_string(),
         }
-    }
-}
-
-/// ## What it does
-/// Checks for strings that include escaped quotes, and suggests changing
-/// the quote style to avoid the need to escape them.
-///
-/// ## Why is this bad?
-/// It's preferable to avoid escaped quotes in strings. By changing the
-/// outer quote style, you can avoid escaping inner quotes.
-///
-/// ## Example
-/// ```python
-/// foo = 'bar\'s'
-/// ```
-///
-/// Use instead:
-/// ```python
-/// foo = "bar's"
-/// ```
-#[violation]
-pub struct AvoidableEscapedQuote;
-
-impl AlwaysFixableViolation for AvoidableEscapedQuote {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Change outer quotes to avoid escaping inner quotes")
-    }
-
-    fn fix_title(&self) -> String {
-        "Change outer quotes to avoid escaping inner quotes".to_string()
-    }
-}
-
-const fn good_single(quote: Quote) -> char {
-    match quote {
-        Quote::Double => '"',
-        Quote::Single => '\'',
-    }
-}
-
-const fn bad_single(quote: Quote) -> char {
-    match quote {
-        Quote::Double => '\'',
-        Quote::Single => '"',
     }
 }
 
@@ -219,6 +174,7 @@ const fn good_docstring(quote: Quote) -> &'static str {
     }
 }
 
+#[derive(Debug)]
 struct Trivia<'a> {
     last_quote_char: char,
     prefix: &'a str,
@@ -254,7 +210,7 @@ impl<'a> From<&'a str> for Trivia<'a> {
     }
 }
 
-/// Q003
+/// Q002
 fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> Option<Diagnostic> {
     let quotes_settings = &settings.flake8_quotes;
 
@@ -270,7 +226,7 @@ fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> 
 
     let mut diagnostic = Diagnostic::new(
         BadQuotesDocstring {
-            quote: quotes_settings.docstring_quotes,
+            preferred_quote: quotes_settings.docstring_quotes,
         },
         range,
     );
@@ -292,7 +248,7 @@ fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> 
     Some(diagnostic)
 }
 
-/// Q001, Q002
+/// Q000, Q001
 fn strings(
     locator: &Locator,
     sequence: &[TextRange],
@@ -318,12 +274,12 @@ fn strings(
             return false;
         }
 
-        if trivia.last_quote_char == good_single(quotes_settings.inline_quotes) {
+        if trivia.last_quote_char == quotes_settings.inline_quotes.as_char() {
             return false;
         }
 
         let string_contents = &trivia.raw_text[1..trivia.raw_text.len() - 1];
-        string_contents.contains(good_single(quotes_settings.inline_quotes))
+        string_contents.contains(quotes_settings.inline_quotes.as_char())
     });
 
     for (range, trivia) in sequence.iter().zip(trivia) {
@@ -346,7 +302,7 @@ fn strings(
 
             let mut diagnostic = Diagnostic::new(
                 BadQuotesMultilineString {
-                    quote: quotes_settings.multiline_quotes,
+                    preferred_quote: quotes_settings.multiline_quotes,
                 },
                 *range,
             );
@@ -367,99 +323,31 @@ fn strings(
                 )));
             }
             diagnostics.push(diagnostic);
-        } else {
-            let string_contents = &trivia.raw_text[1..trivia.raw_text.len() - 1];
-
-            // If we're using the preferred quotation type, check for escapes.
-            if trivia.last_quote_char == good_single(quotes_settings.inline_quotes) {
-                if !quotes_settings.avoid_escape
-                    || trivia.prefix.contains('r')
-                    || trivia.prefix.contains('R')
-                {
-                    continue;
-                }
-
-                if string_contents.contains(good_single(quotes_settings.inline_quotes))
-                    && !string_contents.contains(bad_single(quotes_settings.inline_quotes))
-                {
-                    let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, *range);
-                    if settings.rules.should_fix(Rule::AvoidableEscapedQuote) {
-                        let quote = bad_single(quotes_settings.inline_quotes);
-
-                        let mut fixed_contents =
-                            String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);
-                        fixed_contents.push_str(trivia.prefix);
-                        fixed_contents.push(quote);
-
-                        let chars: Vec<char> = string_contents.chars().collect();
-                        let mut backslash_count = 0;
-                        for col_offset in 0..chars.len() {
-                            let char = chars[col_offset];
-                            if char != '\\' {
-                                fixed_contents.push(char);
-                                continue;
-                            }
-                            backslash_count += 1;
-                            // If the previous character was also a backslash
-                            if col_offset > 0
-                                && chars[col_offset - 1] == '\\'
-                                && backslash_count == 2
-                            {
-                                fixed_contents.push(char);
-                                // reset to 0
-                                backslash_count = 0;
-                                continue;
-                            }
-                            // If we're at the end of the line
-                            if col_offset == chars.len() - 1 {
-                                fixed_contents.push(char);
-                                continue;
-                            }
-                            let next_char = chars[col_offset + 1];
-                            // Remove quote escape
-                            if next_char == '\'' || next_char == '"' {
-                                // reset to 0
-                                backslash_count = 0;
-                                continue;
-                            }
-                            fixed_contents.push(char);
-                        }
-
-                        fixed_contents.push(quote);
-
-                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                            fixed_contents,
-                            *range,
-                        )));
-                    }
-                    diagnostics.push(diagnostic);
-                }
-                continue;
-            }
-
+        } else if trivia.last_quote_char != quotes_settings.inline_quotes.as_char()
             // If we're not using the preferred type, only allow use to avoid escapes.
-            if !relax_quote {
-                let mut diagnostic = Diagnostic::new(
-                    BadQuotesInlineString {
-                        quote: quotes_settings.inline_quotes,
-                    },
+            && !relax_quote
+        {
+            let mut diagnostic = Diagnostic::new(
+                BadQuotesInlineString {
+                    preferred_quote: quotes_settings.inline_quotes,
+                },
+                *range,
+            );
+            if settings.rules.should_fix(Rule::BadQuotesInlineString) {
+                let quote = quotes_settings.inline_quotes.as_char();
+                let string_contents = &trivia.raw_text[1..trivia.raw_text.len() - 1];
+                let mut fixed_contents =
+                    String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);
+                fixed_contents.push_str(trivia.prefix);
+                fixed_contents.push(quote);
+                fixed_contents.push_str(string_contents);
+                fixed_contents.push(quote);
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    fixed_contents,
                     *range,
-                );
-                if settings.rules.should_fix(Rule::BadQuotesInlineString) {
-                    let quote = good_single(quotes_settings.inline_quotes);
-                    let mut fixed_contents =
-                        String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);
-                    fixed_contents.push_str(trivia.prefix);
-                    fixed_contents.push(quote);
-                    fixed_contents.push_str(string_contents);
-                    fixed_contents.push(quote);
-                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        fixed_contents,
-                        *range,
-                    )));
-                }
-                diagnostics.push(diagnostic);
+                )));
             }
+            diagnostics.push(diagnostic);
         }
     }
 
