@@ -746,7 +746,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pygrep_hooks::rules::no_eval(checker, func);
             }
             if checker.enabled(Rule::DeprecatedLogWarn) {
-                pygrep_hooks::rules::deprecated_log_warn(checker, func);
+                pygrep_hooks::rules::deprecated_log_warn(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDirectLambdaCall) {
                 pylint::rules::unnecessary_direct_lambda_call(checker, expr, func);
