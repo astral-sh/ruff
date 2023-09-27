@@ -90,6 +90,13 @@ impl PythonVersion {
         }
         minimum_version
     }
+
+    /// Return `true` if the current version supports [PEP 701].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    pub fn supports_pep701(self) -> bool {
+        self >= Self::Py312
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
