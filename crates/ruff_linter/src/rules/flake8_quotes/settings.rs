@@ -38,3 +38,21 @@ impl Default for Settings {
         }
     }
 }
+
+impl Quote {
+    #[must_use]
+    pub const fn opposite(self) -> Self {
+        match self {
+            Self::Double => Self::Single,
+            Self::Single => Self::Double,
+        }
+    }
+
+    /// Get the character used to represent this quote.
+    pub const fn as_char(self) -> char {
+        match self {
+            Self::Double => '"',
+            Self::Single => '\'',
+        }
+    }
+}

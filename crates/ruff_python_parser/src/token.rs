@@ -401,14 +401,7 @@ impl TryFrom<[char; 2]> for StringKind {
 
 impl fmt::Display for StringKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use StringKind::{Bytes, RawBytes, RawString, String, Unicode};
-        match self {
-            String => f.write_str(""),
-            Bytes => f.write_str("b"),
-            RawString => f.write_str("r"),
-            RawBytes => f.write_str("rb"),
-            Unicode => f.write_str("u"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -441,6 +434,17 @@ impl StringKind {
             RawBytes => 2,
         };
         len.into()
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        use StringKind::{Bytes, RawBytes, RawString, String, Unicode};
+        match self {
+            String => "",
+            Bytes => "b",
+            RawString => "r",
+            RawBytes => "rb",
+            Unicode => "u",
+        }
     }
 }
 
