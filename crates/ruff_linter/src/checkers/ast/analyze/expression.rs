@@ -863,7 +863,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::OsPathGetctime,
                 Rule::Glob,
             ]) {
-                flake8_use_pathlib::rules::replaceable_by_pathlib(checker, func);
+                flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
             if checker.enabled(Rule::PathConstructorCurrentDirectory) {
                 flake8_use_pathlib::rules::path_constructor_current_directory(checker, expr, func);
@@ -894,6 +894,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnsupportedMethodCallOnAll) {
                 flake8_pyi::rules::unsupported_method_call_on_all(checker, func);
+            }
+            if checker.enabled(Rule::PrintEmptyString) {
+                refurb::rules::print_empty_string(checker, call);
             }
             if checker.enabled(Rule::QuadraticListSummation) {
                 ruff::rules::quadratic_list_summation(checker, call);

@@ -4,6 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -74,25 +75,23 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
             visitor.calls
         };
 
-        for expr in calls {
-            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr.func.as_ref() {
-                if attr == "exception" {
-                    // Collect all referenced names in the `logging.exception` call.
-                    let names: Vec<&ast::ExprName> = {
-                        let mut names = Vec::new();
-                        for arg in &expr.arguments.args {
-                            let mut visitor = NameVisitor::default();
-                            visitor.visit_expr(arg);
-                            names.extend(visitor.names);
-                        }
-                        names
-                    };
-                    for expr in names {
-                        if expr.id == target.as_str() {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(VerboseLogMessage, expr.range()));
-                        }
+        for (expr, logging_level) in calls {
+            if matches!(logging_level, LoggingLevel::Exception) {
+                // Collect all referenced names in the `logging.exception` call.
+                let names: Vec<&ast::ExprName> = {
+                    let mut names = Vec::new();
+                    for arg in &expr.arguments.args {
+                        let mut visitor = NameVisitor::default();
+                        visitor.visit_expr(arg);
+                        names.extend(visitor.names);
+                    }
+                    names
+                };
+                for expr in names {
+                    if expr.id == target.as_str() {
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(VerboseLogMessage, expr.range()));
                     }
                 }
             }

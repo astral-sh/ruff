@@ -366,7 +366,7 @@ if (
 ):
     pass
 
- z = (
+z = (
                  a
                  +
                  # a: extracts this comment
@@ -377,7 +377,7 @@ if (
                          x and y
                      )
              )
- )
+)
 
 z = (
     (

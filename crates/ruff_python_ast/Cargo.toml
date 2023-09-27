@@ -21,8 +21,6 @@ bitflags = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
-num-bigint = { workspace = true }
-num-traits = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }

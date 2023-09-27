@@ -1,6 +1,7 @@
 use std::path::Path;
 
 pub use expression::*;
+pub use int::*;
 pub use nodes::*;
 
 pub mod all;
@@ -12,6 +13,7 @@ pub mod hashable;
 pub mod helpers;
 pub mod identifier;
 pub mod imports;
+mod int;
 pub mod node;
 mod nodes;
 pub mod parenthesize;

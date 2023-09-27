@@ -10,7 +10,12 @@ use syn::{
 };
 
 pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let DeriveInput { ident, data, .. } = input;
+    let DeriveInput {
+        ident,
+        data,
+        attrs: struct_attributes,
+        ..
+    } = input;
 
     match data {
         Data::Struct(DataStruct {
@@ -50,15 +55,39 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
                 };
             }
 
-            let options_len = output.len();
+            let docs: Vec<&Attribute> = struct_attributes
+                .iter()
+                .filter(|attr| attr.path().is_ident("doc"))
+                .collect();
+
+            // Convert the list of `doc` attributes into a single string.
+            let doc = dedent(
+                &docs
+                    .into_iter()
+                    .map(parse_doc)
+                    .collect::<syn::Result<Vec<_>>>()?
+                    .join("\n"),
+            )
+            .trim_matches('\n')
+            .to_string();
+
+            let documentation = if doc.is_empty() {
+                None
+            } else {
+                Some(quote!(
+                    fn documentation() -> Option<&'static str> {
+                        Some(&#doc)
+                    }
+                ))
+            };
 
             Ok(quote! {
-
-                impl #ident {
-                    pub const fn metadata() -> crate::options_base::OptionGroup {
-                        const OPTIONS: [(&'static str, crate::options_base::OptionEntry); #options_len] = [#(#output),*];
-                        crate::options_base::OptionGroup::new(&OPTIONS)
+                impl crate::options_base::OptionsMetadata for #ident {
+                    fn record(visit: &mut dyn crate::options_base::Visit) {
+                        #(#output);*
                     }
+
+                    #documentation
                 }
             })
         }
@@ -92,7 +121,7 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
                 let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
                 Ok(quote_spanned!(
-                    ident.span() => (#kebab_name, crate::options_base::OptionEntry::Group(#path::metadata()))
+                    ident.span() => (visit.record_set(#kebab_name, crate::options_base::OptionSet::of::<#path>()))
                 ))
             }
             _ => Err(syn::Error::new(
@@ -150,12 +179,14 @@ fn handle_option(
     let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
     Ok(quote_spanned!(
-        ident.span() => (#kebab_name, crate::options_base::OptionEntry::Field(crate::options_base::OptionField {
-            doc: &#doc,
-            default: &#default,
-            value_type: &#value_type,
-            example: &#example,
-        }))
+        ident.span() => {
+            visit.record_field(#kebab_name, crate::options_base::OptionField{
+                doc: &#doc,
+                default: &#default,
+                value_type: &#value_type,
+                example: &#example,
+            })
+        }
     ))
 }
 

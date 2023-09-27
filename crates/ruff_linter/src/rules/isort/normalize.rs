@@ -1,15 +1,10 @@
-use std::collections::BTreeSet;
-
-use crate::rules::isort::types::TrailingComma;
-
-use super::types::{AliasData, ImportBlock, ImportFromData};
+use super::settings::Settings;
+use super::types::{AliasData, ImportBlock, ImportFromData, TrailingComma};
 use super::AnnotatedImport;
 
 pub(crate) fn normalize_imports<'a>(
     imports: Vec<AnnotatedImport<'a>>,
-    combine_as_imports: bool,
-    force_single_line: bool,
-    single_line_exclusions: &'a BTreeSet<String>,
+    settings: &Settings,
 ) -> ImportBlock<'a> {
     let mut block = ImportBlock::default();
     for import in imports {
@@ -56,8 +51,10 @@ pub(crate) fn normalize_imports<'a>(
                 trailing_comma,
             } => {
                 // Whether to track each member of the import as a separate entry.
-                let isolate_aliases = force_single_line
-                    && module.map_or(true, |module| !single_line_exclusions.contains(module))
+                let isolate_aliases = settings.force_single_line
+                    && module.map_or(true, |module| {
+                        !settings.single_line_exclusions.contains(module)
+                    })
                     && !names.first().is_some_and(|alias| alias.name == "*");
 
                 // Insert comments on the statement itself.
@@ -95,7 +92,7 @@ pub(crate) fn normalize_imports<'a>(
                                 .import_from_star
                                 .entry(ImportFromData { module, level })
                                 .or_default()
-                        } else if alias.asname.is_none() || combine_as_imports {
+                        } else if alias.asname.is_none() || settings.combine_as_imports {
                             block
                                 .import_from
                                 .entry(ImportFromData { module, level })
@@ -130,7 +127,9 @@ pub(crate) fn normalize_imports<'a>(
                             .import_from_star
                             .entry(ImportFromData { module, level })
                             .or_default()
-                    } else if !isolate_aliases && (alias.asname.is_none() || combine_as_imports) {
+                    } else if !isolate_aliases
+                        && (alias.asname.is_none() || settings.combine_as_imports)
+                    {
                         block
                             .import_from
                             .entry(ImportFromData { module, level })

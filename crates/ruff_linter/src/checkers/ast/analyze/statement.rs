@@ -292,6 +292,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     stmt,
                     name,
                     parameters,
+                    returns.as_deref(),
                     decorator_list,
                     body,
                 );

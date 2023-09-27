@@ -1,12 +1,12 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 use itertools::Itertools;
+
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use num_bigint::BigInt;
-
+use crate::int;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
@@ -2584,7 +2584,7 @@ pub enum Constant {
     Bool(bool),
     Str(StringConstant),
     Bytes(BytesConstant),
-    Int(BigInt),
+    Int(int::Int),
     Float(f64),
     Complex { real: f64, imag: f64 },
     Ellipsis,

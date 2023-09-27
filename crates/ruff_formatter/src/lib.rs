@@ -55,7 +55,11 @@ use ruff_macros::CacheKey;
 use ruff_text_size::{TextRange, TextSize};
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, CacheKey)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Default)]
 pub enum IndentStyle {
