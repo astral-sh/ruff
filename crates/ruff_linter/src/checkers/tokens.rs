@@ -127,7 +127,7 @@ pub(crate) fn check_tokens(
         Rule::BadQuotesMultilineString,
         Rule::BadQuotesDocstring,
     ]) {
-        flake8_quotes::rules::from_tokens(&mut diagnostics, tokens, locator, settings);
+        flake8_quotes::rules::check_string_quotes(&mut diagnostics, tokens, locator, settings);
     }
 
     if settings.rules.any_enabled(&[
