@@ -323,3 +323,188 @@ await [1, 2, 3]
 This is more consistent to the formatting of other awaited expressions: Ruff and Black both
 remove parentheses around, e.g., `await (1)`, only retaining them when syntactically required,
 as in, e.g., `await (x := 1)`.
+
+### Line breaks between implicitly concatenated string attributes are not preserved ([#7052](https://github.com/astral-sh/ruff/issues/7052))
+
+Black preserves line breaks between implicitly concatenated string attributes.
+
+```python
+print(
+    "aaaaaaa {:.2f}% "
+    "aaaaaaaaaaaaaaaa".format(
+        (
+            ((df_aaaaaaaaaaa["key"].isna()) | (df_aaaaaaaaaaa["key"] == 0)).sum()
+            / len(df_aaaaaaaaaaa)
+        )
+        * 100
+    )
+)
+```
+
+Ruff will instead collapse them, as long as the resulting line does not exceed the configured
+line width:
+
+```python
+print(
+    "aaaaaaa {:.2f}% " "aaaaaaaaaaaaaaaa".format(
+        (
+            ((df_aaaaaaaaaaa["key"].isna()) | (df_aaaaaaaaaaa["key"] == 0)).sum()
+            / len(df_aaaaaaaaaaa)
+        )
+        * 100
+    )
+)
+```
+
+### Own-line comments on expressions don't cause the expression to expand ([#7314](https://github.com/astral-sh/ruff/issues/7314))
+
+Given an expression like:
+
+```python
+(
+    # A comment in the middle
+    some_example_var and some_example_var not in some_example_var
+)
+```
+
+Black associates the comment with `some_example_var`, thus splitting it over two lines:
+
+```python
+(
+    # A comment in the middle
+    some_example_var
+    and some_example_var not in some_example_var
+)
+```
+
+Ruff will instead associate the comment with the entire boolean expression, thus preserving the
+initial formatting:
+
+```python
+(
+    # A comment in the middle
+    some_example_var and some_example_var not in some_example_var
+)
+```
+
+### Tuples in assignments are parenthesized when expanded ([#7317](https://github.com/astral-sh/ruff/issues/7317))
+
+Ruff tends towards parenthesizing tuples (with a few exceptions), while Black tends to remove tuple
+parentheses more often.
+
+For example, Black will avoid inserting parentheses around the right-hand tuple in:
+
+```python
+def from_user_altitude_range_to_px4_altitude_range(
+    altitude_range: Tuple[float, float],
+) -> Tuple[int, int]:
+    user_minimal_coordinate, user_maximal_coordinate = (0.0, 0.0, altitude_range[0]), (
+        0.0,
+        0.0,
+        altitude_range[1],
+    )
+```
+
+Ruff will instead insert an extra pair of parentheses, to make the tuple more obvious:
+
+```python
+def from_user_altitude_range_to_px4_altitude_range(
+    altitude_range: Tuple[float, float],
+) -> Tuple[int, int]:
+    user_minimal_coordinate, user_maximal_coordinate = (
+        (0.0, 0.0, altitude_range[0]),
+        (
+            0.0,
+            0.0,
+            altitude_range[1],
+        ),
+    )
+```
+
+### Trailing commas are inserted when expanding a function definition with a single argument ([#7323](https://github.com/astral-sh/ruff/issues/7323))
+
+When a function definition with a single argument is expanded over multiple lines, Black
+will add a trailing comma in some cases, depending on whether the argument includes a type
+annotation and/or a default value.
+
+For example, Black will add a trailing comma to the first and second function definitions below,
+but not the third:
+
+```python
+def func(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+) -> None:
+    ...
+
+
+def func(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=1,
+) -> None:
+    ...
+
+
+def func(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: Argument(
+        "network_messages.pickle",
+        help="The path of the pickle file that will contain the network messages",
+    ) = 1
+) -> None:
+    ...
+```
+
+Ruff will instead insert a trailing comma in all such cases for consistency.
+
+### Parentheses around call-chain assignment values are not preserved ([#7320](https://github.com/astral-sh/ruff/issues/7320))
+
+Given:
+
+```python
+def update_emission_strength():
+    (
+        get_rgbw_emission_node_tree(self)
+        .nodes["Emission"]
+        .inputs["Strength"]
+        .default_value
+    ) = (self.emission_strength * 2)
+```
+
+Black will preserve the parentheses in `(self.emission_strength * 2)`, whereas Ruff will remove
+them.
+
+Both Black and Ruff remove such parentheses in simpler assignments, like:
+
+```python
+# Input
+def update_emission_strength():
+    value = (self.emission_strength * 2)
+
+# Black
+def update_emission_strength():
+    value = self.emission_strength * 2
+
+# Ruff
+def update_emission_strength():
+    value = self.emission_strength * 2
+```
+
+### Assignment annotations may be parenthesized when expanded ([#7315](https://github.com/astral-sh/ruff/issues/7315))
+
+Black will avoid parenthesizing type annotations in an annotated assignment, while Ruff will insert
+parentheses in some cases.
+
+For example:
+
+```python
+# Black
+StartElementHandler: Callable[[str, dict[str, str]], Any] | Callable[[str, list[str]], Any] | Callable[
+    [str, dict[str, str], list[str]], Any
+] | None
+
+# Ruff
+StartElementHandler: (
+    Callable[[str, dict[str, str]], Any]
+    | Callable[[str, list[str]], Any]
+    | Callable[[str, dict[str, str], list[str]], Any]
+    | None
+)
+```
