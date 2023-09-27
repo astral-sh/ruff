@@ -501,3 +501,24 @@ match pattern_match_or:
     # own line
     ):
         ...
+
+
+# Single-element tuples.
+match pattern:
+    case (a,):
+        pass
+
+    case (a, b):
+        pass
+
+    case (a, b,):
+        pass
+
+    case a,:
+        pass
+
+    case a, b:
+        pass
+
+    case a, b,:
+        pass
