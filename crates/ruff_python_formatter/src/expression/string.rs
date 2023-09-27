@@ -323,24 +323,32 @@ impl StringPart {
         self,
         quoting: Quoting,
         locator: &'a Locator,
-        quote_style: QuoteStyle,
+        configured_style: QuoteStyle,
     ) -> NormalizedString<'a> {
+        // Per PEP 8 and PEP 257, always prefer double quotes for docstrings and triple-quoted
+        // strings. (We assume docstrings are always triple-quoted.)
+        let preferred_style = if self.quotes.triple {
+            QuoteStyle::Double
+        } else {
+            configured_style
+        };
+
         let raw_content = locator.slice(self.content_range);
 
-        let preferred_quotes = match quoting {
+        let quotes = match quoting {
             Quoting::Preserve => self.quotes,
             Quoting::CanChange => {
                 if self.prefix.is_raw_string() {
-                    preferred_quotes_raw(raw_content, self.quotes, quote_style)
+                    choose_quotes_raw(raw_content, self.quotes, preferred_style)
                 } else {
-                    preferred_quotes(raw_content, self.quotes, quote_style)
+                    choose_quotes(raw_content, self.quotes, preferred_style)
                 }
             }
         };
 
         let normalized = normalize_string(
             locator.slice(self.content_range),
-            preferred_quotes,
+            quotes,
             self.prefix.is_raw_string(),
         );
 
@@ -348,7 +356,7 @@ impl StringPart {
             prefix: self.prefix,
             content_range: self.content_range,
             text: normalized,
-            quotes: preferred_quotes,
+            quotes,
         }
     }
 }
@@ -460,16 +468,17 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
     }
 }
 
-/// Detects the preferred quotes for raw string `input`.
-/// The configured quote style is preferred unless `input` contains unescaped quotes of the
-/// configured style. For example, `r"foo"` is preferred over `r'foo'` if the configured
-/// quote style is double quotes.
-fn preferred_quotes_raw(
+/// Choose the appropriate quote style for a raw string.
+///
+/// The preferred quote style is chosen unless the string contains unescaped quotes of the
+/// preferred style. For example, `r"foo"` is chosen over `r'foo'` if the preferred quote
+/// style is double quotes.
+fn choose_quotes_raw(
     input: &str,
     quotes: StringQuotes,
-    configured_style: QuoteStyle,
+    preferred_style: QuoteStyle,
 ) -> StringQuotes {
-    let configured_quote_char = configured_style.as_char();
+    let preferred_quote_char = preferred_style.as_char();
     let mut chars = input.chars().peekable();
     let contains_unescaped_configured_quotes = loop {
         match chars.next() {
@@ -478,7 +487,7 @@ fn preferred_quotes_raw(
                 chars.next();
             }
             // `"` or `'`
-            Some(c) if c == configured_quote_char => {
+            Some(c) if c == preferred_quote_char => {
                 if !quotes.triple {
                     break true;
                 }
@@ -487,13 +496,13 @@ fn preferred_quotes_raw(
                     // We can't turn `r'''\""'''` into `r"""\"""""`, this would confuse the parser
                     // about where the closing triple quotes start
                     None => break true,
-                    Some(next) if *next == configured_quote_char => {
+                    Some(next) if *next == preferred_quote_char => {
                         // `""` or `''`
                         chars.next();
 
                         // We can't turn `r'''""'''` into `r""""""""`, nor can we have
                         // `"""` or `'''` respectively inside the string
-                        if chars.peek().is_none() || chars.peek() == Some(&configured_quote_char) {
+                        if chars.peek().is_none() || chars.peek() == Some(&preferred_quote_char) {
                             break true;
                         }
                     }
@@ -510,26 +519,27 @@ fn preferred_quotes_raw(
         style: if contains_unescaped_configured_quotes {
             quotes.style
         } else {
-            configured_style
+            preferred_style
         },
     }
 }
 
-/// Detects the preferred quotes for `input`.
-/// * single quoted strings: The preferred quote style is the one that requires less escape sequences.
-/// * triple quoted strings: Use double quotes except the string contains a sequence of `"""`.
-fn preferred_quotes(
-    input: &str,
-    quotes: StringQuotes,
-    configured_style: QuoteStyle,
-) -> StringQuotes {
-    let preferred_style = if quotes.triple {
+/// Choose the appropriate quote style for a string.
+///
+/// For single quoted strings, the preferred quote style is used, unless the alternative quote style
+/// would require fewer escapes.
+///
+/// For triple quoted strings, the preferred quote style is always used, unless the string contains
+/// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
+/// used unless the string contains `"""`).
+fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle) -> StringQuotes {
+    let style = if quotes.triple {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
         let mut chars = input.chars().peekable();
 
         while let Some(c) = chars.next() {
-            let configured_quote_char = configured_style.as_char();
+            let preferred_quote_char = preferred_style.as_char();
             match c {
                 '\\' => {
                     if matches!(chars.peek(), Some('"' | '\\')) {
@@ -537,14 +547,14 @@ fn preferred_quotes(
                     }
                 }
                 // `"` or `'`
-                c if c == configured_quote_char => {
+                c if c == preferred_quote_char => {
                     match chars.peek().copied() {
-                        Some(c) if c == configured_quote_char => {
+                        Some(c) if c == preferred_quote_char => {
                             // `""` or `''`
                             chars.next();
 
                             match chars.peek().copied() {
-                                Some(c) if c == configured_quote_char => {
+                                Some(c) if c == preferred_quote_char => {
                                     // `"""` or `'''`
                                     chars.next();
                                     uses_triple_quotes = true;
@@ -579,7 +589,7 @@ fn preferred_quotes(
             // Keep the existing quote style.
             quotes.style
         } else {
-            configured_style
+            preferred_style
         }
     } else {
         let mut single_quotes = 0u32;
@@ -599,7 +609,7 @@ fn preferred_quotes(
             }
         }
 
-        match configured_style {
+        match preferred_style {
             QuoteStyle::Single => {
                 if single_quotes > double_quotes {
                     QuoteStyle::Double
@@ -619,7 +629,7 @@ fn preferred_quotes(
 
     StringQuotes {
         triple: quotes.triple,
-        style: preferred_style,
+        style,
     }
 }
 
@@ -668,7 +678,7 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
 }
 
 /// Adds the necessary quote escapes and removes unnecessary escape sequences when quoting `input`
-/// with the provided `style`.
+/// with the provided [`StringQuotes`] style.
 ///
 /// Returns the normalized string and whether it contains new lines.
 fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str> {
