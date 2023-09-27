@@ -45,29 +45,29 @@ struct FStringContext {
     /// Whether to check for escaped quotes in the f-string.
     check_for_escaped_quote: bool,
     /// The range of the f-string start token.
-    fstring_start_range: TextRange,
+    start_range: TextRange,
     /// The ranges of the f-string middle tokens containing escaped quotes.
-    fstring_middle_ranges: Vec<TextRange>,
+    middle_ranges_with_escapes: Vec<TextRange>,
 }
 
 impl FStringContext {
     fn new(check_for_escaped_quote: bool, fstring_start_range: TextRange) -> Self {
         Self {
             check_for_escaped_quote,
-            fstring_start_range,
-            fstring_middle_ranges: vec![],
+            start_range: fstring_start_range,
+            middle_ranges_with_escapes: vec![],
         }
     }
 
     /// Update the context to not check for escaped quotes, and clear any
     /// existing reported ranges.
-    fn do_not_check_for_escaped_quote(&mut self) {
+    fn ignore_escaped_quotes(&mut self) {
         self.check_for_escaped_quote = false;
-        self.fstring_middle_ranges.clear();
+        self.middle_ranges_with_escapes.clear();
     }
 
     fn push_fstring_middle_range(&mut self, range: TextRange) {
-        self.fstring_middle_ranges.push(range);
+        self.middle_ranges_with_escapes.push(range);
     }
 }
 
@@ -108,7 +108,7 @@ pub(crate) fn avoidable_escaped_quote(
             // ```
             if matches!(tok, Tok::String { .. } | Tok::FStringStart) {
                 if let Some(fstring_context) = fstrings.last_mut() {
-                    fstring_context.do_not_check_for_escaped_quote();
+                    fstring_context.ignore_escaped_quotes();
                     continue;
                 }
             }
@@ -120,10 +120,14 @@ pub(crate) fn avoidable_escaped_quote(
                 kind,
                 triple_quoted,
             } => {
+                if kind.is_raw() || *triple_quoted {
+                    continue;
+                }
+
                 // Check if we're using the preferred quotation style.
-                let uses_preferred_quote = leading_quote(locator.slice(tok_range))
-                    .is_some_and(|text| text.contains(quotes_settings.inline_quotes.as_char()));
-                if kind.is_raw() || *triple_quoted || !uses_preferred_quote {
+                if !leading_quote(locator.slice(tok_range))
+                    .is_some_and(|text| text.contains(quotes_settings.inline_quotes.as_char()))
+                {
                     continue;
                 }
 
@@ -136,7 +140,7 @@ pub(crate) fn avoidable_escaped_quote(
                             "{prefix}{quote}{value}{quote}",
                             prefix = kind.as_str(),
                             quote = quotes_settings.inline_quotes.opposite().as_char(),
-                            value = unescaped_string(string_contents)
+                            value = unescape_string(string_contents)
                         );
                         diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                             fixed_contents,
@@ -175,27 +179,27 @@ pub(crate) fn avoidable_escaped_quote(
                 let Some(context) = fstrings.pop() else {
                     continue;
                 };
-                if context.fstring_middle_ranges.is_empty() {
+                if context.middle_ranges_with_escapes.is_empty() {
                     // There are no `FStringMiddle` tokens containing any escaped
                     // quotes.
                     continue;
                 }
                 let mut diagnostic = Diagnostic::new(
                     AvoidableEscapedQuote,
-                    TextRange::new(context.fstring_start_range.start(), tok_range.end()),
+                    TextRange::new(context.start_range.start(), tok_range.end()),
                 );
                 if settings.rules.should_fix(diagnostic.kind.rule()) {
                     let fstring_start_edit = Edit::range_replacement(
                         // No need for `r`/`R` as we don't perform the checks
                         // for raw strings.
                         format!("f{}", quotes_settings.inline_quotes.opposite().as_char()),
-                        context.fstring_start_range,
+                        context.start_range,
                     );
                     let fstring_middle_and_end_edits = context
-                        .fstring_middle_ranges
+                        .middle_ranges_with_escapes
                         .iter()
                         .map(|&range| {
-                            Edit::range_replacement(unescaped_string(locator.slice(range)), range)
+                            Edit::range_replacement(unescape_string(locator.slice(range)), range)
                         })
                         .chain(std::iter::once(
                             // `FStringEnd` edit
@@ -220,35 +224,22 @@ pub(crate) fn avoidable_escaped_quote(
     }
 }
 
-fn unescaped_string(value: &str) -> String {
+fn unescape_string(value: &str) -> String {
     let mut fixed_contents = String::with_capacity(value.len());
 
-    let chars: Vec<char> = value.chars().collect();
-    let mut backslash_count = 0;
-    for col_offset in 0..chars.len() {
-        let char = chars[col_offset];
+    let mut chars = value.chars().peekable();
+    while let Some(char) = chars.next() {
         if char != '\\' {
             fixed_contents.push(char);
             continue;
         }
-        backslash_count += 1;
-        // If the previous character was also a backslash
-        if col_offset > 0 && chars[col_offset - 1] == '\\' && backslash_count == 2 {
-            fixed_contents.push(char);
-            // reset to 0
-            backslash_count = 0;
-            continue;
-        }
         // If we're at the end of the line
-        if col_offset == chars.len() - 1 {
+        let Some(next_char) = chars.peek() else {
             fixed_contents.push(char);
             continue;
-        }
-        let next_char = chars[col_offset + 1];
+        };
         // Remove quote escape
-        if next_char == '\'' || next_char == '"' {
-            // reset to 0
-            backslash_count = 0;
+        if matches!(*next_char, '\'' | '"') {
             continue;
         }
         fixed_contents.push(char);
