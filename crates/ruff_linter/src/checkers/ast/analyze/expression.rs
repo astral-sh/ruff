@@ -474,13 +474,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::BlockingHttpCallInAsyncFunction) {
-                flake8_async::rules::blocking_http_call(checker, expr);
+                flake8_async::rules::blocking_http_call(checker, call);
             }
             if checker.enabled(Rule::OpenSleepOrSubprocessInAsyncFunction) {
-                flake8_async::rules::open_sleep_or_subprocess_call(checker, expr);
+                flake8_async::rules::open_sleep_or_subprocess_call(checker, call);
             }
             if checker.enabled(Rule::BlockingOsCallInAsyncFunction) {
-                flake8_async::rules::blocking_os_call(checker, expr);
+                flake8_async::rules::blocking_os_call(checker, call);
             }
             if checker.any_enabled(&[Rule::Print, Rule::PPrint]) {
                 flake8_print::rules::print_call(checker, call);
@@ -508,7 +508,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::SuspiciousTelnetUsage,
                 Rule::SuspiciousFTPLibUsage,
             ]) {
-                flake8_bandit::rules::suspicious_function_call(checker, expr);
+                flake8_bandit::rules::suspicious_function_call(checker, call);
             }
             if checker.enabled(Rule::ReSubPositionalArgs) {
                 flake8_bugbear::rules::re_sub_positional_args(checker, call);
