@@ -118,11 +118,14 @@ pub(crate) fn check_tokens(
         );
     }
 
+    if settings.rules.enabled(Rule::AvoidableEscapedQuote) && settings.flake8_quotes.avoid_escape {
+        flake8_quotes::rules::avoidable_escaped_quote(&mut diagnostics, tokens, locator, settings);
+    }
+
     if settings.rules.any_enabled(&[
         Rule::BadQuotesInlineString,
         Rule::BadQuotesMultilineString,
         Rule::BadQuotesDocstring,
-        Rule::AvoidableEscapedQuote,
     ]) {
         flake8_quotes::rules::from_tokens(&mut diagnostics, tokens, locator, settings);
     }
