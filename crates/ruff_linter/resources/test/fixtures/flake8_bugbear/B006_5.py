@@ -35,3 +35,40 @@ def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
 def import_docstring_module_wrong(value: dict[str, str] = {}):
     """Docstring"""
     import os
+
+
+def import_module_wrong(value: dict[str, str] = {}):
+    """Docstring"""
+    import os; import sys
+
+
+def import_module_wrong(value: dict[str, str] = {}):
+    """Docstring"""
+    import os; import sys; x = 1
+
+
+def import_module_wrong(value: dict[str, str] = {}):
+    """Docstring"""
+    import os; import sys
+
+
+def import_module_wrong(value: dict[str, str] = {}):
+    import os; import sys
+
+
+def import_module_wrong(value: dict[str, str] = {}):
+    import os; import sys; x = 1
+
+
+def import_module_wrong(value: dict[str, str] = {}):
+    import os; import sys
+
+
+def import_module_wrong(value: dict[str, str] = {}): import os
+
+
+def import_module_wrong(value: dict[str, str] = {}): import os; import sys
+
+
+def import_module_wrong(value: dict[str, str] = {}): \
+    import os
