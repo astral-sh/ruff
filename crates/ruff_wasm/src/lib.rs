@@ -4,7 +4,7 @@ use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use ruff_formatter::{FormatResult, Formatted};
+use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::linter::{check_path, LinterResult};
@@ -14,7 +14,7 @@ use ruff_linter::settings::{flags, DUMMY_VARIABLE_RGX, PREFIXES};
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext};
+use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::{parse_tokens, AsMode, Mode};
@@ -22,7 +22,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
-use ruff_workspace::options::Options;
+use ruff_workspace::options::{FormatOptions, FormatOrOutputFormat, LintOptions, Options};
 use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -119,46 +119,32 @@ impl Workspace {
     #[wasm_bindgen(js_name = defaultSettings)]
     pub fn default_settings() -> Result<JsValue, Error> {
         serde_wasm_bindgen::to_value(&Options {
-            // Propagate defaults.
-            allowed_confusables: Some(Vec::default()),
-            builtins: Some(Vec::default()),
-            dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
-            extend_fixable: Some(Vec::default()),
-            extend_ignore: Some(Vec::default()),
-            extend_select: Some(Vec::default()),
-            extend_unfixable: Some(Vec::default()),
-            external: Some(Vec::default()),
-            ignore: Some(Vec::default()),
-            line_length: Some(LineLength::default()),
             preview: Some(false),
-            select: Some(PREFIXES.to_vec()),
+
+            // Propagate defaults.
+            builtins: Some(Vec::default()),
+
+            line_length: Some(LineLength::default()),
+
             tab_size: Some(TabSize::default()),
             target_version: Some(PythonVersion::default()),
-            // Ignore a bunch of options that don't make sense in a single-file editor.
-            cache_dir: None,
-            exclude: None,
-            extend: None,
-            extend_exclude: None,
-            extend_include: None,
-            extend_per_file_ignores: None,
-            fix: None,
-            fix_only: None,
-            fixable: None,
-            force_exclude: None,
-            output_format: None,
-            ignore_init_module_imports: None,
-            include: None,
-            logger_objects: None,
-            namespace_packages: None,
-            per_file_ignores: None,
-            required_version: None,
-            respect_gitignore: None,
-            show_fixes: None,
-            show_source: None,
-            src: None,
-            task_tags: None,
-            typing_modules: None,
-            unfixable: None,
+
+            lint: Some(LintOptions {
+                allowed_confusables: Some(Vec::default()),
+                dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
+                ignore: Some(Vec::default()),
+                select: Some(PREFIXES.to_vec()),
+                extend_fixable: Some(Vec::default()),
+                extend_select: Some(Vec::default()),
+                external: Some(Vec::default()),
+
+                ..LintOptions::default()
+            }),
+            format: Some(FormatOrOutputFormat::Format(FormatOptions {
+                indent_style: Some(IndentStyle::Space),
+                quote_style: Some(QuoteStyle::Double),
+                ..FormatOptions::default()
+            })),
             ..Options::default()
         })
         .map_err(into_error)

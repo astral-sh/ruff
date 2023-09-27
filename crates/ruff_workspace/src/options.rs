@@ -36,30 +36,6 @@ use crate::settings::LineEnding;
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
-    /// A list of allowed "confusable" Unicode characters to ignore when
-    /// enforcing `RUF001`, `RUF002`, and `RUF003`.
-    #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
-        example = r#"
-            # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
-            # which could be confused for "-", "p", and "*", respectively.
-            allowed-confusables = ["−", "ρ", "∗"]
-        "#
-    )]
-    pub allowed_confusables: Option<Vec<char>>,
-
-    /// A list of builtins to treat as defined references, in addition to the
-    /// system builtins.
-    #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
-        example = r#"
-            builtins = ["_"]
-        "#
-    )]
-    pub builtins: Option<Vec<String>>,
-
     /// A path to the cache directory.
     ///
     /// By default, Ruff stores cache results in a `.ruff_cache` directory in
@@ -77,19 +53,98 @@ pub struct Options {
     )]
     pub cache_dir: Option<String>,
 
-    /// A regular expression used to identify "dummy" variables, or those which
-    /// should be ignored when enforcing (e.g.) unused-variable rules. The
-    /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
+    /// A path to a local `pyproject.toml` file to merge into this
+    /// configuration. User home directory and environment variables will be
+    /// expanded.
+    ///
+    /// To resolve the current `pyproject.toml` file, Ruff will first resolve
+    /// this base configuration file, then merge in any properties defined
+    /// in the current configuration file.
     #[option(
-        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
-        value_type = "re.Pattern",
+        default = r#"None"#,
+        value_type = "str",
         example = r#"
-            # Only ignore variables named "_".
-            dummy-variable-rgx = "^_$"
+            # Extend the `pyproject.toml` file in the parent directory.
+            extend = "../pyproject.toml"
+            # But use a different line length.
+            line-length = 100
         "#
     )]
-    pub dummy_variable_rgx: Option<String>,
+    pub extend: Option<String>,
 
+    /// The style in which violation messages should be formatted: `"text"`
+    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
+    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
+    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
+    #[option(
+        default = r#""text""#,
+        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
+        example = r#"
+            # Group violations by containing file.
+            output-format = "grouped"
+        "#
+    )]
+    pub output_format: Option<SerializationFormat>,
+
+    /// Enable autofix behavior by-default when running `ruff` (overridden
+    /// by the `--fix` and `--no-fix` command-line flags).
+    #[option(default = "false", value_type = "bool", example = "fix = true")]
+    pub fix: Option<bool>,
+
+    /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
+    #[option(default = "false", value_type = "bool", example = "fix-only = true")]
+    pub fix_only: Option<bool>,
+
+    /// Whether to show source code snippets when reporting lint violations
+    /// (overridden by the `--show-source` command-line flag).
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # By default, always show source code snippets.
+            show-source = true
+        "#
+    )]
+    pub show_source: Option<bool>,
+
+    /// Whether to show an enumeration of all autofixed lint violations
+    /// (overridden by the `--show-fixes` command-line flag).
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enumerate all fixed violations.
+            show-fixes = true
+        "#
+    )]
+    pub show_fixes: Option<bool>,
+
+    /// Require a specific version of Ruff to be running (useful for unifying
+    /// results across many environments, e.g., with a `pyproject.toml`
+    /// file).
+    #[option(
+        default = "None",
+        value_type = "str",
+        example = r#"
+            required-version = "0.0.193"
+        "#
+    )]
+    pub required_version: Option<Version>,
+
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will
+    /// use unstable rules and fixes.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
+
+    // File resolver options
     /// A list of file patterns to exclude from linting.
     ///
     /// Exclusions are based on globs, and can be either:
@@ -114,25 +169,6 @@ pub struct Options {
         "#
     )]
     pub exclude: Option<Vec<String>>,
-
-    /// A path to a local `pyproject.toml` file to merge into this
-    /// configuration. User home directory and environment variables will be
-    /// expanded.
-    ///
-    /// To resolve the current `pyproject.toml` file, Ruff will first resolve
-    /// this base configuration file, then merge in any properties defined
-    /// in the current configuration file.
-    #[option(
-        default = r#"None"#,
-        value_type = "str",
-        example = r#"
-            # Extend the `pyproject.toml` file in the parent directory.
-            extend = "../pyproject.toml"
-            # But use a different line length.
-            line-length = 100
-        "#
-    )]
-    pub extend: Option<String>,
 
     /// A list of file patterns to omit from linting, in addition to those
     /// specified by `exclude`.
@@ -174,6 +210,218 @@ pub struct Options {
         "#
     )]
     pub extend_include: Option<Vec<String>>,
+
+    /// Whether to enforce `exclude` and `extend-exclude` patterns, even for
+    /// paths that are passed to Ruff explicitly. Typically, Ruff will lint
+    /// any paths passed in directly, even if they would typically be
+    /// excluded. Setting `force-exclude = true` will cause Ruff to
+    /// respect these exclusions unequivocally.
+    ///
+    /// This is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all
+    /// changed files to the [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit)
+    /// plugin, regardless of whether they're marked as excluded by Ruff's own
+    /// settings.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            force-exclude = true
+        "#
+    )]
+    pub force_exclude: Option<bool>,
+
+    /// A list of file patterns to include when linting.
+    ///
+    /// Inclusion are based on globs, and should be single-path patterns, like
+    /// `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is
+    /// included here not for configuration but because we lint whether e.g. the
+    /// `[project]` matches the schema.
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"["*.py", "*.pyi", "**/pyproject.toml"]"#,
+        value_type = "list[str]",
+        example = r#"
+            include = ["*.py"]
+        "#
+    )]
+    pub include: Option<Vec<String>>,
+
+    /// Whether to automatically exclude files that are ignored by `.ignore`,
+    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+    /// Enabled by default.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = r#"
+            respect-gitignore = false
+        "#
+    )]
+    pub respect_gitignore: Option<bool>,
+
+    // Generic python options
+    /// A list of builtins to treat as defined references, in addition to the
+    /// system builtins.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            builtins = ["_"]
+        "#
+    )]
+    pub builtins: Option<Vec<String>>,
+
+    /// Mark the specified directories as namespace packages. For the purpose of
+    /// module resolution, Ruff will treat those directories as if they
+    /// contained an `__init__.py` file.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            namespace-packages = ["airflow/providers"]
+        "#
+    )]
+    pub namespace_packages: Option<Vec<String>>,
+
+    /// The minimum Python version to target, e.g., when considering automatic
+    /// code upgrades, like rewriting type annotations. Ruff will not propose
+    /// changes using features that are not available in the given version.
+    ///
+    /// For example, to represent supporting Python >=3.10 or ==3.10
+    /// specify `target-version = "py310"`.
+    ///
+    /// If omitted, and Ruff is configured via a `pyproject.toml` file, the
+    /// target version will be inferred from its `project.requires-python`
+    /// field (e.g., `requires-python = ">=3.8"`). If Ruff is configured via
+    /// `ruff.toml` or `.ruff.toml`, no such inference will be performed.
+    #[option(
+        default = r#""py38""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
+        example = r#"
+            # Always generate Python 3.7-compatible code.
+            target-version = "py37"
+        "#
+    )]
+    pub target_version: Option<PythonVersion>,
+
+    /// The directories to consider when resolving first- vs. third-party
+    /// imports.
+    ///
+    /// As an example: given a Python package structure like:
+    ///
+    /// ```text
+    /// my_project
+    /// ├── pyproject.toml
+    /// └── src
+    ///     └── my_package
+    ///         ├── __init__.py
+    ///         ├── foo.py
+    ///         └── bar.py
+    /// ```
+    ///
+    /// The `./src` directory should be included in the `src` option
+    /// (e.g., `src = ["src"]`), such that when resolving imports,
+    /// `my_package.foo` is considered a first-party import.
+    ///
+    /// When omitted, the `src` directory will typically default to the
+    /// directory containing the nearest `pyproject.toml`, `ruff.toml`, or
+    /// `.ruff.toml` file (the "project root"), unless a configuration file
+    /// is explicitly provided (e.g., via the `--config` command-line flag).
+    ///
+    /// This field supports globs. For example, if you have a series of Python
+    /// packages in a `python_modules` directory, `src = ["python_modules/*"]`
+    /// would expand to incorporate all of the packages in that directory. User
+    /// home directory and environment variables will also be expanded.
+    #[option(
+        default = r#"["."]"#,
+        value_type = "list[str]",
+        example = r#"
+            # Allow imports relative to the "src" and "test" directories.
+            src = ["src", "test"]
+        "#
+    )]
+    pub src: Option<Vec<String>>,
+
+    // Global Formatting options
+    /// The line length to use when enforcing long-lines violations (like
+    /// `E501`). Must be greater than `0` and less than or equal to `320`.
+    #[option(
+        default = "88",
+        value_type = "int",
+        example = r#"
+        # Allow lines to be as long as 120 characters.
+        line-length = 120
+        "#
+    )]
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))]
+    pub line_length: Option<LineLength>,
+
+    /// The tabulation size to calculate line length.
+    #[option(
+        default = "4",
+        value_type = "int",
+        example = r#"
+            tab-size = 8
+        "#
+    )]
+    pub tab_size: Option<TabSize>,
+
+    pub lint: Option<LintOptions>,
+
+    /// The lint sections specified at the top level.
+    #[serde(flatten)]
+    pub lint_top_level: LintOptions,
+
+    /// Options to configure the code formatting.
+    ///
+    /// Previously:
+    /// The style in which violation messages should be formatted: `"text"`
+    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
+    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
+    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
+    ///
+    /// This option has been **deprecated** in favor of `output-format`
+    /// to avoid ambiguity with Ruff's upcoming formatter.
+    #[option_group]
+    pub format: Option<FormatOrOutputFormat>,
+}
+
+/// Experimental section to configure Ruff's linting. This new section will eventually
+/// replace the top-level linting options.
+///
+/// Options specified in the `lint` section take precedence over the top-level settings.
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(
+    Debug, PartialEq, Eq, Default, ConfigurationOptions, CombineOptions, Serialize, Deserialize,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct LintOptions {
+    /// A list of allowed "confusable" Unicode characters to ignore when
+    /// enforcing `RUF001`, `RUF002`, and `RUF003`.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
+            # which could be confused for "-", "p", and "*", respectively.
+            allowed-confusables = ["−", "ρ", "∗"]
+        "#
+    )]
+    pub allowed_confusables: Option<Vec<char>>,
+
+    /// A regular expression used to identify "dummy" variables, or those which
+    /// should be ignored when enforcing (e.g.) unused-variable rules. The
+    /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
+    #[option(
+        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
+        value_type = "re.Pattern",
+        example = r#"
+            # Only ignore variables named "_".
+            dummy-variable-rgx = "^_$"
+        "#
+    )]
+    pub dummy_variable_rgx: Option<String>,
 
     /// A list of rule codes or prefixes to ignore, in addition to those
     /// specified by `ignore`.
@@ -238,15 +486,6 @@ pub struct Options {
     )]
     pub external: Option<Vec<String>>,
 
-    /// Enable autofix behavior by-default when running `ruff` (overridden
-    /// by the `--fix` and `--no-fix` command-line flags).
-    #[option(default = "false", value_type = "bool", example = "fix = true")]
-    pub fix: Option<bool>,
-
-    /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
-    #[option(default = "false", value_type = "bool", example = "fix-only = true")]
-    pub fix_only: Option<bool>,
-
     /// A list of rule codes or prefixes to consider autofixable. By default,
     /// all rules are considered autofixable.
     #[option(
@@ -258,47 +497,6 @@ pub struct Options {
         "#
     )]
     pub fixable: Option<Vec<RuleSelector>>,
-
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
-    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
-    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
-    #[option(
-        default = r#""text""#,
-        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
-        example = r#"
-            # Group violations by containing file.
-            output-format = "grouped"
-        "#
-    )]
-    pub output_format: Option<SerializationFormat>,
-
-    #[option(
-        default = r#"false"#,
-        value_type = "bool",
-        example = r#"
-            force-exclude = true
-        "#
-    )]
-    /// Whether to enforce `exclude` and `extend-exclude` patterns, even for
-    /// paths that are passed to Ruff explicitly. Typically, Ruff will lint
-    /// any paths passed in directly, even if they would typically be
-    /// excluded. Setting `force-exclude = true` will cause Ruff to
-    /// respect these exclusions unequivocally.
-    ///
-    /// This is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all
-    /// changed files to the [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit)
-    /// plugin, regardless of whether they're marked as excluded by Ruff's own
-    /// settings.
-    #[option(
-        default = r#"false"#,
-        value_type = "bool",
-        example = r#"
-            force-exclude = true
-        "#
-    )]
-    pub force_exclude: Option<bool>,
 
     /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
     /// rules (like `F841`), entire categories (like `F`), or anything in
@@ -330,46 +528,6 @@ pub struct Options {
     )]
     pub ignore_init_module_imports: Option<bool>,
 
-    /// A list of file patterns to include when linting.
-    ///
-    /// Inclusion are based on globs, and should be single-path patterns, like
-    /// `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is
-    /// included here not for configuration but because we lint whether e.g. the
-    /// `[project]` matches the schema.
-    ///
-    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
-    #[option(
-        default = r#"["*.py", "*.pyi", "**/pyproject.toml"]"#,
-        value_type = "list[str]",
-        example = r#"
-            include = ["*.py"]
-        "#
-    )]
-    pub include: Option<Vec<String>>,
-
-    /// The line length to use when enforcing long-lines violations (like
-    /// `E501`). Must be greater than `0` and less than or equal to `320`.
-    #[option(
-        default = "88",
-        value_type = "int",
-        example = r#"
-        # Allow lines to be as long as 120 characters.
-        line-length = 120
-        "#
-    )]
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))]
-    pub line_length: Option<LineLength>,
-
-    /// The tabulation size to calculate line length.
-    #[option(
-        default = "4",
-        value_type = "int",
-        example = r#"
-            tab-size = 8
-        "#
-    )]
-    pub tab_size: Option<TabSize>,
-
     /// A list of objects that should be treated equivalently to a
     /// `logging.Logger` object.
     ///
@@ -395,30 +553,6 @@ pub struct Options {
     )]
     pub logger_objects: Option<Vec<String>>,
 
-    /// Require a specific version of Ruff to be running (useful for unifying
-    /// results across many environments, e.g., with a `pyproject.toml`
-    /// file).
-    #[option(
-        default = "None",
-        value_type = "str",
-        example = r#"
-            required-version = "0.0.193"
-        "#
-    )]
-    pub required_version: Option<Version>,
-
-    /// Whether to automatically exclude files that are ignored by `.ignore`,
-    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
-    /// Enabled by default.
-    #[option(
-        default = "true",
-        value_type = "bool",
-        example = r#"
-            respect-gitignore = false
-        "#
-    )]
-    pub respect_gitignore: Option<bool>,
-
     /// A list of rule codes or prefixes to enable. Prefixes can specify exact
     /// rules (like `F841`), entire categories (like `F`), or anything in
     /// between.
@@ -436,113 +570,6 @@ pub struct Options {
     )]
     pub select: Option<Vec<RuleSelector>>,
 
-    /// Whether to show source code snippets when reporting lint violations
-    /// (overridden by the `--show-source` command-line flag).
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = r#"
-            # By default, always show source code snippets.
-            show-source = true
-        "#
-    )]
-    pub show_source: Option<bool>,
-
-    /// Whether to show an enumeration of all autofixed lint violations
-    /// (overridden by the `--show-fixes` command-line flag).
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = r#"
-            # Enumerate all fixed violations.
-            show-fixes = true
-        "#
-    )]
-    pub show_fixes: Option<bool>,
-
-    /// The directories to consider when resolving first- vs. third-party
-    /// imports.
-    ///
-    /// As an example: given a Python package structure like:
-    ///
-    /// ```text
-    /// my_project
-    /// ├── pyproject.toml
-    /// └── src
-    ///     └── my_package
-    ///         ├── __init__.py
-    ///         ├── foo.py
-    ///         └── bar.py
-    /// ```
-    ///
-    /// The `./src` directory should be included in the `src` option
-    /// (e.g., `src = ["src"]`), such that when resolving imports,
-    /// `my_package.foo` is considered a first-party import.
-    ///
-    /// When omitted, the `src` directory will typically default to the
-    /// directory containing the nearest `pyproject.toml`, `ruff.toml`, or
-    /// `.ruff.toml` file (the "project root"), unless a configuration file
-    /// is explicitly provided (e.g., via the `--config` command-line flag).
-    ///
-    /// This field supports globs. For example, if you have a series of Python
-    /// packages in a `python_modules` directory, `src = ["python_modules/*"]`
-    /// would expand to incorporate all of the packages in that directory. User
-    /// home directory and environment variables will also be expanded.
-    #[option(
-        default = r#"["."]"#,
-        value_type = "list[str]",
-        example = r#"
-            # Allow imports relative to the "src" and "test" directories.
-            src = ["src", "test"]
-        "#
-    )]
-    pub src: Option<Vec<String>>,
-
-    /// Mark the specified directories as namespace packages. For the purpose of
-    /// module resolution, Ruff will treat those directories as if they
-    /// contained an `__init__.py` file.
-    #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
-        example = r#"
-            namespace-packages = ["airflow/providers"]
-        "#
-    )]
-    pub namespace_packages: Option<Vec<String>>,
-
-    /// The minimum Python version to target, e.g., when considering automatic
-    /// code upgrades, like rewriting type annotations. Ruff will not propose
-    /// changes using features that are not available in the given version.
-    ///
-    /// For example, to represent supporting Python >=3.10 or ==3.10
-    /// specify `target-version = "py310"`.
-    ///
-    /// If omitted, and Ruff is configured via a `pyproject.toml` file, the
-    /// target version will be inferred from its `project.requires-python`
-    /// field (e.g., `requires-python = ">=3.8"`). If Ruff is configured via
-    /// `ruff.toml` or `.ruff.toml`, no such inference will be performed.
-    #[option(
-        default = r#""py38""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
-        example = r#"
-            # Always generate Python 3.7-compatible code.
-            target-version = "py37"
-        "#
-    )]
-    pub target_version: Option<PythonVersion>,
-
-    /// Whether to enable preview mode. When preview mode is enabled, Ruff will
-    /// use unstable rules and fixes.
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = r#"
-            # Enable preview features
-            preview = true
-        "#
-    )]
-    pub preview: Option<bool>,
-
     /// A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
     ///
     /// Comments starting with these tags will be ignored by commented-out code
@@ -551,7 +578,9 @@ pub struct Options {
     #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,
         value_type = "list[str]",
-        example = r#"task-tags = ["HACK"]"#
+        example = r#"
+            task-tags = ["HACK"]
+        "#
     )]
     pub task_tags: Option<Vec<String>>,
 
@@ -676,20 +705,6 @@ pub struct Options {
     /// Options for the `pyupgrade` plugin.
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
-
-    /// Options to configure the code formatting.
-    ///
-    /// Previously:
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
-    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
-    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
-    ///
-    /// This option has been **deprecated** in favor of `output-format`
-    /// to avoid ambiguity with Ruff's upcoming formatter.
-    #[option_group]
-    pub format: Option<FormatOrOutputFormat>,
 
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to

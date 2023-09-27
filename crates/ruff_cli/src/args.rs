@@ -610,7 +610,7 @@ impl ConfigurationTransformer for CliOverrides {
             config.cache_dir = Some(cache_dir.clone());
         }
         if let Some(dummy_variable_rgx) = &self.dummy_variable_rgx {
-            config.dummy_variable_rgx = Some(dummy_variable_rgx.clone());
+            config.lint.dummy_variable_rgx = Some(dummy_variable_rgx.clone());
         }
         if let Some(exclude) = &self.exclude {
             config.exclude = Some(exclude.clone());
@@ -624,7 +624,7 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(fix_only) = &self.fix_only {
             config.fix_only = Some(*fix_only);
         }
-        config.rule_selections.push(RuleSelection {
+        config.lint.rule_selections.push(RuleSelection {
             select: self.select.clone(),
             ignore: self
                 .ignore
@@ -657,7 +657,7 @@ impl ConfigurationTransformer for CliOverrides {
             config.preview = Some(*preview);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
-            config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
+            config.lint.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
         }
         if let Some(respect_gitignore) = &self.respect_gitignore {
             config.respect_gitignore = Some(*respect_gitignore);

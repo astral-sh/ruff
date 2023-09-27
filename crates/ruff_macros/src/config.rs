@@ -1,13 +1,14 @@
-use ruff_python_trivia::textwrap::dedent;
-
+use proc_macro2::TokenTree;
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{
     AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput, ExprLit, Field,
-    Fields, Lit, LitStr, Path, PathArguments, PathSegment, Token, Type, TypePath,
+    Fields, Lit, LitStr, Meta, Path, PathArguments, PathSegment, Token, Type, TypePath,
 };
+
+use ruff_python_trivia::textwrap::dedent;
 
 pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let DeriveInput {
@@ -25,34 +26,39 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
             let mut output = vec![];
 
             for field in &fields.named {
-                let docs: Vec<&Attribute> = field
-                    .attrs
-                    .iter()
-                    .filter(|attr| attr.path().is_ident("doc"))
-                    .collect();
-
-                if docs.is_empty() {
-                    return Err(syn::Error::new(
-                        field.span(),
-                        "Missing documentation for field",
-                    ));
-                }
-
                 if let Some(attr) = field
                     .attrs
                     .iter()
                     .find(|attr| attr.path().is_ident("option"))
                 {
-                    output.push(handle_option(field, attr, docs)?);
-                };
-
-                if field
+                    output.push(handle_option(field, attr)?);
+                } else if field
                     .attrs
                     .iter()
                     .any(|attr| attr.path().is_ident("option_group"))
                 {
                     output.push(handle_option_group(field)?);
-                };
+                } else if let Some(serde) = field
+                    .attrs
+                    .iter()
+                    .find(|attr| attr.path().is_ident("serde"))
+                {
+                    // If a field has the `serde(flatten)` attribute, flatten the options into the parent
+                    // by calling `Type::record` instead of `visitor.visit_set`
+                    if let (Type::Path(ty), Meta::List(list)) = (&field.ty, &serde.meta) {
+                        for token in list.tokens.clone() {
+                            if let TokenTree::Ident(ident) = token {
+                                if ident == "flatten" {
+                                    let ty_name = ty.path.require_ident()?;
+                                    output.push(quote_spanned!(
+                                        ident.span() => (#ty_name::record(visit))
+                                    ));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             let docs: Vec<&Attribute> = struct_attributes
@@ -150,11 +156,20 @@ fn parse_doc(doc: &Attribute) -> syn::Result<String> {
 
 /// Parse an `#[option(doc="...", default="...", value_type="...",
 /// example="...")]` attribute and return data in the form of an `OptionField`.
-fn handle_option(
-    field: &Field,
-    attr: &Attribute,
-    docs: Vec<&Attribute>,
-) -> syn::Result<proc_macro2::TokenStream> {
+fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::TokenStream> {
+    let docs: Vec<&Attribute> = field
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .collect();
+
+    if docs.is_empty() {
+        return Err(syn::Error::new(
+            field.span(),
+            "Missing documentation for field",
+        ));
+    }
+
     // Convert the list of `doc` attributes into a single string.
     let doc = dedent(
         &docs
