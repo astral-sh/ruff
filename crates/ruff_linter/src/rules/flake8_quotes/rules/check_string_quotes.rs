@@ -1,6 +1,6 @@
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -354,8 +354,59 @@ fn strings(
     diagnostics
 }
 
+/// A builder for the f-string range.
+///
+/// For now, this is limited to the outermost f-string and doesn't support
+/// nested f-strings.
+#[derive(Debug, Default)]
+struct FStringRangeBuilder {
+    start_location: TextSize,
+    end_location: TextSize,
+    nesting: u32,
+}
+
+impl FStringRangeBuilder {
+    fn visit_token(&mut self, token: &Tok, range: TextRange) {
+        match token {
+            Tok::FStringStart => {
+                if self.nesting == 0 {
+                    self.start_location = range.start();
+                }
+                self.nesting += 1;
+            }
+            Tok::FStringEnd => {
+                self.nesting = self.nesting.saturating_sub(1);
+                if self.nesting == 0 {
+                    self.end_location = range.end();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Returns `true` if the lexer is currently inside of a f-string.
+    ///
+    /// It'll return `false` once the `FStringEnd` token for the outermost
+    /// f-string is visited.
+    const fn in_fstring(&self) -> bool {
+        self.nesting > 0
+    }
+
+    /// Returns the complete range of the previously visited f-string.
+    ///
+    /// This method should only be called once the lexer is outside of any
+    /// f-string otherwise it might return an invalid range.
+    ///
+    /// It doesn't consume the builder because there can be multiple f-strings
+    /// throughout the source code.
+    fn finish(&self) -> TextRange {
+        debug_assert!(!self.in_fstring());
+        TextRange::new(self.start_location, self.end_location)
+    }
+}
+
 /// Generate `flake8-quote` diagnostics from a token stream.
-pub(crate) fn from_tokens(
+pub(crate) fn check_string_quotes(
     diagnostics: &mut Vec<Diagnostic>,
     lxr: &[LexResult],
     locator: &Locator,
@@ -365,7 +416,13 @@ pub(crate) fn from_tokens(
     // concatenation, and should thus be handled as a single unit.
     let mut sequence = vec![];
     let mut state_machine = StateMachine::default();
+    let mut fstring_range_builder = FStringRangeBuilder::default();
     for &(ref tok, range) in lxr.iter().flatten() {
+        fstring_range_builder.visit_token(tok, range);
+        if fstring_range_builder.in_fstring() {
+            continue;
+        }
+
         let is_docstring = state_machine.consume(tok);
 
         // If this is a docstring, consume the existing sequence, then consume the
@@ -379,14 +436,23 @@ pub(crate) fn from_tokens(
                 diagnostics.push(diagnostic);
             }
         } else {
-            if tok.is_string() {
-                // If this is a string, add it to the sequence.
-                sequence.push(range);
-            } else if !matches!(tok, Tok::Comment(..) | Tok::NonLogicalNewline) {
-                // Otherwise, consume the sequence.
-                if !sequence.is_empty() {
-                    diagnostics.extend(strings(locator, &sequence, settings));
-                    sequence.clear();
+            match tok {
+                Tok::String { .. } => {
+                    // If this is a string, add it to the sequence.
+                    sequence.push(range);
+                }
+                Tok::FStringEnd => {
+                    // If this is the end of an f-string, add the entire f-string
+                    // range to the sequence.
+                    sequence.push(fstring_range_builder.finish());
+                }
+                Tok::Comment(..) | Tok::NonLogicalNewline => continue,
+                _ => {
+                    // Otherwise, consume the sequence.
+                    if !sequence.is_empty() {
+                        diagnostics.extend(strings(locator, &sequence, settings));
+                        sequence.clear();
+                    }
                 }
             }
         }
