@@ -139,15 +139,13 @@ fn move_initialization(
     indexer: &Indexer,
     generator: Generator,
 ) -> Option<Fix> {
-    let mut body = function_def.body.iter();
+    let mut body = function_def.body.iter().peekable();
 
-    let statement = body.next()?;
-    if indexer.in_multi_statement_line(statement, locator) {
+    // Avoid attempting to fix single-line functions.
+    let statement = body.peek()?;
+    if indexer.preceded_by_multi_statement_line(statement, locator) {
         return None;
     }
-
-    // Determine the indentation depth of the function body.
-    let indentation = indentation_at_offset(statement.start(), locator)?;
 
     // Set the default argument value to `None`.
     let default_edit = Edit::range_replacement("None".to_string(), default.range());
@@ -164,34 +162,43 @@ fn move_initialization(
     ));
     content.push_str(stylist.line_ending().as_str());
 
+    // Determine the indentation depth of the function body.
+    let indentation = indentation_at_offset(statement.start(), locator)?;
+
     // Indent the edit to match the body indentation.
-    let content = textwrap::indent(&content, indentation).to_string();
+    let mut content = textwrap::indent(&content, indentation).to_string();
 
-    let initialization_edit = if is_docstring_stmt(statement) {
-        // If the first statement in the function is a docstring, insert _after_ it.
-        if let Some(statement) = body.next() {
-            // If there's a second statement, insert _before_ it, but ensure this isn't a
-            // multi-statement line.
-            if indexer.in_multi_statement_line(statement, locator) {
-                return None;
+    // Find the position to insert the initialization after docstring and imports
+    let mut pos = locator.line_start(statement.start());
+    while let Some(statement) = body.next() {
+        // If the statement is a docstring or an import, insert _after_ it.
+        if is_docstring_stmt(statement)
+            || statement.is_import_stmt()
+            || statement.is_import_from_stmt()
+        {
+            if let Some(next) = body.peek() {
+                // If there's a second statement, insert _before_ it, but ensure this isn't a
+                // multi-statement line.
+                if indexer.in_multi_statement_line(statement, locator) {
+                    continue;
+                }
+                pos = locator.line_start(next.start());
+            } else if locator.full_line_end(statement.end()) == locator.text_len() {
+                // If the statement is at the end of the file, without a trailing newline, insert
+                // _after_ it with an extra newline.
+                content = format!("{}{}", stylist.line_ending().as_str(), content);
+                pos = locator.full_line_end(statement.end());
+                break;
+            } else {
+                // If this is the only statement, insert _after_ it.
+                pos = locator.full_line_end(statement.end());
+                break;
             }
-            Edit::insertion(content, locator.line_start(statement.start()))
-        } else if locator.full_line_end(statement.end()) == locator.text_len() {
-            // If the statement is at the end of the file, without a trailing newline, insert
-            // _after_ it with an extra newline.
-            Edit::insertion(
-                format!("{}{}", stylist.line_ending().as_str(), content),
-                locator.full_line_end(statement.end()),
-            )
         } else {
-            // If the docstring is the only statement, insert _after_ it.
-            Edit::insertion(content, locator.full_line_end(statement.end()))
-        }
-    } else {
-        // Otherwise, insert before the first statement.
-        let at = locator.line_start(statement.start());
-        Edit::insertion(content, at)
-    };
+            break;
+        };
+    }
 
+    let initialization_edit = Edit::insertion(content, pos);
     Some(Fix::manual_edits(default_edit, [initialization_edit]))
 }
