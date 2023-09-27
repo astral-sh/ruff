@@ -1,5 +1,5 @@
 pub(crate) use avoidable_escaped_quote::*;
-pub(crate) use from_tokens::*;
+pub(crate) use check_string_quotes::*;
 
 mod avoidable_escaped_quote;
-mod from_tokens;
+mod check_string_quotes;
