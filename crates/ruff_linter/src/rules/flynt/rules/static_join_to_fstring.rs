@@ -101,7 +101,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
             return None;
         }
         if !std::mem::take(&mut first) {
-            fstring_elements.push(helpers::to_constant_string(joiner));
+            fstring_elements.push(helpers::to_fstring_literal(joiner));
         }
         fstring_elements.push(helpers::to_fstring_element(expr)?);
     }

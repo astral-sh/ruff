@@ -12,8 +12,8 @@ fn to_formatted_value_expr(inner: &Expr) -> ast::FStringElement {
     })
 }
 
-/// Convert a string to a constant string expression.
-pub(super) fn to_constant_string(s: &str) -> ast::FStringElement {
+/// Convert a string to a literal fstring element
+pub(super) fn to_fstring_literal(s: &str) -> ast::FStringElement {
     ast::FStringElement::Literal(ast::FStringLiteralElement {
         value: s.to_owned(),
         range: TextRange::default(),
