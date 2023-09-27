@@ -2050,6 +2050,10 @@ impl McCabeOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Pep8NamingOptions {
     /// A list of names (or patterns) to ignore when considering `pep8-naming` violations.
+    ///
+    /// Supports glob patterns. For example, to ignore all names starting with
+    /// or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`.
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = r#"["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]"#,
         value_type = "list[str]",
@@ -2060,7 +2064,11 @@ pub struct Pep8NamingOptions {
     pub ignore_names: Option<Vec<String>>,
 
     /// Additional names (or patterns) to ignore when considering `pep8-naming` violations,
-    /// in addition to those included in `ignore-names`.
+    /// in addition to those included in `ignore-names`
+    ///
+    /// Supports glob patterns. For example, to ignore all names starting with
+    /// or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`.
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax)..
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2074,6 +2082,9 @@ pub struct Pep8NamingOptions {
     ///
     /// For example, Ruff will expect that any method decorated by a decorator
     /// in this list takes a `cls` argument as its first argument.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `pydantic.validator`,
+    /// rather than `validator`).
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2090,12 +2101,15 @@ pub struct Pep8NamingOptions {
     ///
     /// For example, Ruff will expect that any method decorated by a decorator
     /// in this list has no `self` or `cls` argument.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`,
+    /// rather than `teardown`).
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            # Allow a shorthand alias, `@stcmthd`, to trigger static method treatment.
-            staticmethod-decorators = ["stcmthd"]
+            # Allow Belay's `@Device.teardown` decorator to trigger static method treatment.
+            staticmethod-decorators = ["belay.Device.teardown"]
         "#
     )]
     pub staticmethod_decorators: Option<Vec<String>>,
