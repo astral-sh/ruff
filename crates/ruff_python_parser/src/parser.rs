@@ -243,7 +243,7 @@ pub fn parse_ok_tokens(
         .chain(lxr)
         .map(|(t, range)| (range.start(), t, range.end()));
     python::TopParser::new()
-        .parse(mode, lexer)
+        .parse(source, mode, lexer)
         .map_err(|e| parse_error_from_lalrpop(e, source_path))
 }
 
