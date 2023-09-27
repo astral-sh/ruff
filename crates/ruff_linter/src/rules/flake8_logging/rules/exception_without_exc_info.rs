@@ -58,12 +58,6 @@ pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall)
             ) {
                 return;
             }
-
-            if exc_info_arg_is_falsey(call, checker) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
-            }
         }
         Expr::Name(_) => {
             if !checker
@@ -73,14 +67,14 @@ pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall)
             {
                 return;
             }
-
-            if exc_info_arg_is_falsey(call, checker) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
-            }
         }
-        _ => {}
+        _ => return,
+    }
+
+    if exc_info_arg_is_falsey(call, checker) {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
     }
 }
 

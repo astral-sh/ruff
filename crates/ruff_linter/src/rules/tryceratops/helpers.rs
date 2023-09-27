@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Expr};
-
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -10,7 +9,7 @@ use ruff_python_stdlib::logging::LoggingLevel;
 pub(super) struct LoggerCandidateVisitor<'a, 'b> {
     semantic: &'a SemanticModel<'b>,
     logger_objects: &'a [String],
-    pub(super) calls: Vec<&'b ast::ExprCall>,
+    pub(super) calls: Vec<(&'b ast::ExprCall, LoggingLevel)>,
 }
 
 impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
@@ -27,25 +26,23 @@ impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
     fn visit_expr(&mut self, expr: &'b Expr) {
         if let Expr::Call(call) = expr {
             match call.func.as_ref() {
-                Expr::Attribute(_) => {
+                Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
                     if logging::is_logger_candidate(&call.func, self.semantic, self.logger_objects)
                     {
-                        self.calls.push(call);
+                        if let Some(logging_level) = LoggingLevel::from_attribute(attr) {
+                            self.calls.push((call, logging_level));
+                        };
                     }
                 }
                 Expr::Name(_) => {
-                    let Some(call_path) = self.semantic.resolve_call_path(call.func.as_ref())
-                    else {
-                        return;
-                    };
-                    let ["logging", attribute] = call_path.as_slice() else {
-                        return;
-                    };
-                    let Some(_) = LoggingLevel::from_attribute(attribute) else {
-                        return;
-                    };
-                    {
-                        self.calls.push(call);
+                    if let Some(call_path) = self.semantic.resolve_call_path(call.func.as_ref()) {
+                        if let ["logging", attribute] = call_path.as_slice() {
+                            if let Some(logging_level) = LoggingLevel::from_attribute(attribute) {
+                                {
+                                    self.calls.push((call, logging_level));
+                                }
+                            }
+                        }
                     }
                 }
                 _ => {}

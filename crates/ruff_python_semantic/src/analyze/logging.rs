@@ -24,6 +24,7 @@ pub fn is_logger_candidate(
     let Expr::Attribute(ast::ExprAttribute { value, .. }) = func else {
         return false;
     };
+
     // If the symbol was imported from another module, ensure that it's either a user-specified
     // logger object, the `logging` module itself, or `flask.current_app.logger`.
     if let Some(call_path) = semantic.resolve_call_path(value) {
