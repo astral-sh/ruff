@@ -158,6 +158,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::NumpyDeprecatedFunction) {
                         numpy::rules::deprecated_function(checker, expr);
                     }
+                    if checker.enabled(Rule::Numpy2Deprecation) {
+                        numpy::rules::numpy_2_0_deprecation(checker, expr);
+                    }
                     if checker.enabled(Rule::CollectionsNamedTuple) {
                         flake8_pyi::rules::collections_named_tuple(checker, expr);
                     }
@@ -313,6 +316,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::NumpyDeprecatedFunction) {
                 numpy::rules::deprecated_function(checker, expr);
+            }
+            if checker.enabled(Rule::Numpy2Deprecation) {
+                numpy::rules::numpy_2_0_deprecation(checker, expr);
             }
             if checker.enabled(Rule::DeprecatedMockImport) {
                 pyupgrade::rules::deprecated_mock_attribute(checker, expr);
