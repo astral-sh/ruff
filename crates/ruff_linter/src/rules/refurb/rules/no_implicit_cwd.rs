@@ -1,8 +1,6 @@
-use ruff_diagnostics::{Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
-
-
 
 use crate::checkers::ast::Checker;
 
@@ -58,7 +56,5 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
         .semantic()
         .resolve_call_path(func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["pathlib", "Path"]))
-    {
-        return;
-    }
+    {}
 }
