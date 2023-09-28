@@ -15,9 +15,9 @@ use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::codemods::CodegenStylist;
-use crate::autofix::edits::pad;
 use crate::cst::helpers::{negate, space};
+use crate::fix::codemods::CodegenStylist;
+use crate::fix::edits::pad;
 use crate::rules::flake8_comprehensions::rules::ObjectType;
 use crate::{
     checkers::ast::Checker,

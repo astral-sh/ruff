@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::ScopeKind;
 
@@ -33,14 +33,14 @@ pub struct NegateEqualOp {
     right: String,
 }
 
-impl AlwaysAutofixableViolation for NegateEqualOp {
+impl AlwaysFixableViolation for NegateEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NegateEqualOp { left, right } = self;
         format!("Use `{left} != {right}` instead of `not {left} == {right}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `!=` operator".to_string()
     }
 }
@@ -70,14 +70,14 @@ pub struct NegateNotEqualOp {
     right: String,
 }
 
-impl AlwaysAutofixableViolation for NegateNotEqualOp {
+impl AlwaysFixableViolation for NegateNotEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NegateNotEqualOp { left, right } = self;
         format!("Use `{left} == {right}` instead of `not {left} != {right}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `==` operator".to_string()
     }
 }
@@ -106,14 +106,14 @@ pub struct DoubleNegation {
     expr: String,
 }
 
-impl AlwaysAutofixableViolation for DoubleNegation {
+impl AlwaysFixableViolation for DoubleNegation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DoubleNegation { expr } = self;
         format!("Use `{expr}` instead of `not (not {expr})`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let DoubleNegation { expr } = self;
         format!("Replace with `{expr}`")
     }

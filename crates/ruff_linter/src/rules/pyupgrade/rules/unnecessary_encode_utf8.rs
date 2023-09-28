@@ -1,12 +1,12 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, PySourceType};
 use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::{pad, remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{pad, remove_argument, Parentheses};
 use crate::registry::Rule;
 
 /// ## What it does
@@ -33,7 +33,7 @@ pub struct UnnecessaryEncodeUTF8 {
     reason: Reason,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
+impl AlwaysFixableViolation for UnnecessaryEncodeUTF8 {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.reason {
@@ -42,7 +42,7 @@ impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         match self.reason {
             Reason::BytesLiteral => "Rewrite as bytes literal".to_string(),
             Reason::DefaultArgument => "Remove unnecessary `encoding` argument".to_string(),

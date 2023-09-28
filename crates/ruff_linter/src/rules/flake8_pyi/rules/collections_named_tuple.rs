@@ -43,7 +43,7 @@ impl Violation for CollectionsNamedTuple {
         format!("Use `typing.NamedTuple` instead of `collections.namedtuple`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Replace with `typing.NamedTuple`"))
     }
 }

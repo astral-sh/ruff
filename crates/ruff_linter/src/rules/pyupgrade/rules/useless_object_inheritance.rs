@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_argument, Parentheses};
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -33,14 +33,14 @@ pub struct UselessObjectInheritance {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for UselessObjectInheritance {
+impl AlwaysFixableViolation for UselessObjectInheritance {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UselessObjectInheritance { name } = self;
         format!("Class `{name}` inherits from `object`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `object` inheritance".to_string()
     }
 }

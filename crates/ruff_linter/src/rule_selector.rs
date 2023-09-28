@@ -198,16 +198,19 @@ impl RuleSelector {
         }
     }
 
-    /// Returns rules matching the selector, taking into account whether preview mode is enabled.
-    pub fn rules(&self, preview: PreviewMode) -> impl Iterator<Item = Rule> + '_ {
+    /// Returns rules matching the selector, taking into account preview options enabled.
+    pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + 'a {
+        let preview_enabled = preview.mode.is_enabled();
+        let preview_require_explicit = preview.require_explicit;
         #[allow(deprecated)]
         self.all_rules().filter(move |rule| {
             // Always include rules that are not in preview or the nursery
             !(rule.is_preview() || rule.is_nursery())
             // Backwards compatibility allows selection of nursery rules by exact code or dedicated group
             || ((matches!(self, RuleSelector::Rule { .. }) || matches!(self, RuleSelector::Nursery { .. })) && rule.is_nursery())
-            // Enabling preview includes all preview or nursery rules
-            || preview.is_enabled()
+            // Enabling preview includes all preview or nursery rules unless explicit selection
+            // is turned on
+            || (preview_enabled && (matches!(self, RuleSelector::Rule { .. }) || !preview_require_explicit))
         })
     }
 }
@@ -230,6 +233,14 @@ impl Iterator for RuleSelectorIter {
             RuleSelectorIter::Vec(iter) => iter.next(),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PreviewOptions {
+    pub mode: PreviewMode,
+    /// If true, preview rule selection requires explicit codes e.g. not prefixes.
+    /// Generally this should be derived from the user-facing `explicit-preview-rules` option.
+    pub require_explicit: bool,
 }
 
 #[cfg(feature = "schemars")]

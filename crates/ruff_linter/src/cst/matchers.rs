@@ -1,4 +1,4 @@
-use crate::autofix::codemods::CodegenStylist;
+use crate::fix::codemods::CodegenStylist;
 use anyhow::{bail, Result};
 use libcst_native::{
     Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FunctionDef,

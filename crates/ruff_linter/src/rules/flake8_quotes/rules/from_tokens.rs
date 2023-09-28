@@ -2,7 +2,7 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
 
@@ -37,7 +37,7 @@ pub struct BadQuotesInlineString {
     quote: Quote,
 }
 
-impl AlwaysAutofixableViolation for BadQuotesInlineString {
+impl AlwaysFixableViolation for BadQuotesInlineString {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadQuotesInlineString { quote } = self;
@@ -47,7 +47,7 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let BadQuotesInlineString { quote } = self;
         match quote {
             Quote::Double => "Replace single quotes with double quotes".to_string(),
@@ -86,7 +86,7 @@ pub struct BadQuotesMultilineString {
     quote: Quote,
 }
 
-impl AlwaysAutofixableViolation for BadQuotesMultilineString {
+impl AlwaysFixableViolation for BadQuotesMultilineString {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadQuotesMultilineString { quote } = self;
@@ -96,7 +96,7 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let BadQuotesMultilineString { quote } = self;
         match quote {
             Quote::Double => "Replace single multiline quotes with double quotes".to_string(),
@@ -134,7 +134,7 @@ pub struct BadQuotesDocstring {
     quote: Quote,
 }
 
-impl AlwaysAutofixableViolation for BadQuotesDocstring {
+impl AlwaysFixableViolation for BadQuotesDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadQuotesDocstring { quote } = self;
@@ -144,7 +144,7 @@ impl AlwaysAutofixableViolation for BadQuotesDocstring {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let BadQuotesDocstring { quote } = self;
         match quote {
             Quote::Double => "Replace single quotes docstring with double quotes".to_string(),
@@ -173,13 +173,13 @@ impl AlwaysAutofixableViolation for BadQuotesDocstring {
 #[violation]
 pub struct AvoidableEscapedQuote;
 
-impl AlwaysAutofixableViolation for AvoidableEscapedQuote {
+impl AlwaysFixableViolation for AvoidableEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Change outer quotes to avoid escaping inner quotes")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Change outer quotes to avoid escaping inner quotes".to_string()
     }
 }

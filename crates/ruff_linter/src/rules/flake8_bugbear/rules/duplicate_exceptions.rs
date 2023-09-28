@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path;
@@ -86,7 +86,7 @@ pub struct DuplicateHandlerException {
     pub names: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for DuplicateHandlerException {
+impl AlwaysFixableViolation for DuplicateHandlerException {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DuplicateHandlerException { names } = self;
@@ -98,7 +98,7 @@ impl AlwaysAutofixableViolation for DuplicateHandlerException {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "De-duplicate exceptions".to_string()
     }
 }

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::whitespace::indentation;
@@ -44,14 +44,14 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 pub struct PrintfStringFormatting;
 
 impl Violation for PrintfStringFormatting {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use format specifiers instead of percent format")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Replace with format specifiers".to_string())
     }
 }
@@ -465,7 +465,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     contents.push_str(&format!(".format{params_string}"));
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
-    // Avoid autofix if there are comments within the right-hand side:
+    // Avoid fix if there are comments within the right-hand side:
     // ```
     // "%s" % (
     //     0,  # 0

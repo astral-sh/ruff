@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -28,13 +28,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnicodeKindPrefix;
 
-impl AlwaysAutofixableViolation for UnicodeKindPrefix {
+impl AlwaysFixableViolation for UnicodeKindPrefix {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Remove unicode literals from strings")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove unicode prefix".to_string()
     }
 }

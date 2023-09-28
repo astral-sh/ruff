@@ -29,7 +29,7 @@ An extremely fast Python linter, written in Rust.
 - 🛠️ `pyproject.toml` support
 - 🤝 Python 3.11 compatibility
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
-- 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
+- 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [700 built-in rules](https://docs.astral.sh/ruff/rules/)
 - ⚖️ [Near-parity](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8) with the
     built-in Flake8 rule set
@@ -176,7 +176,7 @@ If left unspecified, the default configuration is equivalent to:
 select = ["E", "F"]
 ignore = []
 
-# Allow autofix for all enabled rules (when `--fix`) is provided.
+# Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["A", "B", "C", "D", "E", "F", "G", "I", "N", "Q", "S", "T", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "EM", "ERA", "EXE", "FBT", "ICN", "INP", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
 unfixable = []
 

@@ -8,7 +8,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
-use crate::autofix::snippet::SourceCodeSnippet;
+use crate::fix::snippet::SourceCodeSnippet;
 use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 
 /// ## What it does

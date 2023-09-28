@@ -917,11 +917,11 @@ COM81.py:627:20: COM812 [*] Trailing comma missing
     627 |+    **{'ham': spam},
 628 628 | )
 629 629 | 
-630 630 | # Make sure the COM812 and UP034 rules don't autofix simultaneously and cause a syntax error.
+630 630 | # Make sure the COM812 and UP034 rules don't fix simultaneously and cause a syntax error.
 
 COM81.py:632:42: COM812 [*] Trailing comma missing
     |
-630 | # Make sure the COM812 and UP034 rules don't autofix simultaneously and cause a syntax error.
+630 | # Make sure the COM812 and UP034 rules don't fix simultaneously and cause a syntax error.
 631 | the_first_one = next(
 632 |     (i for i in range(10) if i // 2 == 0)  # COM812 fix should include the final bracket
     |                                           COM812
@@ -931,7 +931,7 @@ COM81.py:632:42: COM812 [*] Trailing comma missing
 
 ℹ Fix
 629 629 | 
-630 630 | # Make sure the COM812 and UP034 rules don't autofix simultaneously and cause a syntax error.
+630 630 | # Make sure the COM812 and UP034 rules don't fix simultaneously and cause a syntax error.
 631 631 | the_first_one = next(
 632     |-    (i for i in range(10) if i // 2 == 0)  # COM812 fix should include the final bracket
     632 |+    (i for i in range(10) if i // 2 == 0),  # COM812 fix should include the final bracket

@@ -13,7 +13,7 @@ exit_code: 0
 
 Derived from the **Pyflakes** linter.
 
-Autofix is sometimes available.
+Fix is sometimes available.
 
 ## What it does
 Checks for unused imports.

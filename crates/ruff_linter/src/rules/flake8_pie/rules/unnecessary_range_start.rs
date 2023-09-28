@@ -1,11 +1,11 @@
 use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_argument, Parentheses};
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -31,13 +31,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnnecessaryRangeStart;
 
-impl AlwaysAutofixableViolation for UnnecessaryRangeStart {
+impl AlwaysFixableViolation for UnnecessaryRangeStart {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary `start` argument in `range`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove `start` argument")
     }
 }

@@ -131,7 +131,7 @@ RET504.py:342:12: RET504 [*] Unnecessary assignment to `b` before `return` state
     = help: Remove unnecessary assignment
 
 ℹ Suggested fix
-338 338 | # Autofix cases
+338 338 | # Fix cases
 339 339 | def foo():
 340 340 |     a = 1
 341     |-    b=a

@@ -187,7 +187,6 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             parenthesize,
         } = self;
 
-        let comments = f.context().comments();
         let preserve_parentheses = parenthesize.is_optional()
             && is_expression_parenthesized(
                 (*expression).into(),
@@ -195,14 +194,20 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 f.context().source(),
             );
 
-        let node_comments = comments.leading_dangling_trailing(*expression);
+        // If we want to preserve parentheses, short-circuit.
+        if preserve_parentheses {
+            return expression.format().with_options(Parentheses::Always).fmt(f);
+        }
 
-        let has_comments = node_comments.has_leading() || node_comments.has_trailing_own_line();
+        let node_comments = f
+            .context()
+            .comments()
+            .leading_dangling_trailing(*expression);
 
         // If the expression has comments, we always want to preserve the parentheses. This also
         // ensures that we correctly handle parenthesized comments, and don't need to worry about
         // them in the implementation below.
-        if preserve_parentheses || has_comments {
+        if node_comments.has_leading() || node_comments.has_trailing_own_line() {
             return expression.format().with_options(Parentheses::Always).fmt(f);
         }
 
@@ -252,11 +257,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                         // The group id is necessary because the nested expressions may reference it.
                         let group_id = f.group_id("optional_parentheses");
                         let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
-                        ruff_formatter::prelude::best_fit_parenthesize(
-                            &expression.format().with_options(Parentheses::Never),
-                        )
-                        .with_group_id(Some(group_id))
-                        .fmt(f)
+                        best_fit_parenthesize(&expression.format().with_options(Parentheses::Never))
+                            .with_group_id(Some(group_id))
+                            .fmt(f)
                     }
                 }
             },
