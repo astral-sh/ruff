@@ -88,7 +88,7 @@ pub struct CheckCommand {
     show_source: bool,
     #[clap(long, overrides_with("show_source"), hide = true)]
     no_show_source: bool,
-    /// Show an enumeration of all autofixed lint violations.
+    /// Show an enumeration of all fixed lint violations.
     /// Use `--no-show-fixes` to disable.
     #[arg(long, overrides_with("no_show_fixes"))]
     show_fixes: bool,
@@ -202,7 +202,7 @@ pub struct CheckCommand {
         help_heading = "File selection"
     )]
     pub extend_exclude: Option<Vec<FilePattern>>,
-    /// List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`).
+    /// List of rule codes to treat as eligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
@@ -212,7 +212,7 @@ pub struct CheckCommand {
         hide_possible_values = true
     )]
     pub fixable: Option<Vec<RuleSelector>>,
-    /// List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`).
+    /// List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
@@ -288,7 +288,7 @@ pub struct CheckCommand {
         conflicts_with = "exit_non_zero_on_fix"
     )]
     pub exit_zero: bool,
-    /// Exit with a non-zero status code if any files were modified via autofix, even if no lint violations remain.
+    /// Exit with a non-zero status code if any files were modified via fix, even if no lint violations remain.
     #[arg(long, help_heading = "Miscellaneous", conflicts_with = "exit_zero")]
     pub exit_non_zero_on_fix: bool,
     /// Show counts for every rule with at least one violation.

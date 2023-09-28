@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
@@ -32,13 +32,13 @@ use crate::settings::LinterSettings;
 #[violation]
 pub struct UTF8EncodingDeclaration;
 
-impl AlwaysAutofixableViolation for UTF8EncodingDeclaration {
+impl AlwaysFixableViolation for UTF8EncodingDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("UTF-8 encoding declaration is unnecessary")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove unnecessary coding comment".to_string()
     }
 }

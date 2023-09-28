@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic};
+use ruff_diagnostics::{Diagnostic, FixKind};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -19,8 +19,8 @@ use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
-use crate::autofix::{fix_file, FixResult};
 use crate::directives;
+use crate::fix::{fix_file, FixResult};
 use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
@@ -102,7 +102,7 @@ pub(crate) fn max_iterations() -> usize {
 }
 
 /// A convenient wrapper around [`check_path`], that additionally
-/// asserts that autofixes converge after a fixed number of iterations.
+/// asserts that fixes converge after a fixed number of iterations.
 pub(crate) fn test_contents<'a>(
     source_kind: &'a SourceKind,
     path: &Path,
@@ -140,7 +140,7 @@ pub(crate) fn test_contents<'a>(
 
     let source_has_errors = error.is_some();
 
-    // Detect autofixes that don't converge after multiple iterations.
+    // Detect fixes that don't converge after multiple iterations.
     let mut iterations = 0;
 
     let mut transformed = Cow::Borrowed(source_kind);
@@ -238,20 +238,20 @@ Source with applied fixes:
             let rule = diagnostic.kind.rule();
             let fixable = diagnostic.fix.is_some();
 
-            match (fixable, rule.autofixable()) {
-                (true, AutofixKind::Sometimes | AutofixKind::Always)
-                | (false, AutofixKind::None | AutofixKind::Sometimes) => {
+            match (fixable, rule.fixable()) {
+                (true, FixKind::Sometimes | FixKind::Always)
+                | (false, FixKind::None | FixKind::Sometimes) => {
                     // Ok
                 }
-                (true, AutofixKind::None) => {
-                    panic!("Rule {rule:?} is marked as non-fixable but it created a fix. Change the `Violation::AUTOFIX` to either `AutofixKind::Sometimes` or `AutofixKind::Always`");
+                (true, FixKind::None) => {
+                    panic!("Rule {rule:?} is marked as non-fixable but it created a fix. Change the `Violation::FIX_KIND` to either `FixKind::Sometimes` or `FixKind::Always`");
                 },
-                (false, AutofixKind::Always) => {
-                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::AUTOFIX` to either `AutofixKind::Sometimes` or `AutofixKind::None")
+                (false, FixKind::Always) => {
+                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::FIX_KINDd` to either `FixKind::Sometimes` or `FixKind::None")
                 }
             }
 
-            assert!(!(fixable && diagnostic.kind.suggestion.is_none()), "Diagnostic emitted by {rule:?} is fixable but `Violation::autofix_title` returns `None`.`");
+            assert!(!(fixable && diagnostic.kind.suggestion.is_none()), "Diagnostic emitted by {rule:?} is fixable but `Violation::fix_title` returns `None`.`");
 
             // Not strictly necessary but adds some coverage for this code path
             let noqa = directives.noqa_line_for.resolve(diagnostic.start());

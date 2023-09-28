@@ -12,9 +12,9 @@ use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use ruff_text_size::TextRange;
 
-use crate::autofix::codemods::CodegenStylist;
 use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
+use crate::fix::codemods::CodegenStylist;
 
 fn parenthesize_and_operand(expr: Expression) -> Expression {
     match &expr {

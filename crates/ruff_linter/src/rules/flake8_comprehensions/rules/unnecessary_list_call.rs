@@ -1,6 +1,6 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -28,13 +28,13 @@ use super::helpers;
 #[violation]
 pub struct UnnecessaryListCall;
 
-impl AlwaysAutofixableViolation for UnnecessaryListCall {
+impl AlwaysFixableViolation for UnnecessaryListCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary `list` call (remove the outer call to `list()`)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove outer `list` call".to_string()
     }
 }

@@ -1,6 +1,6 @@
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::AlwaysAutofixableViolation;
+use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -28,13 +28,13 @@ use ruff_source_file::Locator;
 #[violation]
 pub struct InvalidCharacterBackspace;
 
-impl AlwaysAutofixableViolation for InvalidCharacterBackspace {
+impl AlwaysFixableViolation for InvalidCharacterBackspace {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Invalid unescaped character backspace, use \"\\b\" instead")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with escape sequence".to_string()
     }
 }
@@ -61,13 +61,13 @@ impl AlwaysAutofixableViolation for InvalidCharacterBackspace {
 #[violation]
 pub struct InvalidCharacterSub;
 
-impl AlwaysAutofixableViolation for InvalidCharacterSub {
+impl AlwaysFixableViolation for InvalidCharacterSub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Invalid unescaped character SUB, use \"\\x1A\" instead")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with escape sequence".to_string()
     }
 }
@@ -94,13 +94,13 @@ impl AlwaysAutofixableViolation for InvalidCharacterSub {
 #[violation]
 pub struct InvalidCharacterEsc;
 
-impl AlwaysAutofixableViolation for InvalidCharacterEsc {
+impl AlwaysFixableViolation for InvalidCharacterEsc {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Invalid unescaped character ESC, use \"\\x1B\" instead")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with escape sequence".to_string()
     }
 }
@@ -127,13 +127,13 @@ impl AlwaysAutofixableViolation for InvalidCharacterEsc {
 #[violation]
 pub struct InvalidCharacterNul;
 
-impl AlwaysAutofixableViolation for InvalidCharacterNul {
+impl AlwaysFixableViolation for InvalidCharacterNul {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Invalid unescaped character NUL, use \"\\0\" instead")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with escape sequence".to_string()
     }
 }
@@ -159,13 +159,13 @@ impl AlwaysAutofixableViolation for InvalidCharacterNul {
 #[violation]
 pub struct InvalidCharacterZeroWidthSpace;
 
-impl AlwaysAutofixableViolation for InvalidCharacterZeroWidthSpace {
+impl AlwaysFixableViolation for InvalidCharacterZeroWidthSpace {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Invalid unescaped character zero-width-space, use \"\\u200B\" instead")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with escape sequence".to_string()
     }
 }

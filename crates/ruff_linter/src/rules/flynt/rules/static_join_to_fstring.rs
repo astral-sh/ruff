@@ -1,13 +1,13 @@
 use itertools::Itertools;
 
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::AsRule;
 use crate::rules::flynt::helpers;
 
@@ -34,7 +34,7 @@ pub struct StaticJoinToFString {
     expression: SourceCodeSnippet,
 }
 
-impl AlwaysAutofixableViolation for StaticJoinToFString {
+impl AlwaysFixableViolation for StaticJoinToFString {
     #[derive_message_formats]
     fn message(&self) -> String {
         let StaticJoinToFString { expression } = self;
@@ -45,7 +45,7 @@ impl AlwaysAutofixableViolation for StaticJoinToFString {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let StaticJoinToFString { expression } = self;
         if let Some(expression) = expression.full_display() {
             format!("Replace with `{expression}`")

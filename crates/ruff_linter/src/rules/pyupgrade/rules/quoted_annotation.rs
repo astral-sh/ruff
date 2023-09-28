@@ -1,6 +1,6 @@
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -39,13 +39,13 @@ use crate::registry::Rule;
 #[violation]
 pub struct QuotedAnnotation;
 
-impl AlwaysAutofixableViolation for QuotedAnnotation {
+impl AlwaysFixableViolation for QuotedAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Remove quotes from type annotation")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove quotes".to_string()
     }
 }

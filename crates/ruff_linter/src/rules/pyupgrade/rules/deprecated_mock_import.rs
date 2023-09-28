@@ -6,8 +6,8 @@ use libcst_native::{
 use log::error;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use crate::autofix::codemods::CodegenStylist;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::codemods::CodegenStylist;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::whitespace::indentation;
@@ -52,13 +52,13 @@ pub struct DeprecatedMockImport {
     reference_type: MockReference,
 }
 
-impl AlwaysAutofixableViolation for DeprecatedMockImport {
+impl AlwaysFixableViolation for DeprecatedMockImport {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`mock` is deprecated, use `unittest.mock`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let DeprecatedMockImport { reference_type } = self;
         match reference_type {
             MockReference::Import => "Import from `unittest.mock` instead".to_string(),

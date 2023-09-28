@@ -7,7 +7,7 @@ use libcst_native::{
     SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace,
 };
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -20,11 +20,11 @@ use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
-use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
 use crate::cst::helpers::negate;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
+use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
@@ -62,14 +62,14 @@ use super::unittest_assert::UnittestAssert;
 pub struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Assertion should be broken down into multiple parts")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Break down assertion into multiple parts".to_string())
     }
 }
@@ -192,7 +192,7 @@ pub struct PytestUnittestAssertion {
 }
 
 impl Violation for PytestUnittestAssertion {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -200,7 +200,7 @@ impl Violation for PytestUnittestAssertion {
         format!("Use a regular `assert` instead of unittest-style `{assertion}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let PytestUnittestAssertion { assertion } = self;
         Some(format!("Replace `{assertion}(...)` with `assert ...`"))
     }
@@ -354,7 +354,7 @@ pub struct PytestUnittestRaisesAssertion {
 }
 
 impl Violation for PytestUnittestRaisesAssertion {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -362,7 +362,7 @@ impl Violation for PytestUnittestRaisesAssertion {
         format!("Use `pytest.raises` instead of unittest-style `{assertion}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let PytestUnittestRaisesAssertion { assertion } = self;
         Some(format!("Replace `{assertion}` with `pytest.raises`"))
     }

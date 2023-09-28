@@ -2,7 +2,7 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
@@ -87,13 +87,13 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 #[violation]
 pub struct UselessSemicolon;
 
-impl AlwaysAutofixableViolation for UselessSemicolon {
+impl AlwaysFixableViolation for UselessSemicolon {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Statement ends with an unnecessary semicolon")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove unnecessary semicolon")
     }
 }

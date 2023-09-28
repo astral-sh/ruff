@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
@@ -25,13 +25,13 @@ use super::super::detection::comment_contains_code;
 #[violation]
 pub struct CommentedOutCode;
 
-impl AlwaysAutofixableViolation for CommentedOutCode {
+impl AlwaysFixableViolation for CommentedOutCode {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Found commented-out code")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove commented-out code".to_string()
     }
 }

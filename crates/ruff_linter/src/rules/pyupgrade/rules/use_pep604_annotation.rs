@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr, ExprContext, Operator};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::pad;
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -45,14 +45,14 @@ use crate::registry::AsRule;
 pub struct NonPEP604Annotation;
 
 impl Violation for NonPEP604Annotation {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `X | Y` for type annotations")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Convert to `X | Y`".to_string())
     }
 }

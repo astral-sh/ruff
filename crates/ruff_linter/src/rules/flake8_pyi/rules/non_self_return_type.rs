@@ -104,7 +104,7 @@ impl Violation for NonSelfReturnType {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Consider using `typing_extensions.Self` as return type".to_string())
     }
 }

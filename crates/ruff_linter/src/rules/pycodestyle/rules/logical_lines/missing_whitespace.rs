@@ -1,5 +1,5 @@
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextSize};
@@ -39,25 +39,21 @@ impl MissingWhitespace {
     }
 }
 
-impl AlwaysAutofixableViolation for MissingWhitespace {
+impl AlwaysFixableViolation for MissingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
         let token = self.token_text();
         format!("Missing whitespace after '{token}'")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let token = self.token_text();
         format!("Added missing whitespace after '{token}'")
     }
 }
 
 /// E231
-pub(crate) fn missing_whitespace(
-    line: &LogicalLine,
-    autofix: bool,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn missing_whitespace(line: &LogicalLine, fix: bool, context: &mut LogicalLinesContext) {
     let mut open_parentheses = 0u32;
     let mut prev_lsqb = TextSize::default();
     let mut prev_lbrace = TextSize::default();
@@ -105,7 +101,7 @@ pub(crate) fn missing_whitespace(
                     let kind = MissingWhitespace { token: kind };
                     let mut diagnostic = Diagnostic::new(kind, token.range());
 
-                    if autofix {
+                    if fix {
                         diagnostic.set_fix(Fix::automatic(Edit::insertion(
                             " ".to_string(),
                             token.end(),

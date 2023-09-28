@@ -72,7 +72,7 @@ impl From<Rule> for SerializeRuleAsCode {
 pub(crate) struct Printer {
     format: SerializationFormat,
     log_level: LogLevel,
-    autofix_level: flags::FixMode,
+    fix_mode: flags::FixMode,
     flags: Flags,
 }
 
@@ -80,13 +80,13 @@ impl Printer {
     pub(crate) const fn new(
         format: SerializationFormat,
         log_level: LogLevel,
-        autofix_level: flags::FixMode,
+        fix_mode: flags::FixMode,
         flags: Flags,
     ) -> Self {
         Self {
             format,
             log_level,
-            autofix_level,
+            fix_mode,
             flags,
         }
     }
@@ -118,7 +118,7 @@ impl Printer {
                     writeln!(writer, "Found {remaining} error{s}.")?;
                 }
 
-                if show_fix_status(self.autofix_level) {
+                if show_fix_status(self.fix_mode) {
                     let num_fixable = diagnostics
                         .messages
                         .iter()
@@ -140,7 +140,7 @@ impl Printer {
                     .sum::<usize>();
                 if fixed > 0 {
                     let s = if fixed == 1 { "" } else { "s" };
-                    if self.autofix_level.is_apply() {
+                    if self.fix_mode.is_apply() {
                         writeln!(writer, "Fixed {fixed} error{s}.")?;
                     } else {
                         writeln!(writer, "Would fix {fixed} error{s}.")?;
@@ -191,7 +191,7 @@ impl Printer {
             }
             SerializationFormat::Text => {
                 TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.autofix_level))
+                    .with_show_fix_status(show_fix_status(self.fix_mode))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
@@ -209,7 +209,7 @@ impl Printer {
             SerializationFormat::Grouped => {
                 GroupedEmitter::default()
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
-                    .with_show_fix_status(show_fix_status(self.autofix_level))
+                    .with_show_fix_status(show_fix_status(self.fix_mode))
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
@@ -366,7 +366,7 @@ impl Printer {
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             TextEmitter::default()
-                .with_show_fix_status(show_fix_status(self.autofix_level))
+                .with_show_fix_status(show_fix_status(self.fix_mode))
                 .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                 .emit(writer, &diagnostics.messages, &context)?;
         }
@@ -390,13 +390,13 @@ fn num_digits(n: usize) -> usize {
 }
 
 /// Return `true` if the [`Printer`] should indicate that a rule is fixable.
-const fn show_fix_status(autofix_level: flags::FixMode) -> bool {
+const fn show_fix_status(fix_mode: flags::FixMode) -> bool {
     // If we're in application mode, avoid indicating that a rule is fixable.
     // If the specific violation were truly fixable, it would've been fixed in
     // this pass! (We're occasionally unable to determine whether a specific
-    // violation is fixable without trying to fix it, so if autofix is not
+    // violation is fixable without trying to fix it, so if fix is not
     // enabled, we may inadvertently indicate that a rule is fixable.)
-    !autofix_level.is_apply()
+    !fix_mode.is_apply()
 }
 
 fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {

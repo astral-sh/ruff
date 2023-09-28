@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_false;
 
@@ -33,13 +33,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct AssertFalse;
 
-impl AlwaysAutofixableViolation for AssertFalse {
+impl AlwaysFixableViolation for AssertFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace `assert False`".to_string()
     }
 }

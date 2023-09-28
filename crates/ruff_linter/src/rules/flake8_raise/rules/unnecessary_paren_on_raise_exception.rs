@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -31,13 +31,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnnecessaryParenOnRaiseException;
 
-impl AlwaysAutofixableViolation for UnnecessaryParenOnRaiseException {
+impl AlwaysFixableViolation for UnnecessaryParenOnRaiseException {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary parentheses on raised exception")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove unnecessary parentheses")
     }
 }

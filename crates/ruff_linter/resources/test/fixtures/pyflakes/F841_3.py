@@ -1,4 +1,4 @@
-"""Test case for autofixing F841 violations."""
+"""Test case for fixing F841 violations."""
 
 
 def f():

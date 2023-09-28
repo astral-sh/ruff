@@ -17,9 +17,9 @@ use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::textwrap::indent;
 use ruff_source_file::Locator;
 
-use crate::autofix;
-use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
+use crate::fix;
+use crate::fix::codemods::CodegenStylist;
 use crate::importer::insertion::Insertion;
 
 mod insertion;
@@ -91,7 +91,7 @@ impl<'a> Importer<'a> {
         at: TextSize,
     ) -> Result<RuntimeImportEdit> {
         // Generate the modified import statement.
-        let content = autofix::codemods::retain_imports(
+        let content = fix::codemods::retain_imports(
             &import.names,
             import.statement,
             self.locator,
@@ -124,7 +124,7 @@ impl<'a> Importer<'a> {
         source_type: PySourceType,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
-        let content = autofix::codemods::retain_imports(
+        let content = fix::codemods::retain_imports(
             &import.names,
             import.statement,
             self.locator,
