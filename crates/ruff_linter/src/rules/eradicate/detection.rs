@@ -39,14 +39,13 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
         return false;
     };
 
-    // Ignore task tag comments (e.g., "# TODO(tom): Refactor foo").
-    if let Some(first) = line.split(&[' ', ':', '(']).next() {
-        if task_tags
-            .iter()
-            .any(|tag| tag == first.to_uppercase().as_str())
-        {
-            return false;
-        }
+    // Ignore task tag comments (e.g., "# TODO(tom): Refactor").
+    if line
+        .split(&[' ', ':', '('])
+        .next()
+        .is_some_and(|first| task_tags.iter().any(|tag| tag == first))
+    {
+        return false;
     }
 
     // Ignore non-comment related hashes (e.g., "# Issue #999").
@@ -287,86 +286,39 @@ mod tests {
 
     #[test]
     fn comment_contains_todo() {
-        // Test with default TASK_TAGS.
-        let binding = TASK_TAGS
+        let task_tags = TASK_TAGS
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
-        let default_task_tags: &[String] = &binding;
 
         assert!(!comment_contains_code(
             "# TODO(tom): Rewrite in Rust",
-            default_task_tags
+            &task_tags
         ));
         assert!(!comment_contains_code(
             "# TODO: Rewrite in Rust",
-            default_task_tags
+            &task_tags
         ));
-        assert!(!comment_contains_code(
-            "# TODO:Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# todo(tom): Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# todo: Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# todo:Rewrite in Rust",
-            default_task_tags
-        ));
+        assert!(!comment_contains_code("# TODO:Rewrite in Rust", &task_tags));
 
         assert!(!comment_contains_code(
             "# FIXME(tom): Rewrite in Rust",
-            default_task_tags
+            &task_tags
         ));
         assert!(!comment_contains_code(
             "# FIXME: Rewrite in Rust",
-            default_task_tags
+            &task_tags
         ));
         assert!(!comment_contains_code(
             "# FIXME:Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# fixme(tom): Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# fixme: Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# fixme:Rewrite in Rust",
-            default_task_tags
+            &task_tags
         ));
 
         assert!(!comment_contains_code(
             "# XXX(tom): Rewrite in Rust",
-            default_task_tags
+            &task_tags
         ));
-        assert!(!comment_contains_code(
-            "# XXX: Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# XXX:Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# xxx(tom): Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# xxx: Rewrite in Rust",
-            default_task_tags
-        ));
-        assert!(!comment_contains_code(
-            "# xxx:Rewrite in Rust",
-            default_task_tags
-        ));
+        assert!(!comment_contains_code("# XXX: Rewrite in Rust", &task_tags));
+        assert!(!comment_contains_code("# XXX:Rewrite in Rust", &task_tags));
     }
 }
