@@ -450,12 +450,15 @@ impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
     }
 }
 
-/// A helper for normalizing comments efficiently.
+/// A helper for normalizing comments by:
+/// * Trimming any trailing whitespace.
+/// * Adding a leading space after the `#`, if necessary.
 ///
-/// * Return as fast as possible without making unnecessary allocations.
-/// * Trim any trailing whitespace.
-/// * Normalize for a leading '# '.
-/// * Retain non-breaking spaces for 'type:' pragmas by leading with '# \u{A0}'.
+/// For example:
+/// * `#comment` is normalized to `# comment`.
+/// * `# comment ` is normalized to `# comment`.
+/// * `#  comment` is left as-is.
+/// * `#!comment` is left as-is.
 fn normalize_comment<'a>(
     comment: &'a SourceComment,
     source: SourceCode<'a>,
@@ -471,16 +474,16 @@ fn normalize_comment<'a>(
         return Ok(Cow::Borrowed("#"));
     }
 
-    // Fast path for correctly formatted comments:
-    // * Start with a `# '.
-    // * Have no trailing whitespace.
+    // Fast path for correctly formatted comments: if the comment starts with a space, or any
+    // of the allowed characters, then it's included verbatim (apart for trimming any trailing
+    // whitespace).
     if content.starts_with([' ', '!', ':', '#', '\'']) {
         return Ok(Cow::Borrowed(trimmed));
     }
 
+    // Otherwise, we need to normalize the comment by adding a space after the `#`.
     if content.starts_with('\u{A0}') {
         let trimmed = content.trim_start_matches('\u{A0}');
-
         if trimmed.trim_start().starts_with("type:") {
             // Black adds a space before the non-breaking space if part of a type pragma.
             Ok(Cow::Owned(std::format!("# {content}")))
