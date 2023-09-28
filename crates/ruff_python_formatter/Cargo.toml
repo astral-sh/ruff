@@ -38,7 +38,7 @@ tracing = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]
-ruff_formatter = { path = "../ruff_formatter", features = ["serde"] }
+ruff_formatter = { path = "../ruff_formatter" }
 
 insta = { workspace = true, features = ["glob"] }
 serde = { workspace = true }

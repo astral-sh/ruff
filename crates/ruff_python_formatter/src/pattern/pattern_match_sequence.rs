@@ -1,3 +1,4 @@
+use crate::comments::SourceComment;
 use ruff_formatter::{format_args, Format, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchSequence;
@@ -53,6 +54,15 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
                 .fmt(f),
             SequenceType::TupleNoParens => optional_parentheses(&items).fmt(f),
         }
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_node_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
+        Ok(())
     }
 }
 

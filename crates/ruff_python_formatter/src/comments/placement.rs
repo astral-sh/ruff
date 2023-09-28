@@ -2083,7 +2083,7 @@ fn handle_comprehension_comment<'a>(
             CommentPlacement::Default(comment)
         } else {
             // after the `for`
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
+            CommentPlacement::dangling(comprehension, comment)
         };
     }
 
@@ -2106,7 +2106,7 @@ fn handle_comprehension_comment<'a>(
         // attach as dangling comments on the target
         // (to be rendered as leading on the "in")
         return if is_own_line {
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
+            CommentPlacement::dangling(comprehension, comment)
         } else {
             // correctly trailing on the target
             CommentPlacement::Default(comment)
@@ -2126,7 +2126,7 @@ fn handle_comprehension_comment<'a>(
             CommentPlacement::Default(comment)
         } else {
             // after the `in` but same line, turn into trailing on the `in` token
-            CommentPlacement::dangling(&comprehension.iter, comment)
+            CommentPlacement::dangling(comprehension, comment)
         };
     }
 
@@ -2157,10 +2157,10 @@ fn handle_comprehension_comment<'a>(
         );
         if is_own_line {
             if last_end < comment.start() && comment.start() < if_token.start() {
-                return CommentPlacement::dangling(if_node, comment);
+                return CommentPlacement::dangling(comprehension, comment);
             }
         } else if if_token.start() < comment.start() && comment.start() < if_node.start() {
-            return CommentPlacement::dangling(if_node, comment);
+            return CommentPlacement::dangling(comprehension, comment);
         }
         last_end = if_node.end();
     }

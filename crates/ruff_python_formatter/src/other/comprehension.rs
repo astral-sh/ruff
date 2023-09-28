@@ -1,6 +1,7 @@
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_formatter::{format_args, write, Buffer, FormatError, FormatResult};
 use ruff_python_ast::{Comprehension, Expr};
-use ruff_text_size::Ranged;
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::expression::expr_tuple::TupleParentheses;
@@ -37,11 +38,35 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
 
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling(item);
-        let (before_target_comments, before_in_comments) = dangling_item_comments.split_at(
+        let (before_target_comments, dangling_comments) = dangling_item_comments.split_at(
             dangling_item_comments.partition_point(|comment| comment.end() < target.start()),
         );
 
-        let trailing_in_comments = comments.dangling(iter);
+        let maybe_in_token = SimpleTokenizer::new(
+            f.context().source(),
+            TextRange::new(target.end(), iter.start()),
+        )
+        .skip_trivia()
+        .next();
+
+        let Some(
+            in_keyword @ SimpleToken {
+                kind: SimpleTokenKind::In,
+                ..
+            },
+        ) = maybe_in_token
+        else {
+            return Err(FormatError::syntax_error(
+                "Expected `in` keyword between the `target` and `iter`.",
+            ));
+        };
+
+        let (before_in_comments, dangling_comments) = dangling_comments.split_at(
+            dangling_comments.partition_point(|comment| comment.end() < in_keyword.start()),
+        );
+
+        let (trailing_in_comments, dangling_if_comments) = dangling_comments
+            .split_at(dangling_comments.partition_point(|comment| comment.start() < iter.start()));
 
         let in_spacer = format_with(|f| {
             if before_in_comments.is_empty() {
@@ -66,17 +91,23 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                 iter.format(),
             ]
         )?;
+
         if !ifs.is_empty() {
             let joined = format_with(|f| {
                 let mut joiner = f.join_with(soft_line_break_or_space());
-                for if_case in ifs {
-                    let dangling_if_comments = comments.dangling(if_case);
+                let mut dangling_if_comments = dangling_if_comments;
 
-                    let (own_line_if_comments, end_of_line_if_comments) = dangling_if_comments
-                        .split_at(
-                            dangling_if_comments
-                                .partition_point(|comment| comment.line_position().is_own_line()),
-                        );
+                for if_case in ifs {
+                    let (if_comments, rest) = dangling_if_comments.split_at(
+                        dangling_if_comments
+                            .partition_point(|comment| comment.start() < if_case.start()),
+                    );
+
+                    let (own_line_if_comments, end_of_line_if_comments) = if_comments.split_at(
+                        if_comments
+                            .partition_point(|comment| comment.line_position().is_own_line()),
+                    );
+
                     joiner.entry(&format_args!(
                         leading_comments(own_line_if_comments),
                         token("if"),
@@ -84,7 +115,12 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                         Spacer(if_case),
                         if_case.format(),
                     ));
+
+                    dangling_if_comments = rest;
                 }
+
+                debug_assert!(dangling_if_comments.is_empty());
+
                 joiner.finish()
             });
 
