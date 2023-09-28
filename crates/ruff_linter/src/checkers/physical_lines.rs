@@ -41,7 +41,7 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                if let Some(diagnostic) = doc_line_too_long(&line, settings) {
+                if let Some(diagnostic) = doc_line_too_long(&line, indexer, settings) {
                     diagnostics.push(diagnostic);
                 }
             }
@@ -54,7 +54,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_line_too_long {
-            if let Some(diagnostic) = line_too_long(&line, settings) {
+            if let Some(diagnostic) = line_too_long(&line, indexer, settings) {
                 diagnostics.push(diagnostic);
             }
         }
