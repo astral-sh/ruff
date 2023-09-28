@@ -261,10 +261,14 @@ impl<'source> Lexer<'source> {
             'x' | 'o' | 'b'
         ));
 
+        // Lex the portion of the token after the base prefix (e.g., `9D5` in `0x9D5`).
         let mut number = LexedText::new(self.offset(), self.source);
         self.radix_run(&mut number, radix);
 
-        let value = match Int::from_str_radix(number.as_str(), radix.as_u32()) {
+        // Extract the entire number, including the base prefix (e.g., `0x9D5`).
+        let token = &self.source[self.token_range()];
+
+        let value = match Int::from_str_radix(number.as_str(), radix.as_u32(), token) {
             Ok(int) => int,
             Err(err) => {
                 return Err(LexicalError {
@@ -1462,7 +1466,8 @@ def f(arg=%timeit a = b):
 
     #[test]
     fn test_numbers() {
-        let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000";
+        let source =
+            "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA";
         assert_debug_snapshot!(lex_source(source));
     }
 
