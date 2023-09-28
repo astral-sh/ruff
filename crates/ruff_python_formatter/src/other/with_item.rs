@@ -1,9 +1,12 @@
 use ruff_formatter::write;
+
 use ruff_python_ast::WithItem;
 
 use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::{parenthesized, Parentheses, Parenthesize};
+use crate::expression::parentheses::{
+    is_expression_parenthesized, parenthesized, Parentheses, Parenthesize,
+};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -20,12 +23,24 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         let comments = f.context().comments().clone();
         let trailing_as_comments = comments.dangling(item);
 
+        // Prefer keeping parentheses for already parenthesized expressions over
+        // parenthesizing other nodes.
+        let parenthesize = if is_expression_parenthesized(
+            context_expr.into(),
+            f.context().comments().ranges(),
+            f.context().source(),
+        ) {
+            Parenthesize::IfBreaks
+        } else {
+            Parenthesize::IfRequired
+        };
+
         write!(
             f,
             [maybe_parenthesize_expression(
                 context_expr,
                 item,
-                Parenthesize::IfRequired
+                parenthesize
             )]
         )?;
 
