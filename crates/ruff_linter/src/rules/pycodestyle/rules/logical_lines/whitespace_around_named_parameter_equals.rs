@@ -26,7 +26,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineTo
 ///
 /// Use instead:
 /// ```python
-/// def add(a = 0) -> int:
+/// def add(a=0) -> int:
 ///     return a + 1
 /// ```
 ///

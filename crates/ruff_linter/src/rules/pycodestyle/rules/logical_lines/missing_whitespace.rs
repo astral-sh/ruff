@@ -55,6 +55,7 @@ impl AlwaysFixableViolation for MissingWhitespace {
 /// E231
 pub(crate) fn missing_whitespace(line: &LogicalLine, fix: bool, context: &mut LogicalLinesContext) {
     let mut open_parentheses = 0u32;
+    let mut fstrings = 0u32;
     let mut prev_lsqb = TextSize::default();
     let mut prev_lbrace = TextSize::default();
     let mut iter = line.tokens().iter().peekable();
@@ -62,6 +63,8 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, fix: bool, context: &mut Lo
     while let Some(token) = iter.next() {
         let kind = token.kind();
         match kind {
+            TokenKind::FStringStart => fstrings += 1,
+            TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             TokenKind::Lsqb => {
                 open_parentheses = open_parentheses.saturating_add(1);
                 prev_lsqb = token.start();
@@ -71,6 +74,17 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, fix: bool, context: &mut Lo
             }
             TokenKind::Lbrace => {
                 prev_lbrace = token.start();
+            }
+            TokenKind::Colon if fstrings > 0 => {
+                // Colon in f-string, no space required. This will yield false
+                // negatives for cases like the following as it's hard to
+                // differentiate between the usage of a colon in a f-string.
+                //
+                // ```python
+                // f'{ {'x':1} }'
+                // f'{(lambda x:x)}'
+                // ```
+                continue;
             }
 
             TokenKind::Comma | TokenKind::Semi | TokenKind::Colon => {
