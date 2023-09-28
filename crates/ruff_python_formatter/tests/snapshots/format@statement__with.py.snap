@@ -115,6 +115,40 @@ with (
 ): ...
 
 with (
+    # comment
+    a
+):
+    pass
+
+with (
+    a  # comment
+):
+    pass
+
+with (
+    a
+    # comment
+):
+    pass
+
+with (
+    # comment
+    a as b
+):
+    pass
+
+with (
+    a as b  # comment
+):
+    pass
+
+with (
+    a as b
+    # comment
+):
+    pass
+
+with (
     [
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "bbbbbbbbbb",
@@ -297,10 +331,12 @@ with (
     ...  # body
     # body trailing own
 
-with a as (  # a  # as
-    # own line
-    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-):  # b
+with (
+    a as (  # a  # as
+        # own line
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    )  # b
+):
     pass
 
 
@@ -372,12 +408,48 @@ with (
     ...
 
 with (
-    a
-    # trailing own line comment
-) as (  # trailing as same line comment
-    b
-):  # trailing b same line comment
+    (
+        a
+        # trailing own line comment
+    ) as (  # trailing as same line comment
+        b
+    )  # trailing b same line comment
+):
     ...
+
+with (
+    # comment
+    a
+):
+    pass
+
+with (
+    a  # comment
+):
+    pass
+
+with (
+    a
+    # comment
+):
+    pass
+
+with (
+    # comment
+    a as b
+):
+    pass
+
+with (
+    a as b  # comment
+):
+    pass
+
+with (
+    a as b
+    # comment
+):
+    pass
 
 with (
     [
