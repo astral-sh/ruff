@@ -43,7 +43,22 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    if attr.as_str() != "resolve" {
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = value.as_ref()
+    else {
         return;
     };
+
+    if !arguments.is_empty() {
+        return;
+    }
+
+    if !checker
+        .semantic()
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["pathlib", "Path"]))
+    {
+        return;
+    }
 }
