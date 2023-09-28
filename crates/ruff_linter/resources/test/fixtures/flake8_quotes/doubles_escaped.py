@@ -33,3 +33,9 @@ foo = (
 f'\'foo\' {'nested'}'  # Q003
 f'\'foo\' {f'nested'}'  # Q003
 f'\'foo\' {f'\'nested\''} \'\''  # Q003
+
+f'normal {f'nested'} normal'
+f'\'normal\' {f'nested'} normal'  # Q003
+f'\'normal\' {f'nested'} "double quotes"'
+f'\'normal\' {f'\'nested\' {'other'} normal'} "double quotes"'  # Q003
+f'\'normal\' {f'\'nested\' {'other'} "double quotes"'} normal'  # Q00l

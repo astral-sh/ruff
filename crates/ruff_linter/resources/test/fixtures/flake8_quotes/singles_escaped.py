@@ -31,3 +31,9 @@ foo = (
 f"\"foo\" {"foo"}"  # Q003
 f"\"foo\" {f"foo"}"  # Q003
 f"\"foo\" {f"\"foo\""} \"\""  # Q003
+
+f"normal {f"nested"} normal"
+f"\"normal\" {f"nested"} normal"  # Q003
+f"\"normal\" {f"nested"} 'single quotes'"
+f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
+f"\"normal\" {f"\"nested\" {"other"} 'single quotes'"} normal"  # Q003

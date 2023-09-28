@@ -169,9 +169,13 @@ pub(crate) fn avoidable_escaped_quote(
                 if !context.check_for_escaped_quote {
                     continue;
                 }
-                if string_contents.contains(quotes_settings.inline_quotes.as_char())
-                    && !string_contents.contains(quotes_settings.inline_quotes.opposite().as_char())
-                {
+                // If any part of the f-string contains the opposite quote,
+                // we can't change the quote style in the entire f-string.
+                if string_contents.contains(quotes_settings.inline_quotes.opposite().as_char()) {
+                    context.ignore_escaped_quotes();
+                    continue;
+                }
+                if string_contents.contains(quotes_settings.inline_quotes.as_char()) {
                     context.push_fstring_middle_range(tok_range);
                 }
             }
