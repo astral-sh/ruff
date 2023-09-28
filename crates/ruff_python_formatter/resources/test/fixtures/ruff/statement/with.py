@@ -109,6 +109,40 @@ with (
 ): ...
 
 with (
+    # comment
+    a
+):
+    pass
+
+with (
+    a  # comment
+):
+    pass
+
+with (
+    a
+    # comment
+):
+    pass
+
+with (
+    # comment
+    a as b
+):
+    pass
+
+with (
+    a as b  # comment
+):
+    pass
+
+with (
+    a as b
+    # comment
+):
+    pass
+
+with (
     [
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "bbbbbbbbbb",

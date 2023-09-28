@@ -84,9 +84,9 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                             }))
                             .fmt(f)?;
                         } else if let [item] = item.items.as_slice() {
-                            // This is similar to `maybe_parenthesize_expression`, but we're not dealing with an
-                            // expression here, it's a `WithItem`.
-                            if comments.has_leading(item) || comments.has_trailing_own_line(item) {
+                            // This is similar to `maybe_parenthesize_expression`, but we're not
+                            // dealing with an expression here, it's a `WithItem`.
+                            if comments.has_leading(item) || comments.has_trailing(item) {
                                 optional_parentheses(&item.format()).fmt(f)?;
                             } else {
                                 item.format().fmt(f)?;
