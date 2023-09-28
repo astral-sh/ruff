@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
-use ruff_python_semantic::analyze::typing;
-use ruff_text_size::Ranged;
+
+
 
 use crate::checkers::ast::Checker;
 
@@ -39,7 +39,7 @@ impl Violation for NoImplicitCwd {
 
 /// FURB177
 pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+    let Expr::Attribute(ExprAttribute { attr: _, value, .. }) = call.func.as_ref() else {
         return;
     };
 
