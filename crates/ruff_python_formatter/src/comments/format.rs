@@ -3,7 +3,9 @@ use std::borrow::Cow;
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::PySourceType;
-use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
+use ruff_python_trivia::{
+    is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before,
+};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::{CommentLinePosition, SourceComment};
@@ -370,17 +372,8 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
-        // Trim the normalized comment to detect excluded pragmas (strips NBSP).
-        let trimmed = strip_comment_prefix(&normalized_comment)?.trim_start();
-
-        let is_pragma = if let Some((maybe_pragma, _)) = trimmed.split_once(':') {
-            matches!(maybe_pragma, "noqa" | "type" | "pyright" | "pylint")
-        } else {
-            trimmed.starts_with("noqa")
-        };
-
         // Don't reserve width for excluded pragma comments.
-        let reserved_width = if is_pragma {
+        let reserved_width = if is_pragma_comment(&normalized_comment) {
             0
         } else {
             // Start with 2 because of the two leading spaces.
