@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -56,13 +57,15 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
         return;
     };
 
+    // Detect either, e.g., `paramiko.client.AutoAddPolicy` or `paramiko.client.AutoAddPolicy()`.
     if !checker
         .semantic()
-        .resolve_call_path(policy_argument)
+        .resolve_call_path(map_callable(policy_argument))
         .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["paramiko", "client", "AutoAddPolicy" | "WarningPolicy"]
+                    | ["paramiko", "AutoAddPolicy" | "WarningPolicy"]
             )
         })
     {
@@ -70,7 +73,10 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
     }
 
     if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
-        matches!(call_path.as_slice(), ["paramiko", "client", "SSHClient"])
+        matches!(
+            call_path.as_slice(),
+            ["paramiko", "client", "SSHClient"] | ["paramiko", "SSHClient"]
+        )
     }) {
         checker.diagnostics.push(Diagnostic::new(
             SSHNoHostKeyVerification,
