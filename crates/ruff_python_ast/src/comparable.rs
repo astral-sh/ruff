@@ -15,8 +15,6 @@
 //! an implicit concatenation of string literals, as these expressions are considered to
 //! have the same shape in that they evaluate to the same value.
 
-use num_bigint::BigInt;
-
 use crate as ast;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -334,7 +332,7 @@ pub enum ComparableConstant<'a> {
     Bool(&'a bool),
     Str { value: &'a str, unicode: bool },
     Bytes(&'a [u8]),
-    Int(&'a BigInt),
+    Int(&'a ast::Int),
     Tuple(Vec<ComparableConstant<'a>>),
     Float(u64),
     Complex { real: u64, imag: u64 },
@@ -1161,7 +1159,7 @@ pub struct StmtImport<'a> {
 pub struct StmtImportFrom<'a> {
     module: Option<&'a str>,
     names: Vec<ComparableAlias<'a>>,
-    level: Option<ast::Int>,
+    level: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]

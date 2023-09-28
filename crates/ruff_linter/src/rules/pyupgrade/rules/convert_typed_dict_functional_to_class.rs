@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{
@@ -47,7 +47,7 @@ pub struct ConvertTypedDictFunctionalToClass {
 }
 
 impl Violation for ConvertTypedDictFunctionalToClass {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,7 +55,7 @@ impl Violation for ConvertTypedDictFunctionalToClass {
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let ConvertTypedDictFunctionalToClass { name } = self;
         Some(format!("Convert `{name}` to class syntax"))
     }

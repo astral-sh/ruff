@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
@@ -14,8 +14,8 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
-use crate::autofix::edits;
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::registry::{AsRule, Rule};
 
 use super::helpers::{
@@ -65,14 +65,14 @@ pub struct PytestFixtureIncorrectParenthesesStyle {
     actual: Parentheses,
 }
 
-impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
+impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestFixtureIncorrectParenthesesStyle { expected, actual } = self;
         format!("Use `@pytest.fixture{expected}` over `@pytest.fixture{actual}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let PytestFixtureIncorrectParenthesesStyle { expected, .. } = self;
         match expected {
             Parentheses::None => "Remove parentheses".to_string(),
@@ -154,13 +154,13 @@ impl Violation for PytestFixturePositionalArgs {
 #[violation]
 pub struct PytestExtraneousScopeFunction;
 
-impl AlwaysAutofixableViolation for PytestExtraneousScopeFunction {
+impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`scope='function'` is implied in `@pytest.fixture()`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove implied `scope` argument".to_string()
     }
 }
@@ -488,14 +488,14 @@ pub struct PytestUselessYieldFixture {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
+impl AlwaysFixableViolation for PytestUselessYieldFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestUselessYieldFixture { name } = self;
         format!("No teardown in fixture `{name}`, use `return` instead of `yield`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace `yield` with `return`".to_string()
     }
 }
@@ -543,13 +543,13 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
 #[violation]
 pub struct PytestErroneousUseFixturesOnFixture;
 
-impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
+impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`pytest.mark.usefixtures` has no effect on fixtures")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `pytest.mark.usefixtures`".to_string()
     }
 }
@@ -586,13 +586,13 @@ impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
 #[violation]
 pub struct PytestUnnecessaryAsyncioMarkOnFixture;
 
-impl AlwaysAutofixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
+impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`pytest.mark.asyncio` is unnecessary for fixtures")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `pytest.mark.asyncio`".to_string()
     }
 }
@@ -764,7 +764,13 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
 }
 
 /// PT004, PT005, PT022
-fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &[Stmt]) {
+fn check_fixture_returns(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    name: &str,
+    body: &[Stmt],
+    returns: Option<&Expr>,
+) {
     let mut visitor = SkipFunctionsVisitor::default();
 
     for stmt in body {
@@ -795,27 +801,50 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
     }
 
     if checker.enabled(Rule::PytestUselessYieldFixture) {
-        if let Some(stmt) = body.last() {
-            if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
-                if value.is_yield_expr() {
-                    if visitor.yield_statements.len() == 1 {
-                        let mut diagnostic = Diagnostic::new(
-                            PytestUselessYieldFixture {
-                                name: name.to_string(),
-                            },
-                            stmt.range(),
-                        );
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                                "return".to_string(),
-                                TextRange::at(stmt.start(), "yield".text_len()),
-                            )));
-                        }
-                        checker.diagnostics.push(diagnostic);
-                    }
+        let Some(stmt) = body.last() else {
+            return;
+        };
+        let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+            return;
+        };
+        if !value.is_yield_expr() {
+            return;
+        }
+        if visitor.yield_statements.len() != 1 {
+            return;
+        }
+        let mut diagnostic = Diagnostic::new(
+            PytestUselessYieldFixture {
+                name: name.to_string(),
+            },
+            stmt.range(),
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            let yield_edit = Edit::range_replacement(
+                "return".to_string(),
+                TextRange::at(stmt.start(), "yield".text_len()),
+            );
+            let return_type_edit = returns.and_then(|returns| {
+                let ast::ExprSubscript { value, slice, .. } = returns.as_subscript_expr()?;
+                let ast::ExprTuple { elts, .. } = slice.as_tuple_expr()?;
+                let [first, ..] = elts.as_slice() else {
+                    return None;
+                };
+                if !checker.semantic().match_typing_expr(value, "Generator") {
+                    return None;
                 }
+                Some(Edit::range_replacement(
+                    checker.generator().expr(first),
+                    returns.range(),
+                ))
+            });
+            if let Some(return_type_edit) = return_type_edit {
+                diagnostic.set_fix(Fix::automatic_edits(yield_edit, [return_type_edit]));
+            } else {
+                diagnostic.set_fix(Fix::automatic(yield_edit));
             }
         }
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -910,6 +939,7 @@ pub(crate) fn fixture(
     stmt: &Stmt,
     name: &str,
     parameters: &Parameters,
+    returns: Option<&Expr>,
     decorators: &[Decorator],
     body: &[Stmt],
 ) {
@@ -933,7 +963,7 @@ pub(crate) fn fixture(
             || checker.enabled(Rule::PytestUselessYieldFixture))
             && !is_abstract(decorators, checker.semantic())
         {
-            check_fixture_returns(checker, stmt, name, body);
+            check_fixture_returns(checker, stmt, name, body, returns);
         }
 
         if checker.enabled(Rule::PytestFixtureFinalizerCallback) {

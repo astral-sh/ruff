@@ -1,12 +1,12 @@
 use memchr::memchr_iter;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::autofix::edits::pad_start;
+use crate::fix::edits::pad_start;
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -29,14 +29,14 @@ use crate::autofix::edits::pad_start;
 #[violation]
 pub struct InvalidEscapeSequence(char);
 
-impl AlwaysAutofixableViolation for InvalidEscapeSequence {
+impl AlwaysFixableViolation for InvalidEscapeSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
         let InvalidEscapeSequence(char) = self;
         format!("Invalid escape sequence: `\\{char}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add backslash to escape sequence".to_string()
     }
 }
@@ -46,7 +46,7 @@ pub(crate) fn invalid_escape_sequence(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     range: TextRange,
-    autofix: bool,
+    fix: bool,
 ) {
     let text = locator.slice(range);
 
@@ -125,7 +125,7 @@ pub(crate) fn invalid_escape_sequence(
         invalid_escape_sequence.push(Diagnostic::new(InvalidEscapeSequence(next_char), range));
     }
 
-    if autofix {
+    if fix {
         if contains_valid_escape_sequence {
             // Escape with backslash.
             for diagnostic in &mut invalid_escape_sequence {

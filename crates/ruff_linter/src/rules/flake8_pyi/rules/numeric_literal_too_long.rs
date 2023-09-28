@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -30,13 +30,13 @@ pub struct NumericLiteralTooLong;
 /// ```python
 /// def foo(arg: int = ...) -> None: ...
 /// ```
-impl AlwaysAutofixableViolation for NumericLiteralTooLong {
+impl AlwaysFixableViolation for NumericLiteralTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Numeric literals with a string representation longer than ten characters are not permitted")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `...`".to_string()
     }
 }

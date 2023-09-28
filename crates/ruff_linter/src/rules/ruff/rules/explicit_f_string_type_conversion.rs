@@ -3,7 +3,7 @@ use libcst_native::{
     ConcatenatedString, Expression, FormattedStringContent, FormattedStringExpression,
 };
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_codegen::Stylist;
@@ -41,13 +41,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct ExplicitFStringTypeConversion;
 
-impl AlwaysAutofixableViolation for ExplicitFStringTypeConversion {
+impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use explicit conversion flag")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with conversion flag".to_string()
     }
 }

@@ -5,7 +5,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
@@ -56,14 +56,14 @@ fn compare_stmt(stmt1: &ComparableStmt, stmt2: &ComparableStmt) -> bool {
 pub struct CollapsibleIf;
 
 impl Violation for CollapsibleIf {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a single `if` statement instead of nested `if` statements")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Combine `if` statements using `and`".to_string())
     }
 }
@@ -96,7 +96,7 @@ pub struct NeedlessBool {
 }
 
 impl Violation for NeedlessBool {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -104,7 +104,7 @@ impl Violation for NeedlessBool {
         format!("Return the condition `{condition}` directly")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let NeedlessBool { condition } = self;
         Some(format!("Replace with `return {condition}`"))
     }
@@ -168,7 +168,7 @@ pub struct IfElseBlockInsteadOfIfExp {
 }
 
 impl Violation for IfElseBlockInsteadOfIfExp {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -176,7 +176,7 @@ impl Violation for IfElseBlockInsteadOfIfExp {
         format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let IfElseBlockInsteadOfIfExp { contents } = self;
         Some(format!("Replace `if`-`else`-block with `{contents}`"))
     }
@@ -242,7 +242,7 @@ pub struct IfElseBlockInsteadOfDictGet {
 }
 
 impl Violation for IfElseBlockInsteadOfDictGet {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -250,7 +250,7 @@ impl Violation for IfElseBlockInsteadOfDictGet {
         format!("Use `{contents}` instead of an `if` block")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let IfElseBlockInsteadOfDictGet { contents } = self;
         Some(format!("Replace with `{contents}`"))
     }

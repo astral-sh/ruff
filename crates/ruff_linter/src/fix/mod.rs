@@ -141,7 +141,7 @@ mod tests {
     use ruff_diagnostics::{Diagnostic, Edit, Fix, SourceMarker};
     use ruff_source_file::Locator;
 
-    use crate::autofix::{apply_fixes, FixResult};
+    use crate::fix::{apply_fixes, FixResult};
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
     #[allow(deprecated)]

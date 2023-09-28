@@ -5,10 +5,10 @@ use ruff_macros::CacheKey;
 use crate::registry::{Rule, RuleSet, RuleSetIterator};
 
 /// A table to keep track of which rules are enabled
-/// and Whether they should be autofixed.
+/// and Whether they should be fixed.
 #[derive(Debug, CacheKey, Default)]
 pub struct RuleTable {
-    /// Maps rule codes to a boolean indicating if the rule should be autofixed.
+    /// Maps rule codes to a boolean indicating if the rule should be fixed.
     enabled: RuleSet,
     should_fix: RuleSet,
 }
@@ -34,7 +34,7 @@ impl RuleTable {
         self.enabled.intersects(&RuleSet::from_rules(rules))
     }
 
-    /// Returns whether violations of the given rule should be autofixed.
+    /// Returns whether violations of the given rule should be fixed.
     #[inline]
     pub const fn should_fix(&self, rule: Rule) -> bool {
         self.should_fix.contains(rule)

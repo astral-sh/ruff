@@ -3,7 +3,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::traversal;
@@ -43,7 +43,7 @@ pub struct ReimplementedBuiltin {
 }
 
 impl Violation for ReimplementedBuiltin {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -51,7 +51,7 @@ impl Violation for ReimplementedBuiltin {
         format!("Use `{replacement}` instead of `for` loop")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let ReimplementedBuiltin { replacement } = self;
         Some(format!("Replace with `{replacement}`"))
     }

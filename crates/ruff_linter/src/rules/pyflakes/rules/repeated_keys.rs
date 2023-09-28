@@ -2,15 +2,15 @@ use std::hash::BuildHasherDefault;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::{AsRule, Rule};
 
 /// ## What it does
@@ -49,7 +49,7 @@ pub struct MultiValueRepeatedKeyLiteral {
 }
 
 impl Violation for MultiValueRepeatedKeyLiteral {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -61,7 +61,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let MultiValueRepeatedKeyLiteral { name } = self;
         if let Some(name) = name.full_display() {
             Some(format!("Remove repeated key literal `{name}`"))
@@ -106,7 +106,7 @@ pub struct MultiValueRepeatedKeyVariable {
 }
 
 impl Violation for MultiValueRepeatedKeyVariable {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -118,7 +118,7 @@ impl Violation for MultiValueRepeatedKeyVariable {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let MultiValueRepeatedKeyVariable { name } = self;
         if let Some(name) = name.full_display() {
             Some(format!("Remove repeated key `{name}`"))

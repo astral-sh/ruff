@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, PySourceType};
 use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
@@ -36,13 +36,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct FStringMissingPlaceholders;
 
-impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
+impl AlwaysFixableViolation for FStringMissingPlaceholders {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("f-string without any placeholders")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove extraneous `f` prefix".to_string()
     }
 }

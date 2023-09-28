@@ -6,3 +6,12 @@ logging.info(
         name="foobar",
     ),
 )
+
+from logging import info
+
+info(
+    "Hello world!",
+    extra=dict(
+        name="foobar",
+    ),
+)

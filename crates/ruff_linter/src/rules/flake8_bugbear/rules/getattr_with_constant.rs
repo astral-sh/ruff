@@ -1,5 +1,5 @@
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
@@ -34,7 +34,7 @@ use crate::registry::AsRule;
 #[violation]
 pub struct GetAttrWithConstant;
 
-impl AlwaysAutofixableViolation for GetAttrWithConstant {
+impl AlwaysFixableViolation for GetAttrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -43,7 +43,7 @@ impl AlwaysAutofixableViolation for GetAttrWithConstant {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace `getattr` with attribute access".to_string()
     }
 }
@@ -64,6 +64,9 @@ pub(crate) fn getattr_with_constant(
     let [obj, arg] = args else {
         return;
     };
+    if obj.is_starred_expr() {
+        return;
+    }
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(ast::StringConstant { value, .. }),
         ..
@@ -77,6 +80,9 @@ pub(crate) fn getattr_with_constant(
     if is_mangled_private(value) {
         return;
     }
+    if !checker.semantic().is_builtin("getattr") {
+        return;
+    }
 
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
@@ -85,7 +91,8 @@ pub(crate) fn getattr_with_constant(
                 if matches!(
                     obj,
                     Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
-                ) {
+                ) && !checker.locator().contains_line_break(obj.range())
+                {
                     format!("{}.{}", checker.locator().slice(obj), value)
                 } else {
                     // Defensively parenthesize any other expressions. For example, attribute accesses

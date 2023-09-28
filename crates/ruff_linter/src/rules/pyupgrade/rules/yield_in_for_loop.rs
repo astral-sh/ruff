@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -31,13 +31,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct YieldInForLoop;
 
-impl AlwaysAutofixableViolation for YieldInForLoop {
+impl AlwaysFixableViolation for YieldInForLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Replace `yield` over `for` loop with `yield from`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `yield from`".to_string()
     }
 }

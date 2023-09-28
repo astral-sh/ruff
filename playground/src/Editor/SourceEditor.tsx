@@ -61,7 +61,7 @@ export default function SourceEditor({
                 ? check.fix.message
                   ? `${check.code}: ${check.fix.message}`
                   : `Fix ${check.code}`
-                : "Autofix",
+                : "Fix",
               id: `fix-${check.code}`,
               kind: "quickfix",
               edit: check.fix

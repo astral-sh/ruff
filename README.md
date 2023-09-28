@@ -29,8 +29,8 @@ An extremely fast Python linter, written in Rust.
 - 🛠️ `pyproject.toml` support
 - 🤝 Python 3.11 compatibility
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
-- 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [600 built-in rules](https://docs.astral.sh/ruff/rules/)
+- 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
+- 📏 Over [700 built-in rules](https://docs.astral.sh/ruff/rules/)
 - ⚖️ [Near-parity](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8) with the
     built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
@@ -140,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.290
+  rev: v0.0.291
   hooks:
     - id: ruff
 ```
@@ -176,7 +176,7 @@ If left unspecified, the default configuration is equivalent to:
 select = ["E", "F"]
 ignore = []
 
-# Allow autofix for all enabled rules (when `--fix`) is provided.
+# Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["A", "B", "C", "D", "E", "F", "G", "I", "N", "Q", "S", "T", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "EM", "ERA", "EXE", "FBT", "ICN", "INP", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
 unfixable = []
 
@@ -233,7 +233,7 @@ linting command.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 600 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 700 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 

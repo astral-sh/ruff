@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::{indentation_at_offset, PythonWhitespace};
 use ruff_source_file::{Line, UniversalNewlineIterator};
@@ -43,13 +43,13 @@ use crate::registry::{AsRule, Rule};
 #[violation]
 pub struct OneBlankLineBeforeClass;
 
-impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
+impl AlwaysFixableViolation for OneBlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("1 blank line required before class docstring")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Insert 1 blank line before class docstring".to_string()
     }
 }
@@ -95,13 +95,13 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
 #[violation]
 pub struct OneBlankLineAfterClass;
 
-impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
+impl AlwaysFixableViolation for OneBlankLineAfterClass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("1 blank line required after class docstring")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Insert 1 blank line after class docstring".to_string()
     }
 }
@@ -140,13 +140,13 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 #[violation]
 pub struct BlankLineBeforeClass;
 
-impl AlwaysAutofixableViolation for BlankLineBeforeClass {
+impl AlwaysFixableViolation for BlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No blank lines allowed before class docstring")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove blank line(s) before class docstring".to_string()
     }
 }

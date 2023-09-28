@@ -11,4 +11,14 @@ G101_2.py:6:9: G101 Logging statement uses an `extra` field that clashes with a 
 8 | )
   |
 
+G101_2.py:15:9: G101 Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
+   |
+13 |     "Hello world!",
+14 |     extra=dict(
+15 |         name="foobar",
+   |         ^^^^^^^^^^^^^ G101
+16 |     ),
+17 | )
+   |
+
 

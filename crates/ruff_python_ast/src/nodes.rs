@@ -1,12 +1,12 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 use itertools::Itertools;
+
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use num_bigint::BigInt;
-
+use crate::int;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
@@ -466,7 +466,7 @@ pub struct StmtImportFrom {
     pub range: TextRange,
     pub module: Option<Identifier>,
     pub names: Vec<Alias>,
-    pub level: Option<Int>,
+    pub level: Option<u32>,
 }
 
 impl From<StmtImportFrom> for Stmt {
@@ -2578,42 +2578,13 @@ impl Ranged for Identifier {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Int(u32);
-
-impl Int {
-    pub fn new(i: u32) -> Self {
-        Self(i)
-    }
-    pub fn to_u32(&self) -> u32 {
-        self.0
-    }
-    pub fn to_usize(&self) -> usize {
-        self.0 as _
-    }
-}
-
-impl std::cmp::PartialEq<u32> for Int {
-    #[inline]
-    fn eq(&self, other: &u32) -> bool {
-        self.0 == *other
-    }
-}
-
-impl std::cmp::PartialEq<usize> for Int {
-    #[inline]
-    fn eq(&self, other: &usize) -> bool {
-        self.0 as usize == *other
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Constant {
     None,
     Bool(bool),
     Str(StringConstant),
     Bytes(BytesConstant),
-    Int(BigInt),
+    Int(int::Int),
     Float(f64),
     Complex { real: f64, imag: f64 },
     Ellipsis,

@@ -20,3 +20,4 @@ os.chmod(keyfile, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)  # Error
 os.chmod("~/hidden_exec", stat.S_IXGRP)  # Error
 os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK
 os.chmod("/etc/passwd", stat.S_IWOTH)  # Error
+os.chmod("/etc/passwd", 0o100000000)  # Error

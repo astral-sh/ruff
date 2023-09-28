@@ -3,9 +3,8 @@
 // See also: file:///usr/share/doc/python/html/reference/compound_stmts.html#function-definitions
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
-use num_bigint::BigInt;
 use ruff_text_size::{Ranged, TextSize};
-use ruff_python_ast::{self as ast, IpyEscapeKind};
+use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
@@ -253,18 +252,18 @@ ImportStatement: ast::Stmt = {
     },
 };
 
-ImportFromLocation: (Option<ast::Int>, Option<ast::Identifier>) = {
+ImportFromLocation: (Option<u32>, Option<ast::Identifier>) = {
     <dots: ImportDots*> <name:DottedName> => {
-        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), Some(name))
+        (Some(dots.iter().sum()), Some(name))
     },
     <dots: ImportDots+> => {
-        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), None)
+        (Some(dots.iter().sum()), None)
     },
 };
 
-ImportDots: ast::Int = {
-    "..." => ast::Int::new(3),
-    "." => ast::Int::new(1),
+ImportDots: u32 = {
+    "..." => 3,
+    "." => 1,
 };
 
 ImportAsNames: Vec<ast::Alias> = {
@@ -1928,7 +1927,7 @@ extern {
         "True" => token::Tok::True,
         "False" => token::Tok::False,
         "None" => token::Tok::None,
-        int => token::Tok::Int { value: <BigInt> },
+        int => token::Tok::Int { value: <Int> },
         float => token::Tok::Float { value: <f64> },
         complex => token::Tok::Complex { real: <f64>, imag: <f64> },
         string => token::Tok::String {

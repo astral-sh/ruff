@@ -1,6 +1,6 @@
 use ruff_formatter::write;
 use ruff_python_ast::{Decorator, StmtClassDef};
-use ruff_python_trivia::lines_after_ignoring_trivia;
+use ruff_python_trivia::lines_after_ignoring_end_of_line_trivia;
 use ruff_text_size::Ranged;
 
 use crate::comments::format::empty_lines_before_trailing_comments;
@@ -158,13 +158,15 @@ impl Format<PyFormatContext<'_>> for FormatDecorators<'_> {
                 // Write any leading definition comments (between last decorator and the header)
                 // while maintaining the right amount of empty lines between the comment
                 // and the last decorator.
-                let leading_line =
-                    if lines_after_ignoring_trivia(last_decorator.end(), f.context().source()) <= 1
-                    {
-                        hard_line_break()
-                    } else {
-                        empty_line()
-                    };
+                let leading_line = if lines_after_ignoring_end_of_line_trivia(
+                    last_decorator.end(),
+                    f.context().source(),
+                ) <= 1
+                {
+                    hard_line_break()
+                } else {
+                    empty_line()
+                };
 
                 write!(
                     f,

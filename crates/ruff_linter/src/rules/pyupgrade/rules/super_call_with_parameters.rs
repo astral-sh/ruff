@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
 use ruff_text_size::{Ranged, TextSize};
@@ -47,13 +47,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct SuperCallWithParameters;
 
-impl AlwaysAutofixableViolation for SuperCallWithParameters {
+impl AlwaysFixableViolation for SuperCallWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `super()` instead of `super(__class__, self)`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `__super__` parameters".to_string()
     }
 }

@@ -81,16 +81,20 @@ where
                                 | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                                     return (Some(elts), DunderAllFlags::empty());
                                 }
-                                Expr::ListComp(_) | Expr::SetComp(_) | Expr::GeneratorExp(_) => {
-                                    // Allow comprehensions, even though we can't statically analyze
-                                    // them.
+                                _ => {
+                                    // We can't analyze other expressions, but they must be
+                                    // valid, since the `list` or `tuple` call will ultimately
+                                    // evaluate to a list or tuple.
                                     return (None, DunderAllFlags::empty());
                                 }
-                                _ => {}
                             }
                         }
                     }
                 }
+            }
+            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => {
+                // Allow, e.g., `__all__ += (value := ["A", "B"])`.
+                return extract_elts(value, is_builtin);
             }
             _ => {}
         }

@@ -88,10 +88,33 @@ pub fn lines_after(offset: TextSize, code: &str) -> u32 {
     newlines
 }
 
+/// Counts the empty lines after `offset`, ignoring any trailing trivia: end-of-line comments,
+/// own-line comments, and any intermediary newlines.
+pub fn lines_after_ignoring_trivia(offset: TextSize, code: &str) -> u32 {
+    let mut newlines = 0u32;
+    for token in SimpleTokenizer::starts_at(offset, code) {
+        match token.kind() {
+            SimpleTokenKind::Newline => {
+                newlines += 1;
+            }
+            SimpleTokenKind::Whitespace => {}
+            // If we see a comment, reset the newlines counter.
+            SimpleTokenKind::Comment => {
+                newlines = 0;
+            }
+            // As soon as we see a non-trivia token, we're done.
+            _ => {
+                break;
+            }
+        }
+    }
+    newlines
+}
+
 /// Counts the empty lines after `offset`, ignoring any trailing trivia on the same line as
 /// `offset`.
 #[allow(clippy::cast_possible_truncation)]
-pub fn lines_after_ignoring_trivia(offset: TextSize, code: &str) -> u32 {
+pub fn lines_after_ignoring_end_of_line_trivia(offset: TextSize, code: &str) -> u32 {
     // SAFETY: We don't support files greater than 4GB, so casting to u32 is safe.
     SimpleTokenizer::starts_at(offset, code)
         .skip_while(|token| token.kind != SimpleTokenKind::Newline && token.kind.is_trivia())
@@ -543,8 +566,10 @@ impl<'a> SimpleTokenizer<'a> {
                 kind
             }
 
-            ' ' | '\t' => {
-                self.cursor.eat_while(|c| matches!(c, ' ' | '\t'));
+            // Space, tab, or form feed. We ignore the true semantics of form feed, and treat it as
+            // whitespace.
+            ' ' | '\t' | '\x0C' => {
+                self.cursor.eat_while(|c| matches!(c, ' ' | '\t' | '\x0C'));
                 SimpleTokenKind::Whitespace
             }
 
@@ -814,10 +839,13 @@ impl<'a> BackwardsTokenizer<'a> {
         }
 
         let kind = match last {
-            // This may not be 100% correct because it will lex-out trailing whitespace from a comment
-            // as whitespace rather than being part of the token. This shouldn't matter for what we use the lexer for.
-            ' ' | '\t' => {
-                self.cursor.eat_back_while(|c| matches!(c, ' ' | '\t'));
+            // Space, tab, or form feed. We ignore the true semantics of form feed, and treat it as
+            // whitespace. Note that this will lex-out trailing whitespace from a comment as
+            // whitespace rather than as part of the comment token, but this shouldn't matter for
+            // our use case.
+            ' ' | '\t' | '\x0C' => {
+                self.cursor
+                    .eat_back_while(|c| matches!(c, ' ' | '\t' | '\x0C'));
                 SimpleTokenKind::Whitespace
             }
 

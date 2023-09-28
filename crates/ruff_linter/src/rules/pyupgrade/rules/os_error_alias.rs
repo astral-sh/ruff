@@ -1,8 +1,8 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::SemanticModel;
@@ -40,13 +40,13 @@ pub struct OSErrorAlias {
     name: Option<String>,
 }
 
-impl AlwaysAutofixableViolation for OSErrorAlias {
+impl AlwaysFixableViolation for OSErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Replace aliased errors with `OSError`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let OSErrorAlias { name } = self;
         match name {
             None => "Replace with builtin `OSError`".to_string(),
@@ -61,7 +61,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
         matches!(
             call_path.as_slice(),
             ["", "EnvironmentError" | "IOError" | "WindowsError"]
-                | ["mmap" | "select" | "socket", "error"]
+                | ["mmap" | "select" | "socket" | "os", "error"]
         )
     })
 }
@@ -93,16 +93,13 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
-fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
-    let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, target.range());
+fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
+    let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, tuple.range());
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().is_builtin("OSError") {
-            let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
-                panic!("Expected Expr::Tuple");
-            };
-
             // Filter out any `OSErrors` aliases.
-            let mut remaining: Vec<Expr> = elts
+            let mut remaining: Vec<Expr> = tuple
+                .elts
                 .iter()
                 .filter_map(|elt| {
                     if aliases.contains(&elt) {
@@ -114,7 +111,11 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
                 .collect();
 
             // If `OSError` itself isn't already in the tuple, add it.
-            if elts.iter().all(|elt| !is_os_error(elt, checker.semantic())) {
+            if tuple
+                .elts
+                .iter()
+                .all(|elt| !is_os_error(elt, checker.semantic()))
+            {
                 let node = ast::ExprName {
                     id: "OSError".into(),
                     ctx: ExprContext::Load,
@@ -135,8 +136,8 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
             };
 
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                pad(content, target.range(), checker.locator()),
-                target.range(),
+                pad(content, tuple.range(), checker.locator()),
+                tuple.range(),
             )));
         }
     }
@@ -156,16 +157,16 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[ExceptH
                     atom_diagnostic(checker, expr);
                 }
             }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            Expr::Tuple(tuple) => {
                 // List of aliases to replace with `OSError`.
                 let mut aliases: Vec<&Expr> = vec![];
-                for elt in elts {
+                for elt in &tuple.elts {
                     if is_alias(elt, checker.semantic()) {
                         aliases.push(elt);
                     }
                 }
                 if !aliases.is_empty() {
-                    tuple_diagnostic(checker, expr, &aliases);
+                    tuple_diagnostic(checker, tuple, &aliases);
                 }
             }
             _ => {}

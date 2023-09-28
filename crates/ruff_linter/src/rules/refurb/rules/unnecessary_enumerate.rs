@@ -1,16 +1,14 @@
 use std::fmt;
 
-use num_traits::Zero;
-
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Constant, Expr};
+use ruff_python_ast::{Arguments, Constant, Expr, Int};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::pad;
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -53,7 +51,7 @@ pub struct UnnecessaryEnumerate {
 }
 
 impl Violation for UnnecessaryEnumerate {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -68,7 +66,7 @@ impl Violation for UnnecessaryEnumerate {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UnnecessaryEnumerate { subset } = self;
         match subset {
             EnumerateSubset::Indices => Some("Replace with `range(len(...))`".to_string()),
@@ -160,15 +158,13 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 // there's no clear fix.
                 let start = arguments.find_argument("start", 1);
                 if start.map_or(true, |start| {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Int(value),
-                        ..
-                    }) = start
-                    {
-                        value.is_zero()
-                    } else {
-                        false
-                    }
+                    matches!(
+                        start,
+                        Expr::Constant(ast::ExprConstant {
+                            value: Constant::Int(Int::ZERO),
+                            ..
+                        })
+                    )
                 }) {
                     let replace_iter = Edit::range_replacement(
                         generate_range_len_call(sequence, checker.generator()),

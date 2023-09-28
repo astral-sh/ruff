@@ -101,13 +101,32 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
-        return;
+    match call.func.as_ref() {
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+            if LoggingLevel::from_attribute(attr).is_none() {
+                return;
+            };
+            if !logging::is_logger_candidate(
+                &call.func,
+                checker.semantic(),
+                &checker.settings.logger_objects,
+            ) {
+                return;
+            }
+        }
+        Expr::Name(_) => {
+            let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) else {
+                return;
+            };
+            let ["logging", attribute] = call_path.as_slice() else {
+                return;
+            };
+            if LoggingLevel::from_attribute(attribute).is_none() {
+                return;
+            };
+        }
+        _ => return,
     };
-
-    if LoggingLevel::from_attribute(attr.as_str()).is_none() {
-        return;
-    }
 
     let Some(Expr::Constant(ast::ExprConstant {
         value: Constant::Str(ast::StringConstant { value, .. }),
@@ -116,14 +135,6 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
     else {
         return;
     };
-
-    if !logging::is_logger_candidate(
-        &call.func,
-        checker.semantic(),
-        &checker.settings.logger_objects,
-    ) {
-        return;
-    }
 
     let Ok(summary) = CFormatSummary::try_from(value.as_str()) else {
         return;

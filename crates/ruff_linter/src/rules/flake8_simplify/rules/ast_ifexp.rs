@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -35,7 +35,7 @@ pub struct IfExprWithTrueFalse {
 }
 
 impl Violation for IfExprWithTrueFalse {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,7 +47,7 @@ impl Violation for IfExprWithTrueFalse {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let IfExprWithTrueFalse { is_compare } = self;
         if *is_compare {
             Some(format!("Remove unnecessary `True if ... else False`"))
@@ -81,13 +81,13 @@ impl Violation for IfExprWithTrueFalse {
 #[violation]
 pub struct IfExprWithFalseTrue;
 
-impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
+impl AlwaysFixableViolation for IfExprWithFalseTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `not ...` instead of `False if ... else True`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Replace with `not ...`")
     }
 }
@@ -117,7 +117,7 @@ pub struct IfExprWithTwistedArms {
     expr_else: String,
 }
 
-impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
+impl AlwaysFixableViolation for IfExprWithTwistedArms {
     #[derive_message_formats]
     fn message(&self) -> String {
         let IfExprWithTwistedArms {
@@ -130,7 +130,7 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let IfExprWithTwistedArms {
             expr_body,
             expr_else,

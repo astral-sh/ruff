@@ -115,6 +115,40 @@ with (
 ): ...
 
 with (
+    # comment
+    a
+):
+    pass
+
+with (
+    a  # comment
+):
+    pass
+
+with (
+    a
+    # comment
+):
+    pass
+
+with (
+    # comment
+    a as b
+):
+    pass
+
+with (
+    a as b  # comment
+):
+    pass
+
+with (
+    a as b
+    # comment
+):
+    pass
+
+with (
     [
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "bbbbbbbbbb",
@@ -260,6 +294,25 @@ with (
 
 with (foo() as bar, baz() as bop):
     pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        if get_running_loop()
+        else contextlib.nullcontext()
+    ):
+        pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        and B and [aaaaaaaa, bbbbbbbbbbbbb, cccccccccc, dddddddddddd, eeeeeeeeeeeee]
+    ):
+        pass
+
+if True:
+    with anyio.CancelScope(shield=True) if get_running_loop() else contextlib.nullcontext():
+        pass
 ```
 
 ## Output
@@ -297,10 +350,12 @@ with (
     ...  # body
     # body trailing own
 
-with a as (  # a  # as
-    # own line
-    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-):  # b
+with (
+    a as (  # a  # as
+        # own line
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    )  # b
+):
     pass
 
 
@@ -372,12 +427,48 @@ with (
     ...
 
 with (
-    a
-    # trailing own line comment
-) as (  # trailing as same line comment
-    b
-):  # trailing b same line comment
+    (
+        a
+        # trailing own line comment
+    ) as (  # trailing as same line comment
+        b
+    )  # trailing b same line comment
+):
     ...
+
+with (
+    # comment
+    a
+):
+    pass
+
+with (
+    a  # comment
+):
+    pass
+
+with (
+    a
+    # comment
+):
+    pass
+
+with (
+    # comment
+    a as b
+):
+    pass
+
+with (
+    a as b  # comment
+):
+    pass
+
+with (
+    a as b
+    # comment
+):
+    pass
 
 with (
     [
@@ -508,13 +599,17 @@ with f(
 ) as b, c as d:
     pass
 
-with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b:
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+) as b:
     pass
 
 with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b:
     pass
 
-with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b, c as d:
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+) as b, c as d:
     pass
 
 with (
@@ -533,6 +628,28 @@ with (
 
 with foo() as bar, baz() as bop:
     pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        if get_running_loop()
+        else contextlib.nullcontext()
+    ):
+        pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        and B
+        and [aaaaaaaa, bbbbbbbbbbbbb, cccccccccc, dddddddddddd, eeeeeeeeeeeee]
+    ):
+        pass
+
+if True:
+    with anyio.CancelScope(
+        shield=True
+    ) if get_running_loop() else contextlib.nullcontext():
+        pass
 ```
 
 

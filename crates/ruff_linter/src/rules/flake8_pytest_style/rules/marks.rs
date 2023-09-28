@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
 use ruff_text_size::Ranged;
@@ -54,7 +54,7 @@ pub struct PytestIncorrectMarkParenthesesStyle {
     actual_parens: String,
 }
 
-impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
+impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestIncorrectMarkParenthesesStyle {
@@ -68,7 +68,7 @@ impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add/remove parentheses".to_string()
     }
 }
@@ -103,13 +103,13 @@ impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
 #[violation]
 pub struct PytestUseFixturesWithoutParameters;
 
-impl AlwaysAutofixableViolation for PytestUseFixturesWithoutParameters {
+impl AlwaysFixableViolation for PytestUseFixturesWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Useless `pytest.mark.usefixtures` without parameters")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `usefixtures` decorator or pass parameters".to_string()
     }
 }

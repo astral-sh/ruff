@@ -5,8 +5,8 @@ use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement};
+use crate::fix::codemods::CodegenStylist;
 
 /// Safely adjust the indentation of the indented block at [`TextRange`].
 pub(crate) fn adjust_indentation(

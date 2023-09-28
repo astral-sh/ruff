@@ -147,7 +147,7 @@ pub(crate) fn lint_path(
     settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     // Check the cache.
     // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
@@ -156,7 +156,7 @@ pub(crate) fn lint_path(
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
     let caching = match cache {
-        Some(cache) if noqa.into() && autofix.is_generate() => {
+        Some(cache) if noqa.into() && fix_mode.is_generate() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
@@ -220,7 +220,7 @@ pub(crate) fn lint_path(
             error: parse_error,
         },
         fixed,
-    ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
+    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok(FixerResult {
             result,
             transformed,
@@ -228,7 +228,7 @@ pub(crate) fn lint_path(
         }) = lint_fix(path, package, noqa, settings, &source_kind, source_type)
         {
             if !fixed.is_empty() {
-                match autofix {
+                match fix_mode {
                     flags::FixMode::Apply => match transformed.as_ref() {
                         SourceKind::Python(transformed) => {
                             write(path, transformed.as_bytes())?;
@@ -254,10 +254,9 @@ pub(crate) fn lint_path(
                                 // mutated it.
                                 let src_notebook = source_kind.as_ipy_notebook().unwrap();
                                 let mut stdout = io::stdout().lock();
-                                for ((idx, src_cell), dest_cell) in src_notebook
-                                    .cells()
-                                    .iter()
-                                    .enumerate()
+                                // Cell indices are 1-based.
+                                for ((idx, src_cell), dest_cell) in (1u32..)
+                                    .zip(src_notebook.cells().iter())
                                     .zip(dest_notebook.cells().iter())
                                 {
                                     let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) =
@@ -302,7 +301,7 @@ pub(crate) fn lint_path(
             }
             (result, fixed)
         } else {
-            // If we fail to autofix, lint the original source code.
+            // If we fail to fix, lint the original source code.
             let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
             let fixed = FxHashMap::default();
             (result, fixed)
@@ -370,7 +369,7 @@ pub(crate) fn lint_stdin(
     contents: String,
     settings: &Settings,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
     let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
@@ -393,7 +392,7 @@ pub(crate) fn lint_stdin(
             error: parse_error,
         },
         fixed,
-    ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
+    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok(FixerResult {
             result,
             transformed,
@@ -406,7 +405,7 @@ pub(crate) fn lint_stdin(
             &source_kind,
             source_type,
         ) {
-            match autofix {
+            match fix_mode {
                 flags::FixMode::Apply => {
                     // Write the contents to stdout, regardless of whether any errors were fixed.
                     io::stdout().write_all(transformed.source_code().as_bytes())?;
@@ -435,7 +434,7 @@ pub(crate) fn lint_stdin(
 
             (result, fixed)
         } else {
-            // If we fail to autofix, lint the original source code.
+            // If we fail to fix, lint the original source code.
             let result = lint_only(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
@@ -447,7 +446,7 @@ pub(crate) fn lint_stdin(
             let fixed = FxHashMap::default();
 
             // Write the contents to stdout anyway.
-            if autofix.is_apply() {
+            if fix_mode.is_apply() {
                 io::stdout().write_all(source_kind.source_code().as_bytes())?;
             }
 

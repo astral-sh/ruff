@@ -1,7 +1,7 @@
-use ruff_python_ast::{self as ast, Identifier, Int, Stmt};
+use ruff_python_ast::{self as ast, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_python_codegen::Generator;
@@ -51,7 +51,7 @@ pub struct RelativeImports {
 }
 
 impl Violation for RelativeImports {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -61,7 +61,7 @@ impl Violation for RelativeImports {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let RelativeImports { strictness } = self;
         Some(match strictness {
             Strictness::Parents => {
@@ -99,7 +99,7 @@ fn fix_banned_relative_import(
             TextRange::default(),
         )),
         names: names.clone(),
-        level: Some(Int::new(0)),
+        level: Some(0),
         range: TextRange::default(),
     };
     let content = generator.stmt(&node.into());

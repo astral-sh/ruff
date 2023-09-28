@@ -20,7 +20,7 @@ use ruff_formatter::{IndentStyle, LineWidth};
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
-use ruff_linter::rule_selector::Specificity;
+use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
@@ -32,17 +32,20 @@ use ruff_linter::settings::{
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
 };
-use ruff_python_formatter::{FormatterSettings, MagicTrailingComma, QuoteStyle};
+use ruff_python_formatter::{MagicTrailingComma, QuoteStyle};
 
 use crate::options::{
     Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
     Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
     Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, IsortOptions, McCabeOptions, Options, Pep8NamingOptions,
-    PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions, PylintOptions,
+    Flake8UnusedArgumentsOptions, FormatOptions, FormatOrOutputFormat, IsortOptions, LintOptions,
+    McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
+    PydocstyleOptions, PyflakesOptions, PylintOptions,
 };
-use crate::settings::{FileResolverSettings, Settings, EXCLUDE, INCLUDE};
+use crate::settings::{
+    FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
+};
 
 #[derive(Debug, Default)]
 pub struct RuleSelection {
@@ -56,63 +59,37 @@ pub struct RuleSelection {
 
 #[derive(Debug, Default)]
 pub struct Configuration {
-    pub rule_selections: Vec<RuleSelection>,
-    pub per_file_ignores: Option<Vec<PerFileIgnore>>,
-
-    pub allowed_confusables: Option<Vec<char>>,
-    pub builtins: Option<Vec<String>>,
+    // Global options
     pub cache_dir: Option<PathBuf>,
-    pub dummy_variable_rgx: Option<Regex>,
-    pub exclude: Option<Vec<FilePattern>>,
     pub extend: Option<PathBuf>,
-    pub extend_exclude: Vec<FilePattern>,
-    pub extend_include: Vec<FilePattern>,
-    pub extend_per_file_ignores: Vec<PerFileIgnore>,
-    pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
-    pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
-    pub ignore_init_module_imports: Option<bool>,
-    pub include: Option<Vec<FilePattern>>,
-    pub line_length: Option<LineLength>,
-    pub logger_objects: Option<Vec<String>>,
-    pub namespace_packages: Option<Vec<PathBuf>>,
     pub preview: Option<PreviewMode>,
     pub required_version: Option<Version>,
-    pub respect_gitignore: Option<bool>,
     pub show_fixes: Option<bool>,
     pub show_source: Option<bool>,
+
+    // File resolver options
+    pub exclude: Option<Vec<FilePattern>>,
+    pub extend_exclude: Vec<FilePattern>,
+    pub extend_include: Vec<FilePattern>,
+    pub force_exclude: Option<bool>,
+    pub include: Option<Vec<FilePattern>>,
+    pub respect_gitignore: Option<bool>,
+
+    // Generic python options settings
+    pub builtins: Option<Vec<String>>,
+    pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
-    pub tab_size: Option<TabSize>,
     pub target_version: Option<PythonVersion>,
-    pub task_tags: Option<Vec<String>>,
-    pub typing_modules: Option<Vec<String>>,
-    // Plugins
-    pub flake8_annotations: Option<Flake8AnnotationsOptions>,
-    pub flake8_bandit: Option<Flake8BanditOptions>,
-    pub flake8_bugbear: Option<Flake8BugbearOptions>,
-    pub flake8_builtins: Option<Flake8BuiltinsOptions>,
-    pub flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
-    pub flake8_copyright: Option<Flake8CopyrightOptions>,
-    pub flake8_errmsg: Option<Flake8ErrMsgOptions>,
-    pub flake8_gettext: Option<Flake8GetTextOptions>,
-    pub flake8_implicit_str_concat: Option<Flake8ImplicitStrConcatOptions>,
-    pub flake8_import_conventions: Option<Flake8ImportConventionsOptions>,
-    pub flake8_pytest_style: Option<Flake8PytestStyleOptions>,
-    pub flake8_quotes: Option<Flake8QuotesOptions>,
-    pub flake8_self: Option<Flake8SelfOptions>,
-    pub flake8_tidy_imports: Option<Flake8TidyImportsOptions>,
-    pub flake8_type_checking: Option<Flake8TypeCheckingOptions>,
-    pub flake8_unused_arguments: Option<Flake8UnusedArgumentsOptions>,
-    pub isort: Option<IsortOptions>,
-    pub mccabe: Option<McCabeOptions>,
-    pub pep8_naming: Option<Pep8NamingOptions>,
-    pub pycodestyle: Option<PycodestyleOptions>,
-    pub pydocstyle: Option<PydocstyleOptions>,
-    pub pyflakes: Option<PyflakesOptions>,
-    pub pylint: Option<PylintOptions>,
-    pub pyupgrade: Option<PyUpgradeOptions>,
+
+    // Global formatting options
+    pub line_length: Option<LineLength>,
+    pub tab_size: Option<TabSize>,
+
+    pub lint: LintConfiguration,
+    pub format: FormatConfiguration,
 }
 
 impl Configuration {
@@ -128,7 +105,30 @@ impl Configuration {
         }
 
         let target_version = self.target_version.unwrap_or_default();
-        let rules = self.as_rule_table();
+        let preview = self.preview.unwrap_or_default();
+
+        let format = self.format;
+        let format_defaults = FormatterSettings::default();
+        // TODO(micha): Support changing the tab-width but disallow changing the number of spaces
+        let formatter = FormatterSettings {
+            preview: match format.preview.unwrap_or(preview) {
+                PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+                PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+            },
+            line_width: self
+                .line_length
+                .map_or(format_defaults.line_width, |length| {
+                    LineWidth::from(NonZeroU16::from(length))
+                }),
+            line_ending: format.line_ending.unwrap_or(format_defaults.line_ending),
+            indent_style: format.indent_style.unwrap_or(format_defaults.indent_style),
+            quote_style: format.quote_style.unwrap_or(format_defaults.quote_style),
+            magic_trailing_comma: format
+                .magic_trailing_comma
+                .unwrap_or(format_defaults.magic_trailing_comma),
+        };
+
+        let lint = self.lint;
 
         Ok(Settings {
             cache_dir: self
@@ -156,178 +156,153 @@ impl Configuration {
             },
 
             linter: LinterSettings {
+                rules: lint.as_rule_table(preview),
                 target_version,
                 project_root: project_root.to_path_buf(),
-                rules,
-                allowed_confusables: self
+                allowed_confusables: lint
                     .allowed_confusables
                     .map(FxHashSet::from_iter)
                     .unwrap_or_default(),
                 builtins: self.builtins.unwrap_or_default(),
-                dummy_variable_rgx: self
+                dummy_variable_rgx: lint
                     .dummy_variable_rgx
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
-                external: FxHashSet::from_iter(self.external.unwrap_or_default()),
-                ignore_init_module_imports: self.ignore_init_module_imports.unwrap_or_default(),
+                external: FxHashSet::from_iter(lint.external.unwrap_or_default()),
+                ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
                 line_length: self.line_length.unwrap_or_default(),
                 tab_size: self.tab_size.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
                 per_file_ignores: resolve_per_file_ignores(
-                    self.per_file_ignores
+                    lint.per_file_ignores
                         .unwrap_or_default()
                         .into_iter()
-                        .chain(self.extend_per_file_ignores)
+                        .chain(lint.extend_per_file_ignores)
                         .collect(),
                 )?,
                 src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
+                explicit_preview_rules: lint.explicit_preview_rules.unwrap_or_default(),
 
-                task_tags: self
+                task_tags: lint
                     .task_tags
                     .unwrap_or_else(|| TASK_TAGS.iter().map(ToString::to_string).collect()),
-                logger_objects: self.logger_objects.unwrap_or_default(),
-                preview: self.preview.unwrap_or_default(),
-                typing_modules: self.typing_modules.unwrap_or_default(),
+                logger_objects: lint.logger_objects.unwrap_or_default(),
+                preview,
+                typing_modules: lint.typing_modules.unwrap_or_default(),
                 // Plugins
-                flake8_annotations: self
+                flake8_annotations: lint
                     .flake8_annotations
                     .map(Flake8AnnotationsOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_bandit: self
+                flake8_bandit: lint
                     .flake8_bandit
                     .map(Flake8BanditOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_bugbear: self
+                flake8_bugbear: lint
                     .flake8_bugbear
                     .map(Flake8BugbearOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_builtins: self
+                flake8_builtins: lint
                     .flake8_builtins
                     .map(Flake8BuiltinsOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_comprehensions: self
+                flake8_comprehensions: lint
                     .flake8_comprehensions
                     .map(Flake8ComprehensionsOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_copyright: self
+                flake8_copyright: lint
                     .flake8_copyright
                     .map(Flake8CopyrightOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
-                flake8_errmsg: self
+                flake8_errmsg: lint
                     .flake8_errmsg
                     .map(Flake8ErrMsgOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_implicit_str_concat: self
+                flake8_implicit_str_concat: lint
                     .flake8_implicit_str_concat
                     .map(Flake8ImplicitStrConcatOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_import_conventions: self
+                flake8_import_conventions: lint
                     .flake8_import_conventions
                     .map(Flake8ImportConventionsOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_pytest_style: self
+                flake8_pytest_style: lint
                     .flake8_pytest_style
                     .map(Flake8PytestStyleOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
-                flake8_quotes: self
+                flake8_quotes: lint
                     .flake8_quotes
                     .map(Flake8QuotesOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_self: self
+                flake8_self: lint
                     .flake8_self
                     .map(Flake8SelfOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_tidy_imports: self
+                flake8_tidy_imports: lint
                     .flake8_tidy_imports
                     .map(Flake8TidyImportsOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_type_checking: self
+                flake8_type_checking: lint
                     .flake8_type_checking
                     .map(Flake8TypeCheckingOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_unused_arguments: self
+                flake8_unused_arguments: lint
                     .flake8_unused_arguments
                     .map(Flake8UnusedArgumentsOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_gettext: self
+                flake8_gettext: lint
                     .flake8_gettext
                     .map(Flake8GetTextOptions::into_settings)
                     .unwrap_or_default(),
-                isort: self
+                isort: lint
                     .isort
                     .map(IsortOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
-                mccabe: self
+                mccabe: lint
                     .mccabe
                     .map(McCabeOptions::into_settings)
                     .unwrap_or_default(),
-                pep8_naming: self
+                pep8_naming: lint
                     .pep8_naming
                     .map(Pep8NamingOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
-                pycodestyle: self
+                pycodestyle: lint
                     .pycodestyle
                     .map(PycodestyleOptions::into_settings)
                     .unwrap_or_default(),
-                pydocstyle: self
+                pydocstyle: lint
                     .pydocstyle
                     .map(PydocstyleOptions::into_settings)
                     .unwrap_or_default(),
-                pyflakes: self
+                pyflakes: lint
                     .pyflakes
                     .map(PyflakesOptions::into_settings)
                     .unwrap_or_default(),
-                pylint: self
+                pylint: lint
                     .pylint
                     .map(PylintOptions::into_settings)
                     .unwrap_or_default(),
-                pyupgrade: self
+                pyupgrade: lint
                     .pyupgrade
                     .map(PyUpgradeOptions::into_settings)
                     .unwrap_or_default(),
             },
 
-            formatter: FormatterSettings {
-                exclude: vec![],
-                preview: self
-                    .preview
-                    .map(|preview| match preview {
-                        PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
-                        PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
-                    })
-                    .unwrap_or_default(),
-                line_width: LineWidth::from(NonZeroU16::from(self.line_length.unwrap_or_default())),
-                indent_style: IndentStyle::default(),
-                quote_style: QuoteStyle::default(),
-                magic_trailing_comma: MagicTrailingComma::default(),
-            },
+            formatter,
         })
     }
 
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
+        let lint = if let Some(lint) = options.lint {
+            lint.combine(options.lint_top_level)
+        } else {
+            options.lint_top_level
+        };
+
         Ok(Self {
-            rule_selections: vec![RuleSelection {
-                select: options.select,
-                ignore: options
-                    .ignore
-                    .into_iter()
-                    .flatten()
-                    .chain(options.extend_ignore.into_iter().flatten())
-                    .collect(),
-                extend_select: options.extend_select.unwrap_or_default(),
-                fixable: options.fixable,
-                unfixable: options
-                    .unfixable
-                    .into_iter()
-                    .flatten()
-                    .chain(options.extend_unfixable.into_iter().flatten())
-                    .collect(),
-                extend_fixable: options.extend_fixable.unwrap_or_default(),
-            }],
-            allowed_confusables: options.allowed_confusables,
             builtins: options.builtins,
             cache_dir: options
                 .cache_dir
@@ -337,11 +312,7 @@ impl Configuration {
                 })
                 .transpose()
                 .map_err(|e| anyhow!("Invalid `cache-dir` value: {e}"))?,
-            dummy_variable_rgx: options
-                .dummy_variable_rgx
-                .map(|pattern| Regex::new(&pattern))
-                .transpose()
-                .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
+
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
@@ -383,6 +354,160 @@ impl Configuration {
                         .collect()
                 })
                 .unwrap_or_default(),
+            include: options.include.map(|paths| {
+                paths
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
+            fix: options.fix,
+            fix_only: options.fix_only,
+            output_format: options.output_format.or_else(|| {
+                options
+                    .format
+                    .as_ref()
+                    .and_then(FormatOrOutputFormat::as_output_format)
+            }),
+            force_exclude: options.force_exclude,
+            line_length: options.line_length,
+            tab_size: options.tab_size,
+            namespace_packages: options
+                .namespace_packages
+                .map(|namespace_package| resolve_src(&namespace_package, project_root))
+                .transpose()?,
+            preview: options.preview.map(PreviewMode::from),
+            required_version: options.required_version,
+            respect_gitignore: options.respect_gitignore,
+            show_source: options.show_source,
+            show_fixes: options.show_fixes,
+            src: options
+                .src
+                .map(|src| resolve_src(&src, project_root))
+                .transpose()?,
+            target_version: options.target_version,
+
+            lint: LintConfiguration::from_options(lint, project_root)?,
+            format: if let Some(FormatOrOutputFormat::Format(format)) = options.format {
+                FormatConfiguration::from_options(format)?
+            } else {
+                FormatConfiguration::default()
+            },
+        })
+    }
+
+    #[must_use]
+    pub fn combine(self, config: Self) -> Self {
+        Self {
+            builtins: self.builtins.or(config.builtins),
+            cache_dir: self.cache_dir.or(config.cache_dir),
+            exclude: self.exclude.or(config.exclude),
+            extend: self.extend.or(config.extend),
+            extend_exclude: config
+                .extend_exclude
+                .into_iter()
+                .chain(self.extend_exclude)
+                .collect(),
+            extend_include: config
+                .extend_include
+                .into_iter()
+                .chain(self.extend_include)
+                .collect(),
+            include: self.include.or(config.include),
+            fix: self.fix.or(config.fix),
+            fix_only: self.fix_only.or(config.fix_only),
+            output_format: self.output_format.or(config.output_format),
+            force_exclude: self.force_exclude.or(config.force_exclude),
+            line_length: self.line_length.or(config.line_length),
+            tab_size: self.tab_size.or(config.tab_size),
+            namespace_packages: self.namespace_packages.or(config.namespace_packages),
+            required_version: self.required_version.or(config.required_version),
+            respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
+            show_source: self.show_source.or(config.show_source),
+            show_fixes: self.show_fixes.or(config.show_fixes),
+            src: self.src.or(config.src),
+            target_version: self.target_version.or(config.target_version),
+            preview: self.preview.or(config.preview),
+
+            lint: self.lint.combine(config.lint),
+            format: self.format.combine(config.format),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct LintConfiguration {
+    // Rule selection
+    pub extend_per_file_ignores: Vec<PerFileIgnore>,
+    pub per_file_ignores: Option<Vec<PerFileIgnore>>,
+    pub rule_selections: Vec<RuleSelection>,
+    pub explicit_preview_rules: Option<bool>,
+
+    // Global lint settings
+    pub allowed_confusables: Option<Vec<char>>,
+    pub dummy_variable_rgx: Option<Regex>,
+    pub external: Option<Vec<String>>,
+    pub ignore_init_module_imports: Option<bool>,
+    pub logger_objects: Option<Vec<String>>,
+    pub task_tags: Option<Vec<String>>,
+    pub typing_modules: Option<Vec<String>>,
+
+    // Plugins
+    pub flake8_annotations: Option<Flake8AnnotationsOptions>,
+    pub flake8_bandit: Option<Flake8BanditOptions>,
+    pub flake8_bugbear: Option<Flake8BugbearOptions>,
+    pub flake8_builtins: Option<Flake8BuiltinsOptions>,
+    pub flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
+    pub flake8_copyright: Option<Flake8CopyrightOptions>,
+    pub flake8_errmsg: Option<Flake8ErrMsgOptions>,
+    pub flake8_gettext: Option<Flake8GetTextOptions>,
+    pub flake8_implicit_str_concat: Option<Flake8ImplicitStrConcatOptions>,
+    pub flake8_import_conventions: Option<Flake8ImportConventionsOptions>,
+    pub flake8_pytest_style: Option<Flake8PytestStyleOptions>,
+    pub flake8_quotes: Option<Flake8QuotesOptions>,
+    pub flake8_self: Option<Flake8SelfOptions>,
+    pub flake8_tidy_imports: Option<Flake8TidyImportsOptions>,
+    pub flake8_type_checking: Option<Flake8TypeCheckingOptions>,
+    pub flake8_unused_arguments: Option<Flake8UnusedArgumentsOptions>,
+    pub isort: Option<IsortOptions>,
+    pub mccabe: Option<McCabeOptions>,
+    pub pep8_naming: Option<Pep8NamingOptions>,
+    pub pycodestyle: Option<PycodestyleOptions>,
+    pub pydocstyle: Option<PydocstyleOptions>,
+    pub pyflakes: Option<PyflakesOptions>,
+    pub pylint: Option<PylintOptions>,
+    pub pyupgrade: Option<PyUpgradeOptions>,
+}
+
+impl LintConfiguration {
+    fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
+        Ok(LintConfiguration {
+            rule_selections: vec![RuleSelection {
+                select: options.select,
+                ignore: options
+                    .ignore
+                    .into_iter()
+                    .flatten()
+                    .chain(options.extend_ignore.into_iter().flatten())
+                    .collect(),
+                extend_select: options.extend_select.unwrap_or_default(),
+                fixable: options.fixable,
+                unfixable: options
+                    .unfixable
+                    .into_iter()
+                    .flatten()
+                    .chain(options.extend_unfixable.into_iter().flatten())
+                    .collect(),
+                extend_fixable: options.extend_fixable.unwrap_or_default(),
+            }],
+            allowed_confusables: options.allowed_confusables,
+            dummy_variable_rgx: options
+                .dummy_variable_rgx
+                .map(|pattern| Regex::new(&pattern))
+                .transpose()
+                .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
             extend_per_file_ignores: options
                 .extend_per_file_ignores
                 .map(|per_file_ignores| {
@@ -395,27 +520,8 @@ impl Configuration {
                 })
                 .unwrap_or_default(),
             external: options.external,
-            fix: options.fix,
-            fix_only: options.fix_only,
-            output_format: options.output_format.or(options.format),
-            force_exclude: options.force_exclude,
             ignore_init_module_imports: options.ignore_init_module_imports,
-            include: options.include.map(|paths| {
-                paths
-                    .into_iter()
-                    .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
-                        FilePattern::User(pattern, absolute)
-                    })
-                    .collect()
-            }),
-            line_length: options.line_length,
-            tab_size: options.tab_size,
-            namespace_packages: options
-                .namespace_packages
-                .map(|namespace_package| resolve_src(&namespace_package, project_root))
-                .transpose()?,
-            preview: options.preview.map(PreviewMode::from),
+            explicit_preview_rules: options.explicit_preview_rules,
             per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
                     .into_iter()
@@ -424,15 +530,6 @@ impl Configuration {
                     })
                     .collect()
             }),
-            required_version: options.required_version,
-            respect_gitignore: options.respect_gitignore,
-            show_source: options.show_source,
-            show_fixes: options.show_fixes,
-            src: options
-                .src
-                .map(|src| resolve_src(&src, project_root))
-                .transpose()?,
-            target_version: options.target_version,
             task_tags: options.task_tags,
             logger_objects: options.logger_objects,
             typing_modules: options.typing_modules,
@@ -464,17 +561,20 @@ impl Configuration {
         })
     }
 
-    pub fn as_rule_table(&self) -> RuleTable {
-        let preview = self.preview.unwrap_or_default();
+    fn as_rule_table(&self, preview: PreviewMode) -> RuleTable {
+        let preview = PreviewOptions {
+            mode: preview,
+            require_explicit: self.explicit_preview_rules.unwrap_or_default(),
+        };
 
         // The select_set keeps track of which rules have been selected.
         let mut select_set: RuleSet = PREFIXES
             .iter()
-            .flat_map(|selector| selector.rules(preview))
+            .flat_map(|selector| selector.rules(&preview))
             .collect();
 
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.rules(preview).collect();
+        let mut fixable_set: RuleSet = RuleSelector::All.rules(&preview).collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
@@ -513,7 +613,7 @@ impl Configuration {
                     .chain(selection.extend_select.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(preview) {
+                    for rule in selector.rules(&preview) {
                         select_map_updates.insert(rule, true);
                     }
                 }
@@ -523,7 +623,7 @@ impl Configuration {
                     .chain(carriedover_ignores.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(preview) {
+                    for rule in selector.rules(&preview) {
                         select_map_updates.insert(rule, false);
                     }
                 }
@@ -535,7 +635,7 @@ impl Configuration {
                     .chain(selection.extend_fixable.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(preview) {
+                    for rule in selector.rules(&preview) {
                         fixable_map_updates.insert(rule, true);
                     }
                 }
@@ -545,7 +645,7 @@ impl Configuration {
                     .chain(carriedover_unfixables.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(preview) {
+                    for rule in selector.rules(&preview) {
                         fixable_map_updates.insert(rule, false);
                     }
                 }
@@ -612,16 +712,16 @@ impl Configuration {
             {
                 #[allow(deprecated)]
                 if matches!(selector, RuleSelector::Nursery) {
-                    let suggestion = if preview.is_disabled() {
+                    let suggestion = if preview.mode.is_disabled() {
                         " Use the `--preview` flag instead."
                     } else {
                         // We have no suggested alternative since there is intentionally no "PREVIEW" selector
                         ""
                     };
                     warn_user_once!("The `NURSERY` selector has been deprecated.{suggestion}");
-                }
+                };
 
-                if preview.is_disabled() {
+                if preview.mode.is_disabled() {
                     if let RuleSelector::Rule { prefix, .. } = selector {
                         if prefix.rules().any(|rule| rule.is_nursery()) {
                             deprecated_nursery_selectors.insert(selector);
@@ -629,7 +729,7 @@ impl Configuration {
                     }
 
                     // Check if the selector is empty because preview mode is disabled
-                    if selector.rules(PreviewMode::Disabled).next().is_none() {
+                    if selector.rules(&PreviewOptions::default()).next().is_none() {
                         ignored_preview_selectors.insert(selector);
                     }
                 }
@@ -706,47 +806,21 @@ impl Configuration {
                 .chain(self.rule_selections)
                 .collect(),
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
-            builtins: self.builtins.or(config.builtins),
-            cache_dir: self.cache_dir.or(config.cache_dir),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
-            exclude: self.exclude.or(config.exclude),
-            extend: self.extend.or(config.extend),
-            extend_exclude: config
-                .extend_exclude
-                .into_iter()
-                .chain(self.extend_exclude)
-                .collect(),
-            extend_include: config
-                .extend_include
-                .into_iter()
-                .chain(self.extend_include)
-                .collect(),
             extend_per_file_ignores: config
                 .extend_per_file_ignores
                 .into_iter()
                 .chain(self.extend_per_file_ignores)
                 .collect(),
             external: self.external.or(config.external),
-            fix: self.fix.or(config.fix),
-            fix_only: self.fix_only.or(config.fix_only),
-            output_format: self.output_format.or(config.output_format),
-            force_exclude: self.force_exclude.or(config.force_exclude),
-            include: self.include.or(config.include),
             ignore_init_module_imports: self
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
-            line_length: self.line_length.or(config.line_length),
             logger_objects: self.logger_objects.or(config.logger_objects),
-            tab_size: self.tab_size.or(config.tab_size),
-            namespace_packages: self.namespace_packages.or(config.namespace_packages),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
-            required_version: self.required_version.or(config.required_version),
-            respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
-            show_source: self.show_source.or(config.show_source),
-            show_fixes: self.show_fixes.or(config.show_fixes),
-            src: self.src.or(config.src),
-            target_version: self.target_version.or(config.target_version),
-            preview: self.preview.or(config.preview),
+            explicit_preview_rules: self
+                .explicit_preview_rules
+                .or(config.explicit_preview_rules),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
             // Plugins
@@ -788,6 +862,49 @@ impl Configuration {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct FormatConfiguration {
+    pub preview: Option<PreviewMode>,
+
+    pub indent_style: Option<IndentStyle>,
+
+    pub quote_style: Option<QuoteStyle>,
+
+    pub magic_trailing_comma: Option<MagicTrailingComma>,
+
+    pub line_ending: Option<LineEnding>,
+}
+
+impl FormatConfiguration {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn from_options(options: FormatOptions) -> Result<Self> {
+        Ok(Self {
+            preview: options.preview.map(PreviewMode::from),
+            indent_style: options.indent_style,
+            quote_style: options.quote_style,
+            magic_trailing_comma: options.skip_magic_trailing_comma.map(|skip| {
+                if skip {
+                    MagicTrailingComma::Ignore
+                } else {
+                    MagicTrailingComma::Respect
+                }
+            }),
+            line_ending: options.line_ending,
+        })
+    }
+
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn combine(self, other: Self) -> Self {
+        Self {
+            preview: self.preview.or(other.preview),
+            indent_style: self.indent_style.or(other.indent_style),
+            quote_style: self.quote_style.or(other.quote_style),
+            magic_trailing_comma: self.magic_trailing_comma.or(other.magic_trailing_comma),
+            line_ending: self.line_ending.or(other.line_ending),
+        }
+    }
+}
 pub(crate) trait CombinePluginOptions {
     #[must_use]
     fn combine(self, other: Self) -> Self;
@@ -826,12 +943,12 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 
 #[cfg(test)]
 mod tests {
+    use crate::configuration::{LintConfiguration, RuleSelection};
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
+    use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
     use ruff_linter::RuleSelector;
-
-    use crate::configuration::{Configuration, RuleSelection};
 
     const NURSERY_RULES: &[Rule] = &[
         Rule::MissingCopyrightNotice,
@@ -893,14 +1010,14 @@ mod tests {
     #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(
         selections: impl IntoIterator<Item = RuleSelection>,
-        preview: Option<PreviewMode>,
+        preview: Option<PreviewOptions>,
     ) -> RuleSet {
-        Configuration {
+        LintConfiguration {
             rule_selections: selections.into_iter().collect(),
-            preview,
-            ..Configuration::default()
+            explicit_preview_rules: preview.as_ref().map(|preview| preview.require_explicit),
+            ..LintConfiguration::default()
         }
-        .as_rule_table()
+        .as_rule_table(preview.map(|preview| preview.mode).unwrap_or_default())
         .iter_enabled()
         // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is off-by-default
         .filter(|rule| rule.noqa_code() != "RUF014")
@@ -1136,7 +1253,10 @@ mod tests {
                 select: Some(vec![RuleSelector::All]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         assert!(!actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
 
@@ -1145,7 +1265,10 @@ mod tests {
                 select: Some(vec![RuleSelector::All]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         assert!(actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
     }
@@ -1157,7 +1280,10 @@ mod tests {
                 select: Some(vec![Linter::Flake8Copyright.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
@@ -1167,7 +1293,10 @@ mod tests {
                 select: Some(vec![Linter::Flake8Copyright.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
@@ -1180,7 +1309,10 @@ mod tests {
                 select: Some(vec![Flake8Copyright::_0.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
@@ -1190,7 +1322,10 @@ mod tests {
                 select: Some(vec![Flake8Copyright::_0.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
@@ -1198,12 +1333,16 @@ mod tests {
 
     #[test]
     fn select_rule_preview() {
+        // Test inclusion when toggling preview on and off
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Refurb::_145.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
@@ -1213,7 +1352,24 @@ mod tests {
                 select: Some(vec![Refurb::_145.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
+        );
+        let expected = RuleSet::from_rule(Rule::SliceCopy);
+        assert_eq!(actual, expected);
+
+        // Test inclusion when preview is on but explicit codes are required
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Refurb::_145.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                require_explicit: true,
+            }),
         );
         let expected = RuleSet::from_rule(Rule::SliceCopy);
         assert_eq!(actual, expected);
@@ -1228,7 +1384,10 @@ mod tests {
                 select: Some(vec![Flake8Copyright::_001.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
@@ -1238,7 +1397,10 @@ mod tests {
                 select: Some(vec![Flake8Copyright::_001.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
@@ -1254,7 +1416,10 @@ mod tests {
                 select: Some(vec![RuleSelector::Nursery]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
@@ -1264,7 +1429,10 @@ mod tests {
                 select: Some(vec![RuleSelector::Nursery]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);

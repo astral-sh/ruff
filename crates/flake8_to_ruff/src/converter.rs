@@ -16,8 +16,8 @@ use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::warn_user;
 use ruff_workspace::options::{
     Flake8AnnotationsOptions, Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ErrMsgOptions,
-    Flake8PytestStyleOptions, Flake8QuotesOptions, Flake8TidyImportsOptions, McCabeOptions,
-    Options, Pep8NamingOptions, PydocstyleOptions,
+    Flake8PytestStyleOptions, Flake8QuotesOptions, Flake8TidyImportsOptions, LintOptions,
+    McCabeOptions, Options, Pep8NamingOptions, PydocstyleOptions,
 };
 use ruff_workspace::pyproject::Pyproject;
 
@@ -103,6 +103,7 @@ pub(crate) fn convert(
 
     // Parse each supported option.
     let mut options = Options::default();
+    let mut lint_options = LintOptions::default();
     let mut flake8_annotations = Flake8AnnotationsOptions::default();
     let mut flake8_bugbear = Flake8BugbearOptions::default();
     let mut flake8_builtins = Flake8BuiltinsOptions::default();
@@ -150,7 +151,7 @@ pub(crate) fn convert(
                 "per-file-ignores" | "per_file_ignores" => {
                     match parser::parse_files_to_codes_mapping(value.as_ref()) {
                         Ok(per_file_ignores) => {
-                            options.per_file_ignores =
+                            lint_options.per_file_ignores =
                                 Some(parser::collect_per_file_ignores(per_file_ignores));
                         }
                         Err(e) => {
@@ -358,47 +359,47 @@ pub(crate) fn convert(
     }
 
     // Deduplicate and sort.
-    options.select = Some(
+    lint_options.select = Some(
         select
             .into_iter()
             .sorted_by_key(RuleSelector::prefix_and_code)
             .collect(),
     );
-    options.ignore = Some(
+    lint_options.ignore = Some(
         ignore
             .into_iter()
             .sorted_by_key(RuleSelector::prefix_and_code)
             .collect(),
     );
     if flake8_annotations != Flake8AnnotationsOptions::default() {
-        options.flake8_annotations = Some(flake8_annotations);
+        lint_options.flake8_annotations = Some(flake8_annotations);
     }
     if flake8_bugbear != Flake8BugbearOptions::default() {
-        options.flake8_bugbear = Some(flake8_bugbear);
+        lint_options.flake8_bugbear = Some(flake8_bugbear);
     }
     if flake8_builtins != Flake8BuiltinsOptions::default() {
-        options.flake8_builtins = Some(flake8_builtins);
+        lint_options.flake8_builtins = Some(flake8_builtins);
     }
     if flake8_errmsg != Flake8ErrMsgOptions::default() {
-        options.flake8_errmsg = Some(flake8_errmsg);
+        lint_options.flake8_errmsg = Some(flake8_errmsg);
     }
     if flake8_pytest_style != Flake8PytestStyleOptions::default() {
-        options.flake8_pytest_style = Some(flake8_pytest_style);
+        lint_options.flake8_pytest_style = Some(flake8_pytest_style);
     }
     if flake8_quotes != Flake8QuotesOptions::default() {
-        options.flake8_quotes = Some(flake8_quotes);
+        lint_options.flake8_quotes = Some(flake8_quotes);
     }
     if flake8_tidy_imports != Flake8TidyImportsOptions::default() {
-        options.flake8_tidy_imports = Some(flake8_tidy_imports);
+        lint_options.flake8_tidy_imports = Some(flake8_tidy_imports);
     }
     if mccabe != McCabeOptions::default() {
-        options.mccabe = Some(mccabe);
+        lint_options.mccabe = Some(mccabe);
     }
     if pep8_naming != Pep8NamingOptions::default() {
-        options.pep8_naming = Some(pep8_naming);
+        lint_options.pep8_naming = Some(pep8_naming);
     }
     if pydocstyle != PydocstyleOptions::default() {
-        options.pydocstyle = Some(pydocstyle);
+        lint_options.pydocstyle = Some(pydocstyle);
     }
 
     // Extract any settings from the existing `pyproject.toml`.
@@ -436,6 +437,10 @@ pub(crate) fn convert(
         }
     }
 
+    if lint_options != LintOptions::default() {
+        options.lint = Some(lint_options);
+    }
+
     // Create the pyproject.toml.
     Pyproject::new(options)
 }
@@ -464,7 +469,7 @@ mod tests {
     use ruff_linter::rules::flake8_quotes;
     use ruff_linter::rules::pydocstyle::settings::Convention;
     use ruff_linter::settings::types::PythonVersion;
-    use ruff_workspace::options::{Flake8QuotesOptions, Options, PydocstyleOptions};
+    use ruff_workspace::options::{Flake8QuotesOptions, LintOptions, Options, PydocstyleOptions};
     use ruff_workspace::pyproject::Pyproject;
 
     use crate::converter::DEFAULT_SELECTORS;
@@ -474,8 +479,8 @@ mod tests {
     use super::super::plugin::Plugin;
     use super::convert;
 
-    fn default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> Options {
-        Options {
+    fn lint_default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> LintOptions {
+        LintOptions {
             ignore: Some(vec![]),
             select: Some(
                 DEFAULT_SELECTORS
@@ -485,7 +490,7 @@ mod tests {
                     .sorted_by_key(RuleSelector::prefix_and_code)
                     .collect(),
             ),
-            ..Options::default()
+            ..LintOptions::default()
         }
     }
 
@@ -496,7 +501,10 @@ mod tests {
             &ExternalConfig::default(),
             None,
         );
-        let expected = Pyproject::new(default_options([]));
+        let expected = Pyproject::new(Options {
+            lint: Some(lint_default_options([])),
+            ..Options::default()
+        });
         assert_eq!(actual, expected);
     }
 
@@ -512,7 +520,8 @@ mod tests {
         );
         let expected = Pyproject::new(Options {
             line_length: Some(LineLength::try_from(100).unwrap()),
-            ..default_options([])
+            lint: Some(lint_default_options([])),
+            ..Options::default()
         });
         assert_eq!(actual, expected);
     }
@@ -529,7 +538,8 @@ mod tests {
         );
         let expected = Pyproject::new(Options {
             line_length: Some(LineLength::try_from(100).unwrap()),
-            ..default_options([])
+            lint: Some(lint_default_options([])),
+            ..Options::default()
         });
         assert_eq!(actual, expected);
     }
@@ -544,7 +554,10 @@ mod tests {
             &ExternalConfig::default(),
             Some(vec![]),
         );
-        let expected = Pyproject::new(default_options([]));
+        let expected = Pyproject::new(Options {
+            lint: Some(lint_default_options([])),
+            ..Options::default()
+        });
         assert_eq!(actual, expected);
     }
 
@@ -559,13 +572,16 @@ mod tests {
             Some(vec![]),
         );
         let expected = Pyproject::new(Options {
-            flake8_quotes: Some(Flake8QuotesOptions {
-                inline_quotes: Some(flake8_quotes::settings::Quote::Single),
-                multiline_quotes: None,
-                docstring_quotes: None,
-                avoid_escape: None,
+            lint: Some(LintOptions {
+                flake8_quotes: Some(Flake8QuotesOptions {
+                    inline_quotes: Some(flake8_quotes::settings::Quote::Single),
+                    multiline_quotes: None,
+                    docstring_quotes: None,
+                    avoid_escape: None,
+                }),
+                ..lint_default_options([])
             }),
-            ..default_options([])
+            ..Options::default()
         });
         assert_eq!(actual, expected);
     }
@@ -584,12 +600,15 @@ mod tests {
             Some(vec![Plugin::Flake8Docstrings]),
         );
         let expected = Pyproject::new(Options {
-            pydocstyle: Some(PydocstyleOptions {
-                convention: Some(Convention::Numpy),
-                ignore_decorators: None,
-                property_decorators: None,
+            lint: Some(LintOptions {
+                pydocstyle: Some(PydocstyleOptions {
+                    convention: Some(Convention::Numpy),
+                    ignore_decorators: None,
+                    property_decorators: None,
+                }),
+                ..lint_default_options([Linter::Pydocstyle.into()])
             }),
-            ..default_options([Linter::Pydocstyle.into()])
+            ..Options::default()
         });
         assert_eq!(actual, expected);
     }
@@ -605,13 +624,16 @@ mod tests {
             None,
         );
         let expected = Pyproject::new(Options {
-            flake8_quotes: Some(Flake8QuotesOptions {
-                inline_quotes: Some(flake8_quotes::settings::Quote::Single),
-                multiline_quotes: None,
-                docstring_quotes: None,
-                avoid_escape: None,
+            lint: Some(LintOptions {
+                flake8_quotes: Some(Flake8QuotesOptions {
+                    inline_quotes: Some(flake8_quotes::settings::Quote::Single),
+                    multiline_quotes: None,
+                    docstring_quotes: None,
+                    avoid_escape: None,
+                }),
+                ..lint_default_options([Linter::Flake8Quotes.into()])
             }),
-            ..default_options([Linter::Flake8Quotes.into()])
+            ..Options::default()
         });
         assert_eq!(actual, expected);
     }
@@ -630,7 +652,8 @@ mod tests {
         );
         let expected = Pyproject::new(Options {
             target_version: Some(PythonVersion::Py38),
-            ..default_options([])
+            lint: Some(lint_default_options([])),
+            ..Options::default()
         });
         assert_eq!(actual, expected);
 
