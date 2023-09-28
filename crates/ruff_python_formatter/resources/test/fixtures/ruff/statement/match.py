@@ -522,3 +522,45 @@ match pattern:
 
     case a, b,:
         pass
+
+    case (a,  # comment
+        ):
+        pass
+
+    case (a, b  # comment
+            ):
+        pass
+
+    case (a, b,  # comment
+            ):
+        pass
+
+    case (  # comment
+        a,
+    ):
+        pass
+
+    case (  # comment
+        a, b
+    ):
+        pass
+
+    case (  # comment
+        a, b,
+    ):
+        pass
+
+    case (
+        # comment
+        a,):
+        pass
+
+    case (
+        # comment
+        a, b):
+        pass
+
+    case (
+        # comment
+        a, b,):
+        pass
