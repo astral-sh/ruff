@@ -5,6 +5,7 @@ pub(crate) use reimplemented_starmap::*;
 pub(crate) use repeated_append::*;
 pub(crate) use slice_copy::*;
 pub(crate) use unnecessary_enumerate::*;
+pub(crate) use no_implicit_cwd::*;
 
 mod check_and_remove_from_set;
 mod delete_full_slice;
@@ -13,3 +14,4 @@ mod reimplemented_starmap;
 mod repeated_append;
 mod slice_copy;
 mod unnecessary_enumerate;
+mod no_implicit_cwd;
