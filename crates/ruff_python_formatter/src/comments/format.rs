@@ -1,9 +1,9 @@
-use std::borrow::Cow;
-
-use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
+use ruff_formatter::{format_args, write, FormatError, FormatOptions, IndentWidth, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::PySourceType;
-use ruff_python_trivia::{is_pragma, lines_after, lines_after_ignoring_trivia, lines_before};
+use ruff_python_trivia::{
+    is_pragma, lines_after, lines_after_ignoring_trivia, lines_before, Cursor,
+};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::{CommentLinePosition, SourceComment};
@@ -296,12 +296,11 @@ pub(crate) struct FormatComment<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatComment<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let slice = self.comment.slice();
         let source = SourceCode::new(f.context().source());
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
-        format_normalized_comment(normalized_comment, slice.range()).fmt(f)
+        format_normalized_comment(normalized_comment).fmt(f)
     }
 }
 
@@ -371,18 +370,13 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
         let normalized_comment = normalize_comment(self.comment, source)?;
 
         // Don't reserve width for excluded pragma comments.
-        let reserved_width = if is_pragma(&normalized_comment) {
+        let reserved_width = if is_pragma(slice.text(source)) {
             0
         } else {
             // Start with 2 because of the two leading spaces.
-            let width = 2u32.saturating_add(
-                TextWidth::from_text(&normalized_comment, f.options().indent_width())
-                    .width()
-                    .expect("Expected comment not to contain any newlines")
-                    .value(),
-            );
-
-            width
+            2u32.saturating_add(
+                normalized_comment.width(f.context().source(), f.options().indent_width()),
+            )
         };
 
         write!(
@@ -392,7 +386,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
                     &format_args![
                         space(),
                         space(),
-                        format_normalized_comment(normalized_comment, slice.range())
+                        format_normalized_comment(normalized_comment)
                     ],
                     reserved_width
                 ),
@@ -409,33 +403,52 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 ///   unnecessary allocations.
 /// * If the content is modified then make as few allocations as possible and use
 ///   a dynamic text element at the original slice's start position.
-pub(crate) const fn format_normalized_comment(
-    comment: Cow<'_, str>,
-    range: TextRange,
-) -> FormatNormalizedComment<'_> {
-    FormatNormalizedComment { comment, range }
+const fn format_normalized_comment(comment: NormalizedComment) -> FormatNormalizedComment {
+    FormatNormalizedComment { comment }
 }
 
-pub(crate) struct FormatNormalizedComment<'a> {
-    comment: Cow<'a, str>,
-    range: TextRange,
+struct FormatNormalizedComment {
+    comment: NormalizedComment,
 }
 
-impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
+impl Format<PyFormatContext<'_>> for FormatNormalizedComment {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         match self.comment {
-            Cow::Borrowed(borrowed) => {
-                source_text_slice(TextRange::at(self.range.start(), borrowed.text_len())).fmt(f)
+            NormalizedComment::Verbatim(text) => source_text_slice(text).fmt(f),
+            NormalizedComment::Body(text) => {
+                write!(f, [token("#"), space(), source_text_slice(text)])
             }
+        }
+    }
+}
 
-            Cow::Owned(ref owned) => {
-                write!(
-                    f,
-                    [
-                        text(owned, Some(self.range.start())),
-                        source_position(self.range.end())
-                    ]
-                )
+#[derive(Debug)]
+enum NormalizedComment {
+    /// A complete comment, including the leading `#`.
+    Verbatim(TextRange),
+
+    /// A comment body, exclusive of the leading `#` and a leading space.
+    Body(TextRange),
+}
+
+impl NormalizedComment {
+    /// Return the width of the comment.
+    fn width(&self, source: &str, indent_width: IndentWidth) -> u32 {
+        match self {
+            // Compute the width of the comment, which includes the leading `#`.
+            Self::Verbatim(comment) => TextWidth::from_text(&source[*comment], indent_width)
+                .width()
+                .expect("Expected comment not to contain any newlines")
+                .value(),
+
+            // Compute the width of the comment body, and add two: one for the leading `#`,
+            // and one for the leading space.
+            Self::Body(comment) => {
+                TextWidth::from_text(&source[*comment], indent_width)
+                    .width()
+                    .expect("Expected comment not to contain any newlines")
+                    .value()
+                    + 2u32
             }
         }
     }
@@ -453,41 +466,78 @@ impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
 fn normalize_comment<'a>(
     comment: &'a SourceComment,
     source: SourceCode<'a>,
-) -> FormatResult<Cow<'a, str>> {
+) -> FormatResult<NormalizedComment> {
     let slice = comment.slice();
     let comment_text = slice.text(source);
 
-    let trimmed = comment_text.trim_end();
+    // Strip trailing whitespace.
+    let trimmed_text = comment_text.trim_end();
 
-    let content = strip_comment_prefix(trimmed)?;
+    let mut cursor = Cursor::new(trimmed_text);
 
-    if content.is_empty() {
-        return Ok(Cow::Borrowed("#"));
+    // Strip the leading `#`.
+    if !cursor.eat_char('#') {
+        return Err(FormatError::syntax_error(
+            "Didn't find expected comment token `#`",
+        ));
+    };
+
+    // If the comment is empty, just return the leading `#`.
+    if cursor.is_eof() {
+        return Ok(NormalizedComment::Verbatim(TextRange::at(
+            slice.start(),
+            '#'.text_len(),
+        )));
     }
 
     // Fast path for correctly formatted comments: if the comment starts with a space, or any
     // of the allowed characters, then it's included verbatim (apart for trimming any trailing
     // whitespace).
-    if content.starts_with([' ', '!', ':', '#', '\'']) {
-        return Ok(Cow::Borrowed(trimmed));
+    if matches!(cursor.first(), ' ' | '!' | ':' | '#' | '\'') {
+        return Ok(NormalizedComment::Verbatim(TextRange::at(
+            slice.start(),
+            '#'.text_len() + cursor.text_len(),
+        )));
     }
 
-    // Otherwise, we need to normalize the comment by adding a space after the `#`.
-    if content.starts_with('\u{A0}') {
-        let trimmed = content.trim_start_matches('\u{A0}');
-        if trimmed.trim_start().starts_with("type:") {
-            // Black adds a space before the non-breaking space if part of a type pragma.
-            Ok(Cow::Owned(std::format!("# {content}")))
-        } else if trimmed.starts_with(' ') {
-            // Black replaces the non-breaking space with a space if followed by a space.
-            Ok(Cow::Owned(std::format!("# {trimmed}")))
+    // Non-breaking spaces are special-cased.
+    if cursor.first() == '\u{A0}' {
+        let mut trimmed = cursor.clone();
+        trimmed.eat_while(|c| c == '\u{A0}');
+
+        return if trimmed.chars().as_str().trim_start().starts_with("type:") {
+            // Black adds a space before the non-breaking space if part of a `# type:` pragma.
+            // Ex) `# {cursor}`
+            Ok(NormalizedComment::Body(TextRange::at(
+                slice.start() + cursor.token_len(),
+                cursor.text_len(),
+            )))
+        } else if trimmed.first() == ' ' {
+            // Black replaces the non-breaking space with a space, if it's followed by a space.
+            // Ex) `# {trimmed}`
+            Ok(NormalizedComment::Body(TextRange::at(
+                slice.start() + trimmed.token_len(),
+                trimmed.text_len(),
+            )))
         } else {
-            // Otherwise we replace the first non-breaking space with a regular space.
-            Ok(Cow::Owned(std::format!("# {}", &content["\u{A0}".len()..])))
-        }
-    } else {
-        Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
+            // Otherwise, replace the first non-breaking space with a regular space (by skipping it).
+            // Ex) `# {cursor[1:]}}`
+            cursor.eat_char('\u{A0}');
+            Ok(NormalizedComment::Body(TextRange::at(
+                slice.start() + cursor.token_len(),
+                cursor.text_len(),
+            )))
+        };
     }
+
+    // Black adds a space after the `#` if the comment doesn't start with a space or any of
+    // the specified characters.
+    // Ex) `# {cursor.trim_start()}`
+    cursor.eat_while(char::is_whitespace);
+    Ok(NormalizedComment::Body(TextRange::at(
+        slice.start() + cursor.token_len(),
+        cursor.text_len(),
+    )))
 }
 
 /// A helper for stripping '#' from comments.
