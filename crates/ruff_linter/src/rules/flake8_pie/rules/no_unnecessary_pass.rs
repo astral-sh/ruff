@@ -3,7 +3,6 @@ use ruff_python_ast::Stmt;
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_text_size::Ranged;
 
@@ -17,8 +16,8 @@ use crate::registry::AsRule;
 /// present).
 ///
 /// ## Why is this bad?
-/// When a function or class definition contains a docstring, an additional
-/// `pass` statement is redundant.
+/// When a function or class definition contains more than one statement, the
+/// `pass` statement is not needed.
 ///
 /// ## Example
 /// ```python
@@ -51,28 +50,23 @@ impl AlwaysFixableViolation for UnnecessaryPass {
 
 /// PIE790
 pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
-    let [first, second, ..] = body else {
-        return;
-    };
-    // This only catches the case in which a docstring makes a `pass` statement
-    // redundant. Consider removing all `pass` statements instead.
-    if !is_docstring_stmt(first) {
+    if body.len() < 2 {
         return;
     }
 
-    // The second statement must be a `pass` statement.
-    if !second.is_pass_stmt() {
-        return;
-    }
-
-    let mut diagnostic = Diagnostic::new(UnnecessaryPass, second.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let edit = if let Some(index) = trailing_comment_start_offset(second, checker.locator()) {
-            Edit::range_deletion(second.range().add_end(index))
-        } else {
-            fix::edits::delete_stmt(second, None, checker.locator(), checker.indexer())
-        };
-        diagnostic.set_fix(Fix::automatic(edit));
-    }
-    checker.diagnostics.push(diagnostic);
+    body.iter()
+        .filter(|stmt| stmt.is_pass_stmt())
+        .for_each(|stmt| {
+            let mut diagnostic = Diagnostic::new(UnnecessaryPass, stmt.range());
+            if checker.patch(diagnostic.kind.rule()) {
+                let edit =
+                    if let Some(index) = trailing_comment_start_offset(stmt, checker.locator()) {
+                        Edit::range_deletion(stmt.range().add_end(index))
+                    } else {
+                        fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer())
+                    };
+                diagnostic.set_fix(Fix::automatic(edit));
+            }
+            checker.diagnostics.push(diagnostic);
+        });
 }
