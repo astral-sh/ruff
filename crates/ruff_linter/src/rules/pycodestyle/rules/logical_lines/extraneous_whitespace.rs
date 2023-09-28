@@ -139,31 +139,22 @@ pub(crate) fn extraneous_whitespace(
     for token in line.tokens() {
         let kind = token.kind();
         match kind {
-            TokenKind::FStringStart => {
-                fstrings += 1;
-                continue;
-            }
-            TokenKind::FStringEnd => {
-                fstrings = fstrings.saturating_sub(1);
-                continue;
-            }
+            TokenKind::FStringStart => fstrings += 1,
+            TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             _ => {}
         }
         if let Some(symbol) = BracketOrPunctuation::from_kind(kind) {
+            // Whitespace before "{" or after "}" might be required in f-strings.
+            // For example,
+            //
+            // ```python
+            // f"{ {'a': 1} }"
+            // ```
+            //
+            // Here, `{{` / `}} would be interpreted as a single raw `{` / `}`
+            // character.
             match symbol {
-                BracketOrPunctuation::OpenBracket(symbol) => {
-                    if symbol == '{' && fstrings > 0 {
-                        // Whitespace before "{" might be required in f-strings.
-                        // For example,
-                        //
-                        // ```python
-                        // f"{ {'a': 1} }"
-                        // ```
-                        //
-                        // Here, `{{` would be interpreted as a single raw `{`
-                        // character.
-                        continue;
-                    }
+                BracketOrPunctuation::OpenBracket(symbol) if symbol != '{' || fstrings == 0 => {
                     let (trailing, trailing_len) = line.trailing_whitespace(token);
                     if !matches!(trailing, Whitespace::None) {
                         let mut diagnostic = Diagnostic::new(
@@ -177,19 +168,7 @@ pub(crate) fn extraneous_whitespace(
                         context.push_diagnostic(diagnostic);
                     }
                 }
-                BracketOrPunctuation::CloseBracket(symbol) => {
-                    if symbol == '}' && fstrings > 0 {
-                        // Whitespace before "}" might be required in f-strings.
-                        // For example,
-                        //
-                        // ```python
-                        // f"{ {'a': 1} }"
-                        // ```
-                        //
-                        // Here, `}}` would be interpreted as a single raw `}`
-                        // character.
-                        continue;
-                    }
+                BracketOrPunctuation::CloseBracket(symbol) if symbol != '}' || fstrings == 0 => {
                     if !matches!(prev_token, Some(TokenKind::Comma)) {
                         if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
                             line.leading_whitespace(token)
@@ -225,6 +204,7 @@ pub(crate) fn extraneous_whitespace(
                         }
                     }
                 }
+                _ => {}
             }
         }
 
