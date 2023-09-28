@@ -324,37 +324,47 @@ This is more consistent to the formatting of other awaited expressions: Ruff and
 remove parentheses around, e.g., `await (1)`, only retaining them when syntactically required,
 as in, e.g., `await (x := 1)`.
 
-### Line breaks between implicitly concatenated string attributes are not preserved ([#7052](https://github.com/astral-sh/ruff/issues/7052))
+### Implicit string concatenations in attribute accesses ([#7052](https://github.com/astral-sh/ruff/issues/7052))
 
-Black preserves line breaks between implicitly concatenated string attributes.
+Given the following unformatted code:
+
+```python
+print("aaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaa".format(bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb))
+```
+
+Internally, Black's logic will first expand the outermost `print` call:
 
 ```python
 print(
-    "aaaaaaa {:.2f}% "
-    "aaaaaaaaaaaaaaaa".format(
-        (
-            ((df_aaaaaaaaaaa["key"].isna()) | (df_aaaaaaaaaaa["key"] == 0)).sum()
-            / len(df_aaaaaaaaaaa)
-        )
-        * 100
+    "aaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaa".format(bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb)
+)
+```
+
+Since the argument is _still_ too long, Black will then split on the operator with the highest split
+precedence. In this case, Black splits on the implicit string concatenation, to produce the
+following Black-formatted code:
+
+```python
+print(
+    "aaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaa".format(bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb)
+)
+```
+
+Ruff gives implicit concatenations a "lower" priority when breaking lines. As a result, Ruff
+would instead format the above as:
+
+```python
+print(
+    "aaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaa".format(
+        bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb
     )
 )
 ```
 
-Ruff will instead collapse them, as long as the resulting line does not exceed the configured
-line width:
-
-```python
-print(
-    "aaaaaaa {:.2f}% " "aaaaaaaaaaaaaaaa".format(
-        (
-            ((df_aaaaaaaaaaa["key"].isna()) | (df_aaaaaaaaaaa["key"] == 0)).sum()
-            / len(df_aaaaaaaaaaa)
-        )
-        * 100
-    )
-)
-```
+In general, Black splits implicit string concatenations over multiple lines more often than Ruff,
+even if those concatenations _can_ fit on a single line. Ruff instead avoids splitting such
+concatenations unless doing so is necessary to fit within the configured line width.
 
 ### Own-line comments on expressions don't cause the expression to expand ([#7314](https://github.com/astral-sh/ruff/issues/7314))
 
@@ -387,39 +397,72 @@ initial formatting:
 )
 ```
 
-### Tuples in assignments are parenthesized when expanded ([#7317](https://github.com/astral-sh/ruff/issues/7317))
+### Tuples are parenthesized when expanded ([#7317](https://github.com/astral-sh/ruff/issues/7317))
 
 Ruff tends towards parenthesizing tuples (with a few exceptions), while Black tends to remove tuple
 parentheses more often.
 
-For example, Black will avoid inserting parentheses around the right-hand tuple in:
+In particular, Ruff will always insert parentheses around tuples that expand over multiple lines:
 
 ```python
-def from_user_altitude_range_to_px4_altitude_range(
-    altitude_range: Tuple[float, float],
-) -> Tuple[int, int]:
-    user_minimal_coordinate, user_maximal_coordinate = (0.0, 0.0, altitude_range[0]), (
-        0.0,
-        0.0,
-        altitude_range[1],
-    )
+# Input
+(a, b), (c, d,)
+
+# Black
+(a, b), (
+    c,
+    d,
+)
+
+# Ruff
+(
+    (a, b),
+    (
+        c,
+        c,
+    ),
+)
 ```
 
-Ruff will instead insert an extra pair of parentheses, to make the tuple more obvious:
+There's one exception here. In `for` loops, both Ruff and Black will avoid inserting unnecessary
+parentheses:
 
 ```python
-def from_user_altitude_range_to_px4_altitude_range(
-    altitude_range: Tuple[float, float],
-) -> Tuple[int, int]:
-    user_minimal_coordinate, user_maximal_coordinate = (
-        (0.0, 0.0, altitude_range[0]),
-        (
-            0.0,
-            0.0,
-            altitude_range[1],
-        ),
-    )
+# Input
+for a, f(b,) in c:
+    pass
+
+# Black
+for a, f(
+    b,
+) in c:
+    pass
+
+# Ruff
+for a, f(
+    b,
+) in c:
+    pass
 ```
+
+### Single-element tuples are always parenthesized
+
+Ruff always inserts parentheses around single-element tuples, while Black will omit them in some
+cases:
+
+```python
+# Input
+(a, b),
+
+# Black
+(a, b),
+
+# Ruff
+((a, b),)
+```
+
+Adding parentheses around single-element tuples adds visual distinction and helps avoid "accidental"
+tuples created by extraneous trailing commas (see, e.g., [#17181](https://github.com/django/django/pull/17181)).
 
 ### Trailing commas are inserted when expanding a function definition with a single argument ([#7323](https://github.com/astral-sh/ruff/issues/7323))
 
@@ -487,7 +530,7 @@ def update_emission_strength():
     value = self.emission_strength * 2
 ```
 
-### Assignment annotations may be parenthesized when expanded ([#7315](https://github.com/astral-sh/ruff/issues/7315))
+### Type annotations may be parenthesized when expanded ([#7315](https://github.com/astral-sh/ruff/issues/7315))
 
 Black will avoid parenthesizing type annotations in an annotated assignment, while Ruff will insert
 parentheses in some cases.
