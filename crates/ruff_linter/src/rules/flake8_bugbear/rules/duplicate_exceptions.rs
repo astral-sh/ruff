@@ -10,6 +10,7 @@ use ruff_python_ast::call_path;
 use ruff_python_ast::call_path::CallPath;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::registry::{AsRule, Rule};
 
 /// ## What it does
@@ -112,6 +113,7 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
     .into()
 }
 
+/// B014
 fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
@@ -146,8 +148,14 @@ fn duplicate_handler_exceptions<'a>(
             );
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    if unique_elts.len() == 1 {
-                        checker.generator().expr(unique_elts[0])
+                    // Single exceptions don't require parentheses, but since we're _removing_
+                    // parentheses, insert whitespace as needed.
+                    if let [elt] = unique_elts.as_slice() {
+                        pad(
+                            checker.generator().expr(elt),
+                            expr.range(),
+                            checker.locator(),
+                        )
                     } else {
                         // Multiple exceptions must always be parenthesized. This is done
                         // manually as the generator never parenthesizes lone tuples.
@@ -163,6 +171,7 @@ fn duplicate_handler_exceptions<'a>(
     seen
 }
 
+/// B025
 pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
     let mut seen: FxHashSet<CallPath> = FxHashSet::default();
     let mut duplicates: FxHashMap<CallPath, Vec<&Expr>> = FxHashMap::default();
