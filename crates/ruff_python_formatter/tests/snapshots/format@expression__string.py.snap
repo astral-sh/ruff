@@ -365,17 +365,17 @@ if True:
     'This string will not include \
         backslashes or newline characters.'
 
-'''Multiline
+"""Multiline
 String \"
-'''
+"""
 
-'''Multiline
+"""Multiline
 String \'
-'''
+"""
 
-'''Multiline
+"""Multiline
 String ""
-'''
+"""
 
 '''Multiline
 String """
@@ -391,9 +391,9 @@ String '''
 """Multiline
 String '"""
 
-'''Multiline
+"""Multiline
 String \"\"\"
-'''
+"""
 
 # String continuation
 
@@ -471,16 +471,16 @@ test_particular = [
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5893
 x = (
-    '''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
-    '''bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'''
+    """aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    """bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
 )
 x = (
-    f'''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
-    f'''bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'''
+    f"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    f"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
 )
 x = (
-    b'''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
-    b'''bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'''
+    b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
 )
 
 # https://github.com/astral-sh/ruff/issues/7460
