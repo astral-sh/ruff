@@ -42,4 +42,8 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
         return;
     };
+
+    if attr.as_str() != "resolve" {
+        return;
+    };
 }
