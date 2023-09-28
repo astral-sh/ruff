@@ -22,7 +22,8 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
         let sequence_type = SequenceType::from_pattern(item, f.context().source());
 
         match (patterns.as_slice(), sequence_type) {
-            // If the sequence is empty, the parentheses with any dangling comments.
+            // If the sequence is empty, format the empty parentheses, along with any dangling
+            // comments.
             ([], SequenceType::Tuple | SequenceType::TupleNoParens) => {
                 return empty_parenthesized("(", dangling, ")").fmt(f)
             }
