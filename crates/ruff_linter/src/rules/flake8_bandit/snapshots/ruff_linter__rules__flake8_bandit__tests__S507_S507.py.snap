@@ -25,7 +25,7 @@ S507.py:17:40: S507 Paramiko call with policy set to automatically trust the unk
 15 | ssh_client.set_missing_host_key_policy(client.AutoAddPolicy)
 16 | ssh_client.set_missing_host_key_policy(client.WarningPolicy)
 17 | ssh_client.set_missing_host_key_policy(client.AutoAddPolicy())
-   |                                        ^^^^^^^^^^^^^^^^^^^^ S507
+   |                                        ^^^^^^^^^^^^^^^^^^^^^^ S507
 18 | ssh_client.set_missing_host_key_policy(AutoAddPolicy)
 19 | ssh_client.set_missing_host_key_policy(policy=client.AutoAddPolicy)
    |

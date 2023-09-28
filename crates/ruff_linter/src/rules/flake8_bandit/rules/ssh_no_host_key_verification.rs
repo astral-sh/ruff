@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -42,14 +43,6 @@ impl Violation for SSHNoHostKeyVerification {
     }
 }
 
-fn extract_policy_argument(call: &ExprCall) -> Option<&Expr> {
-    return match call.arguments.find_argument("policy", 0) {
-        Some(Expr::Call(ExprCall { func, .. })) => Some(func.as_ref()),
-        Some(argument) => Some(argument),
-        _ => None,
-    };
-}
-
 /// S507
 pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
@@ -60,13 +53,14 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
         return;
     }
 
-    let Some(policy_argument) = extract_policy_argument(call) else {
+    let Some(policy_argument) = call.arguments.find_argument("policy", 0) else {
         return;
     };
 
+    // Detect either, e.g., `paramiko.client.AutoAddPolicy` or `paramiko.client.AutoAddPolicy()`.
     if !checker
         .semantic()
-        .resolve_call_path(policy_argument)
+        .resolve_call_path(map_callable(policy_argument))
         .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
