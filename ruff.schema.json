@@ -50,6 +50,13 @@
         "type": "string"
       }
     },
+    "explicit-preview-rules": {
+      "description": "Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "extend": {
       "description": "A path to a local `pyproject.toml` file to merge into this configuration. User home directory and environment variables will be expanded.\n\nTo resolve the current `pyproject.toml` file, Ruff will first resolve this base configuration file, then merge in any properties defined in the current configuration file.",
       "type": [
@@ -1566,6 +1573,13 @@
           "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
           "type": [
             "string",
+            "null"
+          ]
+        },
+        "explicit-preview-rules": {
+          "description": "Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
+          "type": [
+            "boolean",
             "null"
           ]
         },

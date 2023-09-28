@@ -570,6 +570,19 @@ pub struct LintOptions {
     )]
     pub select: Option<Vec<RuleSelector>>,
 
+    /// Whether to require exact codes to select preview rules. When enabled,
+    /// preview rules will not be selected by prefixes — the full code of each
+    /// preview rule will be required to enable the rule.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Require explicit selection of preview rules
+            explicit-preview-rules = true
+        "#
+    )]
+    pub explicit_preview_rules: Option<bool>,
+
     /// A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
     ///
     /// Comments starting with these tags will be ignored by commented-out code
