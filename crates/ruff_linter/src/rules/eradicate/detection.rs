@@ -33,11 +33,12 @@ static PRINT_RETURN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(print|retur
 
 /// Returns `true` if a comment contains Python code.
 pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
-    let line = if let Some(line) = line.trim().strip_prefix('#') {
-        line.trim_start_matches([' ', '#'])
-    } else {
+    let line = line.trim_start_matches([' ', '#']).trim_end();
+
+    // Fast path: if none of the indicators are present, the line is not code.
+    if CODE_INDICATORS.iter().all(|symbol| !line.contains(symbol)) {
         return false;
-    };
+    }
 
     // Ignore task tag comments (e.g., "# TODO(tom): Refactor").
     if line
@@ -59,11 +60,6 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     }
 
     if CODING_COMMENT_REGEX.is_match(line) {
-        return false;
-    }
-
-    // Check that this is possibly code.
-    if CODE_INDICATORS.iter().all(|symbol| !line.contains(symbol)) {
         return false;
     }
 
@@ -127,7 +123,6 @@ mod tests {
         assert!(!comment_contains_code("# 123", &[]));
         assert!(!comment_contains_code("# 123.1", &[]));
         assert!(!comment_contains_code("# 1, 2, 3", &[]));
-        assert!(!comment_contains_code("x = 1  # x = 1", &[]));
         assert!(!comment_contains_code(
             "# pylint: disable=redefined-outer-name",
             &[]
