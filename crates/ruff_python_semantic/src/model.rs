@@ -887,11 +887,9 @@ impl<'a> SemanticModel<'a> {
             .filter(|id| self.nodes[*id].is_statement())
     }
 
-    /// Return the [`NodeId`] of the current [`Stmt`].
-    pub fn current_statement_id(&self) -> NodeId {
-        self.current_statement_ids()
-            .next()
-            .expect("No current statement")
+    /// Return the [`NodeId`] of the current [`Stmt`], if any.
+    pub fn current_statement_id(&self) -> Option<NodeId> {
+        self.current_statement_ids().next()
     }
 
     /// Return the [`NodeId`] of the current [`Stmt`] parent, if any.
