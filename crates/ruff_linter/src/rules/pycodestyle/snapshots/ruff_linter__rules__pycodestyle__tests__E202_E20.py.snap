@@ -126,4 +126,22 @@ E20.py:29:11: E202 [*] Whitespace before ']'
 31 31 | spam(ham[1], {eggs: 2})
 32 32 | 
 
+E20.py:90:18: E202 [*] Whitespace before ']'
+   |
+88 | # F-strings
+89 | f"{ {'a': 1} }"
+90 | f"{[ { {'a': 1} } ]}"
+   |                  ^ E202
+91 | f"normal { {f"{ { [1, 2] } }" } } normal"
+   |
+   = help: Remove whitespace before ']'
+
+ℹ Fix
+87 87 | 
+88 88 | # F-strings
+89 89 | f"{ {'a': 1} }"
+90    |-f"{[ { {'a': 1} } ]}"
+   90 |+f"{[ { {'a': 1} }]}"
+91 91 | f"normal { {f"{ { [1, 2] } }" } } normal"
+
 

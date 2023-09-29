@@ -31,4 +31,25 @@ ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concaten
 21 |   )
    |
 
+ISC.py:78:10: ISC003 Explicitly concatenated string should be implicitly concatenated
+   |
+77 |   # Explicitly concatenated nested f-strings
+78 |   _ = f"a {f"first"
+   |  __________^
+79 | |     + f"second"} d"
+   | |_______________^ ISC003
+80 |   _ = f"a {f"first {f"middle"}"
+81 |       + f"second"} d"
+   |
+
+ISC.py:80:10: ISC003 Explicitly concatenated string should be implicitly concatenated
+   |
+78 |   _ = f"a {f"first"
+79 |       + f"second"} d"
+80 |   _ = f"a {f"first {f"middle"}"
+   |  __________^
+81 | |     + f"second"} d"
+   | |_______________^ ISC003
+   |
+
 

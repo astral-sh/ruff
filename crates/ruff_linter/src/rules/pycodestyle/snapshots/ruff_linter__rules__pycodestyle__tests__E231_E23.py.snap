@@ -99,6 +99,26 @@ E23.py:29:20: E231 [*] Missing whitespace after ':'
    29 |+    'tag_smalldata': [('byte_count_mdtype', 'u4'), ('data', 'S4')],
 30 30 | }
 31 31 | 
-32 32 | #: Okay
+32 32 | # E231
+
+E23.py:33:6: E231 [*] Missing whitespace after ','
+   |
+32 | # E231
+33 | f"{(a,b)}"
+   |      ^ E231
+34 | 
+35 | # Okay because it's hard to differentiate between the usages of a colon in a f-string
+   |
+   = help: Added missing whitespace after ','
+
+ℹ Fix
+30 30 | }
+31 31 | 
+32 32 | # E231
+33    |-f"{(a,b)}"
+   33 |+f"{(a, b)}"
+34 34 | 
+35 35 | # Okay because it's hard to differentiate between the usages of a colon in a f-string
+36 36 | f"{a:=1}"
 
 

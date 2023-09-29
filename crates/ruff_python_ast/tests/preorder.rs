@@ -130,7 +130,7 @@ fn function_type_parameters() {
 
 fn trace_preorder_visitation(source: &str) -> String {
     let tokens = lex(source, Mode::Module);
-    let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
+    let parsed = parse_tokens(tokens, source, Mode::Module, "test.py").unwrap();
 
     let mut visitor = RecordVisitor::default();
     visitor.visit_mod(&parsed);

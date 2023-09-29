@@ -320,7 +320,7 @@ fn minimization_step(
     last_strategy_and_idx: Option<(&'static dyn Strategy, usize)>,
 ) -> Result<Option<(&'static dyn Strategy, usize, String)>> {
     let tokens = ruff_python_parser::tokenize(input, Mode::Module);
-    let ast = ruff_python_parser::parse_program_tokens(tokens, "input.py", false)
+    let ast = ruff_python_parser::parse_program_tokens(tokens, input, "input.py", false)
         .context("not valid python")?;
 
     // Try the last succeeding strategy first, skipping all that failed last time

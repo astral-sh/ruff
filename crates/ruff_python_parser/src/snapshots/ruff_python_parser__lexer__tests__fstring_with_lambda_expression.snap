@@ -1,0 +1,110 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        FStringStart,
+        0..2,
+    ),
+    (
+        Lbrace,
+        2..3,
+    ),
+    (
+        Lambda,
+        3..9,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        10..11,
+    ),
+    (
+        Colon,
+        11..12,
+    ),
+    (
+        Lbrace,
+        12..13,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        13..14,
+    ),
+    (
+        Rbrace,
+        14..15,
+    ),
+    (
+        Rbrace,
+        15..16,
+    ),
+    (
+        FStringEnd,
+        16..17,
+    ),
+    (
+        Newline,
+        17..18,
+    ),
+    (
+        FStringStart,
+        18..20,
+    ),
+    (
+        Lbrace,
+        20..21,
+    ),
+    (
+        Lpar,
+        21..22,
+    ),
+    (
+        Lambda,
+        22..28,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        29..30,
+    ),
+    (
+        Colon,
+        30..31,
+    ),
+    (
+        Lbrace,
+        31..32,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        32..33,
+    ),
+    (
+        Rbrace,
+        33..34,
+    ),
+    (
+        Rpar,
+        34..35,
+    ),
+    (
+        Rbrace,
+        35..36,
+    ),
+    (
+        FStringEnd,
+        36..37,
+    ),
+    (
+        Newline,
+        37..37,
+    ),
+]
