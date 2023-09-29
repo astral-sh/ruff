@@ -14,17 +14,15 @@ use crate::settings::types::PythonVersion::Py311;
 ///
 /// ## Why is this bad?
 /// Prefer `typing.Never` (or `typing_extensions.Never`) over `typing.NoReturn`,
-/// as the former is more explicit about the intent of the annotation (namely,
-/// to indicate that a function should never be called or return).
-///
-/// This is a purely stylistic choice, as the two are semantically equivalent.
+/// as the former is more explicit about the intent of the annotation. This is
+/// a purely stylistic choice, as the two are semantically equivalent.
 ///
 /// ## Example
 /// ```python
 /// from typing import NoReturn
 ///
 ///
-/// def do_not_call_me() -> NoReturn: ...
+/// def foo(x: NoReturn): ...
 /// ```
 ///
 /// Use instead:
@@ -32,7 +30,7 @@ use crate::settings::types::PythonVersion::Py311;
 /// from typing import Never
 ///
 ///
-/// def do_not_call_me() -> Never: ...
+/// def foo(x: Never): ...
 /// ```
 ///
 /// ## References
