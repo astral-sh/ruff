@@ -27,6 +27,30 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// the newer `str.format` and f-strings constructs over `printf`-style string
 /// formatting.
 ///
+/// ## Known problems
+/// This rule is unable to detect cases in which the format string contains
+/// a single, generic format specifier (e.g. `%s`), and the right-hand side
+/// is an ambiguous expression.
+///
+/// For example, given:
+/// ```python
+/// "%s" % value
+/// ```
+///
+/// `value` could be a single-element tuple, _or_ it could be a single value.
+/// Both of these would resolve to the same formatted string when using
+/// `printf`-style formatting, but _not_ when using f-strings:
+///
+/// ```python
+/// value = 1
+/// print("%s" % value)  # "1"
+/// print("{}".format(value))  # "1"
+///
+/// value = (1,)
+/// print("%s" % value)  # "1"
+/// print("{}".format(value))  # "(1,)"
+/// ```
+///
 /// ## Example
 /// ```python
 /// "%s, %s" % ("Hello", "World")  # "Hello, World"
