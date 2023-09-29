@@ -21,6 +21,7 @@ mod tests {
     #[test_case(Rule::SliceCopy, Path::new("FURB145.py"))]
     #[test_case(Rule::UnnecessaryEnumerate, Path::new("FURB148.py"))]
     #[test_case(Rule::PrintEmptyString, Path::new("FURB105.py"))]
+    #[test_case(Rule::ImplicitCwd, Path::new("FURB177.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

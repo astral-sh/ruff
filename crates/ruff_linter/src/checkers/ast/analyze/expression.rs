@@ -913,6 +913,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ExceptionWithoutExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
+            if checker.enabled(Rule::ImplicitCwd) {
+                refurb::rules::no_implicit_cwd(checker, call);
+            }
         }
         Expr::Dict(
             dict @ ast::ExprDict {

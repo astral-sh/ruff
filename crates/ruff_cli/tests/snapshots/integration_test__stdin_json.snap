@@ -6,7 +6,7 @@ info:
     - "-"
     - "--isolated"
     - "--no-cache"
-    - "--format"
+    - "--output-format"
     - json
     - "--stdin-filename"
     - F401.py
