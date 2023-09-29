@@ -317,4 +317,37 @@ PIE790.py:101:5: PIE790 [*] Unnecessary `pass` statement
 103 103 | 
 104 104 | class Foo:
 
+PIE790.py:130:5: PIE790 [*] Unnecessary `pass` statement
+    |
+128 | def foo():
+129 |     print("foo")
+130 |     pass
+    |     ^^^^ PIE790
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+127 127 | 
+128 128 | def foo():
+129 129 |     print("foo")
+130     |-    pass
+131 130 | 
+132 131 | 
+133 132 | def foo():
+
+PIE790.py:136:5: PIE790 [*] Unnecessary `pass` statement
+    |
+134 |     """A docstring."""
+135 |     print("foo")
+136 |     pass
+    |     ^^^^ PIE790
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+133 133 | def foo():
+134 134 |     """A docstring."""
+135 135 |     print("foo")
+136     |-    pass
+
 

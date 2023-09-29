@@ -47,6 +47,7 @@ mod tests {
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"))]
     #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"))]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"))]
+    #[test_case(Rule::WeakCryptographicKey, Path::new("S505.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

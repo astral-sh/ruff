@@ -6,7 +6,7 @@ use ruff_python_parser::parse_suite;
 
 static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:)"
+        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:)",
     ).unwrap()
 });
 static BRACKET_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[()\[\]{}\s]+$").unwrap());
@@ -39,6 +39,15 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
         return false;
     };
 
+    // Ignore task tag comments (e.g., "# TODO(tom): Refactor").
+    if line
+        .split(&[' ', ':', '('])
+        .next()
+        .is_some_and(|first| task_tags.iter().any(|tag| tag == first))
+    {
+        return false;
+    }
+
     // Ignore non-comment related hashes (e.g., "# Issue #999").
     if HASH_NUMBER.is_match(line) {
         return false;
@@ -47,12 +56,6 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     // Ignore whitelisted comments.
     if ALLOWLIST_REGEX.is_match(line) {
         return false;
-    }
-
-    if let Some(first) = line.split(&[' ', ':']).next() {
-        if task_tags.iter().any(|tag| tag == first) {
-            return false;
-        }
     }
 
     if CODING_COMMENT_REGEX.is_match(line) {
@@ -102,6 +105,7 @@ fn multiline_case(line: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::comment_contains_code;
+    use crate::settings::TASK_TAGS;
 
     #[test]
     fn comment_contains_code_basic() {
@@ -278,5 +282,43 @@ mod tests {
             "# XXX: What ever",
             &["XXX".to_string()]
         ));
+    }
+
+    #[test]
+    fn comment_contains_todo() {
+        let task_tags = TASK_TAGS
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+
+        assert!(!comment_contains_code(
+            "# TODO(tom): Rewrite in Rust",
+            &task_tags
+        ));
+        assert!(!comment_contains_code(
+            "# TODO: Rewrite in Rust",
+            &task_tags
+        ));
+        assert!(!comment_contains_code("# TODO:Rewrite in Rust", &task_tags));
+
+        assert!(!comment_contains_code(
+            "# FIXME(tom): Rewrite in Rust",
+            &task_tags
+        ));
+        assert!(!comment_contains_code(
+            "# FIXME: Rewrite in Rust",
+            &task_tags
+        ));
+        assert!(!comment_contains_code(
+            "# FIXME:Rewrite in Rust",
+            &task_tags
+        ));
+
+        assert!(!comment_contains_code(
+            "# XXX(tom): Rewrite in Rust",
+            &task_tags
+        ));
+        assert!(!comment_contains_code("# XXX: Rewrite in Rust", &task_tags));
+        assert!(!comment_contains_code("# XXX:Rewrite in Rust", &task_tags));
     }
 }
