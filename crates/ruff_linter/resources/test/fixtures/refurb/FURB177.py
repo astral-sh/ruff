@@ -2,21 +2,30 @@ import pathlib
 from pathlib import Path
 
 # Errors
-cwd = Path().resolve()
-cwd = pathlib.Path().resolve()
+_ = Path().resolve()
+_ = pathlib.Path().resolve()
 
-current_directory = Path().resolve()
-current_directory = pathlib.Path().resolve()
+_ = Path("").resolve()
+_ = pathlib.Path("").resolve()
 
-dir = Path().resolve()
-dir = pathlib.Path().resolve()
+_ = Path(".").resolve()
+_ = pathlib.Path(".").resolve()
+
+_ = Path("", **kwargs).resolve()
+_ = pathlib.Path("", **kwargs).resolve()
+
+_ = Path(".", **kwargs).resolve()
+_ = pathlib.Path(".", **kwargs).resolve()
 
 # OK
-cwd = Path.cwd()
-cwd = pathlib.Path.cwd()
+_ = Path.cwd()
+_ = pathlib.Path.cwd()
 
-current_directory = Path.cwd()
-current_directory = pathlib.Path.cwd()
+_ = Path("foo").resolve()
+_ = pathlib.Path("foo").resolve()
 
-dir = Path.cwd()
-dir = pathlib.Path.cwd()
+_ = Path(".", "foo").resolve()
+_ = pathlib.Path(".", "foo").resolve()
+
+_ = Path(*args).resolve()
+_ = pathlib.Path(*args).resolve()
