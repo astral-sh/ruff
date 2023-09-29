@@ -28,9 +28,9 @@ dependencies = [
 
 [[package]]
 name = "aho-corasick"
-version = "1.0.5"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c378d78423fdad8089616f827526ee33c19f2fddbd5de1629152c9593ba4783"
+checksum = "ea5d730647d4fadd988536d06fecce94b7b4f2a7efdae548f1cf4b63205518ab"
 dependencies = [
  "memchr",
 ]
@@ -2168,6 +2168,7 @@ dependencies = [
 name = "ruff_linter"
 version = "0.0.291"
 dependencies = [
+ "aho-corasick",
  "annotate-snippets 0.9.1",
  "anyhow",
  "bitflags 2.4.0",

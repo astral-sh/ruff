@@ -29,6 +29,7 @@ ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_source_file = { path = "../ruff_source_file", features = ["serde"] }
 ruff_text_size = { path = "../ruff_text_size" }
 
+aho-corasick = { version = "1.1.1" }
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
 bitflags = { workspace = true }

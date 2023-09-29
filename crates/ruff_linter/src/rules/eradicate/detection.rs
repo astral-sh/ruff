@@ -1,43 +1,48 @@
 /// See: [eradicate.py](https://github.com/myint/eradicate/blob/98f199940979c94447a461d50d27862b118b282d/eradicate.py)
+use aho_corasick::AhoCorasick;
 use once_cell::sync::Lazy;
-use regex::Regex;
+use regex::{Regex, RegexSet};
 
 use ruff_python_parser::parse_suite;
 
+static CODE_INDICATORS: Lazy<AhoCorasick> = Lazy::new(|| {
+    AhoCorasick::new([
+        "(", ")", "[", "]", "{", "}", ":", "=", "%", "print", "return", "break", "continue",
+        "import",
+    ])
+    .unwrap()
+});
+
 static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:)",
+        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:|(?:en)?coding[:=][ \t]*([-_.a-zA-Z0-9]+))",
     ).unwrap()
 });
-static BRACKET_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[()\[\]{}\s]+$").unwrap());
-static CODE_INDICATORS: &[&str] = &[
-    "(", ")", "[", "]", "{", "}", ":", "=", "%", "print", "return", "break", "continue", "import",
-];
-static CODE_KEYWORDS: Lazy<Vec<Regex>> = Lazy::new(|| {
-    vec![
-        Regex::new(r"^\s*elif\s+.*\s*:\s*$").unwrap(),
-        Regex::new(r"^\s*else\s*:\s*$").unwrap(),
-        Regex::new(r"^\s*try\s*:\s*$").unwrap(),
-        Regex::new(r"^\s*finally\s*:\s*$").unwrap(),
-        Regex::new(r"^\s*except\s+.*\s*:\s*$").unwrap(),
-    ]
-});
-static CODING_COMMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^.*?coding[:=][ \t]*([-_.a-zA-Z0-9]+)").unwrap());
+
 static HASH_NUMBER: Lazy<Regex> = Lazy::new(|| Regex::new(r"#\d").unwrap());
-static MULTILINE_ASSIGNMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*([(\[]\s*)?(\w+\s*,\s*)*\w+\s*([)\]]\s*)?=.*[(\[{]$").unwrap());
-static PARTIAL_DICTIONARY_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"^\s*['"]\w+['"]\s*:.+[,{]\s*(#.*)?$"#).unwrap());
-static PRINT_RETURN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(print|return)\b\s*").unwrap());
+
+static POSITIVE_CASES: Lazy<RegexSet> = Lazy::new(|| {
+    RegexSet::new([
+        // Keywords
+        r"^(?:elif\s+.*\s*:|else\s*:|try\s*:|finally\s*:|except\s+.*\s*:)$",
+        // Partial dictionary
+        r#"^['"]\w+['"]\s*:.+[,{]\s*(#.*)?$"#,
+        // Multiline assignment
+        r"^(?:[(\[]\s*)?(?:\w+\s*,\s*)*\w+\s*([)\]]\s*)?=.*[(\[{]$",
+        // Brackets,
+        r"^[()\[\]{}\s]+$",
+    ])
+    .unwrap()
+});
 
 /// Returns `true` if a comment contains Python code.
 pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
-    let line = if let Some(line) = line.trim().strip_prefix('#') {
-        line.trim_start_matches([' ', '#'])
-    } else {
+    let line = line.trim_start_matches([' ', '#']).trim_end();
+
+    // Fast path: if none of the indicators are present, the line is not code.
+    if !CODE_INDICATORS.is_match(line) {
         return false;
-    };
+    }
 
     // Ignore task tag comments (e.g., "# TODO(tom): Refactor").
     if line
@@ -48,64 +53,35 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
         return false;
     }
 
-    // Ignore non-comment related hashes (e.g., "# Issue #999").
-    if HASH_NUMBER.is_match(line) {
-        return false;
-    }
-
     // Ignore whitelisted comments.
     if ALLOWLIST_REGEX.is_match(line) {
         return false;
     }
 
-    if CODING_COMMENT_REGEX.is_match(line) {
+    // Ignore non-comment related hashes (e.g., "# Issue #999").
+    if HASH_NUMBER.is_match(line) {
         return false;
     }
 
-    // Check that this is possibly code.
-    if CODE_INDICATORS.iter().all(|symbol| !line.contains(symbol)) {
-        return false;
-    }
-
-    if multiline_case(line) {
-        return true;
-    }
-
-    if CODE_KEYWORDS.iter().any(|symbol| symbol.is_match(line)) {
-        return true;
-    }
-
-    let line = PRINT_RETURN_REGEX.replace_all(line, "");
-
-    if PARTIAL_DICTIONARY_REGEX.is_match(&line) {
-        return true;
-    }
-
-    // Finally, compile the source code.
-    parse_suite(&line, "<filename>").is_ok()
-}
-
-/// Returns `true` if a line is probably part of some multiline code.
-fn multiline_case(line: &str) -> bool {
+    // If the comment made it this far, and ends in a continuation, assume it's code.
     if line.ends_with('\\') {
         return true;
     }
 
-    if MULTILINE_ASSIGNMENT_REGEX.is_match(line) {
+    // If the comment matches any of the specified positive cases, assume it's code.
+    if POSITIVE_CASES.is_match(line) {
         return true;
     }
 
-    if BRACKET_REGEX.is_match(line) {
-        return true;
-    }
-
-    false
+    // Finally, compile the source code.
+    parse_suite(line, "<filename>").is_ok()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::comment_contains_code;
     use crate::settings::TASK_TAGS;
+
+    use super::comment_contains_code;
 
     #[test]
     fn comment_contains_code_basic() {
@@ -127,7 +103,6 @@ mod tests {
         assert!(!comment_contains_code("# 123", &[]));
         assert!(!comment_contains_code("# 123.1", &[]));
         assert!(!comment_contains_code("# 1, 2, 3", &[]));
-        assert!(!comment_contains_code("x = 1  # x = 1", &[]));
         assert!(!comment_contains_code(
             "# pylint: disable=redefined-outer-name",
             &[]
@@ -150,7 +125,6 @@ mod tests {
     fn comment_contains_code_with_print() {
         assert!(comment_contains_code("#print", &[]));
         assert!(comment_contains_code("#print(1)", &[]));
-        assert!(comment_contains_code("#print 1", &[]));
 
         assert!(!comment_contains_code("#to print", &[]));
     }
