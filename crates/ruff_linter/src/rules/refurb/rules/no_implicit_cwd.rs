@@ -1,14 +1,16 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for calls to the Path resolve method without arguments.
+/// Checks for current-directory lookups using `Path().resolve()`.
 ///
 /// ## Why is this bad?
-/// Prefer using `Path.cwd()` which is explicit and avoids any confusion about the current directory.
+/// When looking up the current directory, prefer `Path.cwd()` over
+/// `Path().resolve()`, as `Path.cwd()` is more explicit in its intent.
 ///
 /// ## Example
 /// ```python
@@ -22,8 +24,6 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
-///
-///
 
 #[violation]
 pub struct NoImplicitCwd;
@@ -31,15 +31,23 @@ pub struct NoImplicitCwd;
 impl Violation for NoImplicitCwd {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid using Path.resolve() without arguments. Use Path.cwd() instead.")
+        format!("Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups")
     }
 }
 
 /// FURB177
 pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
-    let Expr::Attribute(ExprAttribute { attr: _, value, .. }) = call.func.as_ref() else {
+    if !call.arguments.is_empty() {
+        return;
+    }
+
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
         return;
     };
+
+    if attr != "resolve" {
+        return;
+    }
 
     let Expr::Call(ExprCall {
         func, arguments, ..
@@ -56,5 +64,11 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
         .semantic()
         .resolve_call_path(func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["pathlib", "Path"]))
-    {}
+    {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(NoImplicitCwd, call.range()))
 }
