@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
@@ -88,14 +88,14 @@ pub struct SectionNotOverIndented {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for SectionNotOverIndented {
+impl AlwaysFixableViolation for SectionNotOverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SectionNotOverIndented { name } = self;
         format!("Section is over-indented (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let SectionNotOverIndented { name } = self;
         format!("Remove over-indentation from \"{name}\"")
     }
@@ -186,14 +186,14 @@ pub struct SectionUnderlineNotOverIndented {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
+impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SectionUnderlineNotOverIndented { name } = self;
         format!("Section underline is over-indented (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let SectionUnderlineNotOverIndented { name } = self;
         format!("Remove over-indentation from \"{name}\" underline")
     }
@@ -265,14 +265,14 @@ pub struct CapitalizeSectionName {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for CapitalizeSectionName {
+impl AlwaysFixableViolation for CapitalizeSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let CapitalizeSectionName { name } = self;
         format!("Section name should be properly capitalized (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let CapitalizeSectionName { name } = self;
         format!("Capitalize \"{name}\"")
     }
@@ -361,14 +361,14 @@ pub struct NewLineAfterSectionName {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for NewLineAfterSectionName {
+impl AlwaysFixableViolation for NewLineAfterSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NewLineAfterSectionName { name } = self;
         format!("Section name should end with a newline (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let NewLineAfterSectionName { name } = self;
         format!("Add newline after \"{name}\"")
     }
@@ -457,14 +457,14 @@ pub struct DashedUnderlineAfterSection {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
+impl AlwaysFixableViolation for DashedUnderlineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DashedUnderlineAfterSection { name } = self;
         format!("Missing dashed underline after section (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let DashedUnderlineAfterSection { name } = self;
         format!("Add dashed line under \"{name}\"")
     }
@@ -559,14 +559,14 @@ pub struct SectionUnderlineAfterName {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
+impl AlwaysFixableViolation for SectionUnderlineAfterName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SectionUnderlineAfterName { name } = self;
         format!("Section underline should be in the line following the section's name (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let SectionUnderlineAfterName { name } = self;
         format!("Add underline to \"{name}\"")
     }
@@ -658,14 +658,14 @@ pub struct SectionUnderlineMatchesSectionLength {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
+impl AlwaysFixableViolation for SectionUnderlineMatchesSectionLength {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SectionUnderlineMatchesSectionLength { name } = self;
         format!("Section underline should match the length of its name (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let SectionUnderlineMatchesSectionLength { name } = self;
         format!("Adjust underline length to match \"{name}\"")
     }
@@ -753,14 +753,14 @@ pub struct NoBlankLineAfterSection {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for NoBlankLineAfterSection {
+impl AlwaysFixableViolation for NoBlankLineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoBlankLineAfterSection { name } = self;
         format!("Missing blank line after section (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let NoBlankLineAfterSection { name } = self;
         format!("Add blank line after \"{name}\"")
     }
@@ -846,14 +846,14 @@ pub struct NoBlankLineBeforeSection {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
+impl AlwaysFixableViolation for NoBlankLineBeforeSection {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoBlankLineBeforeSection { name } = self;
         format!("Missing blank line before section (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let NoBlankLineBeforeSection { name } = self;
         format!("Add blank line before \"{name}\"")
     }
@@ -942,14 +942,14 @@ pub struct BlankLineAfterLastSection {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
+impl AlwaysFixableViolation for BlankLineAfterLastSection {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BlankLineAfterLastSection { name } = self;
         format!("Missing blank line after last section (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let BlankLineAfterLastSection { name } = self;
         format!("Add blank line after \"{name}\"")
     }
@@ -1109,14 +1109,14 @@ pub struct SectionNameEndsInColon {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for SectionNameEndsInColon {
+impl AlwaysFixableViolation for SectionNameEndsInColon {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SectionNameEndsInColon { name } = self;
         format!("Section name should end with a colon (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let SectionNameEndsInColon { name } = self;
         format!("Add colon to \"{name}\"")
     }
@@ -1276,14 +1276,14 @@ pub struct BlankLinesBetweenHeaderAndContent {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for BlankLinesBetweenHeaderAndContent {
+impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BlankLinesBetweenHeaderAndContent { name } = self;
         format!("No blank lines allowed between a section header and its content (\"{name}\")")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove blank line(s)".to_string()
     }
 }

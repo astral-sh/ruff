@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_starred;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::pad;
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -39,13 +39,13 @@ pub struct RedundantTupleInExceptionHandler {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
+impl AlwaysFixableViolation for RedundantTupleInExceptionHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("A length-one tuple literal is redundant in exception handlers")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let RedundantTupleInExceptionHandler { name } = self;
         format!("Replace with `except {name}`")
     }

@@ -12,8 +12,7 @@ use std::process::Command;
 use std::str;
 
 #[cfg(unix)]
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{Context, Result};
 #[cfg(unix)]
 use clap::Parser;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
@@ -137,7 +136,7 @@ fn stdin_json() {
 }
 
 #[test]
-fn stdin_autofix() {
+fn stdin_fix() {
     let args = ["--fix"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -155,7 +154,7 @@ fn stdin_autofix() {
 }
 
 #[test]
-fn stdin_autofix_when_not_fixable_should_still_print_contents() {
+fn stdin_fix_when_not_fixable_should_still_print_contents() {
     let args = ["--fix"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -174,7 +173,7 @@ fn stdin_autofix_when_not_fixable_should_still_print_contents() {
 }
 
 #[test]
-fn stdin_autofix_when_no_issues_should_still_print_contents() {
+fn stdin_fix_when_no_issues_should_still_print_contents() {
     let args = ["--fix"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)

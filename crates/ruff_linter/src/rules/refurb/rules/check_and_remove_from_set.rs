@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
@@ -7,8 +7,8 @@ use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -54,14 +54,14 @@ impl CheckAndRemoveFromSet {
     }
 }
 
-impl AlwaysAutofixableViolation for CheckAndRemoveFromSet {
+impl AlwaysFixableViolation for CheckAndRemoveFromSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         let suggestion = self.suggestion();
         format!("Use `{suggestion}` instead of check and `remove`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let suggestion = self.suggestion();
         format!("Replace with `{suggestion}`")
     }

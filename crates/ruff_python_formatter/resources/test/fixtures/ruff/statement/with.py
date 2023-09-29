@@ -109,6 +109,40 @@ with (
 ): ...
 
 with (
+    # comment
+    a
+):
+    pass
+
+with (
+    a  # comment
+):
+    pass
+
+with (
+    a
+    # comment
+):
+    pass
+
+with (
+    # comment
+    a as b
+):
+    pass
+
+with (
+    a as b  # comment
+):
+    pass
+
+with (
+    a as b
+    # comment
+):
+    pass
+
+with (
     [
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "bbbbbbbbbb",
@@ -254,3 +288,22 @@ with (
 
 with (foo() as bar, baz() as bop):
     pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        if get_running_loop()
+        else contextlib.nullcontext()
+    ):
+        pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        and B and [aaaaaaaa, bbbbbbbbbbbbb, cccccccccc, dddddddddddd, eeeeeeeeeeeee]
+    ):
+        pass
+
+if True:
+    with anyio.CancelScope(shield=True) if get_running_loop() else contextlib.nullcontext():
+        pass

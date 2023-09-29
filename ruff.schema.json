@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Options",
+  "description": "Experimental section to configure Ruff's linting. This new section will eventually replace the top-level linting options.\n\nOptions specified in the `lint` section take precedence over the top-level settings.",
   "type": "object",
   "properties": {
     "allowed-confusables": {
@@ -49,6 +50,13 @@
         "type": "string"
       }
     },
+    "explicit-preview-rules": {
+      "description": "Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "extend": {
       "description": "A path to a local `pyproject.toml` file to merge into this configuration. User home directory and environment variables will be expanded.\n\nTo resolve the current `pyproject.toml` file, Ruff will first resolve this base configuration file, then merge in any properties defined in the current configuration file.",
       "type": [
@@ -67,7 +75,7 @@
       }
     },
     "extend-fixable": {
-      "description": "A list of rule codes or prefixes to consider autofixable, in addition to those specified by `fixable`.",
+      "description": "A list of rule codes or prefixes to consider fixable, in addition to those specified by `fixable`.",
       "type": [
         "array",
         "null"
@@ -120,7 +128,7 @@
       }
     },
     "fix": {
-      "description": "Enable autofix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags).",
+      "description": "Enable fix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags).",
       "type": [
         "boolean",
         "null"
@@ -134,7 +142,7 @@
       ]
     },
     "fixable": {
-      "description": "A list of rule codes or prefixes to consider autofixable. By default, all rules are considered autofixable.",
+      "description": "A list of rule codes or prefixes to consider fixable. By default, all rules are considered fixable.",
       "type": [
         "array",
         "null"
@@ -388,6 +396,16 @@
       "maximum": 320.0,
       "minimum": 1.0
     },
+    "lint": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/LintOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "logger-objects": {
       "description": "A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `\"logging_setup.logger\"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).",
       "type": [
@@ -545,7 +563,7 @@
       }
     },
     "show-fixes": {
-      "description": "Whether to show an enumeration of all autofixed lint violations (overridden by the `--show-fixes` command-line flag).",
+      "description": "Whether to show an enumeration of all fixed lint violations (overridden by the `--show-fixes` command-line flag).",
       "type": [
         "boolean",
         "null"
@@ -611,7 +629,7 @@
       }
     },
     "unfixable": {
-      "description": "A list of rule codes or prefixes to consider non-autofix-able.",
+      "description": "A list of rule codes or prefixes to consider non-fixable.",
       "type": [
         "array",
         "null"
@@ -1196,7 +1214,7 @@
           ]
         },
         "quote-style": {
-          "description": "Whether to prefer single `'` or double `\"` quotes for strings and docstrings.\n\nRuff may deviate from this option if using the configured quotes would require more escaped quotes:\n\n```python a = \"It's monday morning\" b = \"a string without any quotes\" ```\n\nRuff leaves `a` unchanged when using `quote-style = \"single\"` because it is otherwise necessary to escape the `'` which leads to less readable code: `'It\\'s monday morning'`. Ruff changes the quotes of `b` to use single quotes.",
+          "description": "Whether to prefer single `'` or double `\"` quotes for strings. Defaults to double quotes.\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for multiline strings and docstrings, regardless of the configured quote style.\n\nRuff may also deviate from this option if using the configured quotes would require escaping quote characters within the string. For example, given:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change `a` to use single quotes when using `quote-style = \"single\"`. However, `a` will be unchanged, as converting to single quotes would require the inner `'` to be escaped, which leads to less readable code: `'It\\'s monday morning'`.",
           "anyOf": [
             {
               "$ref": "#/definitions/QuoteStyle"
@@ -1535,6 +1553,436 @@
       "format": "uint16",
       "minimum": 1.0
     },
+    "LintOptions": {
+      "description": "Experimental section to configure Ruff's linting. This new section will eventually replace the top-level linting options.\n\nOptions specified in the `lint` section take precedence over the top-level settings.",
+      "type": "object",
+      "properties": {
+        "allowed-confusables": {
+          "description": "A list of allowed \"confusable\" Unicode characters to ignore when enforcing `RUF001`, `RUF002`, and `RUF003`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "maxLength": 1,
+            "minLength": 1
+          }
+        },
+        "dummy-variable-rgx": {
+          "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "explicit-preview-rules": {
+          "description": "Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "extend-fixable": {
+          "description": "A list of rule codes or prefixes to consider fixable, in addition to those specified by `fixable`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "extend-per-file-ignores": {
+          "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by `per-file-ignores`.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/RuleSelector"
+            }
+          }
+        },
+        "extend-select": {
+          "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "external": {
+          "description": "A list of rule codes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "fixable": {
+          "description": "A list of rule codes or prefixes to consider fixable. By default, all rules are considered fixable.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "flake8-annotations": {
+          "description": "Options for the `flake8-annotations` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8AnnotationsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-bandit": {
+          "description": "Options for the `flake8-bandit` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8BanditOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-bugbear": {
+          "description": "Options for the `flake8-bugbear` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8BugbearOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-builtins": {
+          "description": "Options for the `flake8-builtins` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8BuiltinsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-comprehensions": {
+          "description": "Options for the `flake8-comprehensions` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8ComprehensionsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-copyright": {
+          "description": "Options for the `flake8-copyright` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8CopyrightOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-errmsg": {
+          "description": "Options for the `flake8-errmsg` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8ErrMsgOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-gettext": {
+          "description": "Options for the `flake8-gettext` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8GetTextOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-implicit-str-concat": {
+          "description": "Options for the `flake8-implicit-str-concat` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8ImplicitStrConcatOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-import-conventions": {
+          "description": "Options for the `flake8-import-conventions` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8ImportConventionsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-pytest-style": {
+          "description": "Options for the `flake8-pytest-style` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8PytestStyleOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-quotes": {
+          "description": "Options for the `flake8-quotes` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8QuotesOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-self": {
+          "description": "Options for the `flake8_self` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8SelfOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-tidy-imports": {
+          "description": "Options for the `flake8-tidy-imports` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8TidyImportsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-type-checking": {
+          "description": "Options for the `flake8-type-checking` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8TypeCheckingOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-unused-arguments": {
+          "description": "Options for the `flake8-unused-arguments` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8UnusedArgumentsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ignore": {
+          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "ignore-init-module-imports": {
+          "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "isort": {
+          "description": "Options for the `isort` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IsortOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "logger-objects": {
+          "description": "A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `\"logging_setup.logger\"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "mccabe": {
+          "description": "Options for the `mccabe` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/McCabeOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pep8-naming": {
+          "description": "Options for the `pep8-naming` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Pep8NamingOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "per-file-ignores": {
+          "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/RuleSelector"
+            }
+          }
+        },
+        "pycodestyle": {
+          "description": "Options for the `pycodestyle` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PycodestyleOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pydocstyle": {
+          "description": "Options for the `pydocstyle` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PydocstyleOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pyflakes": {
+          "description": "Options for the `pyflakes` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PyflakesOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pylint": {
+          "description": "Options for the `pylint` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PylintOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pyupgrade": {
+          "description": "Options for the `pyupgrade` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PyUpgradeOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "select": {
+          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "task-tags": {
+          "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`), and skipped by line-length rules (`E501`) if `ignore-overlong-task-comments` is set to `true`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "typing-modules": {
+          "description": "A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "unfixable": {
+          "description": "A list of rule codes or prefixes to consider non-fixable.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "McCabeOptions": {
       "type": "object",
       "properties": {
@@ -1576,7 +2024,7 @@
       "type": "object",
       "properties": {
         "classmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method (in addition to the builtin `@classmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method (in addition to the builtin `@classmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.\n\nExpects to receive a list of fully-qualified names (e.g., `pydantic.validator`, rather than `validator`).",
           "type": [
             "array",
             "null"
@@ -1586,7 +2034,7 @@
           }
         },
         "extend-ignore-names": {
-          "description": "Additional names (or patterns) to ignore when considering `pep8-naming` violations, in addition to those included in `ignore-names`.",
+          "description": "Additional names (or patterns) to ignore when considering `pep8-naming` violations, in addition to those included in `ignore-names`\n\nSupports glob patterns. For example, to ignore all names starting with or ending with `_test`, you could use `ignore-names = [\"test_*\", \"*_test\"]`. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax)..",
           "type": [
             "array",
             "null"
@@ -1596,7 +2044,7 @@
           }
         },
         "ignore-names": {
-          "description": "A list of names (or patterns) to ignore when considering `pep8-naming` violations.",
+          "description": "A list of names (or patterns) to ignore when considering `pep8-naming` violations.\n\nSupports glob patterns. For example, to ignore all names starting with or ending with `_test`, you could use `ignore-names = [\"test_*\", \"*_test\"]`. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1606,7 +2054,7 @@
           }
         },
         "staticmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method (in addition to the builtin `@staticmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method (in addition to the builtin `@staticmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.\n\nExpects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`, rather than `teardown`).",
           "type": [
             "array",
             "null"
@@ -2228,6 +2676,8 @@
         "FURB140",
         "FURB145",
         "FURB148",
+        "FURB17",
+        "FURB177",
         "G",
         "G0",
         "G00",
@@ -2740,6 +3190,7 @@
         "S5",
         "S50",
         "S501",
+        "S505",
         "S506",
         "S507",
         "S508",

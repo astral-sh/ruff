@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
@@ -14,8 +14,8 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
-use crate::autofix::edits;
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::registry::{AsRule, Rule};
 
 use super::helpers::{
@@ -65,14 +65,14 @@ pub struct PytestFixtureIncorrectParenthesesStyle {
     actual: Parentheses,
 }
 
-impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
+impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestFixtureIncorrectParenthesesStyle { expected, actual } = self;
         format!("Use `@pytest.fixture{expected}` over `@pytest.fixture{actual}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let PytestFixtureIncorrectParenthesesStyle { expected, .. } = self;
         match expected {
             Parentheses::None => "Remove parentheses".to_string(),
@@ -154,13 +154,13 @@ impl Violation for PytestFixturePositionalArgs {
 #[violation]
 pub struct PytestExtraneousScopeFunction;
 
-impl AlwaysAutofixableViolation for PytestExtraneousScopeFunction {
+impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`scope='function'` is implied in `@pytest.fixture()`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove implied `scope` argument".to_string()
     }
 }
@@ -488,14 +488,14 @@ pub struct PytestUselessYieldFixture {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
+impl AlwaysFixableViolation for PytestUselessYieldFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestUselessYieldFixture { name } = self;
         format!("No teardown in fixture `{name}`, use `return` instead of `yield`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace `yield` with `return`".to_string()
     }
 }
@@ -543,13 +543,13 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
 #[violation]
 pub struct PytestErroneousUseFixturesOnFixture;
 
-impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
+impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`pytest.mark.usefixtures` has no effect on fixtures")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `pytest.mark.usefixtures`".to_string()
     }
 }
@@ -586,13 +586,13 @@ impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
 #[violation]
 pub struct PytestUnnecessaryAsyncioMarkOnFixture;
 
-impl AlwaysAutofixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
+impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`pytest.mark.asyncio` is unnecessary for fixtures")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `pytest.mark.asyncio`".to_string()
     }
 }

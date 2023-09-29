@@ -59,15 +59,15 @@ with open(name="foo", mode="Ub") as f:
 with open(mode="Ub", name="foo") as f:
     pass
 
-open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
-open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
-open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
-open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
-open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
 open = 1
 open("foo", "U")

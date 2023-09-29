@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_text_size::Ranged;
@@ -32,13 +32,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnpackedListComprehension;
 
-impl AlwaysAutofixableViolation for UnpackedListComprehension {
+impl AlwaysFixableViolation for UnpackedListComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Replace unpacked list comprehension with a generator expression")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with generator expression".to_string()
     }
 }

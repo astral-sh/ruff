@@ -85,7 +85,7 @@
 //!    return bool(i & 1)
 //! "#;
 //! let tokens = lex(python_source, Mode::Module);
-//! let ast = parse_tokens(tokens, Mode::Module, "<embedded>");
+//! let ast = parse_tokens(tokens, python_source, Mode::Module, "<embedded>");
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -110,8 +110,8 @@
 //! [lexer]: crate::lexer
 
 pub use parser::{
-    parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
-    parse_suite, parse_tokens, ParseError, ParseErrorType,
+    parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
+    parse_starts_at, parse_suite, parse_tokens, ParseError, ParseErrorType,
 };
 use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -146,6 +146,7 @@ pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
 /// Parse a full Python program from its tokens.
 pub fn parse_program_tokens(
     lxr: Vec<LexResult>,
+    source: &str,
     source_path: &str,
     is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
@@ -154,7 +155,7 @@ pub fn parse_program_tokens(
     } else {
         Mode::Module
     };
-    match parse_tokens(lxr, mode, source_path)? {
+    match parse_tokens(lxr, source, mode, source_path)? {
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -35,14 +35,14 @@ pub struct UnnecessaryCallAroundSorted {
     func: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryCallAroundSorted {
+impl AlwaysFixableViolation for UnnecessaryCallAroundSorted {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryCallAroundSorted { func } = self;
         format!("Unnecessary `{func}` call around `sorted()`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let UnnecessaryCallAroundSorted { func } = self;
         format!("Remove unnecessary `{func}` call")
     }

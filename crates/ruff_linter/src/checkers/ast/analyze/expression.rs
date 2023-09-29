@@ -474,13 +474,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::BlockingHttpCallInAsyncFunction) {
-                flake8_async::rules::blocking_http_call(checker, expr);
+                flake8_async::rules::blocking_http_call(checker, call);
             }
             if checker.enabled(Rule::OpenSleepOrSubprocessInAsyncFunction) {
-                flake8_async::rules::open_sleep_or_subprocess_call(checker, expr);
+                flake8_async::rules::open_sleep_or_subprocess_call(checker, call);
             }
             if checker.enabled(Rule::BlockingOsCallInAsyncFunction) {
-                flake8_async::rules::blocking_os_call(checker, expr);
+                flake8_async::rules::blocking_os_call(checker, call);
             }
             if checker.any_enabled(&[Rule::Print, Rule::PPrint]) {
                 flake8_print::rules::print_call(checker, call);
@@ -508,7 +508,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::SuspiciousTelnetUsage,
                 Rule::SuspiciousFTPLibUsage,
             ]) {
-                flake8_bandit::rules::suspicious_function_call(checker, expr);
+                flake8_bandit::rules::suspicious_function_call(checker, call);
             }
             if checker.enabled(Rule::ReSubPositionalArgs) {
                 flake8_bugbear::rules::re_sub_positional_args(checker, call);
@@ -591,6 +591,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::FlaskDebugTrue) {
                 flake8_bandit::rules::flask_debug_true(checker, call);
+            }
+            if checker.enabled(Rule::WeakCryptographicKey) {
+                flake8_bandit::rules::weak_cryptographic_key(checker, call);
             }
             if checker.any_enabled(&[
                 Rule::SubprocessWithoutShellEqualsTrue,
@@ -746,7 +749,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pygrep_hooks::rules::no_eval(checker, func);
             }
             if checker.enabled(Rule::DeprecatedLogWarn) {
-                pygrep_hooks::rules::deprecated_log_warn(checker, func);
+                pygrep_hooks::rules::deprecated_log_warn(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDirectLambdaCall) {
                 pylint::rules::unnecessary_direct_lambda_call(checker, expr, func);
@@ -863,7 +866,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::OsPathGetctime,
                 Rule::Glob,
             ]) {
-                flake8_use_pathlib::rules::replaceable_by_pathlib(checker, func);
+                flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
             if checker.enabled(Rule::PathConstructorCurrentDirectory) {
                 flake8_use_pathlib::rules::path_constructor_current_directory(checker, expr, func);
@@ -909,6 +912,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ExceptionWithoutExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
+            }
+            if checker.enabled(Rule::ImplicitCwd) {
+                refurb::rules::no_implicit_cwd(checker, call);
             }
         }
         Expr::Dict(
@@ -960,9 +966,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::await_outside_async(checker, expr);
             }
         }
-        Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::FString(fstring @ ast::ExprFString { values, .. }) => {
             if checker.enabled(Rule::FStringMissingPlaceholders) {
-                pyflakes::rules::f_string_missing_placeholders(expr, values, checker);
+                pyflakes::rules::f_string_missing_placeholders(fstring, checker);
             }
             if checker.enabled(Rule::HardcodedSQLExpression) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);

@@ -92,3 +92,35 @@ try:
     pass
 except Exception:
     logging.error("...", exc_info=True)
+
+
+from logging import error, exception
+
+try:
+    pass
+except Exception:
+    error("...")
+
+
+try:
+    pass
+except Exception:
+    error("...", exc_info=False)
+
+
+try:
+    pass
+except Exception:
+    error("...", exc_info=None)
+
+
+try:
+    pass
+except Exception:
+    exception("...")
+
+
+try:
+    pass
+except Exception:
+    error("...", exc_info=True)

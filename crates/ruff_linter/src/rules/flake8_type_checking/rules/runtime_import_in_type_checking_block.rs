@@ -3,14 +3,14 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{AnyImport, Imported, NodeId, ResolvedReferenceId, Scope};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
+use crate::fix;
 use crate::importer::ImportedMembers;
 
 /// ## What it does
@@ -49,7 +49,7 @@ pub struct RuntimeImportInTypeCheckingBlock {
 }
 
 impl Violation for RuntimeImportInTypeCheckingBlock {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -59,7 +59,7 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
         )
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Move out of type-checking block".to_string())
     }
 }
@@ -216,7 +216,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         .expect("Expected at least one import");
 
     // Step 1) Remove the import.
-    let remove_import_edit = autofix::edits::remove_unused_imports(
+    let remove_import_edit = fix::edits::remove_unused_imports(
         member_names.iter().map(AsRef::as_ref),
         statement,
         parent,

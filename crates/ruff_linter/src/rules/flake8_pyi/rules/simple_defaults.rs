@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::{
@@ -18,13 +18,13 @@ use crate::settings::types::PythonVersion;
 #[violation]
 pub struct TypedArgumentDefaultInStub;
 
-impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
+impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for typed arguments")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace default value with `...`".to_string()
     }
 }
@@ -32,13 +32,13 @@ impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
 #[violation]
 pub struct ArgumentDefaultInStub;
 
-impl AlwaysAutofixableViolation for ArgumentDefaultInStub {
+impl AlwaysFixableViolation for ArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for arguments")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace default value with `...`".to_string()
     }
 }
@@ -46,13 +46,13 @@ impl AlwaysAutofixableViolation for ArgumentDefaultInStub {
 #[violation]
 pub struct AssignmentDefaultInStub;
 
-impl AlwaysAutofixableViolation for AssignmentDefaultInStub {
+impl AlwaysFixableViolation for AssignmentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for assignments")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace default value with `...`".to_string()
     }
 }
@@ -131,7 +131,7 @@ pub struct TypeAliasWithoutAnnotation {
     value: String,
 }
 
-impl AlwaysAutofixableViolation for TypeAliasWithoutAnnotation {
+impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TypeAliasWithoutAnnotation {
@@ -142,7 +142,7 @@ impl AlwaysAutofixableViolation for TypeAliasWithoutAnnotation {
         format!("Use `{module}.TypeAlias` for type alias, e.g., `{name}: TypeAlias = {value}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add `TypeAlias` annotation".to_string()
     }
 }

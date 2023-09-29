@@ -20,6 +20,8 @@ __all__ = foo.bar  # [invalid-all-format]
 
 __all__ = foo["bar"]  # [invalid-all-format]
 
+__all__ = (foo := bar)  # [invalid-all-format]
+
 __all__ = ["Hello"]
 
 __all__ = ("Hello",)
@@ -41,3 +43,7 @@ __all__ = __all__ + ["Hello"]
 __all__ = __all__ + multiprocessing.__all__
 
 __all__ = list[str](["Hello", "world"])
+
+__all__ = list[str](foo())
+
+__all__ = (foo := ["Hello", "world"])

@@ -143,9 +143,9 @@ impl Display for RuleCodeAndBody<'_> {
         if self.show_fix_status && self.message.fix.is_some() {
             write!(
                 f,
-                "{code} {autofix}{body}",
+                "{code} {fix}{body}",
                 code = kind.rule().noqa_code().to_string().red().bold(),
-                autofix = format_args!("[{}] ", "*".cyan()),
+                fix = format_args!("[{}] ", "*".cyan()),
                 body = kind.body,
             )
         } else {

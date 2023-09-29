@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use anyhow::{Context, Result};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
@@ -44,14 +44,14 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 pub struct FString;
 
 impl Violation for FString {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use f-string instead of `format` call")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Convert to f-string".to_string())
     }
 }
@@ -413,7 +413,7 @@ pub(crate) fn f_strings(
 
     let mut diagnostic = Diagnostic::new(FString, call.range());
 
-    // Avoid autofix if there are comments within the call:
+    // Avoid fix if there are comments within the call:
     // ```
     // "{}".format(
     //     0,  # 0

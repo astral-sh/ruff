@@ -507,6 +507,69 @@ match pattern_match_or:
     # own line
     ):
         ...
+
+
+# Single-element tuples.
+match pattern:
+    case (a,):
+        pass
+
+    case (a, b):
+        pass
+
+    case (a, b,):
+        pass
+
+    case a,:
+        pass
+
+    case a, b:
+        pass
+
+    case a, b,:
+        pass
+
+    case (a,  # comment
+        ):
+        pass
+
+    case (a, b  # comment
+            ):
+        pass
+
+    case (a, b,  # comment
+            ):
+        pass
+
+    case (  # comment
+        a,
+    ):
+        pass
+
+    case (  # comment
+        a, b
+    ):
+        pass
+
+    case (  # comment
+        a, b,
+    ):
+        pass
+
+    case (
+        # comment
+        a,):
+        pass
+
+    case (
+        # comment
+        a, b):
+        pass
+
+    case (
+        # comment
+        a, b,):
+        pass
 ```
 
 ## Output
@@ -1038,6 +1101,87 @@ match pattern_match_or:
         # own line
     ):
         ...
+
+
+# Single-element tuples.
+match pattern:
+    case (a,):
+        pass
+
+    case (a, b):
+        pass
+
+    case (
+        a,
+        b,
+    ):
+        pass
+
+    case (a,):
+        pass
+
+    case a, b:
+        pass
+
+    case (
+        a,
+        b,
+    ):
+        pass
+
+    case (
+        a,  # comment
+    ):
+        pass
+
+    case (
+        a,
+        b,  # comment
+    ):
+        pass
+
+    case (
+        a,
+        b,  # comment
+    ):
+        pass
+
+    case (  # comment
+        a,
+    ):
+        pass
+
+    case (  # comment
+        a,
+        b,
+    ):
+        pass
+
+    case (  # comment
+        a,
+        b,
+    ):
+        pass
+
+    case (
+        # comment
+        a,
+    ):
+        pass
+
+    case (
+        # comment
+        a,
+        b,
+    ):
+        pass
+
+    case (
+        # comment
+        a,
+        b,
+    ):
+        pass
 ```
 
 

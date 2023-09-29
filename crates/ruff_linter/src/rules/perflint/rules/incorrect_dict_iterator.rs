@@ -1,7 +1,7 @@
 use std::fmt;
 
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr};
@@ -43,14 +43,14 @@ pub struct IncorrectDictIterator {
     subset: DictSubset,
 }
 
-impl AlwaysAutofixableViolation for IncorrectDictIterator {
+impl AlwaysFixableViolation for IncorrectDictIterator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let IncorrectDictIterator { subset } = self;
         format!("When using only the {subset} of a dict use the `{subset}()` method")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let IncorrectDictIterator { subset } = self;
         format!("Replace `.items()` with `.{subset}()`")
     }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
@@ -48,7 +48,7 @@ pub struct SuppressibleException {
 }
 
 impl Violation for SuppressibleException {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -56,7 +56,7 @@ impl Violation for SuppressibleException {
         format!("Use `contextlib.suppress({exception})` instead of `try`-`except`-`pass`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let SuppressibleException { exception } = self;
         Some(format!("Replace with `contextlib.suppress({exception})`"))
     }

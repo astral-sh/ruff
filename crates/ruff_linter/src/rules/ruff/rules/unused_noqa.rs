@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::AlwaysAutofixableViolation;
+use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_macros::{derive_message_formats, violation};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -42,7 +42,7 @@ pub struct UnusedNOQA {
     pub codes: Option<UnusedCodes>,
 }
 
-impl AlwaysAutofixableViolation for UnusedNOQA {
+impl AlwaysFixableViolation for UnusedNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedNOQA { codes } = self;
@@ -89,7 +89,7 @@ impl AlwaysAutofixableViolation for UnusedNOQA {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove unused `noqa` directive".to_string()
     }
 }

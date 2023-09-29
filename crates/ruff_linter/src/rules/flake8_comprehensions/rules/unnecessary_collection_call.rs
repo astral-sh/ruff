@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, Keyword};
 use ruff_text_size::Ranged;
@@ -37,14 +37,14 @@ pub struct UnnecessaryCollectionCall {
     obj_type: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryCollectionCall {
+impl AlwaysFixableViolation for UnnecessaryCollectionCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryCollectionCall { obj_type } = self;
         format!("Unnecessary `{obj_type}` call (rewrite as a literal)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Rewrite as a literal".to_string()
     }
 }

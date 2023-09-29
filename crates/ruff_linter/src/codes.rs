@@ -597,6 +597,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "323") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::SuspiciousUnverifiedContextUsage),
         (Flake8Bandit, "324") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::HashlibInsecureHashFunction),
         (Flake8Bandit, "501") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::RequestWithNoCertValidation),
+        (Flake8Bandit, "505") => (RuleGroup::Preview, rules::flake8_bandit::rules::WeakCryptographicKey),
         (Flake8Bandit, "506") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::UnsafeYAMLLoad),
         (Flake8Bandit, "507") => (RuleGroup::Preview, rules::flake8_bandit::rules::SSHNoHostKeyVerification),
         (Flake8Bandit, "508") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::SnmpInsecureVersion),
@@ -924,6 +925,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "140") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedStarmap),
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
         (Refurb, "148") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryEnumerate),
+        (Refurb, "177") => (RuleGroup::Preview, rules::refurb::rules::ImplicitCwd),
 
         // flake8-logging
         (Flake8Logging, "001") => (RuleGroup::Preview, rules::flake8_logging::rules::DirectLoggerInstantiation),

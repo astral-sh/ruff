@@ -75,3 +75,37 @@ def fine():
         a = 1
     except Exception:
         logger.error("Context message here", exc_info=sys.exc_info())
+
+
+from logging import error, exception
+
+
+def bad():
+    try:
+        a = 1
+    except Exception:
+        error("Context message here")
+
+        if True:
+            error("Context message here")
+
+
+def good():
+    try:
+        a = 1
+    except Exception:
+        exception("Context message here")
+
+
+def fine():
+    try:
+        a = 1
+    except Exception:
+        error("Context message here", exc_info=True)
+
+
+def fine():
+    try:
+        a = 1
+    except Exception:
+        error("Context message here", exc_info=sys.exc_info())

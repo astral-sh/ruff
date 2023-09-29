@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_python_ast::{Expr, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -51,14 +51,14 @@ pub struct UnnecessaryLiteralWithinDictCall {
     kind: DictKind,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinDictCall {
+impl AlwaysFixableViolation for UnnecessaryLiteralWithinDictCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryLiteralWithinDictCall { kind } = self;
         format!("Unnecessary `dict` {kind} passed to `dict()` (remove the outer call to `dict()`)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove outer `dict` call".to_string()
     }
 }

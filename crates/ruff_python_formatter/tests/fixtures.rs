@@ -1,5 +1,5 @@
 use ruff_formatter::FormatOptions;
-use ruff_python_formatter::{format_module, PyFormatOptions};
+use ruff_python_formatter::{format_module_source, PyFormatOptions};
 use similar::TextDiff;
 use std::fmt::{Formatter, Write};
 use std::io::BufReader;
@@ -20,7 +20,7 @@ fn black_compatibility() {
             PyFormatOptions::from_extension(input_path)
         };
 
-        let printed = format_module(&content, options.clone()).unwrap_or_else(|err| {
+        let printed = format_module_source(&content, options.clone()).unwrap_or_else(|err| {
             panic!(
                 "Formatting of {} to succeed but encountered error {err}",
                 input_path.display()
@@ -107,7 +107,8 @@ fn format() {
         let content = fs::read_to_string(input_path).unwrap();
 
         let options = PyFormatOptions::from_extension(input_path);
-        let printed = format_module(&content, options.clone()).expect("Formatting to succeed");
+        let printed =
+            format_module_source(&content, options.clone()).expect("Formatting to succeed");
         let formatted_code = printed.as_code();
 
         ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
@@ -124,7 +125,7 @@ fn format() {
 
             for (i, options) in options.into_iter().enumerate() {
                 let printed =
-                    format_module(&content, options.clone()).expect("Formatting to succeed");
+                    format_module_source(&content, options.clone()).expect("Formatting to succeed");
                 let formatted_code = printed.as_code();
 
                 ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
@@ -139,7 +140,8 @@ fn format() {
                 .unwrap();
             }
         } else {
-            let printed = format_module(&content, options.clone()).expect("Formatting to succeed");
+            let printed =
+                format_module_source(&content, options.clone()).expect("Formatting to succeed");
             let formatted_code = printed.as_code();
 
             ensure_stability_when_formatting_twice(formatted_code, options, input_path);
@@ -174,7 +176,7 @@ fn ensure_stability_when_formatting_twice(
     options: PyFormatOptions,
     input_path: &Path,
 ) {
-    let reformatted = match format_module(formatted_code, options) {
+    let reformatted = match format_module_source(formatted_code, options) {
         Ok(reformatted) => reformatted,
         Err(err) => {
             panic!(

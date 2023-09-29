@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace;
 use ruff_python_codegen::{Generator, Stylist};
@@ -50,14 +50,14 @@ use crate::registry::{AsRule, Rule};
 pub struct RawStringInException;
 
 impl Violation for RawStringInException {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Exception must not use a string literal, assign to variable first")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Assign to variable; remove string literal".to_string())
     }
 }
@@ -104,14 +104,14 @@ impl Violation for RawStringInException {
 pub struct FStringInException;
 
 impl Violation for FStringInException {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Exception must not use an f-string literal, assign to variable first")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Assign to variable; remove f-string literal".to_string())
     }
 }
@@ -160,14 +160,14 @@ impl Violation for FStringInException {
 pub struct DotFormatInException;
 
 impl Violation for DotFormatInException {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Exception must not use a `.format()` string directly, assign to variable first")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Assign to variable; remove `.format()` string".to_string())
     }
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_python_codegen::Generator;
@@ -43,7 +43,7 @@ enum Reason {
 }
 
 impl Violation for PrintEmptyString {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,7 +55,7 @@ impl Violation for PrintEmptyString {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let PrintEmptyString { reason } = self;
         match reason {
             Reason::EmptyArgument => Some("Remove empty string".to_string()),

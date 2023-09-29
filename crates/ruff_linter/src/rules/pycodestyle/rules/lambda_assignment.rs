@@ -3,7 +3,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -42,14 +42,14 @@ pub struct LambdaAssignment {
 }
 
 impl Violation for LambdaAssignment {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not assign a `lambda` expression, use a `def`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let LambdaAssignment { name } = self;
         Some(format!("Rewrite `{name}` as a `def`"))
     }

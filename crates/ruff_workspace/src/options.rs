@@ -27,39 +27,15 @@ use ruff_linter::settings::types::{
     IdentifierPattern, PythonVersion, SerializationFormat, Version,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
-use ruff_macros::{CombineOptions, ConfigurationOptions};
+use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::QuoteStyle;
 
 use crate::settings::LineEnding;
 
-#[derive(Debug, PartialEq, Eq, Default, ConfigurationOptions, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
-    /// A list of allowed "confusable" Unicode characters to ignore when
-    /// enforcing `RUF001`, `RUF002`, and `RUF003`.
-    #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
-        example = r#"
-            # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
-            # which could be confused for "-", "p", and "*", respectively.
-            allowed-confusables = ["−", "ρ", "∗"]
-        "#
-    )]
-    pub allowed_confusables: Option<Vec<char>>,
-
-    /// A list of builtins to treat as defined references, in addition to the
-    /// system builtins.
-    #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
-        example = r#"
-            builtins = ["_"]
-        "#
-    )]
-    pub builtins: Option<Vec<String>>,
-
     /// A path to the cache directory.
     ///
     /// By default, Ruff stores cache results in a `.ruff_cache` directory in
@@ -77,19 +53,98 @@ pub struct Options {
     )]
     pub cache_dir: Option<String>,
 
-    /// A regular expression used to identify "dummy" variables, or those which
-    /// should be ignored when enforcing (e.g.) unused-variable rules. The
-    /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
+    /// A path to a local `pyproject.toml` file to merge into this
+    /// configuration. User home directory and environment variables will be
+    /// expanded.
+    ///
+    /// To resolve the current `pyproject.toml` file, Ruff will first resolve
+    /// this base configuration file, then merge in any properties defined
+    /// in the current configuration file.
     #[option(
-        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
-        value_type = "re.Pattern",
+        default = r#"None"#,
+        value_type = "str",
         example = r#"
-            # Only ignore variables named "_".
-            dummy-variable-rgx = "^_$"
+            # Extend the `pyproject.toml` file in the parent directory.
+            extend = "../pyproject.toml"
+            # But use a different line length.
+            line-length = 100
         "#
     )]
-    pub dummy_variable_rgx: Option<String>,
+    pub extend: Option<String>,
 
+    /// The style in which violation messages should be formatted: `"text"`
+    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
+    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
+    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
+    #[option(
+        default = r#""text""#,
+        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
+        example = r#"
+            # Group violations by containing file.
+            output-format = "grouped"
+        "#
+    )]
+    pub output_format: Option<SerializationFormat>,
+
+    /// Enable fix behavior by-default when running `ruff` (overridden
+    /// by the `--fix` and `--no-fix` command-line flags).
+    #[option(default = "false", value_type = "bool", example = "fix = true")]
+    pub fix: Option<bool>,
+
+    /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
+    #[option(default = "false", value_type = "bool", example = "fix-only = true")]
+    pub fix_only: Option<bool>,
+
+    /// Whether to show source code snippets when reporting lint violations
+    /// (overridden by the `--show-source` command-line flag).
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # By default, always show source code snippets.
+            show-source = true
+        "#
+    )]
+    pub show_source: Option<bool>,
+
+    /// Whether to show an enumeration of all fixed lint violations
+    /// (overridden by the `--show-fixes` command-line flag).
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enumerate all fixed violations.
+            show-fixes = true
+        "#
+    )]
+    pub show_fixes: Option<bool>,
+
+    /// Require a specific version of Ruff to be running (useful for unifying
+    /// results across many environments, e.g., with a `pyproject.toml`
+    /// file).
+    #[option(
+        default = "None",
+        value_type = "str",
+        example = r#"
+            required-version = "0.0.193"
+        "#
+    )]
+    pub required_version: Option<Version>,
+
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will
+    /// use unstable rules and fixes.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
+
+    // File resolver options
     /// A list of file patterns to exclude from linting.
     ///
     /// Exclusions are based on globs, and can be either:
@@ -114,25 +169,6 @@ pub struct Options {
         "#
     )]
     pub exclude: Option<Vec<String>>,
-
-    /// A path to a local `pyproject.toml` file to merge into this
-    /// configuration. User home directory and environment variables will be
-    /// expanded.
-    ///
-    /// To resolve the current `pyproject.toml` file, Ruff will first resolve
-    /// this base configuration file, then merge in any properties defined
-    /// in the current configuration file.
-    #[option(
-        default = r#"None"#,
-        value_type = "str",
-        example = r#"
-            # Extend the `pyproject.toml` file in the parent directory.
-            extend = "../pyproject.toml"
-            # But use a different line length.
-            line-length = 100
-        "#
-    )]
-    pub extend: Option<String>,
 
     /// A list of file patterns to omit from linting, in addition to those
     /// specified by `exclude`.
@@ -175,112 +211,6 @@ pub struct Options {
     )]
     pub extend_include: Option<Vec<String>>,
 
-    /// A list of rule codes or prefixes to ignore, in addition to those
-    /// specified by `ignore`.
-    ///
-    /// This option has been **deprecated** in favor of `ignore`
-    /// since its usage is now interchangeable with `ignore`.
-    #[option(
-        default = "[]",
-        value_type = "list[RuleSelector]",
-        example = r#"
-            # Skip unused variable rules (`F841`).
-            extend-ignore = ["F841"]
-        "#
-    )]
-    #[cfg_attr(feature = "schemars", schemars(skip))]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
-
-    /// A list of rule codes or prefixes to enable, in addition to those
-    /// specified by `select`.
-    #[option(
-        default = "[]",
-        value_type = "list[RuleSelector]",
-        example = r#"
-            # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            extend-select = ["B", "Q"]
-        "#
-    )]
-    pub extend_select: Option<Vec<RuleSelector>>,
-
-    /// A list of rule codes or prefixes to consider autofixable, in addition to those
-    /// specified by `fixable`.
-    #[option(
-        default = r#"[]"#,
-        value_type = "list[RuleSelector]",
-        example = r#"
-            # Enable autofix for flake8-bugbear (`B`), on top of any rules specified by `fixable`.
-            extend-fixable = ["B"]
-        "#
-    )]
-    pub extend_fixable: Option<Vec<RuleSelector>>,
-
-    /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
-    /// specified by `unfixable`.
-    ///
-    /// This option has been **deprecated** in favor of `unfixable` since its usage is now
-    /// interchangeable with `unfixable`.
-    #[cfg_attr(feature = "schemars", schemars(skip))]
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
-
-    /// A list of rule codes that are unsupported by Ruff, but should be
-    /// preserved when (e.g.) validating `# noqa` directives. Useful for
-    /// retaining `# noqa` directives that cover plugins not yet implemented
-    /// by Ruff.
-    #[option(
-        default = "[]",
-        value_type = "list[str]",
-        example = r#"
-            # Avoiding flagging (and removing) `V101` from any `# noqa`
-            # directives, despite Ruff's lack of support for `vulture`.
-            external = ["V101"]
-        "#
-    )]
-    pub external: Option<Vec<String>>,
-
-    /// Enable autofix behavior by-default when running `ruff` (overridden
-    /// by the `--fix` and `--no-fix` command-line flags).
-    #[option(default = "false", value_type = "bool", example = "fix = true")]
-    pub fix: Option<bool>,
-
-    /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
-    #[option(default = "false", value_type = "bool", example = "fix-only = true")]
-    pub fix_only: Option<bool>,
-
-    /// A list of rule codes or prefixes to consider autofixable. By default,
-    /// all rules are considered autofixable.
-    #[option(
-        default = r#"["ALL"]"#,
-        value_type = "list[RuleSelector]",
-        example = r#"
-            # Only allow autofix behavior for `E` and `F` rules.
-            fixable = ["E", "F"]
-        "#
-    )]
-    pub fixable: Option<Vec<RuleSelector>>,
-
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
-    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
-    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
-    #[option(
-        default = r#""text""#,
-        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
-        example = r#"
-            # Group violations by containing file.
-            output-format = "grouped"
-        "#
-    )]
-    pub output_format: Option<SerializationFormat>,
-
-    #[option(
-        default = r#"false"#,
-        value_type = "bool",
-        example = r#"
-            force-exclude = true
-        "#
-    )]
     /// Whether to enforce `exclude` and `extend-exclude` patterns, even for
     /// paths that are passed to Ruff explicitly. Typically, Ruff will lint
     /// any paths passed in directly, even if they would typically be
@@ -300,36 +230,6 @@ pub struct Options {
     )]
     pub force_exclude: Option<bool>,
 
-    /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
-    /// between.
-    ///
-    /// When breaking ties between enabled and disabled rules (via `select` and
-    /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
-    #[option(
-        default = "[]",
-        value_type = "list[RuleSelector]",
-        example = r#"
-            # Skip unused variable rules (`F841`).
-            ignore = ["F841"]
-        "#
-    )]
-    pub ignore: Option<Vec<RuleSelector>>,
-
-    /// Avoid automatically removing unused imports in `__init__.py` files. Such
-    /// imports will still be flagged, but with a dedicated message suggesting
-    /// that the import is either added to the module's `__all__` symbol, or
-    /// re-exported with a redundant alias (e.g., `import os as os`).
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = r#"
-            ignore-init-module-imports = true
-        "#
-    )]
-    pub ignore_init_module_imports: Option<bool>,
-
     /// A list of file patterns to include when linting.
     ///
     /// Inclusion are based on globs, and should be single-path patterns, like
@@ -347,66 +247,6 @@ pub struct Options {
     )]
     pub include: Option<Vec<String>>,
 
-    /// The line length to use when enforcing long-lines violations (like
-    /// `E501`). Must be greater than `0` and less than or equal to `320`.
-    #[option(
-        default = "88",
-        value_type = "int",
-        example = r#"
-        # Allow lines to be as long as 120 characters.
-        line-length = 120
-        "#
-    )]
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))]
-    pub line_length: Option<LineLength>,
-
-    /// The tabulation size to calculate line length.
-    #[option(
-        default = "4",
-        value_type = "int",
-        example = r#"
-            tab-size = 8
-        "#
-    )]
-    pub tab_size: Option<TabSize>,
-
-    /// A list of objects that should be treated equivalently to a
-    /// `logging.Logger` object.
-    ///
-    /// This is useful for ensuring proper diagnostics (e.g., to identify
-    /// `logging` deprecations and other best-practices) for projects that
-    /// re-export a `logging.Logger` object from a common module.
-    ///
-    /// For example, if you have a module `logging_setup.py` with the following
-    /// contents:
-    /// ```python
-    /// import logging
-    ///
-    /// logger = logging.getLogger(__name__)
-    /// ```
-    ///
-    /// Adding `"logging_setup.logger"` to `logger-objects` will ensure that
-    /// `logging_setup.logger` is treated as a `logging.Logger` object when
-    /// imported from other modules (e.g., `from logging_setup import logger`).
-    #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
-        example = r#"logger-objects = ["logging_setup.logger"]"#
-    )]
-    pub logger_objects: Option<Vec<String>>,
-
-    /// Require a specific version of Ruff to be running (useful for unifying
-    /// results across many environments, e.g., with a `pyproject.toml`
-    /// file).
-    #[option(
-        default = "None",
-        value_type = "str",
-        example = r#"
-            required-version = "0.0.193"
-        "#
-    )]
-    pub required_version: Option<Version>,
-
     /// Whether to automatically exclude files that are ignored by `.ignore`,
     /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
     /// Enabled by default.
@@ -419,46 +259,50 @@ pub struct Options {
     )]
     pub respect_gitignore: Option<bool>,
 
-    /// A list of rule codes or prefixes to enable. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
-    /// between.
+    // Generic python options
+    /// A list of builtins to treat as defined references, in addition to the
+    /// system builtins.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            builtins = ["_"]
+        "#
+    )]
+    pub builtins: Option<Vec<String>>,
+
+    /// Mark the specified directories as namespace packages. For the purpose of
+    /// module resolution, Ruff will treat those directories as if they
+    /// contained an `__init__.py` file.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            namespace-packages = ["airflow/providers"]
+        "#
+    )]
+    pub namespace_packages: Option<Vec<String>>,
+
+    /// The minimum Python version to target, e.g., when considering automatic
+    /// code upgrades, like rewriting type annotations. Ruff will not propose
+    /// changes using features that are not available in the given version.
     ///
-    /// When breaking ties between enabled and disabled rules (via `select` and
-    /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
+    /// For example, to represent supporting Python >=3.10 or ==3.10
+    /// specify `target-version = "py310"`.
+    ///
+    /// If omitted, and Ruff is configured via a `pyproject.toml` file, the
+    /// target version will be inferred from its `project.requires-python`
+    /// field (e.g., `requires-python = ">=3.8"`). If Ruff is configured via
+    /// `ruff.toml` or `.ruff.toml`, no such inference will be performed.
     #[option(
-        default = r#"["E", "F"]"#,
-        value_type = "list[RuleSelector]",
+        default = r#""py38""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
         example = r#"
-            # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            select = ["E", "F", "B", "Q"]
+            # Always generate Python 3.7-compatible code.
+            target-version = "py37"
         "#
     )]
-    pub select: Option<Vec<RuleSelector>>,
-
-    /// Whether to show source code snippets when reporting lint violations
-    /// (overridden by the `--show-source` command-line flag).
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = r#"
-            # By default, always show source code snippets.
-            show-source = true
-        "#
-    )]
-    pub show_source: Option<bool>,
-
-    /// Whether to show an enumeration of all autofixed lint violations
-    /// (overridden by the `--show-fixes` command-line flag).
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = r#"
-            # Enumerate all fixed violations.
-            show-fixes = true
-        "#
-    )]
-    pub show_fixes: Option<bool>,
+    pub target_version: Option<PythonVersion>,
 
     /// The directories to consider when resolving first- vs. third-party
     /// imports.
@@ -498,50 +342,246 @@ pub struct Options {
     )]
     pub src: Option<Vec<String>>,
 
-    /// Mark the specified directories as namespace packages. For the purpose of
-    /// module resolution, Ruff will treat those directories as if they
-    /// contained an `__init__.py` file.
+    // Global Formatting options
+    /// The line length to use when enforcing long-lines violations (like
+    /// `E501`). Must be greater than `0` and less than or equal to `320`.
+    #[option(
+        default = "88",
+        value_type = "int",
+        example = r#"
+        # Allow lines to be as long as 120 characters.
+        line-length = 120
+        "#
+    )]
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))]
+    pub line_length: Option<LineLength>,
+
+    /// The tabulation size to calculate line length.
+    #[option(
+        default = "4",
+        value_type = "int",
+        example = r#"
+            tab-size = 8
+        "#
+    )]
+    pub tab_size: Option<TabSize>,
+
+    pub lint: Option<LintOptions>,
+
+    /// The lint sections specified at the top level.
+    #[serde(flatten)]
+    pub lint_top_level: LintOptions,
+
+    /// Options to configure the code formatting.
+    ///
+    /// Previously:
+    /// The style in which violation messages should be formatted: `"text"`
+    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
+    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
+    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
+    ///
+    /// This option has been **deprecated** in favor of `output-format`
+    /// to avoid ambiguity with Ruff's upcoming formatter.
+    #[option_group]
+    pub format: Option<FormatOrOutputFormat>,
+}
+
+/// Experimental section to configure Ruff's linting. This new section will eventually
+/// replace the top-level linting options.
+///
+/// Options specified in the `lint` section take precedence over the top-level settings.
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(
+    Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct LintOptions {
+    /// A list of allowed "confusable" Unicode characters to ignore when
+    /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            namespace-packages = ["airflow/providers"]
+            # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
+            # which could be confused for "-", "p", and "*", respectively.
+            allowed-confusables = ["−", "ρ", "∗"]
         "#
     )]
-    pub namespace_packages: Option<Vec<String>>,
+    pub allowed_confusables: Option<Vec<char>>,
 
-    /// The minimum Python version to target, e.g., when considering automatic
-    /// code upgrades, like rewriting type annotations. Ruff will not propose
-    /// changes using features that are not available in the given version.
-    ///
-    /// For example, to represent supporting Python >=3.10 or ==3.10
-    /// specify `target-version = "py310"`.
-    ///
-    /// If omitted, and Ruff is configured via a `pyproject.toml` file, the
-    /// target version will be inferred from its `project.requires-python`
-    /// field (e.g., `requires-python = ">=3.8"`). If Ruff is configured via
-    /// `ruff.toml` or `.ruff.toml`, no such inference will be performed.
+    /// A regular expression used to identify "dummy" variables, or those which
+    /// should be ignored when enforcing (e.g.) unused-variable rules. The
+    /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     #[option(
-        default = r#""py38""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
+        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
+        value_type = "re.Pattern",
         example = r#"
-            # Always generate Python 3.7-compatible code.
-            target-version = "py37"
+            # Only ignore variables named "_".
+            dummy-variable-rgx = "^_$"
         "#
     )]
-    pub target_version: Option<PythonVersion>,
+    pub dummy_variable_rgx: Option<String>,
 
-    /// Whether to enable preview mode. When preview mode is enabled, Ruff will
-    /// use unstable rules and fixes.
+    /// A list of rule codes or prefixes to ignore, in addition to those
+    /// specified by `ignore`.
+    ///
+    /// This option has been **deprecated** in favor of `ignore`
+    /// since its usage is now interchangeable with `ignore`.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Skip unused variable rules (`F841`).
+            extend-ignore = ["F841"]
+        "#
+    )]
+    #[cfg_attr(feature = "schemars", schemars(skip))]
+    pub extend_ignore: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes to enable, in addition to those
+    /// specified by `select`.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            extend-select = ["B", "Q"]
+        "#
+    )]
+    pub extend_select: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes to consider fixable, in addition to those
+    /// specified by `fixable`.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Enable fix for flake8-bugbear (`B`), on top of any rules specified by `fixable`.
+            extend-fixable = ["B"]
+        "#
+    )]
+    pub extend_fixable: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
+    /// specified by `unfixable`.
+    ///
+    /// This option has been **deprecated** in favor of `unfixable` since its usage is now
+    /// interchangeable with `unfixable`.
+    #[cfg_attr(feature = "schemars", schemars(skip))]
+    pub extend_unfixable: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes that are unsupported by Ruff, but should be
+    /// preserved when (e.g.) validating `# noqa` directives. Useful for
+    /// retaining `# noqa` directives that cover plugins not yet implemented
+    /// by Ruff.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            # Avoiding flagging (and removing) `V101` from any `# noqa`
+            # directives, despite Ruff's lack of support for `vulture`.
+            external = ["V101"]
+        "#
+    )]
+    pub external: Option<Vec<String>>,
+
+    /// A list of rule codes or prefixes to consider fixable. By default,
+    /// all rules are considered fixable.
+    #[option(
+        default = r#"["ALL"]"#,
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Only allow fix behavior for `E` and `F` rules.
+            fixable = ["E", "F"]
+        "#
+    )]
+    pub fixable: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
+    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// between.
+    ///
+    /// When breaking ties between enabled and disabled rules (via `select` and
+    /// `ignore`, respectively), more specific prefixes override less
+    /// specific prefixes.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Skip unused variable rules (`F841`).
+            ignore = ["F841"]
+        "#
+    )]
+    pub ignore: Option<Vec<RuleSelector>>,
+
+    /// Avoid automatically removing unused imports in `__init__.py` files. Such
+    /// imports will still be flagged, but with a dedicated message suggesting
+    /// that the import is either added to the module's `__all__` symbol, or
+    /// re-exported with a redundant alias (e.g., `import os as os`).
     #[option(
         default = "false",
         value_type = "bool",
         example = r#"
-            # Enable preview features
-            preview = true
+            ignore-init-module-imports = true
         "#
     )]
-    pub preview: Option<bool>,
+    pub ignore_init_module_imports: Option<bool>,
+
+    /// A list of objects that should be treated equivalently to a
+    /// `logging.Logger` object.
+    ///
+    /// This is useful for ensuring proper diagnostics (e.g., to identify
+    /// `logging` deprecations and other best-practices) for projects that
+    /// re-export a `logging.Logger` object from a common module.
+    ///
+    /// For example, if you have a module `logging_setup.py` with the following
+    /// contents:
+    /// ```python
+    /// import logging
+    ///
+    /// logger = logging.getLogger(__name__)
+    /// ```
+    ///
+    /// Adding `"logging_setup.logger"` to `logger-objects` will ensure that
+    /// `logging_setup.logger` is treated as a `logging.Logger` object when
+    /// imported from other modules (e.g., `from logging_setup import logger`).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"logger-objects = ["logging_setup.logger"]"#
+    )]
+    pub logger_objects: Option<Vec<String>>,
+
+    /// A list of rule codes or prefixes to enable. Prefixes can specify exact
+    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// between.
+    ///
+    /// When breaking ties between enabled and disabled rules (via `select` and
+    /// `ignore`, respectively), more specific prefixes override less
+    /// specific prefixes.
+    #[option(
+        default = r#"["E", "F"]"#,
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            select = ["E", "F", "B", "Q"]
+        "#
+    )]
+    pub select: Option<Vec<RuleSelector>>,
+
+    /// Whether to require exact codes to select preview rules. When enabled,
+    /// preview rules will not be selected by prefixes — the full code of each
+    /// preview rule will be required to enable the rule.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Require explicit selection of preview rules
+            explicit-preview-rules = true
+        "#
+    )]
+    pub explicit_preview_rules: Option<bool>,
 
     /// A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
     ///
@@ -551,7 +591,9 @@ pub struct Options {
     #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,
         value_type = "list[str]",
-        example = r#"task-tags = ["HACK"]"#
+        example = r#"
+            task-tags = ["HACK"]
+        "#
     )]
     pub task_tags: Option<Vec<String>>,
 
@@ -570,12 +612,12 @@ pub struct Options {
     )]
     pub typing_modules: Option<Vec<String>>,
 
-    /// A list of rule codes or prefixes to consider non-autofix-able.
+    /// A list of rule codes or prefixes to consider non-fixable.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
         example = r#"
-            # Disable autofix for unused imports (`F401`).
+            # Disable fix for unused imports (`F401`).
             unfixable = ["F401"]
         "#
     )]
@@ -677,20 +719,6 @@ pub struct Options {
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
 
-    /// Options to configure the code formatting.
-    ///
-    /// Previously:
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
-    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
-    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
-    ///
-    /// This option has been **deprecated** in favor of `output-format`
-    /// to avoid ambiguity with Ruff's upcoming formatter.
-    #[option_group]
-    pub format: Option<FormatOrOutputFormat>,
-
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files.
@@ -722,7 +750,7 @@ pub struct Options {
 
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
-    Debug, PartialEq, Eq, Default, ConfigurationOptions, CombineOptions, Serialize, Deserialize,
+    Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Flake8AnnotationsOptions {
@@ -790,7 +818,7 @@ impl Flake8AnnotationsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -838,7 +866,7 @@ impl Flake8BanditOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -868,7 +896,7 @@ impl Flake8BugbearOptions {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -890,7 +918,7 @@ impl Flake8BuiltinsOptions {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -915,7 +943,7 @@ impl Flake8ComprehensionsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -969,7 +997,7 @@ impl Flake8CopyrightOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -988,7 +1016,7 @@ impl Flake8ErrMsgOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1025,7 +1053,7 @@ impl Flake8GetTextOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1058,7 +1086,7 @@ impl Flake8ImplicitStrConcatOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1140,7 +1168,7 @@ impl Flake8ImportConventionsOptions {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1276,7 +1304,7 @@ impl Flake8PytestStyleOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1339,7 +1367,7 @@ impl Flake8QuotesOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1379,7 +1407,7 @@ impl Flake8SelfOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1436,7 +1464,7 @@ impl Flake8TidyImportsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1510,7 +1538,7 @@ impl Flake8TypeCheckingOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1533,7 +1561,7 @@ impl Flake8UnusedArgumentsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2016,7 +2044,7 @@ impl IsortOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2044,12 +2072,16 @@ impl McCabeOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Pep8NamingOptions {
     /// A list of names (or patterns) to ignore when considering `pep8-naming` violations.
+    ///
+    /// Supports glob patterns. For example, to ignore all names starting with
+    /// or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`.
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = r#"["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]"#,
         value_type = "list[str]",
@@ -2060,7 +2092,11 @@ pub struct Pep8NamingOptions {
     pub ignore_names: Option<Vec<String>>,
 
     /// Additional names (or patterns) to ignore when considering `pep8-naming` violations,
-    /// in addition to those included in `ignore-names`.
+    /// in addition to those included in `ignore-names`
+    ///
+    /// Supports glob patterns. For example, to ignore all names starting with
+    /// or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`.
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax)..
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2074,6 +2110,9 @@ pub struct Pep8NamingOptions {
     ///
     /// For example, Ruff will expect that any method decorated by a decorator
     /// in this list takes a `cls` argument as its first argument.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `pydantic.validator`,
+    /// rather than `validator`).
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2090,12 +2129,15 @@ pub struct Pep8NamingOptions {
     ///
     /// For example, Ruff will expect that any method decorated by a decorator
     /// in this list has no `self` or `cls` argument.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`,
+    /// rather than `teardown`).
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            # Allow a shorthand alias, `@stcmthd`, to trigger static method treatment.
-            staticmethod-decorators = ["stcmthd"]
+            # Allow Belay's `@Device.teardown` decorator to trigger static method treatment.
+            staticmethod-decorators = ["belay.Device.teardown"]
         "#
     )]
     pub staticmethod_decorators: Option<Vec<String>>,
@@ -2123,7 +2165,7 @@ impl Pep8NamingOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2165,7 +2207,7 @@ impl PycodestyleOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2246,7 +2288,7 @@ impl PydocstyleOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2274,7 +2316,7 @@ impl PyflakesOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2337,7 +2379,7 @@ impl PylintOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2422,7 +2464,7 @@ impl OptionsMetadata for FormatOrOutputFormat {
 ///
 /// Please provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2432,7 +2474,7 @@ pub struct FormatOptions {
         default = "false",
         value_type = "bool",
         example = r#"
-            # Enable preview style formatting
+            # Enable preview style formatting.
             preview = true
         "#
     )]
@@ -2440,34 +2482,40 @@ pub struct FormatOptions {
 
     /// Whether to use 4 spaces or hard tabs for indenting code.
     ///
-    /// Defaults to 4 spaces. We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.
+    /// Defaults to 4 spaces. We care about accessibility; if you do not need tabs for
+    /// accessibility, we do not recommend you use them.
     #[option(
         default = "space",
         value_type = r#""space" | "tab""#,
         example = r#"
-            # Use tabs instead of 4 space indentation
+            # Use tabs instead of 4 space indentation.
             indent-style = "tab"
         "#
     )]
     pub indent_style: Option<IndentStyle>,
 
-    /// Whether to prefer single `'` or double `"` quotes for strings and docstrings.
+    /// Whether to prefer single `'` or double `"` quotes for strings. Defaults to double quotes.
     ///
-    /// Ruff may deviate from this option if using the configured quotes would require more escaped quotes:
+    /// In compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/),
+    /// Ruff prefers double quotes for multiline strings and docstrings, regardless of the
+    /// configured quote style.
+    ///
+    /// Ruff may also deviate from this option if using the configured quotes would require
+    /// escaping quote characters within the string. For example, given:
     ///
     /// ```python
-    /// a = "It's monday morning"
-    /// b = "a string without any quotes"
+    /// a = "a string without any quotes"
+    /// b = "It's monday morning"
     /// ```
     ///
-    /// Ruff leaves `a` unchanged when using `quote-style = "single"` because it is otherwise
-    /// necessary to escape the `'` which leads to less readable code: `'It\'s monday morning'`.
-    /// Ruff changes the quotes of `b` to use single quotes.
+    /// Ruff will change `a` to use single quotes when using `quote-style = "single"`. However,
+    /// `a` will be unchanged, as converting to single quotes would require the inner `'` to be
+    /// escaped, which leads to less readable code: `'It\'s monday morning'`.
     #[option(
         default = r#"double"#,
         value_type = r#""double" | "single""#,
         example = r#"
-            # Prefer single quotes over double quotes
+            # Prefer single quotes over double quotes.
             quote-style = "single"
         "#
     )]

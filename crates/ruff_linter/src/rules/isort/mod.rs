@@ -1,6 +1,5 @@
 //! Rules from [isort](https://pypi.org/project/isort/).
 
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use annotate::annotate_imports;
@@ -14,14 +13,12 @@ use order::order_imports;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
-use settings::RelativeImportsOrder;
+use settings::Settings;
 use sorting::cmp_either_import;
 use types::EitherImport::{Import, ImportFrom};
-use types::{AliasData, EitherImport, TrailingComma};
+use types::{AliasData, EitherImport, ImportBlock, TrailingComma};
 
 use crate::line_width::{LineLength, LineWidthBuilder};
-use crate::rules::isort::categorize::KnownModules;
-use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
 
 mod annotate;
@@ -74,49 +71,25 @@ pub(crate) fn format_imports(
     src: &[PathBuf],
     package: Option<&Path>,
     source_type: PySourceType,
-    combine_as_imports: bool,
-    force_single_line: bool,
-    force_sort_within_sections: bool,
-    case_sensitive: bool,
-    force_wrap_aliases: bool,
-    force_to_top: &BTreeSet<String>,
-    known_modules: &KnownModules,
-    order_by_type: bool,
-    detect_same_package: bool,
-    relative_imports_order: RelativeImportsOrder,
-    single_line_exclusions: &BTreeSet<String>,
-    split_on_trailing_comma: bool,
-    classes: &BTreeSet<String>,
-    constants: &BTreeSet<String>,
-    variables: &BTreeSet<String>,
-    no_lines_before: &BTreeSet<ImportSection>,
-    lines_after_imports: isize,
-    lines_between_types: usize,
-    forced_separate: &[String],
     target_version: PythonVersion,
-    section_order: &[ImportSection],
+    settings: &Settings,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(
         &block.imports,
         comments,
         locator,
-        split_on_trailing_comma,
+        settings.split_on_trailing_comma,
         source_type,
     );
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
-    let block = normalize_imports(
-        block,
-        combine_as_imports,
-        force_single_line,
-        single_line_exclusions,
-    );
+    let block = normalize_imports(block, settings);
 
     // Categorize imports.
     let mut output = String::new();
 
-    for block in split::split_by_forced_separate(block, forced_separate) {
+    for block in split::split_by_forced_separate(block, &settings.forced_separate) {
         let block_output = format_import_block(
             block,
             line_length,
@@ -124,22 +97,8 @@ pub(crate) fn format_imports(
             stylist,
             src,
             package,
-            force_sort_within_sections,
-            case_sensitive,
-            force_wrap_aliases,
-            force_to_top,
-            known_modules,
-            order_by_type,
-            detect_same_package,
-            relative_imports_order,
-            split_on_trailing_comma,
-            classes,
-            constants,
-            variables,
-            no_lines_before,
-            lines_between_types,
             target_version,
-            section_order,
+            settings,
         );
 
         if !block_output.is_empty() && !output.is_empty() {
@@ -150,6 +109,7 @@ pub(crate) fn format_imports(
         output.push_str(block_output.as_str());
     }
 
+    let lines_after_imports = settings.lines_after_imports;
     match trailer {
         None => {}
         Some(Trailer::Sibling) => {
@@ -183,30 +143,16 @@ fn format_import_block(
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
-    force_sort_within_sections: bool,
-    case_sensitive: bool,
-    force_wrap_aliases: bool,
-    force_to_top: &BTreeSet<String>,
-    known_modules: &KnownModules,
-    order_by_type: bool,
-    detect_same_package: bool,
-    relative_imports_order: RelativeImportsOrder,
-    split_on_trailing_comma: bool,
-    classes: &BTreeSet<String>,
-    constants: &BTreeSet<String>,
-    variables: &BTreeSet<String>,
-    no_lines_before: &BTreeSet<ImportSection>,
-    lines_between_types: usize,
     target_version: PythonVersion,
-    section_order: &[ImportSection],
+    settings: &Settings,
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
     let mut block_by_type = categorize_imports(
         block,
         src,
         package,
-        detect_same_package,
-        known_modules,
+        settings.detect_same_package,
+        &settings.known_modules,
         target_version,
     );
 
@@ -215,26 +161,17 @@ fn format_import_block(
     // Generate replacement source code.
     let mut is_first_block = true;
     let mut pending_lines_before = false;
-    for import_section in section_order {
+    for import_section in &settings.section_order {
         let import_block = block_by_type.remove(import_section);
 
-        if !no_lines_before.contains(import_section) {
+        if !settings.no_lines_before.contains(import_section) {
             pending_lines_before = true;
         }
         let Some(import_block) = import_block else {
             continue;
         };
 
-        let imports = order_imports(
-            import_block,
-            order_by_type,
-            case_sensitive,
-            relative_imports_order,
-            classes,
-            constants,
-            variables,
-            force_to_top,
-        );
+        let imports = order_imports(import_block, settings);
 
         let imports = {
             let mut imports = imports
@@ -243,16 +180,8 @@ fn format_import_block(
                 .map(Import)
                 .chain(imports.import_from.into_iter().map(ImportFrom))
                 .collect::<Vec<EitherImport>>();
-            if force_sort_within_sections {
-                imports.sort_by(|import1, import2| {
-                    cmp_either_import(
-                        import1,
-                        import2,
-                        relative_imports_order,
-                        force_to_top,
-                        case_sensitive,
-                    )
-                });
+            if settings.force_sort_within_sections {
+                imports.sort_by(|import1, import2| cmp_either_import(import1, import2, settings));
             };
             imports
         };
@@ -269,6 +198,7 @@ fn format_import_block(
         let mut lines_inserted = false;
         let mut has_direct_import = false;
         let mut is_first_statement = true;
+        let lines_between_types = settings.lines_between_types;
         for import in imports {
             match import {
                 Import((alias, comments)) => {
@@ -299,9 +229,10 @@ fn format_import_block(
                         line_length,
                         indentation_width,
                         stylist,
-                        force_wrap_aliases,
+                        settings.force_wrap_aliases,
                         is_first_statement,
-                        split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
+                        settings.split_on_trailing_comma
+                            && matches!(trailing_comma, TrailingComma::Present),
                     ));
                 }
             }

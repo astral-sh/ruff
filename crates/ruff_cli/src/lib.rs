@@ -234,13 +234,13 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         ..
     } = pyproject_config.settings;
 
-    // Autofix rules are as follows:
+    // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
     // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
     // - If `--diff` or `--fix-only` are set, don't print any violations (only
     //   fixes).
-    let autofix = if cli.diff {
+    let fix_mode = if cli.diff {
         flags::FixMode::Diff
     } else if fix || fix_only {
         flags::FixMode::Apply
@@ -275,7 +275,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     }
 
     if cli.add_noqa {
-        if !autofix.is_generate() {
+        if !fix_mode.is_generate() {
             warn_user!("--fix is incompatible with --add-noqa.");
         }
         let modifications =
@@ -290,7 +290,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(output_format, log_level, autofix, printer_flags);
+    let printer = Printer::new(output_format, log_level, fix_mode, printer_flags);
 
     if cli.watch {
         if output_format != SerializationFormat::Text {
@@ -317,7 +317,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             &overrides,
             cache.into(),
             noqa.into(),
-            autofix,
+            fix_mode,
         )?;
         printer.write_continuously(&mut writer, &messages)?;
 
@@ -349,7 +349,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         &overrides,
                         cache.into(),
                         noqa.into(),
-                        autofix,
+                        fix_mode,
                     )?;
                     printer.write_continuously(&mut writer, &messages)?;
                 }
@@ -366,7 +366,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 &pyproject_config,
                 &overrides,
                 noqa.into(),
-                autofix,
+                fix_mode,
             )?
         } else {
             commands::check::check(
@@ -375,14 +375,14 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 &overrides,
                 cache.into(),
                 noqa.into(),
-                autofix,
+                fix_mode,
             )?
         };
 
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
+        if !(is_stdin && matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff)) {
             if cli.statistics {
                 printer.write_statistics(&diagnostics, &mut writer)?;
             } else {

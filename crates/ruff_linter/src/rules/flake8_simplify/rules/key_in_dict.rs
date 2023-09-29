@@ -1,5 +1,5 @@
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -35,14 +35,14 @@ pub struct InDictKeys {
     operator: String,
 }
 
-impl AlwaysAutofixableViolation for InDictKeys {
+impl AlwaysFixableViolation for InDictKeys {
     #[derive_message_formats]
     fn message(&self) -> String {
         let InDictKeys { operator } = self;
         format!("Use `key {operator} dict` instead of `key {operator} dict.keys()`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let InDictKeys { operator: _ } = self;
         format!("Remove `.keys()`")
     }

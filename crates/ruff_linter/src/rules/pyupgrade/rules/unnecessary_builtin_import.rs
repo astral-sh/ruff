@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
+use crate::fix;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -35,7 +35,7 @@ pub struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryBuiltinImport {
+impl AlwaysFixableViolation for UnnecessaryBuiltinImport {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryBuiltinImport { names } = self;
@@ -48,7 +48,7 @@ impl AlwaysAutofixableViolation for UnnecessaryBuiltinImport {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove unnecessary builtin import".to_string()
     }
 }
@@ -125,7 +125,7 @@ pub(crate) fn unnecessary_builtin_import(
         diagnostic.try_set_fix(|| {
             let statement = checker.semantic().current_statement();
             let parent = checker.semantic().current_statement_parent();
-            let edit = autofix::edits::remove_unused_imports(
+            let edit = fix::edits::remove_unused_imports(
                 unused_imports
                     .iter()
                     .map(|alias| &alias.name)

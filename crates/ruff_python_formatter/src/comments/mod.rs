@@ -549,9 +549,9 @@ mod tests {
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::Mod;
-    use ruff_python_index::CommentRangesBuilder;
-    use ruff_python_parser::lexer::lex;
-    use ruff_python_parser::{parse_tokens, Mode};
+    use ruff_python_index::tokens_and_ranges;
+
+    use ruff_python_parser::{parse_ok_tokens, Mode};
     use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
@@ -563,19 +563,11 @@ mod tests {
     }
 
     impl<'a> CommentsTestCase<'a> {
-        fn from_code(code: &'a str) -> Self {
-            let source_code = SourceCode::new(code);
-            let tokens: Vec<_> = lex(code, Mode::Module).collect();
-
-            let mut comment_ranges = CommentRangesBuilder::default();
-
-            for (token, range) in tokens.iter().flatten() {
-                comment_ranges.visit_token(token, *range);
-            }
-
-            let comment_ranges = comment_ranges.finish();
-
-            let parsed = parse_tokens(tokens, Mode::Module, "test.py")
+        fn from_code(source: &'a str) -> Self {
+            let source_code = SourceCode::new(source);
+            let (tokens, comment_ranges) =
+                tokens_and_ranges(source).expect("Expect source to be valid Python");
+            let parsed = parse_ok_tokens(tokens, source, Mode::Module, "test.py")
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {

@@ -8,7 +8,7 @@ use anyhow::Result;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::AutofixKind;
+use ruff_diagnostics::FixKind;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_workspace::options::Options;
 use ruff_workspace::options_base::OptionsMetadata;
@@ -37,16 +37,16 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            let autofix = rule.autofixable();
-            if matches!(autofix, AutofixKind::Always | AutofixKind::Sometimes) {
-                output.push_str(&autofix.to_string());
+            let fix_kind = rule.fixable();
+            if matches!(fix_kind, FixKind::Always | FixKind::Sometimes) {
+                output.push_str(&fix_kind.to_string());
                 output.push('\n');
                 output.push('\n');
             }
 
-            if rule.is_preview() {
+            if rule.is_preview() || rule.is_nursery() {
                 output.push_str(
-                    r#"This rule is in preview and is not stable. The `--preview` flag is required for use."#,
+                    r#"This rule is unstable and in [preview](../preview.md). The `--preview` flag is required for use."#,
                 );
                 output.push('\n');
                 output.push('\n');

@@ -2,7 +2,7 @@ use std::string::ToString;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword};
 use ruff_text_size::{Ranged, TextRange};
@@ -145,7 +145,7 @@ pub struct PercentFormatExtraNamedArguments {
     missing: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
+impl AlwaysFixableViolation for PercentFormatExtraNamedArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PercentFormatExtraNamedArguments { missing } = self;
@@ -153,7 +153,7 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
         format!("`%`-format string has unused named argument(s): {message}")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let PercentFormatExtraNamedArguments { missing } = self;
         let message = missing.join(", ");
         format!("Remove extra named arguments: {message}")
@@ -387,7 +387,7 @@ pub struct StringDotFormatExtraNamedArguments {
 }
 
 impl Violation for StringDotFormatExtraNamedArguments {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -396,7 +396,7 @@ impl Violation for StringDotFormatExtraNamedArguments {
         format!("`.format` call has unused named argument(s): {message}")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let StringDotFormatExtraNamedArguments { missing } = self;
         let message = missing.join(", ");
         Some(format!("Remove extra named arguments: {message}"))
@@ -428,7 +428,7 @@ pub struct StringDotFormatExtraPositionalArguments {
 }
 
 impl Violation for StringDotFormatExtraPositionalArguments {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -437,7 +437,7 @@ impl Violation for StringDotFormatExtraPositionalArguments {
         format!("`.format` call has unused arguments at position(s): {message}")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let StringDotFormatExtraPositionalArguments { missing } = self;
         let message = missing.join(", ");
         Some(format!(

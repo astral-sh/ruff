@@ -1,7 +1,7 @@
 use ruff_text_size::TextLen;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
@@ -47,13 +47,13 @@ use crate::rules::pydocstyle::helpers::logical_line;
 #[violation]
 pub struct EndsInPeriod;
 
-impl AlwaysAutofixableViolation for EndsInPeriod {
+impl AlwaysFixableViolation for EndsInPeriod {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("First line should end with a period")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add period".to_string()
     }
 }
@@ -103,7 +103,7 @@ pub(crate) fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
 
         if !trimmed.ends_with('.') {
             let mut diagnostic = Diagnostic::new(EndsInPeriod, docstring.range());
-            // Best-effort autofix: avoid adding a period after other punctuation marks.
+            // Best-effort fix: avoid adding a period after other punctuation marks.
             if checker.patch(diagnostic.kind.rule()) && !trimmed.ends_with([':', ';']) {
                 diagnostic.set_fix(Fix::suggested(Edit::insertion(
                     ".".to_string(),

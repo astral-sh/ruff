@@ -1,6 +1,6 @@
 use ruff_python_ast::{Expr, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -38,7 +38,7 @@ pub struct UnnecessaryLiteralWithinTupleCall {
     literal: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
+impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryLiteralWithinTupleCall { literal } = self;
@@ -55,7 +55,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let UnnecessaryLiteralWithinTupleCall { literal } = self;
         {
             if literal == "list" {

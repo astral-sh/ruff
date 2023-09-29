@@ -183,7 +183,7 @@ impl<'a> Checker<'a> {
 
         // Find the quote character used to start the containing f-string.
         let expr = self.semantic.current_expression()?;
-        let string_range = self.indexer.f_string_range(expr.start())?;
+        let string_range = self.indexer.fstring_ranges().innermost(expr.start())?;
         let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
 
         // Invert the quote character, if it's a single quote.
