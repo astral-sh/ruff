@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_parser::lexer::LexResult;
@@ -30,13 +30,13 @@ use crate::settings::LinterSettings;
 #[violation]
 pub struct AvoidableEscapedQuote;
 
-impl AlwaysAutofixableViolation for AvoidableEscapedQuote {
+impl AlwaysFixableViolation for AvoidableEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Change outer quotes to avoid escaping inner quotes")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Change outer quotes to avoid escaping inner quotes".to_string()
     }
 }
