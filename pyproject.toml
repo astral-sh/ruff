@@ -6,8 +6,7 @@ build-backend = "maturin"
 name = "ruff"
 version = "0.0.291"
 description = "An extremely fast Python linter, written in Rust."
-authors = [{ name = "Astral", email = "hey@astral.sh" }]
-maintainers = [{ name = "Astral", email = "hey@astral.sh" }]
+authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
 license = { file = "LICENSE" }
