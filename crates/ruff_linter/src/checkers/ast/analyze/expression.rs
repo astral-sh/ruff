@@ -592,6 +592,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FlaskDebugTrue) {
                 flake8_bandit::rules::flask_debug_true(checker, call);
             }
+            if checker.enabled(Rule::WeakCryptographicKey) {
+                flake8_bandit::rules::weak_cryptographic_key(checker, call);
+            }
             if checker.any_enabled(&[
                 Rule::SubprocessWithoutShellEqualsTrue,
                 Rule::SubprocessPopenWithShellEqualsTrue,
