@@ -19,3 +19,8 @@ def func():
     import functools, operator
 
     sum([x, y], [])
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7718
+def func():
+    sum((factor.dims for factor in bases), [])

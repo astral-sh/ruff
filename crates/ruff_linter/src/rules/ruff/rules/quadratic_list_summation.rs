@@ -3,6 +3,8 @@ use itertools::Itertools;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::node::AstNode;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -100,7 +102,15 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
         checker.semantic(),
     )?;
 
-    let iterable = checker.locator().slice(iterable);
+    let iterable = checker.locator().slice(
+        parenthesized_range(
+            iterable.into(),
+            call.arguments.as_any_node_ref(),
+            checker.indexer().comment_ranges(),
+            checker.locator().contents(),
+        )
+        .unwrap_or(iterable.range()),
+    );
 
     Ok(Fix::suggested_edits(
         Edit::range_replacement(
