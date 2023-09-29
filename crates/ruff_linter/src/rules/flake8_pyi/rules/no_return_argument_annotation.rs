@@ -8,26 +8,23 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion::Py311;
 
-#[violation]
-pub struct NoReturnArgumentAnnotationInStub {
-    module: TypingModule,
-}
-
 /// ## What it does
 /// Checks for uses of `typing.NoReturn` (and `typing_extensions.NoReturn`) in
 /// stubs.
 ///
 /// ## Why is this bad?
 /// Prefer `typing.Never` (or `typing_extensions.Never`) over `typing.NoReturn`,
-/// as the former is more explicit about the intent of the annotation. This is
-/// a purely stylistic choice, as the two are semantically equivalent.
+/// as the former is more explicit about the intent of the annotation (namely,
+/// to indicate that a function should never be called or return).
+///
+/// This is a purely stylistic choice, as the two are semantically equivalent.
 ///
 /// ## Example
 /// ```python
 /// from typing import NoReturn
 ///
 ///
-/// def foo(x: NoReturn): ...
+/// def do_not_call_me() -> NoReturn: ...
 /// ```
 ///
 /// Use instead:
@@ -35,8 +32,17 @@ pub struct NoReturnArgumentAnnotationInStub {
 /// from typing import Never
 ///
 ///
-/// def foo(x: Never): ...
+/// def do_not_call_me() -> Never: ...
 /// ```
+///
+/// ## References
+/// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
+/// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
+#[violation]
+pub struct NoReturnArgumentAnnotationInStub {
+    module: TypingModule,
+}
+
 impl Violation for NoReturnArgumentAnnotationInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
