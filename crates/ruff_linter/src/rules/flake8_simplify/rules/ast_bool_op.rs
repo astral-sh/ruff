@@ -476,7 +476,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     let [comparator] = comparators.as_slice() else {
         return None;
     };
-    if !matches!(&comparator, Expr::Name(_)) {
+    if !comparator.is_name_expr() {
         return None;
     }
     Some((id, comparator))
