@@ -26,9 +26,9 @@ use crate::{checkers::ast::Checker, importer::ImportRequest, registry::AsRule};
 /// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
 
 #[violation]
-pub struct NoImplicitCwd;
+pub struct ImplicitCwd;
 
-impl Violation for NoImplicitCwd {
+impl Violation for ImplicitCwd {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups")
@@ -86,7 +86,7 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(NoImplicitCwd, call.range());
+    let mut diagnostic = Diagnostic::new(ImplicitCwd, call.range());
 
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
@@ -104,5 +104,5 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
 
     checker
         .diagnostics
-        .push(Diagnostic::new(NoImplicitCwd, call.range()))
+        .push(Diagnostic::new(ImplicitCwd, call.range()))
 }
