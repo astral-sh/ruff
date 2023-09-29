@@ -369,6 +369,15 @@ impl Notebook {
         self.index.get_or_init(|| self.build_index())
     }
 
+    /// Return the Jupyter notebook index, consuming the notebook.
+    ///
+    /// The index is built only once when required. This is only used to
+    /// report diagnostics, so by that time all of the fixes must have
+    /// been applied if `--fix` was passed.
+    pub fn into_index(mut self) -> NotebookIndex {
+        self.index.take().unwrap_or_else(|| self.build_index())
+    }
+
     /// Return the cell offsets for the concatenated source code corresponding
     /// the Jupyter notebook.
     pub fn cell_offsets(&self) -> &[TextSize] {

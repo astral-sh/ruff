@@ -8,7 +8,7 @@ use std::ops::AddAssign;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
@@ -342,13 +342,7 @@ pub(crate) fn lint_path(
     }
 
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
-        FxHashMap::from_iter([(
-            path.to_str()
-                .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
-                .to_string(),
-            // Index needs to be computed always to store in cache.
-            notebook.index().clone(),
-        )])
+        FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
     } else {
         FxHashMap::default()
     };
@@ -474,6 +468,15 @@ pub(crate) fn lint_stdin(
         );
     }
 
+    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
+        FxHashMap::from_iter([(
+            path.map_or_else(|| "-".into(), |path| path.to_string_lossy().to_string()),
+            notebook.into_index(),
+        )])
+    } else {
+        FxHashMap::default()
+    };
+
     Ok(Diagnostics {
         messages,
         fixed: FxHashMap::from_iter([(
@@ -481,7 +484,7 @@ pub(crate) fn lint_stdin(
             fixed,
         )]),
         imports,
-        notebook_indexes: FxHashMap::default(),
+        notebook_indexes,
     })
 }
 
