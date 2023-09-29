@@ -85,6 +85,11 @@ where
         dangling_node_comments: &[SourceComment],
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
+        debug_assert!(
+            dangling_node_comments.is_empty(),
+            "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields` and override `fmt_dangling_comments` with an empty implementation that returns `Ok(())`."
+        );
+
         dangling_comments(dangling_node_comments).fmt(f)
     }
 

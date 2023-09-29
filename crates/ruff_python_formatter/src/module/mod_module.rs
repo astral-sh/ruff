@@ -37,10 +37,11 @@ impl FormatNodeRule<ModModule> for FormatModModule {
 
     fn fmt_dangling_comments(
         &self,
-        _dangling_comments: &[SourceComment],
+        dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
+        // Node can't have dangling comments.
+        debug_assert!(dangling_comments.is_empty());
         Ok(())
     }
 }
