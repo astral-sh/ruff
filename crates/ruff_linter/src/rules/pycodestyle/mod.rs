@@ -3,6 +3,7 @@ pub(crate) mod rules;
 pub mod settings;
 
 pub(crate) mod helpers;
+pub(super) mod overlong;
 
 #[cfg(test)]
 mod tests {
@@ -30,6 +31,7 @@ mod tests {
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_1.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_2.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501.py"))]
+    #[test_case(Rule::LineTooLong, Path::new("E501_3.py"))]
     #[test_case(Rule::MixedSpacesAndTabs, Path::new("E101.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.py"))]
