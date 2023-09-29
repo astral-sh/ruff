@@ -1,7 +1,6 @@
-use ruff_python_ast::Expr;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,7 +40,7 @@ impl Violation for UselessComparison {
 
 /// B015
 pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
-    if matches!(expr, Expr::Compare(_)) {
+    if expr.is_compare_expr() {
         checker
             .diagnostics
             .push(Diagnostic::new(UselessComparison, expr.range()));

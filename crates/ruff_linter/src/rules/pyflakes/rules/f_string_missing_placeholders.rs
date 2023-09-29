@@ -103,11 +103,7 @@ fn fstring_prefix_and_tok_range<'a>(
 
 /// F541
 pub(crate) fn f_string_missing_placeholders(fstring: &ast::ExprFString, checker: &mut Checker) {
-    if !fstring
-        .values
-        .iter()
-        .any(|value| matches!(value, Expr::FormattedValue(_)))
-    {
+    if !fstring.values.iter().any(Expr::is_formatted_value_expr) {
         for (prefix_range, tok_range) in
             fstring_prefix_and_tok_range(fstring, checker.locator(), checker.source_type)
         {

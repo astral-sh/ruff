@@ -361,7 +361,7 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
     } else {
         fn is_parenthesized(expr: &Expr, context: &PyFormatContext) -> bool {
             // Don't break subscripts except in parenthesized context. It looks weird.
-            !matches!(expr, Expr::Subscript(_))
+            !expr.is_subscript_expr()
                 && has_parentheses(expr, context).is_some_and(OwnParentheses::is_non_empty)
         }
 
