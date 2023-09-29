@@ -91,7 +91,8 @@ pub(crate) fn getattr_with_constant(
                 if matches!(
                     obj,
                     Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
-                ) {
+                ) && !checker.locator().contains_line_break(obj.range())
+                {
                     format!("{}.{}", checker.locator().slice(obj), value)
                 } else {
                     // Defensively parenthesize any other expressions. For example, attribute accesses

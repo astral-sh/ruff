@@ -75,11 +75,31 @@ B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
    = help: De-duplicate exceptions
 
 ℹ Fix
-79 79 | # https://github.com/astral-sh/ruff/issues/6412
+79 79 | # Regression test for: https://github.com/astral-sh/ruff/issues/6412
 80 80 | try:
 81 81 |     pass
 82    |-except (ValueError, ValueError, TypeError):
    82 |+except (ValueError, TypeError):
 83 83 |     pass
+84 84 | 
+85 85 | 
+
+B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`
+   |
+87 | try:
+88 |     pas
+89 | except(re.error, re.error):
+   |       ^^^^^^^^^^^^^^^^^^^^ B014
+90 |     p
+   |
+   = help: De-duplicate exceptions
+
+ℹ Fix
+86 86 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739801758
+87 87 | try:
+88 88 |     pas
+89    |-except(re.error, re.error):
+   89 |+except re.error:
+90 90 |     p
 
 

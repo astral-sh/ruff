@@ -570,6 +570,19 @@ pub struct LintOptions {
     )]
     pub select: Option<Vec<RuleSelector>>,
 
+    /// Whether to require exact codes to select preview rules. When enabled,
+    /// preview rules will not be selected by prefixes — the full code of each
+    /// preview rule will be required to enable the rule.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Require explicit selection of preview rules
+            explicit-preview-rules = true
+        "#
+    )]
+    pub explicit_preview_rules: Option<bool>,
+
     /// A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
     ///
     /// Comments starting with these tags will be ignored by commented-out code
@@ -2461,7 +2474,7 @@ pub struct FormatOptions {
         default = "false",
         value_type = "bool",
         example = r#"
-            # Enable preview style formatting
+            # Enable preview style formatting.
             preview = true
         "#
     )]
@@ -2469,34 +2482,40 @@ pub struct FormatOptions {
 
     /// Whether to use 4 spaces or hard tabs for indenting code.
     ///
-    /// Defaults to 4 spaces. We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.
+    /// Defaults to 4 spaces. We care about accessibility; if you do not need tabs for
+    /// accessibility, we do not recommend you use them.
     #[option(
         default = "space",
         value_type = r#""space" | "tab""#,
         example = r#"
-            # Use tabs instead of 4 space indentation
+            # Use tabs instead of 4 space indentation.
             indent-style = "tab"
         "#
     )]
     pub indent_style: Option<IndentStyle>,
 
-    /// Whether to prefer single `'` or double `"` quotes for strings and docstrings.
+    /// Whether to prefer single `'` or double `"` quotes for strings. Defaults to double quotes.
     ///
-    /// Ruff may deviate from this option if using the configured quotes would require more escaped quotes:
+    /// In compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/),
+    /// Ruff prefers double quotes for multiline strings and docstrings, regardless of the
+    /// configured quote style.
+    ///
+    /// Ruff may also deviate from this option if using the configured quotes would require
+    /// escaping quote characters within the string. For example, given:
     ///
     /// ```python
-    /// a = "It's monday morning"
-    /// b = "a string without any quotes"
+    /// a = "a string without any quotes"
+    /// b = "It's monday morning"
     /// ```
     ///
-    /// Ruff leaves `a` unchanged when using `quote-style = "single"` because it is otherwise
-    /// necessary to escape the `'` which leads to less readable code: `'It\'s monday morning'`.
-    /// Ruff changes the quotes of `b` to use single quotes.
+    /// Ruff will change `a` to use single quotes when using `quote-style = "single"`. However,
+    /// `a` will be unchanged, as converting to single quotes would require the inner `'` to be
+    /// escaped, which leads to less readable code: `'It\'s monday morning'`.
     #[option(
         default = r#"double"#,
         value_type = r#""double" | "single""#,
         example = r#"
-            # Prefer single quotes over double quotes
+            # Prefer single quotes over double quotes.
             quote-style = "single"
         "#
     )]
