@@ -11,24 +11,29 @@ use crate::fix;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for unnecessary `pass` statements in class and function bodies.
-/// where it is not needed syntactically (e.g., when an indented docstring is
-/// present).
+/// Checks for unnecessary `pass` statements in functions, classes, and other
+/// blocks.
 ///
 /// ## Why is this bad?
-/// When a function or class definition contains more than one statement, the
-/// `pass` statement is not needed.
+/// In Python, the `pass` statement serves as a placeholder, allowing for
+/// syntactically correct empty code blocks. The primary purpose of the `pass`
+/// statement is to avoid syntax errors in situations where a statement is
+/// syntactically required, but no code needs to be executed.
+///
+/// If a `pass` statement is present in a code block that includes at least
+/// one other statement (even, e.g., a docstring), it is unnecessary and should
+/// be removed.
 ///
 /// ## Example
 /// ```python
-/// def foo():
+/// def func():
 ///     """Placeholder docstring."""
 ///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo():
+/// def func():
 ///     """Placeholder docstring."""
 /// ```
 ///
