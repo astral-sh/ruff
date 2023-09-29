@@ -7,7 +7,7 @@ use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, 
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{contains_effect, Truthiness};
@@ -49,7 +49,7 @@ pub struct DuplicateIsinstanceCall {
 }
 
 impl Violation for DuplicateIsinstanceCall {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -61,7 +61,7 @@ impl Violation for DuplicateIsinstanceCall {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let DuplicateIsinstanceCall { name } = self;
 
         Some(if let Some(name) = name {
@@ -99,14 +99,14 @@ pub struct CompareWithTuple {
     replacement: String,
 }
 
-impl AlwaysAutofixableViolation for CompareWithTuple {
+impl AlwaysFixableViolation for CompareWithTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
         let CompareWithTuple { replacement } = self;
         format!("Use `{replacement}` instead of multiple equality comparisons")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let CompareWithTuple { replacement } = self;
         format!("Replace with `{replacement}`")
     }
@@ -132,14 +132,14 @@ pub struct ExprAndNotExpr {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for ExprAndNotExpr {
+impl AlwaysFixableViolation for ExprAndNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprAndNotExpr { name } = self;
         format!("Use `False` instead of `{name} and not {name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `False`".to_string()
     }
 }
@@ -164,14 +164,14 @@ pub struct ExprOrNotExpr {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for ExprOrNotExpr {
+impl AlwaysFixableViolation for ExprOrNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprOrNotExpr { name } = self;
         format!("Use `True` instead of `{name} or not {name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `True`".to_string()
     }
 }
@@ -217,7 +217,7 @@ pub struct ExprOrTrue {
     remove: ContentAround,
 }
 
-impl AlwaysAutofixableViolation for ExprOrTrue {
+impl AlwaysFixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprOrTrue { expr, remove } = self;
@@ -229,7 +229,7 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
         format!("Use `{expr}` instead of `{replaced}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let ExprOrTrue { expr, .. } = self;
         format!("Replace with `{expr}`")
     }
@@ -269,7 +269,7 @@ pub struct ExprAndFalse {
     remove: ContentAround,
 }
 
-impl AlwaysAutofixableViolation for ExprAndFalse {
+impl AlwaysFixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprAndFalse { expr, remove } = self;
@@ -281,7 +281,7 @@ impl AlwaysAutofixableViolation for ExprAndFalse {
         format!("Use `{expr}` instead of `{replaced}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let ExprAndFalse { expr, .. } = self;
         format!("Replace with `{expr}`")
     }

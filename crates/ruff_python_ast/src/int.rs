@@ -40,16 +40,23 @@ impl Int {
         Self(Number::Big(value.into()))
     }
 
-    /// Parse an [`Int`] from a string with a given radix.
-    pub fn from_str_radix(s: &str, radix: u32) -> Result<Self, std::num::ParseIntError> {
-        match i64::from_str_radix(s, radix) {
+    /// Parse an [`Int`] from a string with a given radix, like `0x95D`.
+    ///
+    /// Takes, as input, the numerical portion (`95D`), the parsed base (`16`), and the entire
+    /// token (`0x95D`).
+    pub fn from_str_radix(
+        number: &str,
+        radix: u32,
+        token: &str,
+    ) -> Result<Self, std::num::ParseIntError> {
+        match i64::from_str_radix(number, radix) {
             Ok(value) => Ok(Int::small(value)),
             Err(err) => {
                 if matches!(
                     err.kind(),
                     std::num::IntErrorKind::PosOverflow | std::num::IntErrorKind::NegOverflow
                 ) {
-                    Ok(Int::big(s))
+                    Ok(Int::big(token))
                 } else {
                     Err(err)
                 }

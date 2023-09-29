@@ -141,6 +141,7 @@ pub(crate) fn missing_whitespace_around_operator(
         prev_token.kind(),
         TokenKind::Lpar | TokenKind::Lambda
     ));
+    let mut fstrings = u32::from(matches!(prev_token.kind(), TokenKind::FStringStart));
 
     while let Some(token) = tokens.next() {
         let kind = token.kind();
@@ -150,13 +151,15 @@ pub(crate) fn missing_whitespace_around_operator(
         }
 
         match kind {
+            TokenKind::FStringStart => fstrings += 1,
+            TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             TokenKind::Lpar | TokenKind::Lambda => parens += 1,
             TokenKind::Rpar => parens = parens.saturating_sub(1),
             _ => {}
         };
 
-        let needs_space = if kind == TokenKind::Equal && parens > 0 {
-            // Allow keyword args or defaults: foo(bar=None).
+        let needs_space = if kind == TokenKind::Equal && (parens > 0 || fstrings > 0) {
+            // Allow keyword args, defaults: foo(bar=None) and f-strings: f'{foo=}'
             NeedsSpace::No
         } else if kind == TokenKind::Slash {
             // Tolerate the "/" operator in function definition

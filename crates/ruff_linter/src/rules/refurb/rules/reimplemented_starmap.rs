@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr};
@@ -57,14 +57,14 @@ use crate::registry::AsRule;
 pub struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `itertools.starmap` instead of the generator")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Replace with `itertools.starmap`"))
     }
 }

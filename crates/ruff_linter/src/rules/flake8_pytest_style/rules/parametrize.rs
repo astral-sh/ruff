@@ -2,7 +2,7 @@ use std::hash::BuildHasherDefault;
 
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::node::AstNode;
@@ -77,7 +77,7 @@ pub struct PytestParametrizeNamesWrongType {
 }
 
 impl Violation for PytestParametrizeNamesWrongType {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -85,7 +85,7 @@ impl Violation for PytestParametrizeNamesWrongType {
         format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let PytestParametrizeNamesWrongType { expected } = self;
         Some(format!("Use a `{expected}` for parameter names"))
     }
@@ -234,7 +234,7 @@ pub struct PytestDuplicateParametrizeTestCases {
 }
 
 impl Violation for PytestDuplicateParametrizeTestCases {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -242,7 +242,7 @@ impl Violation for PytestDuplicateParametrizeTestCases {
         format!("Duplicate of test case at index {index} in `@pytest_mark.parametrize`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Remove duplicate test case".to_string())
     }
 }

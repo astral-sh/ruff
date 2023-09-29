@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -43,7 +43,7 @@ pub struct SysExitAlias {
 }
 
 impl Violation for SysExitAlias {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -51,7 +51,7 @@ impl Violation for SysExitAlias {
         format!("Use `sys.exit()` instead of `{name}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let SysExitAlias { name } = self;
         Some(format!("Replace `{name}` with `sys.exit()`"))
     }

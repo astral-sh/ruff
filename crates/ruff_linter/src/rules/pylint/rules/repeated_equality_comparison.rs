@@ -12,8 +12,8 @@ use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for repeated equality comparisons that can rewritten as a membership

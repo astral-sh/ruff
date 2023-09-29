@@ -1,13 +1,13 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
-use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
+use crate::fix::edits::delete_stmt;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -29,14 +29,14 @@ pub struct StrOrReprDefinedInStub {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for StrOrReprDefinedInStub {
+impl AlwaysFixableViolation for StrOrReprDefinedInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         let StrOrReprDefinedInStub { name } = self;
         format!("Defining `{name}` in a stub is almost always redundant")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let StrOrReprDefinedInStub { name } = self;
         format!("Remove definition of `{name}`")
     }

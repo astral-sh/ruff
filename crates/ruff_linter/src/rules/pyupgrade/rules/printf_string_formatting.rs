@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::whitespace::indentation;
@@ -27,6 +27,30 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// the newer `str.format` and f-strings constructs over `printf`-style string
 /// formatting.
 ///
+/// ## Known problems
+/// This rule is unable to detect cases in which the format string contains
+/// a single, generic format specifier (e.g. `%s`), and the right-hand side
+/// is an ambiguous expression.
+///
+/// For example, given:
+/// ```python
+/// "%s" % value
+/// ```
+///
+/// `value` could be a single-element tuple, _or_ it could be a single value.
+/// Both of these would resolve to the same formatted string when using
+/// `printf`-style formatting, but _not_ when using f-strings:
+///
+/// ```python
+/// value = 1
+/// print("%s" % value)  # "1"
+/// print("{}".format(value))  # "1"
+///
+/// value = (1,)
+/// print("%s" % value)  # "1"
+/// print("{}".format(value))  # "(1,)"
+/// ```
+///
 /// ## Example
 /// ```python
 /// "%s, %s" % ("Hello", "World")  # "Hello, World"
@@ -44,14 +68,14 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 pub struct PrintfStringFormatting;
 
 impl Violation for PrintfStringFormatting {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use format specifiers instead of percent format")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Replace with format specifiers".to_string())
     }
 }
@@ -465,7 +489,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     contents.push_str(&format!(".format{params_string}"));
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
-    // Avoid autofix if there are comments within the right-hand side:
+    // Avoid fix if there are comments within the right-hand side:
     // ```
     // "%s" % (
     //     0,  # 0

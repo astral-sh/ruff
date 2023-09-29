@@ -132,7 +132,7 @@ pub fn format_module_source(
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
     let (tokens, comment_ranges) = tokens_and_ranges(source)?;
-    let module = parse_ok_tokens(tokens, Mode::Module, "<filename>")?;
+    let module = parse_ok_tokens(tokens, source, Mode::Module, "<filename>")?;
     let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
@@ -218,7 +218,7 @@ def main() -> None:
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let module = parse_ok_tokens(tokens, Mode::Module, source_path).unwrap();
+        let module = parse_ok_tokens(tokens, source, Mode::Module, source_path).unwrap();
         let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&module, &comment_ranges, source, options).unwrap();
 

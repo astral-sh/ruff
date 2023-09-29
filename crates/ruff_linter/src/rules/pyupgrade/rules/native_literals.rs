@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_text_size::Ranged;
@@ -107,14 +107,14 @@ pub struct NativeLiterals {
     literal_type: LiteralType,
 }
 
-impl AlwaysAutofixableViolation for NativeLiterals {
+impl AlwaysFixableViolation for NativeLiterals {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NativeLiterals { literal_type } = self;
         format!("Unnecessary `{literal_type}` call (rewrite as a literal)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let NativeLiterals { literal_type } = self;
         match literal_type {
             LiteralType::Str => "Replace with empty string".to_string(),

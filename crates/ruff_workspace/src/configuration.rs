@@ -20,7 +20,7 @@ use ruff_formatter::{IndentStyle, LineWidth};
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
-use ruff_linter::rule_selector::Specificity;
+use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
@@ -180,6 +180,7 @@ impl Configuration {
                         .collect(),
                 )?,
                 src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
+                explicit_preview_rules: lint.explicit_preview_rules.unwrap_or_default(),
 
                 task_tags: lint
                     .task_tags
@@ -442,6 +443,7 @@ pub struct LintConfiguration {
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
     pub rule_selections: Vec<RuleSelection>,
+    pub explicit_preview_rules: Option<bool>,
 
     // Global lint settings
     pub allowed_confusables: Option<Vec<char>>,
@@ -519,6 +521,7 @@ impl LintConfiguration {
                 .unwrap_or_default(),
             external: options.external,
             ignore_init_module_imports: options.ignore_init_module_imports,
+            explicit_preview_rules: options.explicit_preview_rules,
             per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
                     .into_iter()
@@ -559,14 +562,19 @@ impl LintConfiguration {
     }
 
     fn as_rule_table(&self, preview: PreviewMode) -> RuleTable {
+        let preview = PreviewOptions {
+            mode: preview,
+            require_explicit: self.explicit_preview_rules.unwrap_or_default(),
+        };
+
         // The select_set keeps track of which rules have been selected.
         let mut select_set: RuleSet = PREFIXES
             .iter()
-            .flat_map(|selector| selector.rules(preview))
+            .flat_map(|selector| selector.rules(&preview))
             .collect();
 
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.rules(preview).collect();
+        let mut fixable_set: RuleSet = RuleSelector::All.rules(&preview).collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
@@ -605,7 +613,7 @@ impl LintConfiguration {
                     .chain(selection.extend_select.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(preview) {
+                    for rule in selector.rules(&preview) {
                         select_map_updates.insert(rule, true);
                     }
                 }
@@ -615,7 +623,7 @@ impl LintConfiguration {
                     .chain(carriedover_ignores.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(preview) {
+                    for rule in selector.rules(&preview) {
                         select_map_updates.insert(rule, false);
                     }
                 }
@@ -627,7 +635,7 @@ impl LintConfiguration {
                     .chain(selection.extend_fixable.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(preview) {
+                    for rule in selector.rules(&preview) {
                         fixable_map_updates.insert(rule, true);
                     }
                 }
@@ -637,7 +645,7 @@ impl LintConfiguration {
                     .chain(carriedover_unfixables.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(preview) {
+                    for rule in selector.rules(&preview) {
                         fixable_map_updates.insert(rule, false);
                     }
                 }
@@ -704,16 +712,16 @@ impl LintConfiguration {
             {
                 #[allow(deprecated)]
                 if matches!(selector, RuleSelector::Nursery) {
-                    let suggestion = if preview.is_disabled() {
+                    let suggestion = if preview.mode.is_disabled() {
                         " Use the `--preview` flag instead."
                     } else {
                         // We have no suggested alternative since there is intentionally no "PREVIEW" selector
                         ""
                     };
                     warn_user_once!("The `NURSERY` selector has been deprecated.{suggestion}");
-                }
+                };
 
-                if preview.is_disabled() {
+                if preview.mode.is_disabled() {
                     if let RuleSelector::Rule { prefix, .. } = selector {
                         if prefix.rules().any(|rule| rule.is_nursery()) {
                             deprecated_nursery_selectors.insert(selector);
@@ -721,7 +729,7 @@ impl LintConfiguration {
                     }
 
                     // Check if the selector is empty because preview mode is disabled
-                    if selector.rules(PreviewMode::Disabled).next().is_none() {
+                    if selector.rules(&PreviewOptions::default()).next().is_none() {
                         ignored_preview_selectors.insert(selector);
                     }
                 }
@@ -810,6 +818,9 @@ impl LintConfiguration {
                 .or(config.ignore_init_module_imports),
             logger_objects: self.logger_objects.or(config.logger_objects),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
+            explicit_preview_rules: self
+                .explicit_preview_rules
+                .or(config.explicit_preview_rules),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
             // Plugins
@@ -932,12 +943,12 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 
 #[cfg(test)]
 mod tests {
+    use crate::configuration::{LintConfiguration, RuleSelection};
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
+    use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
     use ruff_linter::RuleSelector;
-
-    use crate::configuration::{LintConfiguration, RuleSelection};
 
     const NURSERY_RULES: &[Rule] = &[
         Rule::MissingCopyrightNotice,
@@ -999,13 +1010,14 @@ mod tests {
     #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(
         selections: impl IntoIterator<Item = RuleSelection>,
-        preview: Option<PreviewMode>,
+        preview: Option<PreviewOptions>,
     ) -> RuleSet {
         LintConfiguration {
             rule_selections: selections.into_iter().collect(),
+            explicit_preview_rules: preview.as_ref().map(|preview| preview.require_explicit),
             ..LintConfiguration::default()
         }
-        .as_rule_table(preview.unwrap_or_default())
+        .as_rule_table(preview.map(|preview| preview.mode).unwrap_or_default())
         .iter_enabled()
         // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is off-by-default
         .filter(|rule| rule.noqa_code() != "RUF014")
@@ -1241,7 +1253,10 @@ mod tests {
                 select: Some(vec![RuleSelector::All]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         assert!(!actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
 
@@ -1250,7 +1265,10 @@ mod tests {
                 select: Some(vec![RuleSelector::All]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         assert!(actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
     }
@@ -1262,7 +1280,10 @@ mod tests {
                 select: Some(vec![Linter::Flake8Copyright.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
@@ -1272,7 +1293,10 @@ mod tests {
                 select: Some(vec![Linter::Flake8Copyright.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
@@ -1285,7 +1309,10 @@ mod tests {
                 select: Some(vec![Flake8Copyright::_0.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
@@ -1295,7 +1322,10 @@ mod tests {
                 select: Some(vec![Flake8Copyright::_0.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
@@ -1303,12 +1333,16 @@ mod tests {
 
     #[test]
     fn select_rule_preview() {
+        // Test inclusion when toggling preview on and off
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Refurb::_145.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
@@ -1318,7 +1352,24 @@ mod tests {
                 select: Some(vec![Refurb::_145.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
+        );
+        let expected = RuleSet::from_rule(Rule::SliceCopy);
+        assert_eq!(actual, expected);
+
+        // Test inclusion when preview is on but explicit codes are required
+        let actual = resolve_rules(
+            [RuleSelection {
+                select: Some(vec![Refurb::_145.into()]),
+                ..RuleSelection::default()
+            }],
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                require_explicit: true,
+            }),
         );
         let expected = RuleSet::from_rule(Rule::SliceCopy);
         assert_eq!(actual, expected);
@@ -1333,7 +1384,10 @@ mod tests {
                 select: Some(vec![Flake8Copyright::_001.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
@@ -1343,7 +1397,10 @@ mod tests {
                 select: Some(vec![Flake8Copyright::_001.into()]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
@@ -1359,7 +1416,10 @@ mod tests {
                 select: Some(vec![RuleSelector::Nursery]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Disabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Disabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
@@ -1369,7 +1429,10 @@ mod tests {
                 select: Some(vec![RuleSelector::Nursery]),
                 ..RuleSelection::default()
             }],
-            Some(PreviewMode::Enabled),
+            Some(PreviewOptions {
+                mode: PreviewMode::Enabled,
+                ..PreviewOptions::default()
+            }),
         );
         let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);

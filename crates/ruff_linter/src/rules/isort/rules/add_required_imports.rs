@@ -1,6 +1,6 @@
 use log::error;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
@@ -40,14 +40,14 @@ use crate::settings::LinterSettings;
 #[violation]
 pub struct MissingRequiredImport(pub String);
 
-impl AlwaysAutofixableViolation for MissingRequiredImport {
+impl AlwaysFixableViolation for MissingRequiredImport {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MissingRequiredImport(name) = self;
         format!("Missing required import: `{name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let MissingRequiredImport(name) = self;
         format!("Insert required import: `{name}`")
     }

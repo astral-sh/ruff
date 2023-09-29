@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::lexer::{LexResult, Spanned};
@@ -138,13 +138,13 @@ impl Context {
 #[violation]
 pub struct MissingTrailingComma;
 
-impl AlwaysAutofixableViolation for MissingTrailingComma {
+impl AlwaysFixableViolation for MissingTrailingComma {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Trailing comma missing")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add trailing comma".to_string()
     }
 }
@@ -209,13 +209,13 @@ impl Violation for TrailingCommaOnBareTuple {
 #[violation]
 pub struct ProhibitedTrailingComma;
 
-impl AlwaysAutofixableViolation for ProhibitedTrailingComma {
+impl AlwaysFixableViolation for ProhibitedTrailingComma {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Trailing comma prohibited")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove trailing comma".to_string()
     }
 }
@@ -361,7 +361,7 @@ pub(crate) fn trailing_commas(
             );
             if settings.rules.should_fix(Rule::MissingTrailingComma) {
                 // Create a replacement that includes the final bracket (or other token),
-                // rather than just inserting a comma at the end. This prevents the UP034 autofix
+                // rather than just inserting a comma at the end. This prevents the UP034 fix
                 // removing any brackets in the same linter pass - doing both at the same time could
                 // lead to a syntax error.
                 let contents = locator.slice(missing_comma.1);

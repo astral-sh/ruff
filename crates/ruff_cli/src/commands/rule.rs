@@ -5,7 +5,7 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::AutofixKind;
+use ruff_diagnostics::FixKind;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
@@ -17,7 +17,7 @@ struct Explanation<'a> {
     linter: &'a str,
     summary: &'a str,
     message_formats: &'a [&'a str],
-    autofix: String,
+    fix: String,
     explanation: Option<&'a str>,
     preview: bool,
 }
@@ -26,14 +26,14 @@ impl<'a> Explanation<'a> {
     fn from_rule(rule: &'a Rule) -> Self {
         let code = rule.noqa_code().to_string();
         let (linter, _) = Linter::parse_code(&code).unwrap();
-        let autofix = rule.autofixable().to_string();
+        let fix = rule.fixable().to_string();
         Self {
             name: rule.as_ref(),
             code,
             linter: linter.name(),
             summary: rule.message_formats()[0],
             message_formats: rule.message_formats(),
-            autofix,
+            fix,
             explanation: rule.explanation(),
             preview: rule.is_preview(),
         }
@@ -51,9 +51,9 @@ fn format_rule_text(rule: Rule) -> String {
     output.push('\n');
     output.push('\n');
 
-    let autofix = rule.autofixable();
-    if matches!(autofix, AutofixKind::Always | AutofixKind::Sometimes) {
-        output.push_str(&autofix.to_string());
+    let fix_kind = rule.fixable();
+    if matches!(fix_kind, FixKind::Always | FixKind::Sometimes) {
+        output.push_str(&fix_kind.to_string());
         output.push('\n');
         output.push('\n');
     }

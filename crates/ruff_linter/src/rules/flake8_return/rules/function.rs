@@ -3,7 +3,7 @@ use std::ops::Add;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
@@ -14,8 +14,8 @@ use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::is_python_whitespace;
 
-use crate::autofix::edits;
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
 
@@ -51,7 +51,7 @@ use super::super::visitor::{ReturnVisitor, Stack};
 #[violation]
 pub struct UnnecessaryReturnNone;
 
-impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
+impl AlwaysFixableViolation for UnnecessaryReturnNone {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -59,7 +59,7 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove explicit `return None`".to_string()
     }
 }
@@ -93,13 +93,13 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
 #[violation]
 pub struct ImplicitReturnValue;
 
-impl AlwaysAutofixableViolation for ImplicitReturnValue {
+impl AlwaysFixableViolation for ImplicitReturnValue {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not implicitly `return None` in function able to return non-`None` value")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add explicit `None` return value".to_string()
     }
 }
@@ -131,13 +131,13 @@ impl AlwaysAutofixableViolation for ImplicitReturnValue {
 #[violation]
 pub struct ImplicitReturn;
 
-impl AlwaysAutofixableViolation for ImplicitReturn {
+impl AlwaysFixableViolation for ImplicitReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing explicit `return` at the end of function able to return non-`None` value")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add explicit `return` statement".to_string()
     }
 }
@@ -167,14 +167,14 @@ pub struct UnnecessaryAssign {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryAssign {
+impl AlwaysFixableViolation for UnnecessaryAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryAssign { name } = self;
         format!("Unnecessary assignment to `{name}` before `return` statement")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove unnecessary assignment".to_string()
     }
 }

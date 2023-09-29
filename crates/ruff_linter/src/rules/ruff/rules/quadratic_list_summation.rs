@@ -1,7 +1,7 @@
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -48,13 +48,13 @@ use crate::{checkers::ast::Checker, registry::Rule};
 #[violation]
 pub struct QuadraticListSummation;
 
-impl AlwaysAutofixableViolation for QuadraticListSummation {
+impl AlwaysFixableViolation for QuadraticListSummation {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Avoid quadratic list summation")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Replace with `functools.reduce`")
     }
 }

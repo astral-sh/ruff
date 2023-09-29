@@ -1,6 +1,6 @@
 use ruff_python_ast::Parameters;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -41,14 +41,14 @@ pub struct AnyEqNeAnnotation {
     method_name: String,
 }
 
-impl AlwaysAutofixableViolation for AnyEqNeAnnotation {
+impl AlwaysFixableViolation for AnyEqNeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AnyEqNeAnnotation { method_name } = self;
         format!("Prefer `object` to `Any` for the second parameter to `{method_name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Replace with `object`")
     }
 }

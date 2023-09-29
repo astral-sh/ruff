@@ -50,6 +50,13 @@
         "type": "string"
       }
     },
+    "explicit-preview-rules": {
+      "description": "Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "extend": {
       "description": "A path to a local `pyproject.toml` file to merge into this configuration. User home directory and environment variables will be expanded.\n\nTo resolve the current `pyproject.toml` file, Ruff will first resolve this base configuration file, then merge in any properties defined in the current configuration file.",
       "type": [
@@ -68,7 +75,7 @@
       }
     },
     "extend-fixable": {
-      "description": "A list of rule codes or prefixes to consider autofixable, in addition to those specified by `fixable`.",
+      "description": "A list of rule codes or prefixes to consider fixable, in addition to those specified by `fixable`.",
       "type": [
         "array",
         "null"
@@ -121,7 +128,7 @@
       }
     },
     "fix": {
-      "description": "Enable autofix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags).",
+      "description": "Enable fix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags).",
       "type": [
         "boolean",
         "null"
@@ -135,7 +142,7 @@
       ]
     },
     "fixable": {
-      "description": "A list of rule codes or prefixes to consider autofixable. By default, all rules are considered autofixable.",
+      "description": "A list of rule codes or prefixes to consider fixable. By default, all rules are considered fixable.",
       "type": [
         "array",
         "null"
@@ -556,7 +563,7 @@
       }
     },
     "show-fixes": {
-      "description": "Whether to show an enumeration of all autofixed lint violations (overridden by the `--show-fixes` command-line flag).",
+      "description": "Whether to show an enumeration of all fixed lint violations (overridden by the `--show-fixes` command-line flag).",
       "type": [
         "boolean",
         "null"
@@ -622,7 +629,7 @@
       }
     },
     "unfixable": {
-      "description": "A list of rule codes or prefixes to consider non-autofix-able.",
+      "description": "A list of rule codes or prefixes to consider non-fixable.",
       "type": [
         "array",
         "null"
@@ -1207,7 +1214,7 @@
           ]
         },
         "quote-style": {
-          "description": "Whether to prefer single `'` or double `\"` quotes for strings and docstrings.\n\nRuff may deviate from this option if using the configured quotes would require more escaped quotes:\n\n```python a = \"It's monday morning\" b = \"a string without any quotes\" ```\n\nRuff leaves `a` unchanged when using `quote-style = \"single\"` because it is otherwise necessary to escape the `'` which leads to less readable code: `'It\\'s monday morning'`. Ruff changes the quotes of `b` to use single quotes.",
+          "description": "Whether to prefer single `'` or double `\"` quotes for strings. Defaults to double quotes.\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for multiline strings and docstrings, regardless of the configured quote style.\n\nRuff may also deviate from this option if using the configured quotes would require escaping quote characters within the string. For example, given:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change `a` to use single quotes when using `quote-style = \"single\"`. However, `a` will be unchanged, as converting to single quotes would require the inner `'` to be escaped, which leads to less readable code: `'It\\'s monday morning'`.",
           "anyOf": [
             {
               "$ref": "#/definitions/QuoteStyle"
@@ -1569,8 +1576,15 @@
             "null"
           ]
         },
+        "explicit-preview-rules": {
+          "description": "Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "extend-fixable": {
-          "description": "A list of rule codes or prefixes to consider autofixable, in addition to those specified by `fixable`.",
+          "description": "A list of rule codes or prefixes to consider fixable, in addition to those specified by `fixable`.",
           "type": [
             "array",
             "null"
@@ -1613,7 +1627,7 @@
           }
         },
         "fixable": {
-          "description": "A list of rule codes or prefixes to consider autofixable. By default, all rules are considered autofixable.",
+          "description": "A list of rule codes or prefixes to consider fixable. By default, all rules are considered fixable.",
           "type": [
             "array",
             "null"
@@ -1957,7 +1971,7 @@
           }
         },
         "unfixable": {
-          "description": "A list of rule codes or prefixes to consider non-autofix-able.",
+          "description": "A list of rule codes or prefixes to consider non-fixable.",
           "type": [
             "array",
             "null"
@@ -2662,6 +2676,8 @@
         "FURB140",
         "FURB145",
         "FURB148",
+        "FURB17",
+        "FURB177",
         "G",
         "G0",
         "G00",
@@ -3174,6 +3190,7 @@
         "S5",
         "S50",
         "S501",
+        "S505",
         "S506",
         "S507",
         "S508",

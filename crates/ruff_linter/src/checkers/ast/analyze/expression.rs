@@ -592,6 +592,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FlaskDebugTrue) {
                 flake8_bandit::rules::flask_debug_true(checker, call);
             }
+            if checker.enabled(Rule::WeakCryptographicKey) {
+                flake8_bandit::rules::weak_cryptographic_key(checker, call);
+            }
             if checker.any_enabled(&[
                 Rule::SubprocessWithoutShellEqualsTrue,
                 Rule::SubprocessPopenWithShellEqualsTrue,
@@ -910,6 +913,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ExceptionWithoutExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
+            if checker.enabled(Rule::ImplicitCwd) {
+                refurb::rules::no_implicit_cwd(checker, call);
+            }
         }
         Expr::Dict(
             dict @ ast::ExprDict {
@@ -960,9 +966,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::await_outside_async(checker, expr);
             }
         }
-        Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::FString(fstring @ ast::ExprFString { values, .. }) => {
             if checker.enabled(Rule::FStringMissingPlaceholders) {
-                pyflakes::rules::f_string_missing_placeholders(expr, values, checker);
+                pyflakes::rules::f_string_missing_placeholders(fstring, checker);
             }
             if checker.enabled(Rule::HardcodedSQLExpression) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);

@@ -1,8 +1,8 @@
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
+use crate::fix::snippet::SourceCodeSnippet;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 
@@ -41,7 +41,7 @@ pub struct UncapitalizedEnvironmentVariables {
 }
 
 impl Violation for UncapitalizedEnvironmentVariables {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -53,7 +53,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UncapitalizedEnvironmentVariables { expected, actual } = self;
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             Some(format!("Replace `{actual}` with `{expected}`"))
@@ -90,7 +90,7 @@ pub struct DictGetWithNoneDefault {
     actual: SourceCodeSnippet,
 }
 
-impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
+impl AlwaysFixableViolation for DictGetWithNoneDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DictGetWithNoneDefault { expected, actual } = self;
@@ -101,7 +101,7 @@ impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let DictGetWithNoneDefault { expected, actual } = self;
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Replace `{actual}` with `{expected}`")

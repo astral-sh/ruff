@@ -1,15 +1,15 @@
 use std::cmp::Ordering;
 
 use anyhow::Result;
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, CmpOp, Constant, ElifElseClause, Expr, Int, StmtIf};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
-use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
+use crate::fix::edits::delete_stmt;
 use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes::adjust_indentation;
 use crate::settings::types::PythonVersion;
@@ -51,7 +51,7 @@ pub struct OutdatedVersionBlock {
 }
 
 impl Violation for OutdatedVersionBlock {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_KIND: FixKind = FixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -62,7 +62,7 @@ impl Violation for OutdatedVersionBlock {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let OutdatedVersionBlock { reason } = self;
         match reason {
             Reason::Outdated => Some("Remove outdated version block".to_string()),
@@ -456,17 +456,17 @@ mod tests {
 
     use super::*;
 
-    #[test_case(PythonVersion::Py37, &[2], true, true; "compare-2.0")]
-    #[test_case(PythonVersion::Py37, &[2, 0], true, true; "compare-2.0-whole")]
-    #[test_case(PythonVersion::Py37, &[3], true, true; "compare-3.0")]
-    #[test_case(PythonVersion::Py37, &[3, 0], true, true; "compare-3.0-whole")]
-    #[test_case(PythonVersion::Py37, &[3, 1], true, true; "compare-3.1")]
-    #[test_case(PythonVersion::Py37, &[3, 5], true, true; "compare-3.5")]
-    #[test_case(PythonVersion::Py37, &[3, 7], true, false; "compare-3.7")]
-    #[test_case(PythonVersion::Py37, &[3, 7], false, true; "compare-3.7-not-equal")]
-    #[test_case(PythonVersion::Py37, &[3, 8], false , false; "compare-3.8")]
-    #[test_case(PythonVersion::Py310, &[3,9], true, true; "compare-3.9")]
-    #[test_case(PythonVersion::Py310, &[3, 11], true, false; "compare-3.11")]
+    #[test_case(PythonVersion::Py37, & [2], true, true; "compare-2.0")]
+    #[test_case(PythonVersion::Py37, & [2, 0], true, true; "compare-2.0-whole")]
+    #[test_case(PythonVersion::Py37, & [3], true, true; "compare-3.0")]
+    #[test_case(PythonVersion::Py37, & [3, 0], true, true; "compare-3.0-whole")]
+    #[test_case(PythonVersion::Py37, & [3, 1], true, true; "compare-3.1")]
+    #[test_case(PythonVersion::Py37, & [3, 5], true, true; "compare-3.5")]
+    #[test_case(PythonVersion::Py37, & [3, 7], true, false; "compare-3.7")]
+    #[test_case(PythonVersion::Py37, & [3, 7], false, true; "compare-3.7-not-equal")]
+    #[test_case(PythonVersion::Py37, & [3, 8], false, false; "compare-3.8")]
+    #[test_case(PythonVersion::Py310, & [3, 9], true, true; "compare-3.9")]
+    #[test_case(PythonVersion::Py310, & [3, 11], true, false; "compare-3.11")]
     fn test_compare_version(
         version: PythonVersion,
         target_versions: &[u8],

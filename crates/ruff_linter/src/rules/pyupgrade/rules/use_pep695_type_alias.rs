@@ -1,5 +1,5 @@
 use ast::{Constant, ExprCall, ExprConstant};
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     self as ast,
@@ -49,7 +49,7 @@ pub struct NonPEP695TypeAlias {
 }
 
 impl Violation for NonPEP695TypeAlias {
-    const AUTOFIX: AutofixKind = AutofixKind::Always;
+    const FIX_KIND: FixKind = FixKind::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -57,7 +57,7 @@ impl Violation for NonPEP695TypeAlias {
         format!("Type alias `{name}` uses `TypeAlias` annotation instead of the `type` keyword")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Use the `type` keyword".to_string())
     }
 }

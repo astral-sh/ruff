@@ -59,7 +59,7 @@ pub(crate) fn violation(violation: &ItemStruct) -> Result<TokenStream> {
 
                     Self {
                         body: Violation::message(&value),
-                        suggestion: Violation::autofix_title(&value),
+                        suggestion: Violation::fix_title(&value),
                         name: stringify!(#ident).to_string(),
                     }
                 }
@@ -82,7 +82,7 @@ pub(crate) fn violation(violation: &ItemStruct) -> Result<TokenStream> {
 
                     Self {
                         body: Violation::message(&value),
-                        suggestion: Violation::autofix_title(&value),
+                        suggestion: Violation::fix_title(&value),
                         name: stringify!(#ident).to_string(),
                     }
                 }

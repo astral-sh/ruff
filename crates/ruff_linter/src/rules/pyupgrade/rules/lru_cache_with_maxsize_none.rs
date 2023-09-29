@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 
@@ -45,13 +45,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct LRUCacheWithMaxsizeNone;
 
-impl AlwaysAutofixableViolation for LRUCacheWithMaxsizeNone {
+impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Rewrite with `@functools.cache".to_string()
     }
 }

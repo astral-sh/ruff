@@ -48,3 +48,9 @@ def add(a: int=0, b: int =0, c: int= 0) -> int:
 #: Okay
 def add(a: int = _default(name='f')):
     return a
+
+# F-strings
+f"{a=}"
+f"{a:=1}"
+f"{foo(a=1)}"
+f"normal {f"{a=}"} normal"

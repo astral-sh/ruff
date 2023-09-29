@@ -12,7 +12,6 @@ changelog:
     - title: Rules
       labels:
         - rule
-        - autofix
     - title: Settings
       labels:
         - configuration

@@ -1,8 +1,8 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::SemanticModel;
@@ -40,13 +40,13 @@ pub struct OSErrorAlias {
     name: Option<String>,
 }
 
-impl AlwaysAutofixableViolation for OSErrorAlias {
+impl AlwaysFixableViolation for OSErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Replace aliased errors with `OSError`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let OSErrorAlias { name } = self;
         match name {
             None => "Replace with builtin `OSError`".to_string(),
