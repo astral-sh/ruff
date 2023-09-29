@@ -468,7 +468,7 @@ pub fn lint_fix<'a>(
             &directives,
             settings,
             noqa,
-            source_kind,
+            &transformed,
             source_type,
         );
 

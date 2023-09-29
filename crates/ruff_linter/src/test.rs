@@ -197,7 +197,7 @@ pub(crate) fn test_contents<'a>(
                 &directives,
                 settings,
                 flags::Noqa::Enabled,
-                source_kind,
+                &transformed,
                 source_type,
             );
 

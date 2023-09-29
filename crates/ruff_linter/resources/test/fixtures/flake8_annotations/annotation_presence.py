@@ -158,3 +158,9 @@ class Foo:
     @decorator()
     def __init__(self: "Foo", foo: int):
        ...
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7711
+class Class:
+    def __init__(self):
+        print(f"{self.attr=}")
