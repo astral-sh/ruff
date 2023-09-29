@@ -342,11 +342,7 @@ pub(crate) fn lint_path(
     }
 
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
-        FxHashMap::from_iter([(
-            path.to_string_lossy().to_string(),
-            // Index needs to be computed always to store in cache.
-            notebook.index().clone(),
-        )])
+        FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
     } else {
         FxHashMap::default()
     };
@@ -475,8 +471,7 @@ pub(crate) fn lint_stdin(
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
         FxHashMap::from_iter([(
             path.map_or_else(|| "-".into(), |path| path.to_string_lossy().to_string()),
-            // Index needs to be computed always to store in cache.
-            notebook.index().clone(),
+            notebook.into_index(),
         )])
     } else {
         FxHashMap::default()
