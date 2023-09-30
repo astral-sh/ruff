@@ -914,7 +914,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
             if checker.enabled(Rule::ImplicitCwd) {
-                refurb::rules::no_implicit_cwd(checker, call);
+                refurb::rules::implicit_cwd(checker, call);
+            }
+            if checker.enabled(Rule::RedundantContinue) {
+                refurb::rules::redundant_continue(checker, call);
             }
         }
         Expr::Dict(

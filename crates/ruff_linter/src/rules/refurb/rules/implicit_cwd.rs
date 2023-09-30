@@ -36,7 +36,7 @@ impl Violation for ImplicitCwd {
 }
 
 /// FURB177
-pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn implicit_cwd(checker: &mut Checker, call: &ExprCall) {
     if !call.arguments.is_empty() {
         return;
     }

@@ -10,7 +10,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest, registry::AsRule};
 ///
 /// ## Why is this bad?
 /// TODO
-/// 
+///
 ///
 /// ## Example
 /// ```python
@@ -32,7 +32,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest, registry::AsRule};
 /// - [Python documentation: `continue`](https://docs.python.org/3/reference/simple_stmts.html#continue)
 
 #[violation]
-pub struct ImplicitCwd;
+pub struct RedundantContinue;
 
 impl Violation for ImplicitCwd {
     #[derive_message_formats]
@@ -41,6 +41,61 @@ impl Violation for ImplicitCwd {
     }
 }
 
-
 /// FURB133
-pub(crate) fn no_redundant_continue(checker: &mut Checker, continue_stmt: &ast::Continue) {}
+pub(crate) fn redundant_continue(checker: &mut Checker, continue_stmt: &ast::Continue) {}
+
+fn get_trailing_continue(node: Statement) -> impl Iterator<Item = Statement> {
+    match node {
+        Statement::ContinueStmt(_) => vec![node].into_iter(),
+        Statement::MatchStmt { bodies, patterns } => bodies
+            .into_iter()
+            .zip(patterns.into_iter())
+            .flat_map(|(body, pattern)| match (&*body.body, pattern) {
+                (
+                    _,
+                    Pattern::AsPattern {
+                        pattern: None,
+                        name: None,
+                    },
+                ) => Vec::new().into_iter(),
+
+                (vec![Statement::ContinueStmt(_)], _) => vec![].into_iter(),
+
+                _ => get_trailing_continue(body.body.last().unwrap()),
+            }),
+        _ => {
+            let stmt = match node {
+                Statement::IfStmt {
+                    else_body: Block { body },
+                    ..
+                }
+                | Statement::WithStmt {
+                    body: Block { body },
+                    ..
+                } => body.last().unwrap(),
+                _ => return Vec::new().into_iter(),
+            };
+            get_trailing_continue(stmt)
+        }
+    }
+}
+
+fn check(node: Statement, errors: &mut Vec<Error>) {
+    match node {
+        Statement::ForStmt {
+            body: Block { body },
+            ..
+        }
+        | Statement::WhileStmt {
+            body: Block { body },
+            ..
+        } => {
+            if let vec![stmt @ Statement::ContinueStmt(_)] = &*body {
+                return;
+            }
+
+            errors.extend(get_trailing_continue(body.last().unwrap()).map(ErrorInfo::from_node));
+        }
+        _ => (),
+    }
+}
