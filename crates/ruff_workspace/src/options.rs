@@ -138,7 +138,7 @@ pub struct Options {
         default = "false",
         value_type = "bool",
         example = r#"
-            # Enable preview features
+            # Enable preview features.
             preview = true
         "#
     )]
@@ -577,7 +577,7 @@ pub struct LintOptions {
         default = "false",
         value_type = "bool",
         example = r#"
-            # Require explicit selection of preview rules
+            # Require explicit selection of preview rules.
             explicit-preview-rules = true
         "#
     )]
@@ -1821,7 +1821,7 @@ pub struct IsortOptions {
         default = r#"0"#,
         value_type = "int",
         example = r#"
-            # Use a single line between direct and from import
+            # Use a single line between direct and from import.
             lines-between-types = 1
         "#
     )]
@@ -2096,7 +2096,7 @@ pub struct Pep8NamingOptions {
     ///
     /// Supports glob patterns. For example, to ignore all names starting with
     /// or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`.
-    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax)..
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
