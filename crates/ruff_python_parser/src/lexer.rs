@@ -584,7 +584,7 @@ impl<'source> Lexer<'source> {
                         location: self.offset(),
                     });
                 }
-                '\n' if !fstring.is_triple_quoted() => {
+                '\n' | '\r' if !fstring.is_triple_quoted() => {
                     return Err(LexicalError {
                         error: LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
                         location: self.offset(),
@@ -603,7 +603,11 @@ impl<'source> Lexer<'source> {
                         }
                     }
                     // Consume the escaped character.
-                    self.cursor.bump();
+                    if self.cursor.eat_char('\r') {
+                        self.cursor.eat_char('\n');
+                    } else {
+                        self.cursor.bump();
+                    }
                 }
                 quote @ ('\'' | '"') if quote == fstring.quote_char() => {
                     if let Some(triple_quotes) = fstring.triple_quotes() {
@@ -1981,6 +1985,26 @@ def f(arg=%timeit a = b):
     fn test_fstring_parentheses() {
         let source = r#"f"{}" f"{{}}" f" {}" f"{{{}}}" f"{{{{}}}}" f" {} {{}} {{{}}} {{{{}}}}  ""#;
         assert_debug_snapshot!(lex_source(source));
+    }
+
+    fn fstring_single_quote_escape_eol(eol: &str) -> Vec<Spanned> {
+        let source = format!(r"f'text \{eol} more text'");
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_fstring_single_quote_escape_unix_eol() {
+        assert_debug_snapshot!(fstring_single_quote_escape_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_fstring_single_quote_escape_mac_eol() {
+        assert_debug_snapshot!(fstring_single_quote_escape_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_fstring_single_quote_escape_windows_eol() {
+        assert_debug_snapshot!(fstring_single_quote_escape_eol(WINDOWS_EOL));
     }
 
     #[test]
