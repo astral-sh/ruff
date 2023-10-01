@@ -144,6 +144,11 @@ impl AlwaysFixableViolation for AssignmentDefaultInStub {
     }
 }
 
+/// ## What it does?
+/// Checks for assignments in stub files without type annotations.
+///
+/// ## Why is this bad?
+/// Stub files should contain type annotations.
 #[violation]
 pub struct UnannotatedAssignmentInStub {
     name: String,
