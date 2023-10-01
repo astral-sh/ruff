@@ -29,7 +29,7 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use log::error;
+use log::debug;
 use ruff_python_ast::{
     self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
     ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
@@ -1176,7 +1176,7 @@ where
                                     self.visit_expr_context(ctx);
                                 }
                             } else {
-                                error!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
                         }
                         None => {
