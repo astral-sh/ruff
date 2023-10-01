@@ -41,6 +41,13 @@ impl SourceMap {
         &self.0
     }
 
+    pub fn push_marker(&mut self, offset: TextSize, output_length: TextSize) {
+        self.0.push(SourceMarker {
+            source: offset,
+            dest: output_length,
+        });
+    }
+
     /// Push the start marker for an [`Edit`].
     ///
     /// The `output_length` is the length of the transformed string before the

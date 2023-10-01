@@ -1,21 +1,28 @@
 use std::fmt::{Display, Formatter};
+use std::fs::File;
 use std::io;
+use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::Result;
 use colored::Colorize;
+use itertools::Itertools;
 use log::error;
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
 use tracing::debug;
 
+use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
+use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
+use ruff_notebook::Notebook;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::python_files_in_path;
 use ruff_workspace::FormatterSettings;
 
@@ -64,10 +71,7 @@ pub(crate) fn format(
                 Ok(entry) => {
                     let path = entry.path();
 
-                    let SourceType::Python(
-                        source_type @ (PySourceType::Python | PySourceType::Stub),
-                    ) = SourceType::from(path)
-                    else {
+                    let SourceType::Python(source_type) = SourceType::from(path) else {
                         // Ignore any non-Python files.
                         return None;
                     };
@@ -76,7 +80,7 @@ pub(crate) fn format(
 
                     Some(
                         match catch_unwind(|| {
-                            format_path(path, &resolved_settings.formatter, source_type, mode)
+                            format_notebook(path, &resolved_settings.formatter, source_type, mode)
                         }) {
                             Ok(inner) => inner,
                             Err(error) => {
@@ -145,8 +149,17 @@ fn format_path(
     source_type: PySourceType,
     mode: FormatMode,
 ) -> Result<FormatCommandResult, FormatCommandError> {
-    let unformatted = std::fs::read_to_string(path)
-        .map_err(|err| FormatCommandError::Read(Some(path.to_path_buf()), err))?;
+    // Extract the sources from the file.
+    let source_kind = if source_type.is_ipynb() {
+        let notebook = Notebook::from_path(path).unwrap();
+        SourceKind::IpyNotebook(notebook)
+    } else {
+        let contents = std::fs::read_to_string(path)
+            .map_err(|err| FormatCommandError::Read(Some(path.to_path_buf()), err))?;
+        SourceKind::Python(contents)
+    };
+
+    let unformatted = source_kind.source_code();
 
     let options = settings.to_format_options(source_type, &unformatted);
     debug!("Formatting {} with {:?}", path.display(), options);
@@ -163,6 +176,75 @@ fn format_path(
                 .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
         }
         Ok(FormatCommandResult::Formatted)
+    }
+}
+
+/// Format the file at the given [`Path`].
+#[tracing::instrument(skip_all, fields(path = %path.display()))]
+fn format_notebook(
+    path: &Path,
+    settings: &FormatterSettings,
+    source_type: PySourceType,
+    mode: FormatMode,
+) -> Result<FormatCommandResult, FormatCommandError> {
+    // Extract the sources from the file.
+    let mut notebook = Notebook::from_path(path).unwrap();
+
+    // Format each cell individually.
+    let mut source_map = SourceMap::default();
+    let mut output = String::with_capacity(notebook.source_code().len());
+    let mut last_pos: Option<TextSize> = None;
+    for (start, end) in notebook.cell_offsets().iter().tuple_windows::<(_, _)>() {
+        let range = TextRange::new(*start, *end);
+        let unformatted = &notebook.source_code()[range];
+
+        let options = settings.to_format_options(source_type, unformatted);
+
+        // Format the cell.
+        let formatted = format_module_source(&unformatted, options)
+            .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?;
+
+        let formatted = formatted.as_code();
+        if formatted.len() == unformatted.len() && formatted == unformatted {
+            continue;
+        }
+
+        // Add all contents from `last_pos` to `fix.location`.
+        let slice =
+            &notebook.source_code()[TextRange::new(last_pos.unwrap_or_default(), range.start())];
+        output.push_str(slice);
+
+        // Add the start source marker for the patch.
+        source_map.push_marker(*start, output.text_len());
+
+        // Add the patch itself.
+        output.push_str(formatted);
+
+        // Add the end source marker for the added patch.
+        source_map.push_marker(*end, output.text_len());
+
+        // Track that the edit was applied.
+        last_pos = Some(*end);
+    }
+
+    // Add the remaining content.
+    let slice = &notebook.source_code()[usize::from(last_pos)..];
+    output.push_str(slice);
+
+    if let Some(last_pos) = last_pos {
+        if mode.is_write() {
+            notebook.update(&source_map, output);
+
+            let mut writer = BufWriter::new(
+                File::create(path)
+                    .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?,
+            );
+            notebook.write(&mut writer).unwrap()
+        }
+
+        Ok(FormatCommandResult::Formatted)
+    } else {
+        Ok(FormatCommandResult::Unchanged)
     }
 }
 
