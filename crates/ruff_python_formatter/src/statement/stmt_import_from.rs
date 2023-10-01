@@ -20,16 +20,17 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
             range: _,
         } = item;
 
-        let level_str = level
-            .map(|level| ".".repeat(level as usize))
-            .unwrap_or(String::default());
-
         write!(
             f,
             [
                 token("from"),
                 space(),
-                text(&level_str, None),
+                format_with(|f| {
+                    for _ in 0..level.unwrap_or(0) {
+                        token(".").fmt(f)?;
+                    }
+                    Ok(())
+                }),
                 module.as_ref().map(AsFormat::format),
                 space(),
                 token("import"),
