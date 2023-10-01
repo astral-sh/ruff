@@ -6,6 +6,25 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for the presence of docstrings in stub files.
+///
+/// ## Why is this bad?
+/// In stub files, docstrings should not be included, as they are meant to
+/// provide type hints and not documentation.
+///
+/// ## Example
+/// ```python
+/// def my_function(param: int) -> str:
+///     """This is a docstring."""
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def my_function(param: int) -> str:
+///     ...
+/// ```
 #[violation]
 pub struct DocstringInStub;
 
