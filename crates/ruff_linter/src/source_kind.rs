@@ -1,3 +1,7 @@
+use std::io::Write;
+
+use anyhow::Result;
+
 use ruff_diagnostics::SourceMap;
 use ruff_notebook::Notebook;
 
@@ -22,10 +26,21 @@ impl SourceKind {
         }
     }
 
+    /// Returns the Python source code for this source kind.
     pub fn source_code(&self) -> &str {
         match self {
             SourceKind::Python(source) => source,
             SourceKind::IpyNotebook(notebook) => notebook.source_code(),
+        }
+    }
+
+    /// Write the transformed source file to the given writer.
+    ///
+    /// For Jupyter notebooks, this will write out the notebook as JSON.
+    pub fn write(&self, writer: &mut dyn Write) -> Result<()> {
+        match self {
+            SourceKind::Python(source) => writer.write_all(source.as_bytes()).map_err(Into::into),
+            SourceKind::IpyNotebook(notebook) => notebook.write(writer).map_err(Into::into),
         }
     }
 }
