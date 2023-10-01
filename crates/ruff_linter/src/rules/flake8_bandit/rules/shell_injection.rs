@@ -89,17 +89,20 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 }
 
 /// ## What it does
-/// Checks for method calls that set the `shell` parameter to `true` when invoking a subprocess.
+/// Checks for method calls that set the `shell` parameter to `true` when
+/// invoking a subprocess.
 ///
 /// ## Why is this bad?
-/// Setting the `shell` parameter to `true` when invoking a subprocess can introduce security
-/// vulnerabilities, as it allows shell metacharacters and whitespace to be passed to child processes,
-/// potentially leading to shell injection attacks. It is recommended to avoid using `shell=True`
-/// unless absolutely necessary, and when used, ensure that all inputs are properly sanitized and
-/// quoted to prevent such vulnerabilities.
+/// Setting the `shell` parameter to `true` when invoking a subprocess can
+/// introduce security vulnerabilities, as it allows shell metacharacters and
+/// whitespace to be passed to child processes, potentially leading to shell
+/// injection attacks. It is recommended to avoid using `shell=True` unless
+/// absolutely necessary, and when used, ensure that all inputs are properly
+/// sanitized and quoted to prevent such vulnerabilities.
 ///
 /// ## Known problems
-/// Prone to false positives as it is triggered on any function call which has a shell=True parameter.
+/// Prone to false positives as it is triggered on any function call which has
+/// a shell=True parameter.
 ///
 /// ## Example
 /// ```python
@@ -122,8 +125,8 @@ impl Violation for CallWithShellEqualsTrue {
 }
 
 /// ## What it does
-/// Checks for functions that start a process with a shell and provides guidance
-/// on whether it seems safe or not.
+/// Checks for functions that start a process with a shell and provides
+/// guidance on whether it seems safe or not.
 ///
 /// ## Why is this bad?
 /// Starting a process with a shell can introduce security risks, such as
@@ -173,6 +176,26 @@ impl Violation for StartProcessWithAShell {
     }
 }
 
+/// ## What it does
+/// Checks for functions that start a process without a shell.
+///
+/// ## Why is this bad?
+/// The subprocess module provides more powerful facilities for spawning new
+/// processes and retrieving their results; using that module is preferable to
+/// using these functions.
+///
+/// ## Example
+/// ```python
+/// os.spawnlp(os.P_NOWAIT, "/bin/mycmd", "mycmd", "myarg")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// subprocess.Popen(["/bin/mycmd", "myarg"])
+/// ```
+///
+/// ## References
+/// - [Python documentation: Replacing Older Functions with the subprocess Module](https://docs.python.org/3/library/subprocess.html#replacing-the-os-spawn-family)
 #[violation]
 pub struct StartProcessWithNoShell;
 
