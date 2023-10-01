@@ -103,6 +103,33 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
     }
 }
 
+/// ## What it does
+/// Checks for assignments in stubs with default values that are not simple
+/// (int, float, complex, bytes, str, bool, None, ..., or simple container literals).
+///
+/// ## Why is this bad?
+/// Type checkers ignore the default value, so it's not useful for type-checking
+/// purposes. However, it may be valuable information for IDEs and other users
+/// of stubs.
+///
+/// If you're writing a stub for a function that has a more complex default
+/// value, use ... instead of trying to reproduce the runtime default exactly
+/// in the stub. Also use ... for very long numbers, very long strings, very
+/// long bytes, or defaults that vary according to the machine Python is being
+/// run on.
+///
+/// ## Example
+/// ```python
+/// foo: str = "..."
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: str = ...
+/// ```
+///
+/// ## References
+/// - [flake8-pyi Error Codes](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[violation]
 pub struct AssignmentDefaultInStub;
 
