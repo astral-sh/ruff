@@ -9,8 +9,8 @@ use crate::checkers::ast::Checker;
 /// Checks for type alias names that are not in CamelCase.
 ///
 /// ## Why is this bad?
-/// In Python, it's a convention to use CamelCase for type aliases to distinguish
-/// them from regular variable names. Using CamelCase for type aliases makes the
+/// It's a convention to use CamelCase for type aliases to distinguish them
+/// from regular variable names. Using CamelCase for type aliases makes the
 /// code more readable and follows common naming conventions.
 ///
 /// ## Example
@@ -35,6 +35,23 @@ impl Violation for SnakeCaseTypeAlias {
     }
 }
 
+/// ## What it does
+/// Checks for private type alias definitions suffixed with 'T'.
+///
+/// ## Why is this bad?
+/// It is a convention to use the 'T' suffix for type variables (`TypeVar`).
+/// When 'T' is used in a type alias for a non-type variable, it can be
+/// misleading and should be avoided.
+///
+/// ## Example
+/// ```python
+/// MyTypeT = int
+/// ```
+///
+/// Use instead:
+/// ```python
+/// MyType = int
+/// ```
 #[violation]
 pub struct TSuffixedTypeAlias {
     name: String,
