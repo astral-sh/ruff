@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -17,9 +16,9 @@ use tracing::debug;
 use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::source_kind::SourceKind;
+use ruff_linter::source_kind::{SourceKind, WriteError};
 use ruff_linter::warn_user_once;
-use ruff_notebook::Notebook;
+use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError};
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -80,7 +79,7 @@ pub(crate) fn format(
 
                     Some(
                         match catch_unwind(|| {
-                            format_notebook(path, &resolved_settings.formatter, source_type, mode)
+                            format_path(path, &resolved_settings.formatter, source_type, mode)
                         }) {
                             Ok(inner) => inner,
                             Err(error) => {
@@ -151,7 +150,11 @@ fn format_path(
 ) -> Result<FormatCommandResult, FormatCommandError> {
     // Extract the sources from the file.
     let source_kind = if source_type.is_ipynb() {
-        let notebook = Notebook::from_path(path).unwrap();
+        let notebook = Notebook::from_path(path)
+            .map_err(|err| FormatCommandError::ReadNotebook(Some(path.to_path_buf()), err))?;
+        if !notebook.is_python_notebook() {
+            return Ok(FormatCommandResult::Unchanged);
+        }
         SourceKind::IpyNotebook(notebook)
     } else {
         let contents = std::fs::read_to_string(path)
@@ -159,125 +162,52 @@ fn format_path(
         SourceKind::Python(contents)
     };
 
-    let formatted = format_source(source_kind, source_type, Some(path), settings)?;
-
-    let unformatted = source_kind.source_code();
-
-    let options = settings.to_format_options(source_type, &unformatted);
-    debug!("Formatting {} with {:?}", path.display(), options);
-
-    let formatted = format_module_source(&unformatted, options)
-        .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?;
-
-    let formatted = formatted.as_code();
-    if formatted.len() == unformatted.len() && formatted == unformatted {
-        Ok(FormatCommandResult::Unchanged)
-    } else {
+    // Format the source.
+    if let Some(source_kind) = format_source(&source_kind, source_type, Some(path), settings)? {
         if mode.is_write() {
-            std::fs::write(path, formatted.as_bytes())
+            let mut writer = File::create(path)
                 .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
+            source_kind.write(&mut writer).map_err(|err| match err {
+                WriteError::Io(err) => FormatCommandError::Write(Some(path.to_path_buf()), err),
+                WriteError::Notebook(err) => {
+                    FormatCommandError::WriteNotebook(Some(path.to_path_buf()), err)
+                }
+            })?;
         }
-        Ok(FormatCommandResult::Formatted)
-    }
-}
-
-/// Format the file at the given [`Path`].
-#[tracing::instrument(skip_all, fields(path = %path.display()))]
-fn format_notebook(
-    path: &Path,
-    settings: &FormatterSettings,
-    source_type: PySourceType,
-    mode: FormatMode,
-) -> Result<FormatCommandResult, FormatCommandError> {
-    // Extract the sources from the file.
-    let mut notebook = Notebook::from_path(path).unwrap();
-
-    // Format each cell individually.
-    let mut source_map = SourceMap::default();
-    let mut output = String::with_capacity(notebook.source_code().len());
-    let mut last_pos: Option<TextSize> = None;
-    for (start, end) in notebook.cell_offsets().iter().tuple_windows::<(_, _)>() {
-        let range = TextRange::new(*start, *end);
-        let unformatted = &notebook.source_code()[range];
-
-        let options = settings.to_format_options(source_type, unformatted);
-
-        // Format the cell.
-        let formatted = format_module_source(&unformatted, options)
-            .map_err(|err| FormatCommandError::FormatModule(Some(path.to_path_buf()), err))?;
-
-        let formatted = formatted.as_code();
-        if formatted.len() == unformatted.len() && formatted == unformatted {
-            continue;
-        }
-
-        // Add all contents from `last_pos` to `fix.location`.
-        let slice =
-            &notebook.source_code()[TextRange::new(last_pos.unwrap_or_default(), range.start())];
-        output.push_str(slice);
-
-        // Add the start source marker for the patch.
-        source_map.push_marker(*start, output.text_len());
-
-        // Add the patch itself.
-        output.push_str(formatted);
-
-        // Add the end source marker for the added patch.
-        source_map.push_marker(*end, output.text_len());
-
-        // Track that the edit was applied.
-        last_pos = Some(*end);
-    }
-
-    // Add the remaining content.
-    let slice = &notebook.source_code()[usize::from(last_pos)..];
-    output.push_str(slice);
-
-    if let Some(last_pos) = last_pos {
-        if mode.is_write() {
-            notebook.update(&source_map, output);
-
-            let mut writer = BufWriter::new(
-                File::create(path)
-                    .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?,
-            );
-            notebook.write(&mut writer).unwrap()
-        }
-
         Ok(FormatCommandResult::Formatted)
     } else {
         Ok(FormatCommandResult::Unchanged)
     }
 }
 
-fn format_source<'a>(
-    source_kind: SourceKind,
+/// Format a [`SourceKind`], returning the transformed [`SourceKind`], or `None` if the source was
+/// unchanged.
+pub(crate) fn format_source(
+    source_kind: &SourceKind,
     source_type: PySourceType,
     path: Option<&Path>,
     settings: &FormatterSettings,
-) -> Result<Option<String>, FormatCommandError> {
+) -> Result<Option<SourceKind>, FormatCommandError> {
     match source_kind {
         SourceKind::Python(unformatted) => {
             let options = settings.to_format_options(source_type, &unformatted);
 
-            let formatted = format_module_source(&unformatted, options).map_err(|err| {
-                FormatCommandError::FormatModule(path.map(Path::to_path_buf), err)
-            })?;
+            let formatted = format_module_source(&unformatted, options)
+                .map_err(|err| FormatCommandError::Format(path.map(Path::to_path_buf), err))?;
 
             let formatted = formatted.into_code();
-            Ok(
-                if formatted.len() == unformatted.len() && formatted == unformatted {
-                    None
-                } else {
-                    Some(formatted)
-                },
-            )
+            if formatted.len() == unformatted.len() && formatted == *unformatted {
+                Ok(None)
+            } else {
+                Ok(Some(SourceKind::Python(formatted)))
+            }
         }
-        SourceKind::IpyNotebook(mut notebook) => {
-            // Format each cell individually.
-            let mut source_map = SourceMap::default();
+        SourceKind::IpyNotebook(notebook) => {
             let mut output = String::with_capacity(notebook.source_code().len());
-            let mut last_pos: Option<TextSize> = None;
+            let mut source_map = SourceMap::default();
+            let mut last: Option<TextSize> = None;
+
+            // Format each cell individually.
             for (start, end) in notebook.cell_offsets().iter().tuple_windows::<(_, _)>() {
                 let range = TextRange::new(*start, *end);
                 let unformatted = &notebook.source_code()[range];
@@ -285,41 +215,47 @@ fn format_source<'a>(
                 let options = settings.to_format_options(source_type, unformatted);
 
                 // Format the cell.
-                let formatted = format_module_source(&unformatted, options).map_err(|err| {
-                    FormatCommandError::FormatModule(Some(path.to_path_buf()), err)
-                })?;
+                let formatted = format_module_source(&unformatted, options)
+                    .map_err(|err| FormatCommandError::Format(path.map(Path::to_path_buf), err))?;
 
+                // If the cell is unchanged, skip it.
                 let formatted = formatted.as_code();
                 if formatted.len() == unformatted.len() && formatted == unformatted {
                     continue;
                 }
 
-                // Add all contents from `last_pos` to `fix.location`.
+                // Add all contents from `last` to the current cell.
                 let slice = &notebook.source_code()
-                    [TextRange::new(last_pos.unwrap_or_default(), range.start())];
+                    [TextRange::new(last.unwrap_or_default(), range.start())];
                 output.push_str(slice);
 
-                // Add the start source marker for the patch.
+                // Add the start source marker for the cell.
                 source_map.push_marker(*start, output.text_len());
 
-                // Add the patch itself.
+                // Add the cell itself.
                 output.push_str(formatted);
 
-                // Add the end source marker for the added patch.
+                // Add the end source marker for the added cell.
                 source_map.push_marker(*end, output.text_len());
 
-                // Track that the edit was applied.
-                last_pos = Some(*end);
+                // Track that the cell was formatted.
+                last = Some(*end);
             }
 
-            Ok(if let Some(last_pos) = last_pos {
-                // Add the remaining content.
-                let slice = &notebook.source_code()[usize::from(last_pos)..];
-                output.push_str(slice);
-                Some(output)
-            } else {
-                None
-            })
+            // If the file was unchanged, return `None`.
+            let Some(last) = last else {
+                return Ok(None);
+            };
+
+            // Add the remaining content.
+            let slice = &notebook.source_code()[usize::from(last)..];
+            output.push_str(slice);
+
+            // Update the notebook.
+            let mut notebook = notebook.clone();
+            notebook.update(&source_map, output);
+
+            Ok(Some(SourceKind::IpyNotebook(notebook)))
         }
     }
 }
@@ -401,11 +337,14 @@ impl Display for FormatResultSummary {
 /// An error that can occur while formatting a set of files.
 #[derive(Error, Debug)]
 pub(crate) enum FormatCommandError {
+    // Generic errors.
     Ignore(#[from] ignore::Error),
-    Read(Option<PathBuf>, io::Error),
-    Write(Option<PathBuf>, io::Error),
-    FormatModule(Option<PathBuf>, FormatModuleError),
     Panic(Option<PathBuf>, PanicError),
+    Read(Option<PathBuf>, io::Error),
+    Format(Option<PathBuf>, FormatModuleError),
+    Write(Option<PathBuf>, io::Error),
+    ReadNotebook(Option<PathBuf>, NotebookError),
+    WriteNotebook(Option<PathBuf>, NotebookError),
 }
 
 impl Display for FormatCommandError {
@@ -458,7 +397,7 @@ impl Display for FormatCommandError {
                     write!(f, "{}{} {err}", "Failed to write".bold(), ":".bold())
                 }
             }
-            Self::FormatModule(path, err) => {
+            Self::Format(path, err) => {
                 if let Some(path) = path {
                     write!(
                         f,
@@ -469,6 +408,42 @@ impl Display for FormatCommandError {
                     )
                 } else {
                     write!(f, "{}{} {err}", "Failed to format".bold(), ":".bold())
+                }
+            }
+            Self::ReadNotebook(path, err) => {
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{}{}{} {err}",
+                        "Failed to read notebook ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{}{} {err}",
+                        "Failed to read notebook".bold(),
+                        ":".bold()
+                    )
+                }
+            }
+            Self::WriteNotebook(path, err) => {
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{}{}{} {err}",
+                        "Failed to write notebook ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{}{} {err}",
+                        "Failed to write notebook".bold(),
+                        ":".bold()
+                    )
                 }
             }
             Self::Panic(path, err) => {
