@@ -157,11 +157,6 @@ impl Violation for UnannotatedAssignmentInStub {
     }
 }
 
-#[violation]
-pub struct UnassignedSpecialVariableInStub {
-    name: String,
-}
-
 /// ## What it does
 /// Checks that `__all__`, `__match_args__`, and `__slots__` variables are
 /// assigned to values when defined in stub files.
@@ -180,6 +175,11 @@ pub struct UnassignedSpecialVariableInStub {
 /// ```python
 /// __all__: list[str] = ["foo", "bar"]
 /// ```
+#[violation]
+pub struct UnassignedSpecialVariableInStub {
+    name: String,
+}
+
 impl Violation for UnassignedSpecialVariableInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
