@@ -88,6 +88,29 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
     }
 }
 
+/// ## What it does
+/// Checks for method calls that set the `shell` parameter to `true` when invoking a subprocess.
+///
+/// ## Why is this bad?
+/// Setting the `shell` parameter to `true` when invoking a subprocess can introduce security
+/// vulnerabilities, as it allows shell metacharacters and whitespace to be passed to child processes,
+/// potentially leading to shell injection attacks. It is recommended to avoid using `shell=True`
+/// unless absolutely necessary, and when used, ensure that all inputs are properly sanitized and
+/// quoted to prevent such vulnerabilities.
+///
+/// ## Known problems
+/// Prone to false positives as it is triggered on any function call which has a shell=True parameter.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// user_input = input("Enter a command: ")
+/// subprocess.run(user_input, shell=True)  # This triggers the violation.
+/// ```
+///
+/// ## References
+/// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html#security-considerations)
 #[violation]
 pub struct CallWithShellEqualsTrue;
 
