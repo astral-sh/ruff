@@ -159,6 +159,8 @@ fn format_path(
         SourceKind::Python(contents)
     };
 
+    let formatted = format_source(source_kind, source_type, Some(path), settings)?;
+
     let unformatted = source_kind.source_code();
 
     let options = settings.to_format_options(source_type, &unformatted);
@@ -245,6 +247,80 @@ fn format_notebook(
         Ok(FormatCommandResult::Formatted)
     } else {
         Ok(FormatCommandResult::Unchanged)
+    }
+}
+
+fn format_source<'a>(
+    source_kind: SourceKind,
+    source_type: PySourceType,
+    path: Option<&Path>,
+    settings: &FormatterSettings,
+) -> Result<Option<String>, FormatCommandError> {
+    match source_kind {
+        SourceKind::Python(unformatted) => {
+            let options = settings.to_format_options(source_type, &unformatted);
+
+            let formatted = format_module_source(&unformatted, options).map_err(|err| {
+                FormatCommandError::FormatModule(path.map(Path::to_path_buf), err)
+            })?;
+
+            let formatted = formatted.into_code();
+            Ok(
+                if formatted.len() == unformatted.len() && formatted == unformatted {
+                    None
+                } else {
+                    Some(formatted)
+                },
+            )
+        }
+        SourceKind::IpyNotebook(mut notebook) => {
+            // Format each cell individually.
+            let mut source_map = SourceMap::default();
+            let mut output = String::with_capacity(notebook.source_code().len());
+            let mut last_pos: Option<TextSize> = None;
+            for (start, end) in notebook.cell_offsets().iter().tuple_windows::<(_, _)>() {
+                let range = TextRange::new(*start, *end);
+                let unformatted = &notebook.source_code()[range];
+
+                let options = settings.to_format_options(source_type, unformatted);
+
+                // Format the cell.
+                let formatted = format_module_source(&unformatted, options).map_err(|err| {
+                    FormatCommandError::FormatModule(Some(path.to_path_buf()), err)
+                })?;
+
+                let formatted = formatted.as_code();
+                if formatted.len() == unformatted.len() && formatted == unformatted {
+                    continue;
+                }
+
+                // Add all contents from `last_pos` to `fix.location`.
+                let slice = &notebook.source_code()
+                    [TextRange::new(last_pos.unwrap_or_default(), range.start())];
+                output.push_str(slice);
+
+                // Add the start source marker for the patch.
+                source_map.push_marker(*start, output.text_len());
+
+                // Add the patch itself.
+                output.push_str(formatted);
+
+                // Add the end source marker for the added patch.
+                source_map.push_marker(*end, output.text_len());
+
+                // Track that the edit was applied.
+                last_pos = Some(*end);
+            }
+
+            Ok(if let Some(last_pos) = last_pos {
+                // Add the remaining content.
+                let slice = &notebook.source_code()[usize::from(last_pos)..];
+                output.push_str(slice);
+                Some(output)
+            } else {
+                None
+            })
+        }
     }
 }
 
