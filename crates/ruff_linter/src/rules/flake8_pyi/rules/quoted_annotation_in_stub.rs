@@ -6,6 +6,23 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for quoted type annotations in stub files, which should be avoided.
+///
+/// ## Why is this bad?
+/// Type annotations aren't required to be quoted inside type stubs.
+///
+/// ## Example
+/// ```python
+/// def my_function() -> 'int':
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def my_function() -> int:
+///     ...
+/// ```
 #[violation]
 pub struct QuotedAnnotationInStub;
 
