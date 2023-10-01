@@ -5,6 +5,23 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for type alias names that are not in CamelCase.
+///
+/// ## Why is this bad?
+/// In Python, it's a convention to use CamelCase for type aliases to distinguish
+/// them from regular variable names. Using CamelCase for type aliases makes the
+/// code more readable and follows common naming conventions.
+///
+/// ## Example
+/// ```python
+/// type_alias_name: TypeAlias = int
+/// ```
+///
+/// Use instead:
+/// ```python
+/// TypeAliasName: TypeAlias = int
+/// ```
 #[violation]
 pub struct SnakeCaseTypeAlias {
     name: String,
