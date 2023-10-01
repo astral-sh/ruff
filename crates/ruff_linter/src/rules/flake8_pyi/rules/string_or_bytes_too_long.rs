@@ -8,9 +8,6 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-#[violation]
-pub struct StringOrBytesTooLong;
-
 /// ## What it does
 /// Checks for the use of string and bytes literals longer than 50 characters.
 ///
@@ -30,6 +27,9 @@ pub struct StringOrBytesTooLong;
 /// ```python
 /// def foo(arg: str = ...) -> None: ...
 /// ```
+#[violation]
+pub struct StringOrBytesTooLong;
+
 impl AlwaysFixableViolation for StringOrBytesTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
