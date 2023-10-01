@@ -5,6 +5,13 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for the presence of the `from __future__ import annotations` import
+/// statement in stub files.
+///
+/// Why is this bad?
+/// Stub files already have the semantics of the annotations feature and thus
+/// this import statement is not required.
 #[violation]
 pub struct FutureAnnotationsInStub;
 
