@@ -1,6 +1,7 @@
 use ruff_formatter::write;
 use ruff_python_ast::Alias;
 
+use crate::other::identifier::DotDelimitedIdentifier;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -13,7 +14,7 @@ impl FormatNodeRule<Alias> for FormatAlias {
             name,
             asname,
         } = item;
-        name.format().fmt(f)?;
+        DotDelimitedIdentifier::new(name).fmt(f)?;
         if let Some(asname) = asname {
             write!(f, [space(), token("as"), space(), asname.format()])?;
         }
