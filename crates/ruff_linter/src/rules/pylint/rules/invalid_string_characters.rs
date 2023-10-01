@@ -180,7 +180,9 @@ pub(crate) fn invalid_string_characters(
 ) {
     let text = match tok {
         Tok::String { .. } => locator.slice(range),
-        Tok::FStringMiddle { value, .. } => value.as_str(),
+        // The string value has already decoded escaped curly braces, which would gives us wrong
+        // column information
+        Tok::FStringMiddle { .. } => &locator.contents()[range],
         _ => return,
     };
 
