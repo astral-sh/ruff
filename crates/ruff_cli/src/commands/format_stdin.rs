@@ -4,8 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 use log::warn;
 
-use ruff_linter::source_kind::{SourceKind, WriteError};
-use ruff_notebook::Notebook;
+use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::python_file_at_path;
 use ruff_workspace::FormatterSettings;
@@ -36,13 +35,13 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
         }
     }
 
-    // Format the file.
     let path = cli.stdin_filename.as_deref();
 
     let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
         return Ok(ExitStatus::Success);
     };
 
+    // Format the file.
     match format_source_code(
         path,
         &pyproject_config.settings.formatter,
@@ -75,40 +74,26 @@ fn format_source_code(
 ) -> Result<FormatCommandResult, FormatCommandError> {
     // Read the source from stdin.
     let source_code = read_from_stdin()
-        .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err))?;
-    let source_kind = if source_type.is_ipynb() {
-        let notebook = Notebook::from_source_code(&source_code)
-            .map_err(|err| FormatCommandError::ReadNotebook(path.map(Path::to_path_buf), err))?;
-        if !notebook.is_python_notebook() {
-            return Ok(FormatCommandResult::Unchanged);
-        }
-        SourceKind::IpyNotebook(notebook)
-    } else {
-        SourceKind::Python(source_code)
-    };
+        .map_err(|err| FormatCommandError::Read(path.map(Into::into), err.into()))?;
+    let source_kind = SourceKind::from_source_code(source_code, source_type)
+        .map_err(|err| FormatCommandError::Read(path.map(Into::into), err))?;
 
     // Format the source, and write to stdout regardless of the mode.
     if let Some(formatted) = format_source(&source_kind, source_type, path, settings)? {
         if mode.is_write() {
             let mut writer = stdout().lock();
-            formatted.write(&mut writer).map_err(|err| match err {
-                WriteError::Io(err) => FormatCommandError::Write(path.map(Path::to_path_buf), err),
-                WriteError::Notebook(err) => {
-                    FormatCommandError::WriteNotebook(path.map(Path::to_path_buf), err)
-                }
-            })?;
+            formatted
+                .write(&mut writer)
+                .map_err(|err| FormatCommandError::Write(path.map(Into::into), err))?;
         }
 
         Ok(FormatCommandResult::Formatted)
     } else {
         if mode.is_write() {
             let mut writer = stdout().lock();
-            source_kind.write(&mut writer).map_err(|err| match err {
-                WriteError::Io(err) => FormatCommandError::Write(path.map(Path::to_path_buf), err),
-                WriteError::Notebook(err) => {
-                    FormatCommandError::WriteNotebook(path.map(Path::to_path_buf), err)
-                }
-            })?;
+            source_kind
+                .write(&mut writer)
+                .map_err(|err| FormatCommandError::Write(path.map(Into::into), err))?;
         }
 
         Ok(FormatCommandResult::Unchanged)

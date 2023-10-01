@@ -1,11 +1,13 @@
 use std::io;
 use std::io::Write;
+use std::path::Path;
 
 use anyhow::Result;
 use thiserror::Error;
 
 use ruff_diagnostics::SourceMap;
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum SourceKind {
@@ -36,10 +38,34 @@ impl SourceKind {
         }
     }
 
+    /// Read the source kind from the given path.
+    pub fn from_path(path: &Path, source_type: PySourceType) -> Result<Self, SourceReadError> {
+        if source_type.is_ipynb() {
+            let notebook = Notebook::from_path(path)?;
+            Ok(Self::IpyNotebook(notebook))
+        } else {
+            let contents = std::fs::read_to_string(path)?;
+            Ok(Self::Python(contents))
+        }
+    }
+
+    /// Read the source kind from the given source code.
+    pub fn from_source_code(
+        source_code: String,
+        source_type: PySourceType,
+    ) -> Result<Self, SourceReadError> {
+        if source_type.is_ipynb() {
+            let notebook = Notebook::from_source_code(&source_code)?;
+            Ok(Self::IpyNotebook(notebook))
+        } else {
+            Ok(Self::Python(source_code))
+        }
+    }
+
     /// Write the transformed source file to the given writer.
     ///
     /// For Jupyter notebooks, this will write out the notebook as JSON.
-    pub fn write(&self, writer: &mut dyn Write) -> Result<(), WriteError> {
+    pub fn write(&self, writer: &mut dyn Write) -> Result<(), SourceWriteError> {
         match self {
             SourceKind::Python(source) => writer.write_all(source.as_bytes()).map_err(Into::into),
             SourceKind::IpyNotebook(notebook) => notebook.write(writer).map_err(Into::into),
@@ -48,7 +74,15 @@ impl SourceKind {
 }
 
 #[derive(Error, Debug)]
-pub enum WriteError {
+pub enum SourceReadError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Notebook(#[from] NotebookError),
+}
+
+#[derive(Error, Debug)]
+pub enum SourceWriteError {
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]

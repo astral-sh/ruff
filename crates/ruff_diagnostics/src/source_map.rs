@@ -41,22 +41,12 @@ impl SourceMap {
         &self.0
     }
 
-    pub fn push_marker(&mut self, offset: TextSize, output_length: TextSize) {
-        self.0.push(SourceMarker {
-            source: offset,
-            dest: output_length,
-        });
-    }
-
     /// Push the start marker for an [`Edit`].
     ///
     /// The `output_length` is the length of the transformed string before the
     /// edit is applied.
     pub fn push_start_marker(&mut self, edit: &Edit, output_length: TextSize) {
-        self.0.push(SourceMarker {
-            source: edit.start(),
-            dest: output_length,
-        });
+        self.push_marker(edit.start(), output_length);
     }
 
     /// Push the end marker for an [`Edit`].
@@ -65,16 +55,18 @@ impl SourceMap {
     /// edit has been applied.
     pub fn push_end_marker(&mut self, edit: &Edit, output_length: TextSize) {
         if edit.is_insertion() {
-            self.0.push(SourceMarker {
-                source: edit.start(),
-                dest: output_length,
-            });
+            self.push_marker(edit.start(), output_length);
         } else {
             // Deletion or replacement
-            self.0.push(SourceMarker {
-                source: edit.end(),
-                dest: output_length,
-            });
+            self.push_marker(edit.end(), output_length);
         }
+    }
+
+    /// Push a new marker to the sourcemap.
+    pub fn push_marker(&mut self, offset: TextSize, output_length: TextSize) {
+        self.0.push(SourceMarker {
+            source: offset,
+            dest: output_length,
+        });
     }
 }

@@ -1,6 +1,5 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -16,9 +15,8 @@ use tracing::debug;
 use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::source_kind::{SourceKind, WriteError};
+use ruff_linter::source_kind::{SourceKind, SourceReadError, SourceWriteError};
 use ruff_linter::warn_user_once;
-use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError};
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -149,30 +147,17 @@ fn format_path(
     mode: FormatMode,
 ) -> Result<FormatCommandResult, FormatCommandError> {
     // Extract the sources from the file.
-    let source_kind = if source_type.is_ipynb() {
-        let notebook = Notebook::from_path(path)
-            .map_err(|err| FormatCommandError::ReadNotebook(Some(path.to_path_buf()), err))?;
-        if !notebook.is_python_notebook() {
-            return Ok(FormatCommandResult::Unchanged);
-        }
-        SourceKind::IpyNotebook(notebook)
-    } else {
-        let contents = std::fs::read_to_string(path)
-            .map_err(|err| FormatCommandError::Read(Some(path.to_path_buf()), err))?;
-        SourceKind::Python(contents)
-    };
+    let source_kind = SourceKind::from_path(path, source_type)
+        .map_err(|err| FormatCommandError::Read(Some(path.to_path_buf()), err))?;
 
     // Format the source.
     if let Some(source_kind) = format_source(&source_kind, source_type, Some(path), settings)? {
         if mode.is_write() {
             let mut writer = File::create(path)
+                .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err.into()))?;
+            source_kind
+                .write(&mut writer)
                 .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
-            source_kind.write(&mut writer).map_err(|err| match err {
-                WriteError::Io(err) => FormatCommandError::Write(Some(path.to_path_buf()), err),
-                WriteError::Notebook(err) => {
-                    FormatCommandError::WriteNotebook(Some(path.to_path_buf()), err)
-                }
-            })?;
         }
         Ok(FormatCommandResult::Formatted)
     } else {
@@ -190,9 +175,9 @@ pub(crate) fn format_source(
 ) -> Result<Option<SourceKind>, FormatCommandError> {
     match source_kind {
         SourceKind::Python(unformatted) => {
-            let options = settings.to_format_options(source_type, &unformatted);
+            let options = settings.to_format_options(source_type, unformatted);
 
-            let formatted = format_module_source(&unformatted, options)
+            let formatted = format_module_source(unformatted, options)
                 .map_err(|err| FormatCommandError::Format(path.map(Path::to_path_buf), err))?;
 
             let formatted = formatted.into_code();
@@ -203,6 +188,10 @@ pub(crate) fn format_source(
             }
         }
         SourceKind::IpyNotebook(notebook) => {
+            if !notebook.is_python_notebook() {
+                return Ok(None);
+            }
+
             let mut output = String::with_capacity(notebook.source_code().len());
             let mut source_map = SourceMap::default();
             let mut last: Option<TextSize> = None;
@@ -215,7 +204,7 @@ pub(crate) fn format_source(
                 let options = settings.to_format_options(source_type, unformatted);
 
                 // Format the cell.
-                let formatted = format_module_source(&unformatted, options)
+                let formatted = format_module_source(unformatted, options)
                     .map_err(|err| FormatCommandError::Format(path.map(Path::to_path_buf), err))?;
 
                 // If the cell is unchanged, skip it.
@@ -337,14 +326,11 @@ impl Display for FormatResultSummary {
 /// An error that can occur while formatting a set of files.
 #[derive(Error, Debug)]
 pub(crate) enum FormatCommandError {
-    // Generic errors.
     Ignore(#[from] ignore::Error),
     Panic(Option<PathBuf>, PanicError),
-    Read(Option<PathBuf>, io::Error),
+    Read(Option<PathBuf>, SourceReadError),
     Format(Option<PathBuf>, FormatModuleError),
-    Write(Option<PathBuf>, io::Error),
-    ReadNotebook(Option<PathBuf>, NotebookError),
-    WriteNotebook(Option<PathBuf>, NotebookError),
+    Write(Option<PathBuf>, SourceWriteError),
 }
 
 impl Display for FormatCommandError {
@@ -408,42 +394,6 @@ impl Display for FormatCommandError {
                     )
                 } else {
                     write!(f, "{}{} {err}", "Failed to format".bold(), ":".bold())
-                }
-            }
-            Self::ReadNotebook(path, err) => {
-                if let Some(path) = path {
-                    write!(
-                        f,
-                        "{}{}{} {err}",
-                        "Failed to read notebook ".bold(),
-                        fs::relativize_path(path).bold(),
-                        ":".bold()
-                    )
-                } else {
-                    write!(
-                        f,
-                        "{}{} {err}",
-                        "Failed to read notebook".bold(),
-                        ":".bold()
-                    )
-                }
-            }
-            Self::WriteNotebook(path, err) => {
-                if let Some(path) = path {
-                    write!(
-                        f,
-                        "{}{}{} {err}",
-                        "Failed to write notebook ".bold(),
-                        fs::relativize_path(path).bold(),
-                        ":".bold()
-                    )
-                } else {
-                    write!(
-                        f,
-                        "{}{} {err}",
-                        "Failed to write notebook".bold(),
-                        ":".bold()
-                    )
                 }
             }
             Self::Panic(path, err) => {
