@@ -5,6 +5,12 @@ use ruff_python_ast::Stmt;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for functions in stub files which contain multiple statements.
+///
+/// ## Why is this bad?
+/// Function bodies in stub files should not have functional code.
+/// They should be replaced with `...`
 #[violation]
 pub struct StubBodyMultipleStatements;
 
