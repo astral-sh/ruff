@@ -178,6 +178,12 @@ impl<'a> StringParser<'a> {
                     'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
                     // Special cases where the escape sequence is not a single character
                     '\n' => return Ok(String::new()),
+                    '\r' => {
+                        if self.peek() == Some('\n') {
+                            self.next_char();
+                        }
+                        return Ok(String::new());
+                    }
                     c => {
                         if self.kind.is_any_bytes() && !c.is_ascii() {
                             return Err(LexicalError {
@@ -558,9 +564,36 @@ impl From<FStringError> for crate::parser::LalrpopError<TextSize, Tok, LexicalEr
 mod tests {
     use crate::lexer::LexicalErrorType;
     use crate::parser::parse_suite;
-    use crate::ParseErrorType;
+    use crate::{ParseErrorType, Suite};
 
     use super::*;
+
+    const WINDOWS_EOL: &str = "\r\n";
+    const MAC_EOL: &str = "\r";
+    const UNIX_EOL: &str = "\n";
+
+    fn string_parser_escaped_eol(eol: &str) -> Suite {
+        let source = format!(r"'text \{eol}more text'");
+        parse_suite(&source, "<test>").unwrap()
+    }
+
+    #[test]
+    fn test_string_parser_escaped_unix_eol() {
+        let parse_ast = string_parser_escaped_eol(UNIX_EOL);
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_string_parser_escaped_mac_eol() {
+        let parse_ast = string_parser_escaped_eol(MAC_EOL);
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_string_parser_escaped_windows_eol() {
+        let parse_ast = string_parser_escaped_eol(WINDOWS_EOL);
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 
     #[test]
     fn test_parse_fstring() {
