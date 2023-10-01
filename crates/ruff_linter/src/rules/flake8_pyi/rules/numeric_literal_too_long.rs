@@ -7,9 +7,6 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-#[violation]
-pub struct NumericLiteralTooLong;
-
 /// ## What it does
 /// Checks for numeric literals with a string representation longer than ten
 /// characters.
@@ -30,6 +27,9 @@ pub struct NumericLiteralTooLong;
 /// ```python
 /// def foo(arg: int = ...) -> None: ...
 /// ```
+#[violation]
+pub struct NumericLiteralTooLong;
+
 impl AlwaysFixableViolation for NumericLiteralTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
