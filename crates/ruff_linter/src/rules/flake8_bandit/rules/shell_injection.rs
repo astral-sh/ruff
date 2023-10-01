@@ -121,6 +121,42 @@ impl Violation for CallWithShellEqualsTrue {
     }
 }
 
+/// ## What it does
+/// Checks for functions that start a process with a shell and provides guidance
+/// on whether it seems safe or not.
+///
+/// ## Why is this bad?
+/// Starting a process with a shell can introduce security risks, such as
+/// possible code injection vulnerabilities. It's important to be aware of
+/// whether the usage of the shell is safe or not.
+///
+/// ## How it works
+/// This rule triggers on functions like `os.system`, `popen`, etc., which
+/// start processes with a shell. It evaluates whether the provided command
+/// is a literal string or an expression. If the command is a literal string,
+/// it considers it safe. If the command is an expression, it assumes it is
+/// potentially unsafe.
+///
+/// ## Example
+/// ```python
+/// import os
+///
+/// # Safe usage (literal string)
+/// command = "ls -l"
+/// os.system(command)
+///
+/// # Potentially unsafe usage (expression)
+/// cmd = get_user_input()
+/// os.system(cmd)
+/// ```
+///
+/// ## Note
+/// The `subprocess` module provides more powerful facilities for spawning new
+/// processes and retrieving their results, and using that module is preferable
+/// to using `os.system` or similar functions. Consider replacing such usages
+/// with `subprocess.call` or related functions.
+///
+/// [Learn more](https://docs.python.org/3/library/subprocess.html)
 #[violation]
 pub struct StartProcessWithAShell {
     seems_safe: bool,
