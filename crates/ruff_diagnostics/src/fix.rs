@@ -88,7 +88,7 @@ impl Fix {
     /// Create a new [`Fix`] with [automatic applicability](Applicability::Automatic) from multiple [`Edit`] elements.
     pub fn automatic_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
-        edits.sort_by_key(Ranged::start);
+        edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
             applicability: Applicability::Automatic,
@@ -108,7 +108,7 @@ impl Fix {
     /// Create a new [`Fix`] with [suggested applicability](Applicability::Suggested) from multiple [`Edit`] elements.
     pub fn suggested_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
-        edits.sort_by_key(Ranged::start);
+        edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
             applicability: Applicability::Suggested,
@@ -128,7 +128,7 @@ impl Fix {
     /// Create a new [`Fix`] with [manual applicability](Applicability::Manual) from multiple [`Edit`] elements.
     pub fn manual_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
-        edits.sort_by_key(Ranged::start);
+        edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
             applicability: Applicability::Manual,

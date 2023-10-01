@@ -40,7 +40,8 @@ mod tests {
         feature = "unreachable-code",
         test_case(Rule::UnreachableCode, Path::new("RUF014.py"))
     )]
-    #[test_case(Rule::QuadraticListSummation, Path::new("RUF017.py"))]
+    #[test_case(Rule::QuadraticListSummation, Path::new("RUF017_1.py"))]
+    #[test_case(Rule::QuadraticListSummation, Path::new("RUF017_0.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
