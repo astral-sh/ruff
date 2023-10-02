@@ -179,8 +179,9 @@ pub(crate) fn invalid_string_characters(
     locator: &Locator,
 ) {
     let text = match tok {
-        Tok::String { .. } => locator.slice(range),
-        Tok::FStringMiddle { value, .. } => value.as_str(),
+        // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
+        // brace that escaped another curly brace, which would gives us wrong column information.
+        Tok::String { .. } | Tok::FStringMiddle { .. } => locator.slice(range),
         _ => return,
     };
 
