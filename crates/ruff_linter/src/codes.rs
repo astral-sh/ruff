@@ -262,6 +262,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0602") => (RuleGroup::Unspecified, rules::pylint::rules::GlobalVariableNotAssigned),
         (Pylint, "W0603") => (RuleGroup::Unspecified, rules::pylint::rules::GlobalStatement),
         (Pylint, "W0711") => (RuleGroup::Unspecified, rules::pylint::rules::BinaryOpException),
+        (Pylint, "W1501") => (RuleGroup::Unspecified, rules::pylint::rules::BadOpenMode),
         (Pylint, "W1508") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidEnvvarDefault),
         (Pylint, "W1509") => (RuleGroup::Unspecified, rules::pylint::rules::SubprocessPopenPreexecFn),
         (Pylint, "W1510") => (RuleGroup::Unspecified, rules::pylint::rules::SubprocessRunWithoutCheck),
