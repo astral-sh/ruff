@@ -3,7 +3,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::traversal;
@@ -43,7 +43,7 @@ pub struct ReimplementedBuiltin {
 }
 
 impl Violation for ReimplementedBuiltin {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -99,7 +99,11 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
             if LineWidthBuilder::new(checker.settings.tab_size)
-                .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt.start())])
+                .add_str(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(line_start, stmt.start())),
+                )
                 .add_str(&contents)
                 > checker.settings.line_length
             {
@@ -181,7 +185,11 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
             if LineWidthBuilder::new(checker.settings.tab_size)
-                .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt.start())])
+                .add_str(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(line_start, stmt.start())),
+                )
                 .add_str(&contents)
                 > checker.settings.line_length
             {

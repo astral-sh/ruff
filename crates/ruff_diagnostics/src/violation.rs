@@ -1,26 +1,26 @@
 use std::fmt::{Debug, Display};
 
 #[derive(Debug, Copy, Clone)]
-pub enum FixKind {
+pub enum FixAvailability {
     Sometimes,
     Always,
     None,
 }
 
-impl Display for FixKind {
+impl Display for FixAvailability {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FixKind::Sometimes => write!(f, "Fix is sometimes available."),
-            FixKind::Always => write!(f, "Fix is always available."),
-            FixKind::None => write!(f, "Fix is not available."),
+            FixAvailability::Sometimes => write!(f, "Fix is sometimes available."),
+            FixAvailability::Always => write!(f, "Fix is always available."),
+            FixAvailability::None => write!(f, "Fix is not available."),
         }
     }
 }
 
 pub trait Violation: Debug + PartialEq + Eq {
     /// `None` in the case an fix is never available or otherwise Some
-    /// [`FixKind`] describing the available fix.
-    const FIX_KIND: FixKind = FixKind::None;
+    /// [`FixAvailability`] describing the available fix.
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     /// The message used to describe the violation.
     fn message(&self) -> String;
@@ -65,7 +65,7 @@ pub trait AlwaysFixableViolation: Debug + PartialEq + Eq {
 
 /// A blanket implementation.
 impl<V: AlwaysFixableViolation> Violation for V {
-    const FIX_KIND: FixKind = FixKind::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     fn message(&self) -> String {
         <Self as AlwaysFixableViolation>::message(self)

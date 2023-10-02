@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -35,7 +35,7 @@ pub struct IfExprWithTrueFalse {
 }
 
 impl Violation for IfExprWithTrueFalse {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

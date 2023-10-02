@@ -48,6 +48,8 @@ invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, 
 54 | 
 55 | nested_fstrings = f'{f'{f''}'}'
    |                      PLE2510
+56 | 
+57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
    |
    = help: Replace with escape sequence
 
@@ -57,5 +59,8 @@ invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, 
 54 54 | 
 55    |-nested_fstrings = f'{f'{f''}'}'
    55 |+nested_fstrings = f'\b{f'{f''}'}'
+56 56 | 
+57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
+58 58 | x = f"""}}ab"""
 
 

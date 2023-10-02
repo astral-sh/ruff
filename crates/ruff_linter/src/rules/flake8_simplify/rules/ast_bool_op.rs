@@ -7,7 +7,7 @@ use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, 
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{contains_effect, Truthiness};
@@ -49,7 +49,7 @@ pub struct DuplicateIsinstanceCall {
 }
 
 impl Violation for DuplicateIsinstanceCall {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

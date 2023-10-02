@@ -5,7 +5,7 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::FixKind;
+use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
@@ -51,9 +51,12 @@ fn format_rule_text(rule: Rule) -> String {
     output.push('\n');
     output.push('\n');
 
-    let fix_kind = rule.fixable();
-    if matches!(fix_kind, FixKind::Always | FixKind::Sometimes) {
-        output.push_str(&fix_kind.to_string());
+    let fix_availability = rule.fixable();
+    if matches!(
+        fix_availability,
+        FixAvailability::Always | FixAvailability::Sometimes
+    ) {
+        output.push_str(&fix_availability.to_string());
         output.push('\n');
         output.push('\n');
     }

@@ -102,19 +102,28 @@ on-save by adding `"editor.formatOnSave": true` to your `settings.json`:
 
 ### Configuration
 
-The Ruff formatter respects Ruff's [`line-length`](https://docs.astral.sh/ruff/settings/#line-length)
-setting, which can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as in:
+The Ruff formatter allows configuration of [indent style](https://docs.astral.sh/ruff/settings/#format-indent-style),
+[line ending](https://docs.astral.sh/ruff/settings/#format-line-ending), [quote style](https://docs.astral.sh/ruff/settings/#format-quote-style),
+and [magic trailing comma behavior](https://docs.astral.sh/ruff/settings/#format-skip-magic-trailing-comma).
+Like the linter, the Ruff formatter reads configuration via `pyproject.toml` or `ruff.toml` files,
+as in:
+
+```toml
+[tool.ruff.format]
+# Use tabs instead of 4 space indentation
+indent-style = "tab"
+
+# Prefer single quotes over double quotes
+quote-style = "single"
+```
+
+The Ruff formatter also respects Ruff's [`line-length`](https://docs.astral.sh/ruff/settings/#line-length)
+setting, which also can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as
+in:
 
 ```console
 ruff format --line-length 100 /path/to/file.py
 ```
-
-In future releases, the Ruff formatter will likely support configuration of:
-
-- Quote style (single vs. double).
-- Line endings (LF vs. CRLF).
-- Indentation (tabs vs. spaces).
-- Tab width.
 
 ### Excluding code from formatting
 

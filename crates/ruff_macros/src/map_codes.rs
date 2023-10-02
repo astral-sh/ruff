@@ -405,7 +405,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         rule_message_formats_match_arms
             .extend(quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::message_formats(),});
         rule_fixable_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_KIND,},
+            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms
             .extend(quote! {#(#attrs)* Self::#name => #path::explanation(),});
@@ -448,7 +448,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             }
 
             /// Returns the fix status of this rule.
-            pub const fn fixable(&self) -> ruff_diagnostics::FixKind {
+            pub const fn fixable(&self) -> ruff_diagnostics::FixAvailability {
                 match self { #rule_fixable_match_arms }
             }
         }

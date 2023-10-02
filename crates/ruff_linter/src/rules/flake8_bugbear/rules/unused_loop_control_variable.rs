@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
@@ -56,7 +56,7 @@ pub struct UnusedLoopControlVariable {
 }
 
 impl Violation for UnusedLoopControlVariable {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

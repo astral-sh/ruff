@@ -2,7 +2,7 @@ use std::hash::BuildHasherDefault;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -49,7 +49,7 @@ pub struct MultiValueRepeatedKeyLiteral {
 }
 
 impl Violation for MultiValueRepeatedKeyLiteral {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -106,7 +106,7 @@ pub struct MultiValueRepeatedKeyVariable {
 }
 
 impl Violation for MultiValueRepeatedKeyVariable {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
