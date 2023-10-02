@@ -23,7 +23,7 @@ configparser = { version = "3.0.2" }
 itertools = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
-pep440_rs = { version = "0.3.1", features = ["serde"] }
+pep440_rs = { version = "0.3.12", features = ["serde"] }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }

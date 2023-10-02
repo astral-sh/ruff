@@ -31,7 +31,7 @@ glob = { workspace = true }
 globset = { workspace = true }
 once_cell = { workspace = true }
 path-absolutize = { workspace = true }
-pep440_rs = { version = "0.3.1", features = ["serde"] }
+pep440_rs = { version = "0.3.12", features = ["serde"] }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
