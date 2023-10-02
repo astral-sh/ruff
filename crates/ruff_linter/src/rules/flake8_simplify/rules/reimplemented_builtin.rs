@@ -99,7 +99,11 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
             if LineWidthBuilder::new(checker.settings.tab_size)
-                .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt.start())])
+                .add_str(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(line_start, stmt.start())),
+                )
                 .add_str(&contents)
                 > checker.settings.line_length
             {
@@ -181,7 +185,11 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
             if LineWidthBuilder::new(checker.settings.tab_size)
-                .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt.start())])
+                .add_str(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(line_start, stmt.start())),
+                )
                 .add_str(&contents)
                 > checker.settings.line_length
             {

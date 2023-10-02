@@ -298,7 +298,9 @@ fn fix_always_false_branch(
                 ..
             }) => {
                 debug_assert!(
-                    &checker.locator().contents()[TextRange::at(range.start(), "elif".text_len())]
+                    checker
+                        .locator()
+                        .slice(TextRange::at(range.start(), "elif".text_len()))
                         == "elif"
                 );
                 let end_location = range.start() + ("elif".text_len() - "if".text_len());
