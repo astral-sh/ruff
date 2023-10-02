@@ -9,7 +9,8 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for the use of string and bytes literals longer than 50 characters.
+/// Checks for the use of string and bytes literals longer than 50 characters
+/// in stub (`.pyi`) files.
 ///
 /// ## Why is this bad?
 /// If a function has a default value where the string or bytes representation
@@ -20,12 +21,14 @@ use crate::registry::AsRule;
 ///
 /// ## Example
 /// ```python
-/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None: ...
+/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None:
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo(arg: str = ...) -> None: ...
+/// def foo(arg: str = ...) -> None:
+///     ...
 /// ```
 #[violation]
 pub struct StringOrBytesTooLong;

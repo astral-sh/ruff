@@ -20,12 +20,14 @@ use crate::registry::AsRule;
 ///
 /// ## Example
 /// ```python
-/// def foo(arg: int = 12345678901) -> None: ...
+/// def foo(arg: int = 12345678901) -> None:
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo(arg: int = ...) -> None: ...
+/// def foo(arg: int = ...) -> None:
+///     ...
 /// ```
 #[violation]
 pub struct NumericLiteralTooLong;

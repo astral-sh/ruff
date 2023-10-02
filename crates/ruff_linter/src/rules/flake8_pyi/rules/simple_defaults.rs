@@ -17,19 +17,21 @@ use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with default values that
-/// are not simple (int, float, complex, bytes, str, bool, None, ..., or
-/// simple container literals).
+/// are not "simple" /// (i.e., `int`, `float`, `complex`, `bytes`, `str`,
+/// `bool`, `None`, `...`, or simple container literals).
 ///
 /// ## Why is this bad?
-/// Type checkers ignore the default value, so it's not useful for type-checking
-/// purposes. However, it may be valuable information for IDEs and other users
-/// of stubs.
+/// Stub (`.pyi`) files exist to define type hints, and are not evaluated at
+/// runtime. As such, function arguments in stub files should not have default
+/// values, as they are ignored by type checkers.
 ///
-/// If you're writing a stub for a function that has a more complex default
-/// value, use ... instead of trying to reproduce the runtime default exactly
-/// in the stub. Also use ... for very long numbers, very long strings, very
-/// long bytes, or defaults that vary according to the machine Python is being
-/// run on.
+/// However, the use of default values may be useful for IDEs and other
+/// consumers of stub files, and so "simple" values may be worth including and
+/// are permitted by this rule.
+///
+/// Instead of including and reproducing a complex value, use `...` to indicate
+/// that the assignment has a default value, but that the value is non-simple
+/// or varies according to the current platform or Python version.
 ///
 /// ## Example
 /// ```python
@@ -44,7 +46,7 @@ use crate::settings::types::PythonVersion;
 /// ```
 ///
 /// ## References
-/// - [flake8-pyi Error Codes](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
+/// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[violation]
 pub struct TypedArgumentDefaultInStub;
 
@@ -61,19 +63,21 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 
 /// ## What it does
 /// Checks for untyped function arguments in stubs with default values that
-/// are not simple (int, float, complex, bytes, str, bool, None, ..., or
-/// simple container literals).
+/// are not "simple" /// (i.e., `int`, `float`, `complex`, `bytes`, `str`,
+/// `bool`, `None`, `...`, or simple container literals).
 ///
 /// ## Why is this bad?
-/// Type checkers ignore the default value, so it's not useful for type-checking
-/// purposes. However, it may be valuable information for IDEs and other users
-/// of stubs.
+/// Stub (`.pyi`) files exist to define type hints, and are not evaluated at
+/// runtime. As such, function arguments in stub files should not have default
+/// values, as they are ignored by type checkers.
 ///
-/// If you're writing a stub for a function that has a more complex default
-/// value, use ... instead of trying to reproduce the runtime default exactly
-/// in the stub. Also use ... for very long numbers, very long strings, very
-/// long bytes, or defaults that vary according to the machine Python is being
-/// run on.
+/// However, the use of default values may be useful for IDEs and other
+/// consumers of stub files, and so "simple" values may be worth including and
+/// are permitted by this rule.
+///
+/// Instead of including and reproducing a complex value, use `...` to indicate
+/// that the assignment has a default value, but that the value is non-simple
+/// or varies according to the current platform or Python version.
 ///
 /// ## Example
 /// ```python
@@ -88,7 +92,7 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// ```
 ///
 /// ## References
-/// - [flake8-pyi Error Codes](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
+/// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[violation]
 pub struct ArgumentDefaultInStub;
 
@@ -104,19 +108,22 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
 }
 
 /// ## What it does
-/// Checks for assignments in stubs with default values that are not simple
-/// (int, float, complex, bytes, str, bool, None, ..., or simple container literals).
+/// Checks for assignments in stubs with default values that are not "simple"
+/// (i.e., `int`, `float`, `complex`, `bytes`, `str`, `bool`, `None`, `...`, or
+/// simple container literals).
 ///
 /// ## Why is this bad?
-/// Type checkers ignore the default value, so it's not useful for type-checking
-/// purposes. However, it may be valuable information for IDEs and other users
-/// of stubs.
+/// Stub (`.pyi`) files exist to define type hints, and are not evaluated at
+/// runtime. As such, assignments in stub files should not include values,
+/// as they are ignored by type checkers.
 ///
-/// If you're writing a stub for a function that has a more complex default
-/// value, use ... instead of trying to reproduce the runtime default exactly
-/// in the stub. Also use ... for very long numbers, very long strings, very
-/// long bytes, or defaults that vary according to the machine Python is being
-/// run on.
+/// However, the use of such values may be useful for IDEs and other consumers
+/// of stub files, and so "simple" values may be worth including and are
+/// permitted by this rule.
+///
+/// Instead of including and reproducing a complex value, use `...` to indicate
+/// that the assignment has a default value, but that the value is non-simple
+/// or varies according to the current platform or Python version.
 ///
 /// ## Example
 /// ```python
@@ -129,7 +136,7 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
 /// ```
 ///
 /// ## References
-/// - [flake8-pyi Error Codes](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
+/// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[violation]
 pub struct AssignmentDefaultInStub;
 
@@ -145,10 +152,11 @@ impl AlwaysFixableViolation for AssignmentDefaultInStub {
 }
 
 /// ## What it does?
-/// Checks for assignments in stub files without type annotations.
+/// Checks for unannotated assignments in stub (`.pyi`) files.
 ///
 /// ## Why is this bad?
-/// Stub files should contain type annotations.
+/// Stub files exist to provide type hints, and are never executed. As such,
+/// all assignments in stub files should be annotated with a type.
 #[violation]
 pub struct UnannotatedAssignmentInStub {
     name: String,

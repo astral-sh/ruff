@@ -6,12 +6,11 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for type alias names that are not in CamelCase.
+/// Checks for type aliases that do not use the CamelCase naming convention.
 ///
 /// ## Why is this bad?
-/// It's a convention to use CamelCase for type aliases to distinguish them
-/// from regular variable names. Using CamelCase for type aliases makes the
-/// code more readable and follows common naming conventions.
+/// It's conventional to use the CamelCase naming convention for type aliases,
+/// to distinguish them from other variables.
 ///
 /// ## Example
 /// ```python
@@ -39,9 +38,11 @@ impl Violation for SnakeCaseTypeAlias {
 /// Checks for private type alias definitions suffixed with 'T'.
 ///
 /// ## Why is this bad?
-/// It is a convention to use the 'T' suffix for type variables (`TypeVar`).
-/// When 'T' is used in a type alias for a non-type variable, it can be
-/// misleading and should be avoided.
+/// It's conventional to use the 'T' suffix for type variables; the use of
+/// such a suffix implies that the object is a `TypeVar`.
+///
+/// Adding the 'T' suffix to a non-`TypeVar`, it can be misleading and should
+/// be avoided.
 ///
 /// ## Example
 /// ```python
