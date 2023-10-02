@@ -7,6 +7,7 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
+use ruff_diagnostics::Applicability;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
 
@@ -19,7 +20,7 @@ use ruff_linter::message::{
 };
 use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
-use ruff_linter::settings::flags;
+use ruff_linter::settings::flags::{self, SuggestedFixes};
 use ruff_linter::settings::types::SerializationFormat;
 
 use crate::diagnostics::Diagnostics;
@@ -118,19 +119,10 @@ impl Printer {
                     writeln!(writer, "Found {remaining} error{s}.")?;
                 }
 
-                if show_fix_status(self.fix_mode) {
-                    let num_fixable = diagnostics
-                        .messages
-                        .iter()
-                        .filter(|message| message.fix.is_some())
-                        .count();
-                    if num_fixable > 0 {
-                        writeln!(
-                            writer,
-                            "[{}] {num_fixable} potentially fixable with the --fix option.",
-                            "*".cyan(),
-                        )?;
-                    }
+                let fixables = FixableStatistics::new(diagnostics, self.fix_mode.suggested_fixes());
+
+                if !fixables.is_empty() {
+                    writeln!(writer, "{}", fixables.violation_string())?;
                 }
             } else {
                 let fixed = diagnostics
@@ -178,6 +170,7 @@ impl Printer {
         }
 
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
+        let fixables = FixableStatistics::new(diagnostics, self.fix_mode.suggested_fixes());
 
         match self.format {
             SerializationFormat::Json => {
@@ -191,9 +184,9 @@ impl Printer {
             }
             SerializationFormat::Text => {
                 TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode))
-                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
+                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables))
+                    .with_show_fix_diff(self.flags.contains(Flags::SHOW_FIX_DIFF))
+                    .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
@@ -209,7 +202,7 @@ impl Printer {
             SerializationFormat::Grouped => {
                 GroupedEmitter::default()
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
-                    .with_show_fix_status(show_fix_status(self.fix_mode))
+                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables))
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
@@ -359,6 +352,8 @@ impl Printer {
             );
         }
 
+        let fixables = FixableStatistics::new(diagnostics, self.fix_mode.suggested_fixes());
+
         if !diagnostics.messages.is_empty() {
             if self.log_level >= LogLevel::Default {
                 writeln!(writer)?;
@@ -366,7 +361,7 @@ impl Printer {
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             TextEmitter::default()
-                .with_show_fix_status(show_fix_status(self.fix_mode))
+                .with_show_fix_status(show_fix_status(self.fix_mode, fixables))
                 .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                 .emit(writer, &diagnostics.messages, &context)?;
         }
@@ -390,13 +385,13 @@ fn num_digits(n: usize) -> usize {
 }
 
 /// Return `true` if the [`Printer`] should indicate that a rule is fixable.
-const fn show_fix_status(fix_mode: flags::FixMode) -> bool {
+fn show_fix_status(fix_mode: flags::FixMode, fixables: FixableStatistics) -> bool {
     // If we're in application mode, avoid indicating that a rule is fixable.
     // If the specific violation were truly fixable, it would've been fixed in
     // this pass! (We're occasionally unable to determine whether a specific
     // violation is fixable without trying to fix it, so if fix is not
     // enabled, we may inadvertently indicate that a rule is fixable.)
-    !fix_mode.is_apply()
+    (!fix_mode.is_apply()) && fixables.fixes_are_applicable()
 }
 
 fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
@@ -438,4 +433,74 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>
         }
     }
     Ok(())
+}
+
+/// Contains the number of [`Applicability::Automatic`] and [`Applicability::Suggested`] fixes
+struct FixableStatistics<'a> {
+    automatic: u32,
+    suggested: u32,
+    apply_suggested: &'a SuggestedFixes,
+}
+
+impl<'a> FixableStatistics<'a> {
+    fn new(diagnostics: &Diagnostics, apply_suggested: &'a SuggestedFixes) -> Self {
+        let mut automatic = 0;
+        let mut suggested = 0;
+
+        for message in &diagnostics.messages {
+            if let Some(fix) = &message.fix {
+                if fix.applicability() == Applicability::Suggested {
+                    suggested += 1;
+                } else if fix.applicability() == Applicability::Automatic {
+                    automatic += 1;
+                }
+            }
+        }
+
+        Self {
+            automatic,
+            suggested,
+            apply_suggested,
+        }
+    }
+
+    fn fixes_are_applicable(&self) -> bool {
+        match self.apply_suggested {
+            SuggestedFixes::Apply => self.automatic > 0 || self.suggested > 0,
+            SuggestedFixes::Disable => self.automatic > 0,
+        }
+    }
+
+    /// Returns [`true`] if there aren't any fixes to be displayed
+    fn is_empty(&self) -> bool {
+        self.automatic == 0 && self.suggested == 0
+    }
+
+    /// Build the displayed fix status message depending on the types of the remaining fixes.
+    fn violation_string(&self) -> String {
+        let prefix = format!("[{}]", "*".cyan());
+        let mut fix_status = prefix;
+
+        if self.automatic > 0 {
+            fix_status = format!(
+                "{fix_status} {} potentially fixable with the --fix option.",
+                self.automatic
+            );
+        }
+
+        if self.suggested > 0 {
+            let (line_break, extra_prefix) = if self.automatic > 0 {
+                ("\n", format!("[{}]", "*".cyan()))
+            } else {
+                ("", String::new())
+            };
+
+            let total = self.automatic + self.suggested;
+            fix_status = format!(
+            "{fix_status}{line_break}{extra_prefix} {total} potentially fixable with the --fix-suggested option."
+        );
+        }
+
+        fix_status
+    }
 }

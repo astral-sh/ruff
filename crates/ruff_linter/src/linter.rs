@@ -415,6 +415,7 @@ fn diagnostics_to_messages(
 
 /// Generate `Diagnostic`s from source code content, iteratively fixing
 /// until stable.
+#[allow(clippy::too_many_arguments)]
 pub fn lint_fix<'a>(
     path: &Path,
     package: Option<&Path>,
@@ -422,6 +423,7 @@ pub fn lint_fix<'a>(
     settings: &LinterSettings,
     source_kind: &'a SourceKind,
     source_type: PySourceType,
+    fix_suggested: flags::SuggestedFixes,
 ) -> Result<FixerResult<'a>> {
     let mut transformed = Cow::Borrowed(source_kind);
 
@@ -494,7 +496,7 @@ pub fn lint_fix<'a>(
             code: fixed_contents,
             fixes: applied,
             source_map,
-        }) = fix_file(&result.data.0, &locator)
+        }) = fix_file(&result.data.0, &locator, fix_suggested)
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.

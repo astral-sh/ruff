@@ -72,7 +72,6 @@ pub enum Command {
 
 // The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
 #[derive(Clone, Debug, clap::Parser)]
-#[allow(clippy::struct_excessive_bools)]
 pub struct CheckCommand {
     /// List of files or directories to check.
     pub files: Vec<PathBuf>,
@@ -80,7 +79,10 @@ pub struct CheckCommand {
     /// Use `--no-fix` to disable.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
-    #[clap(long, overrides_with("fix"), hide = true)]
+    /// Attempt to automatically fix both automatic and suggested lint violations.
+    #[arg(long, overrides_with_all(["fix", "no_fix"]))]
+    fix_suggested: bool,
+    #[clap(long, overrides_with_all(["fix", "fix_suggested"]), hide = true)]
     no_fix: bool,
     /// Show violations with source code.
     /// Use `--no-show-source` to disable.
@@ -497,6 +499,7 @@ impl CheckCommand {
                 cache_dir: self.cache_dir,
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
+                fix_suggested: Some(self.fix_suggested),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 output_format: self.output_format.or(self.format),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
@@ -599,6 +602,7 @@ pub struct CliOverrides {
     pub cache_dir: Option<PathBuf>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
+    pub fix_suggested: Option<bool>,
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
@@ -623,6 +627,9 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(fix_only) = &self.fix_only {
             config.fix_only = Some(*fix_only);
+        }
+        if self.fix_suggested.is_some() {
+            config.fix_suggested = self.fix_suggested;
         }
         config.lint.rule_selections.push(RuleSelection {
             select: self.select.clone(),

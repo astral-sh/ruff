@@ -241,81 +241,9 @@ fn stdin_fix_jupyter() {
     success: true
     exit_code: 0
     ----- stdout -----
-    {
-     "cells": [
-      {
-       "cell_type": "code",
-       "execution_count": 1,
-       "id": "dccc687c-96e2-4604-b957-a8a89b5bec06",
-       "metadata": {},
-       "outputs": [],
-       "source": []
-      },
-      {
-       "cell_type": "markdown",
-       "id": "19e1b029-f516-4662-a9b9-623b93edac1a",
-       "metadata": {},
-       "source": [
-        "Foo"
-       ]
-      },
-      {
-       "cell_type": "code",
-       "execution_count": 2,
-       "id": "cdce7b92-b0fb-4c02-86f6-e233b26fa84f",
-       "metadata": {},
-       "outputs": [],
-       "source": []
-      },
-      {
-       "cell_type": "code",
-       "execution_count": 3,
-       "id": "e40b33d2-7fe4-46c5-bdf0-8802f3052565",
-       "metadata": {},
-       "outputs": [
-        {
-         "name": "stdout",
-         "output_type": "stream",
-         "text": [
-          "1\n"
-         ]
-        }
-       ],
-       "source": [
-        "print(1)"
-       ]
-      },
-      {
-       "cell_type": "code",
-       "execution_count": null,
-       "id": "a1899bc8-d46f-4ec0-b1d1-e1ca0f04bf60",
-       "metadata": {},
-       "outputs": [],
-       "source": []
-      }
-     ],
-     "metadata": {
-      "kernelspec": {
-       "display_name": "Python 3 (ipykernel)",
-       "language": "python",
-       "name": "python3"
-      },
-      "language_info": {
-       "codemirror_mode": {
-        "name": "ipython",
-        "version": 3
-       },
-       "file_extension": ".py",
-       "mimetype": "text/x-python",
-       "name": "python",
-       "nbconvert_exporter": "python",
-       "pygments_lexer": "ipython3",
-       "version": "3.11.2"
-      }
-     },
-     "nbformat": 4,
-     "nbformat_minor": 5
-    }
+    print(1)
+
+
     ----- stderr -----
     "###);
 }
@@ -866,6 +794,235 @@ fn check_input_from_argfile() -> Result<()> {
         ----- stderr -----
         "###);
     });
+
+    Ok(())
+}
+
+#[test]
+fn displays_fix_applicability_levels() -> Result<()> {
+    // `--fix` should only apply automatic fixes, but should tell the user about `--fix --unautomatic` if
+    // there are remaining unautomatic fixes.
+    // TODO: this should be a failure but we don't have a way to track that
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format=text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--no-cache",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 1 potentially fixable with the --fix option.
+    [*] 2 potentially fixable with the --fix-suggested option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn displays_remaining_suggested_fixes() -> Result<()> {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["-", "--output-format", "text", "--no-cache", "--isolated", "--select", "F601"])
+        .pass_stdin("x = {'a': 1, 'a': 1}\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    Found 1 error.
+    [*] 1 potentially fixable with the --fix-suggested option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn fix_applies_automatic_fixes_only() -> Result<()> {
+    // `--fix` should only apply automatic fixes. Since we're runnnig in `stdin` mode, output shouldn't
+    // be printed.
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated","--no-cache", 
+                "--select",
+                "F601,UP034",
+                "--fix",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn fix_applies_automatic_and_suggested_fixes_with_fix_suggested() -> Result<()> {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated","--no-cache", 
+                "--select",
+                "F601,UP034",
+                "--fix",
+                "--fix-suggested",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 1 potentially fixable with the --fix option.
+    [*] 2 potentially fixable with the --fix-suggested option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn diff_shows_automatic_and_suggested_fixes_with_fix_suggested() -> Result<()> {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated","--no-cache",
+                "--select",
+                "F601,UP034",
+                "--diff",
+                "--fix-suggested",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+    -x = {'a': 1, 'a': 1}
+    -print(('foo'))
+    +x = {'a': 1}
+    +print('foo')
+
+
+    ----- stderr -----
+    "###
+    );
+
+    Ok(())
+}
+
+#[test]
+fn diff_shows_automatic_fixes_only() -> Result<()> {
+    assert_cmd_snapshot!(
+    Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format",
+            "text",
+            "--isolated","--no-cache",
+            "--select",
+            "F601,UP034",
+            "--diff",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+     x = {'a': 1, 'a': 1}
+    -print(('foo'))
+    +print('foo')
+
+
+    ----- stderr -----
+    "###
+    );
+
+    Ok(())
+}
+
+#[test]
+fn fix_only_applies_automatic_and_suggested_fixes_with_fix_suggested() -> Result<()> {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format",
+            "text",
+            "--isolated","--no-cache", 
+            "--select",
+            "F601,UP034",
+            "--fix-only",
+            "--fix-suggested",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    x = {'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn fix_only_applies_automatic_fixes_only() -> Result<()> {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format",
+            "text",
+            "--isolated","--no-cache", 
+            "--select",
+            "F601,UP034",
+            "--fix-only",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }

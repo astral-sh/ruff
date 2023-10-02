@@ -194,6 +194,8 @@ Arguments:
 Options:
       --fix
           Attempt to automatically fix lint violations. Use `--no-fix` to disable
+      --fix-suggested
+          Attempt to automatically fix both automatic and suggested lint violations
       --show-source
           Show violations with source code. Use `--no-show-source` to disable
       --show-fixes

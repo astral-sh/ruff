@@ -409,7 +409,7 @@ mod tests {
                     &settings.linter,
                     Some(&cache),
                     flags::Noqa::Enabled,
-                    flags::FixMode::Generate,
+                    flags::FixMode::Generate(flags::SuggestedFixes::Apply),
                 )
                 .unwrap();
                 if diagnostics
@@ -454,7 +454,7 @@ mod tests {
                 &settings.linter,
                 Some(&cache),
                 flags::Noqa::Enabled,
-                flags::FixMode::Generate,
+                flags::FixMode::Generate(flags::SuggestedFixes::Apply),
             )
             .unwrap();
         }
@@ -711,7 +711,7 @@ mod tests {
                 &self.settings.linter,
                 Some(cache),
                 flags::Noqa::Enabled,
-                flags::FixMode::Generate,
+                flags::FixMode::Generate(flags::SuggestedFixes::Apply),
             )
         }
     }
