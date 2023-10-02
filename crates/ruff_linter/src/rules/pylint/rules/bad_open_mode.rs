@@ -33,16 +33,18 @@ pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ExprCall) {
         return;
     };
     let Constant::Str(s) = &a.value else { return };
-    if !is_open_mode_good(s.value.as_str()) {
-        checker.diagnostics.push(Diagnostic::new(
-            BadOpenMode {
-                mode: s.value.clone(),
-            },
-            call.range(),
-        ));
+    if is_open_mode_good(s.value.as_str()) {
+        return;
     }
+    checker.diagnostics.push(Diagnostic::new(
+        BadOpenMode {
+            mode: s.value.clone(),
+        },
+        call.range(),
+    ));
 }
 
+/// <https://github.com/python/cpython/blob/65c285062ce2769249610348636d3d73153e0144/Lib/_pyio.py#L207>
 #[rustfmt::skip]
 fn is_open_mode_good(mode: &str) -> bool {
     let mut creating  = false;
@@ -64,15 +66,7 @@ fn is_open_mode_good(mode: &str) -> bool {
             _ => return false
         }
     }
-    if (text && binary)
-        || [creating, reading, writing, appending]
-            .iter()
-            .filter(|i| **i)
-            .count()
-            > 1
-        || !(creating || reading || writing || appending)
-    {
-        return false
-    }
-    true
+    !((text && binary)
+    ||[creating, reading, writing, appending].iter().filter(|i| **i).count() > 1
+    ||!(creating || reading || writing || appending))
 }
