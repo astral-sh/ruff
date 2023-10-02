@@ -10,19 +10,19 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of docstrings in stub files.
 ///
 /// ## Why is this bad?
-/// In stub files, docstrings should not be included, as they are meant to
-/// provide type hints and not documentation.
+/// Stub files should omit docstrings, as they're intended to provide type
+/// hints, rather than documentation.
 ///
 /// ## Example
 /// ```python
-/// def my_function(param: int) -> str:
+/// def func(param: int) -> str:
 ///     """This is a docstring."""
 ///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def my_function(param: int) -> str:
+/// def func(param: int) -> str:
 ///     ...
 /// ```
 #[violation]
