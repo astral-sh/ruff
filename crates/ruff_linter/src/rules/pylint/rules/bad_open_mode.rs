@@ -7,6 +7,7 @@ use ruff_macros::violation;
 use ruff_python_ast::Constant;
 use ruff_python_ast::Expr;
 use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprConstant;
 use ruff_text_size::Ranged;
 
 #[violation]
@@ -26,10 +27,22 @@ impl Violation for BadOpenMode {
 
 /// PLW1501
 pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ExprCall) {
-    if !is_open_builtin(call.func.as_ref(), checker.semantic()) {
-        return;
-    }
-    let Some(Expr::Constant(a)) = call.arguments.find_argument("mode", 1) else {
+    let Some(Expr::Constant(a)) = (if let Expr::Attribute(f) = &*call.func {
+        let Expr::Call(c) = &*f.value else { return };
+        let Expr::Name(s) = &*c.func else { return };
+        if "open" != f.attr.as_str() {
+            return;
+        }
+        if "Path" != s.id.as_str() {
+            return;
+        };
+        call.arguments.find_argument("mode", 0)
+    } else {
+        if !is_open_builtin(call.func.as_ref(), checker.semantic()) {
+            return;
+        }
+        call.arguments.find_argument("mode", 1)
+    }) else {
         return;
     };
     let Constant::Str(s) = &a.value else { return };
