@@ -39,7 +39,7 @@ pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ExprCall) {
                 mode: s.value.clone(),
             },
             call.range(),
-        ))
+        ));
     }
 }
 
