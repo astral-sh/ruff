@@ -7,9 +7,19 @@ use ruff_macros::violation;
 use ruff_python_ast::Constant;
 use ruff_python_ast::Expr;
 use ruff_python_ast::ExprCall;
-use ruff_python_ast::ExprConstant;
 use ruff_text_size::Ranged;
 
+/// ## What it does
+/// Checks for `open` or `Path.open` calls with an invalid `mode` argument.
+///
+/// ## Why is this bad?
+/// The `mode` parameter to the `open` function is a list of single-character
+/// flags. The access modes `x`, `r`, `w`, `a` and `+` are mutually exclusive.
+/// The modes `t` and `b` are mutually exclusive.
+/// There should be atleast one access mode.
+///
+/// ## References
+/// - [Python documentation: Built-in functions `open`](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct BadOpenMode {
     mode: String,
