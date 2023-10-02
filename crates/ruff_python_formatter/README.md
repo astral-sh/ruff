@@ -560,3 +560,72 @@ StartElementHandler: (
     | None
 )
 ```
+
+### Call chain calls break differently ([#7051](https://github.com/astral-sh/ruff/issues/7051))
+
+Black occasionally breaks call chains differently than Ruff; in particular, Black occasionally
+expands the arguments for the last call in the chain, as in:
+
+```python
+# Input
+df.drop(
+    columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+).drop_duplicates().rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(path / "aaaaaa.csv", index=False)
+
+# Black
+df.drop(
+    columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+).drop_duplicates().rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(
+    path / "aaaaaa.csv", index=False
+)
+
+# Ruff
+df.drop(
+    columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+).drop_duplicates().rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(path / "aaaaaa.csv", index=False)
+```
+
+Ruff will only expand the arguments if doing so is necessary to fit within the configured line
+width.
+
+Note that Black does not apply this last-call argument breaking universally. For example, both
+Black and Ruff will format the following identically:
+
+```python
+# Input
+df.drop(
+    columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+).drop_duplicates(a).rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(
+    path / "aaaaaa.csv", index=False
+).other(a)
+
+# Black
+df.drop(columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]).drop_duplicates(a).rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(path / "aaaaaa.csv", index=False).other(a)
+
+# Ruff
+df.drop(columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]).drop_duplicates(a).rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(path / "aaaaaa.csv", index=False).other(a)
+```
