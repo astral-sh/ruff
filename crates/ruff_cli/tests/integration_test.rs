@@ -799,7 +799,7 @@ fn check_input_from_argfile() -> Result<()> {
 }
 
 #[test]
-fn displays_fix_applicability_levels() -> Result<()> {
+fn displays_fix_applicability_levels() {
     // `--fix` should only apply automatic fixes, but should tell the user about `--fix --unautomatic` if
     // there are remaining unautomatic fixes.
     // TODO: this should be a failure but we don't have a way to track that
@@ -825,12 +825,10 @@ fn displays_fix_applicability_levels() -> Result<()> {
 
     ----- stderr -----
     "###);
-
-    Ok(())
 }
 
 #[test]
-fn displays_remaining_suggested_fixes() -> Result<()> {
+fn displays_remaining_suggested_fixes() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["-", "--output-format", "text", "--no-cache", "--isolated", "--select", "F601"])
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
@@ -844,12 +842,10 @@ fn displays_remaining_suggested_fixes() -> Result<()> {
 
     ----- stderr -----
     "###);
-
-    Ok(())
 }
 
 #[test]
-fn fix_applies_automatic_fixes_only() -> Result<()> {
+fn fix_applies_automatic_fixes_only() {
     // `--fix` should only apply automatic fixes. Since we're runnnig in `stdin` mode, output shouldn't
     // be printed.
     assert_cmd_snapshot!(
@@ -873,12 +869,10 @@ fn fix_applies_automatic_fixes_only() -> Result<()> {
 
     ----- stderr -----
     "###);
-
-    Ok(())
 }
 
 #[test]
-fn fix_applies_automatic_and_suggested_fixes_with_fix_suggested() -> Result<()> {
+fn fix_applies_automatic_and_suggested_fixes_with_fix_suggested() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
             .args([
@@ -904,12 +898,10 @@ fn fix_applies_automatic_and_suggested_fixes_with_fix_suggested() -> Result<()> 
 
     ----- stderr -----
     "###);
-
-    Ok(())
 }
 
 #[test]
-fn diff_shows_automatic_and_suggested_fixes_with_fix_suggested() -> Result<()> {
+fn diff_shows_automatic_and_suggested_fixes_with_fix_suggested() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
             .args([
@@ -937,12 +929,10 @@ fn diff_shows_automatic_and_suggested_fixes_with_fix_suggested() -> Result<()> {
     ----- stderr -----
     "###
     );
-
-    Ok(())
 }
 
 #[test]
-fn diff_shows_automatic_fixes_only() -> Result<()> {
+fn diff_shows_automatic_fixes_only() {
     assert_cmd_snapshot!(
     Command::new(get_cargo_bin(BIN_NAME))
         .args([
@@ -968,12 +958,10 @@ fn diff_shows_automatic_fixes_only() -> Result<()> {
     ----- stderr -----
     "###
     );
-
-    Ok(())
 }
 
 #[test]
-fn fix_only_applies_automatic_and_suggested_fixes_with_fix_suggested() -> Result<()> {
+fn fix_only_applies_automatic_and_suggested_fixes_with_fix_suggested() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
         .args([
@@ -996,12 +984,10 @@ fn fix_only_applies_automatic_and_suggested_fixes_with_fix_suggested() -> Result
 
     ----- stderr -----
     "###);
-
-    Ok(())
 }
 
 #[test]
-fn fix_only_applies_automatic_fixes_only() -> Result<()> {
+fn fix_only_applies_automatic_fixes_only() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
         .args([
@@ -1023,6 +1009,4 @@ fn fix_only_applies_automatic_fixes_only() -> Result<()> {
 
     ----- stderr -----
     "###);
-
-    Ok(())
 }

@@ -184,7 +184,7 @@ impl Printer {
             }
             SerializationFormat::Text => {
                 TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables))
+                    .with_show_fix_status(show_fix_status(self.fix_mode, &fixables))
                     .with_show_fix_diff(self.flags.contains(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
@@ -202,7 +202,7 @@ impl Printer {
             SerializationFormat::Grouped => {
                 GroupedEmitter::default()
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables))
+                    .with_show_fix_status(show_fix_status(self.fix_mode, &fixables))
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
@@ -361,7 +361,7 @@ impl Printer {
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             TextEmitter::default()
-                .with_show_fix_status(show_fix_status(self.fix_mode, fixables))
+                .with_show_fix_status(show_fix_status(self.fix_mode, &fixables))
                 .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                 .emit(writer, &diagnostics.messages, &context)?;
         }
@@ -385,7 +385,7 @@ fn num_digits(n: usize) -> usize {
 }
 
 /// Return `true` if the [`Printer`] should indicate that a rule is fixable.
-fn show_fix_status(fix_mode: flags::FixMode, fixables: FixableStatistics) -> bool {
+fn show_fix_status(fix_mode: flags::FixMode, fixables: &FixableStatistics) -> bool {
     // If we're in application mode, avoid indicating that a rule is fixable.
     // If the specific violation were truly fixable, it would've been fixed in
     // this pass! (We're occasionally unable to determine whether a specific

@@ -395,7 +395,7 @@ pub(crate) fn lint_path(
 pub(crate) fn lint_stdin(
     path: Option<&Path>,
     package: Option<&Path>,
-    contents: String,
+    contents: &str,
     settings: &Settings,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
@@ -406,7 +406,7 @@ pub(crate) fn lint_stdin(
     };
 
     // Extract the sources from the file.
-    let source_kind = match SourceKind::from_source_code(contents.clone(), source_type) {
+    let source_kind = match SourceKind::from_source_code(contents.to_string(), source_type) {
         Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
