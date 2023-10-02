@@ -247,7 +247,7 @@ Source with applied fixes:
                     panic!("Rule {rule:?} is marked as non-fixable but it created a fix. Change the `Violation::FIX_AVAILABILITY` to either `FixAvailability::Sometimes` or `FixAvailability::Always`");
                 },
                 (false, FixAvailability::Always) => {
-                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::FIX_AVAILIBITYd` to either `FixAvailability::Sometimes` or `FixAvailability::None")
+                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to either `FixAvailability::Sometimes` or `FixAvailability::None")
                 }
             }
 
