@@ -416,6 +416,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     }
 
     quote! {
+        use ruff_diagnostics::Violation;
+
         #[derive(
             EnumIter,
             Debug,
