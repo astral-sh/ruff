@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace;
 use ruff_python_codegen::{Generator, Stylist};
@@ -50,7 +50,7 @@ use crate::registry::{AsRule, Rule};
 pub struct RawStringInException;
 
 impl Violation for RawStringInException {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -104,7 +104,7 @@ impl Violation for RawStringInException {
 pub struct FStringInException;
 
 impl Violation for FStringInException {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -160,7 +160,7 @@ impl Violation for FStringInException {
 pub struct DotFormatInException;
 
 impl Violation for DotFormatInException {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 
@@ -41,7 +41,7 @@ pub struct UncapitalizedEnvironmentVariables {
 }
 
 impl Violation for UncapitalizedEnvironmentVariables {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

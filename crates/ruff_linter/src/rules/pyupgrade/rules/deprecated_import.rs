@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
@@ -66,7 +66,7 @@ pub struct DeprecatedImport {
 }
 
 impl Violation for DeprecatedImport {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

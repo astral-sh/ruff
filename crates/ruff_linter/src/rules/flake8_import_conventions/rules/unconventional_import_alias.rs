@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{Binding, Imported};
 use ruff_text_size::Ranged;
@@ -37,7 +37,7 @@ pub struct UnconventionalImportAlias {
 }
 
 impl Violation for UnconventionalImportAlias {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

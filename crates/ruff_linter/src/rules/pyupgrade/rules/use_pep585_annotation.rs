@@ -1,6 +1,6 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::analyze::typing::ModuleMember;
@@ -56,7 +56,7 @@ pub struct NonPEP585Annotation {
 }
 
 impl Violation for NonPEP585Annotation {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use anyhow::Result;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
@@ -51,7 +51,7 @@ pub struct OutdatedVersionBlock {
 }
 
 impl Violation for OutdatedVersionBlock {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

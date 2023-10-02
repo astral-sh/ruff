@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::Imported;
 use ruff_python_semantic::{Binding, BindingKind};
@@ -33,7 +33,7 @@ use crate::renamer::Renamer;
 pub struct UnaliasedCollectionsAbcSetImport;
 
 impl Violation for UnaliasedCollectionsAbcSetImport {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

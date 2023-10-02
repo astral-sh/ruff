@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -39,7 +39,7 @@ use crate::registry::AsRule;
 pub struct PandasUseOfInplaceArgument;
 
 impl Violation for PandasUseOfInplaceArgument {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
