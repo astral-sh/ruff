@@ -24,6 +24,12 @@ from itertools import starmap as sm
 # FURB140
 {print(x, y) for x, y in zipped()}
 
+# FURB140 (check it still flags starred arguments).
+# See https://github.com/astral-sh/ruff/issues/7636
+[print(*x, y) for x, y in zipped()]
+(print(x, *y) for x, y in zipped())
+{print(*x, *y) for x, y in zipped()}
+
 # Non-errors.
 
 [print(x, int) for x, _ in zipped()]

@@ -102,8 +102,16 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
     // Here we want to check that `args` and `elts` are the same (same length, same elements,
     // same order).
     if elts.len() != args.len()
-        || !std::iter::zip(elts, args)
-            .all(|(x, y)| ComparableExpr::from(x) == ComparableExpr::from(y))
+        || !std::iter::zip(elts, args).all(|(x, y)| {
+            ComparableExpr::from(x) == ComparableExpr::from(y) || {
+                // Check if y is x starred (i.e., `*x`).
+                if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = y {
+                    ComparableExpr::from(value.as_ref()) == ComparableExpr::from(x)
+                } else {
+                    false
+                }
+            }
+        })
     {
         return;
     }
@@ -312,8 +320,16 @@ fn match_comprehension(comprehension: &ast::Comprehension) -> Option<(&[Expr], &
         return None;
     }
 
-    let ast::ExprTuple { elts, .. } = comprehension.target.as_tuple_expr()?;
-    Some((elts, &comprehension.iter))
+    match &comprehension.target {
+        // Get the elements of the tuple.
+        ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => Some((elts, &comprehension.iter)),
+        // If there is only one element, it might still be starred later on.
+        ast::Expr::Name(_) => {
+            let elt = std::slice::from_ref(&comprehension.target);
+            Some((elt, &comprehension.iter))
+        }
+        _ => None,
+    }
 }
 
 /// Match that the given expression is `func(x, y, z, ...)`.
