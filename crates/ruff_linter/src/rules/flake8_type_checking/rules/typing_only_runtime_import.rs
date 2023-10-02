@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{AnyImport, Binding, Imported, NodeId, ResolvedReferenceId, Scope};
 use ruff_text_size::{Ranged, TextRange};
@@ -67,7 +67,7 @@ pub struct TypingOnlyFirstPartyImport {
 }
 
 impl Violation for TypingOnlyFirstPartyImport {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -135,7 +135,7 @@ pub struct TypingOnlyThirdPartyImport {
 }
 
 impl Violation for TypingOnlyThirdPartyImport {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -203,7 +203,7 @@ pub struct TypingOnlyStandardLibraryImport {
 }
 
 impl Violation for TypingOnlyStandardLibraryImport {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

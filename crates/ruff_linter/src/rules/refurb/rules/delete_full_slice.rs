@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::{is_dict, is_list};
@@ -47,7 +47,7 @@ use crate::rules::refurb::helpers::generate_method_call;
 pub struct DeleteFullSlice;
 
 impl Violation for DeleteFullSlice {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

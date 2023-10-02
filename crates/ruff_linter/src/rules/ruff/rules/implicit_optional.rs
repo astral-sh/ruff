@@ -2,7 +2,7 @@ use std::fmt;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::{self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters};
@@ -80,7 +80,7 @@ pub struct ImplicitOptional {
 }
 
 impl Violation for ImplicitOptional {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

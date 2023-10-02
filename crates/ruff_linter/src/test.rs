@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, FixKind};
+use ruff_diagnostics::{Diagnostic, FixAvailability};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -239,15 +239,15 @@ Source with applied fixes:
             let fixable = diagnostic.fix.is_some();
 
             match (fixable, rule.fixable()) {
-                (true, FixKind::Sometimes | FixKind::Always)
-                | (false, FixKind::None | FixKind::Sometimes) => {
+                (true, FixAvailability::Sometimes | FixAvailability::Always)
+                | (false, FixAvailability::None | FixAvailability::Sometimes) => {
                     // Ok
                 }
-                (true, FixKind::None) => {
-                    panic!("Rule {rule:?} is marked as non-fixable but it created a fix. Change the `Violation::FIX_KIND` to either `FixKind::Sometimes` or `FixKind::Always`");
+                (true, FixAvailability::None) => {
+                    panic!("Rule {rule:?} is marked as non-fixable but it created a fix. Change the `Violation::FIX_AVAILABILITY` to either `FixAvailability::Sometimes` or `FixAvailability::Always`");
                 },
-                (false, FixKind::Always) => {
-                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::FIX_KINDd` to either `FixKind::Sometimes` or `FixKind::None")
+                (false, FixAvailability::Always) => {
+                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to either `FixAvailability::Sometimes` or `FixAvailability::None")
                 }
             }
 

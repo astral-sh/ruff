@@ -2,7 +2,7 @@ use std::string::ToString;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixKind, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword};
 use ruff_text_size::{Ranged, TextRange};
@@ -387,7 +387,7 @@ pub struct StringDotFormatExtraNamedArguments {
 }
 
 impl Violation for StringDotFormatExtraNamedArguments {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -428,7 +428,7 @@ pub struct StringDotFormatExtraPositionalArguments {
 }
 
 impl Violation for StringDotFormatExtraPositionalArguments {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

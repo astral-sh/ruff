@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libcst_native::CompOp;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
 use ruff_python_codegen::Stylist;
@@ -52,7 +52,7 @@ pub struct YodaConditions {
 }
 
 impl Violation for YodaConditions {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

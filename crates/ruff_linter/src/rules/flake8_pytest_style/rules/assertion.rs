@@ -7,7 +7,7 @@ use libcst_native::{
     SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace,
 };
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -62,7 +62,7 @@ use super::unittest_assert::UnittestAssert;
 pub struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -192,7 +192,7 @@ pub struct PytestUnittestAssertion {
 }
 
 impl Violation for PytestUnittestAssertion {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -354,7 +354,7 @@ pub struct PytestUnittestRaisesAssertion {
 }
 
 impl Violation for PytestUnittestRaisesAssertion {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -5,7 +5,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
@@ -56,7 +56,7 @@ fn compare_stmt(stmt1: &ComparableStmt, stmt2: &ComparableStmt) -> bool {
 pub struct CollapsibleIf;
 
 impl Violation for CollapsibleIf {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -96,7 +96,7 @@ pub struct NeedlessBool {
 }
 
 impl Violation for NeedlessBool {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -168,7 +168,7 @@ pub struct IfElseBlockInsteadOfIfExp {
 }
 
 impl Violation for IfElseBlockInsteadOfIfExp {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -242,7 +242,7 @@ pub struct IfElseBlockInsteadOfDictGet {
 }
 
 impl Violation for IfElseBlockInsteadOfDictGet {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

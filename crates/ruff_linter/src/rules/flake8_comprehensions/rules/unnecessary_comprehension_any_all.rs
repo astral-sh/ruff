@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Keyword};
 
 use ruff_diagnostics::Violation;
-use ruff_diagnostics::{Diagnostic, FixKind};
+use ruff_diagnostics::{Diagnostic, FixAvailability};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_text_size::Ranged;
@@ -44,7 +44,7 @@ use crate::rules::flake8_comprehensions::fixes;
 pub struct UnnecessaryComprehensionAnyAll;
 
 impl Violation for UnnecessaryComprehensionAnyAll {
-    const FIX_KIND: FixKind = FixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

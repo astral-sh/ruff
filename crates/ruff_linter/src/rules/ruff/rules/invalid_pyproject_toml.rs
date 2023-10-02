@@ -1,4 +1,4 @@
-use ruff_diagnostics::{FixKind, Violation};
+use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 /// ## What it does
@@ -36,7 +36,7 @@ pub struct InvalidPyprojectToml {
 }
 
 impl Violation for InvalidPyprojectToml {
-    const FIX_KIND: FixKind = FixKind::None;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
     fn message(&self) -> String {
