@@ -25,7 +25,7 @@ insta = { version = "1.33.0", feature = ["filters", "glob"] }
 is-macro = { version = "0.3.0" }
 itertools = { version = "0.11.0" }
 log = { version = "0.4.17" }
-memchr = "2.6.3"
+memchr = "2.6.4"
 once_cell = { version = "1.17.1" }
 path-absolutize = { version = "3.1.1" }
 proc-macro2 = { version = "1.0.67" }
