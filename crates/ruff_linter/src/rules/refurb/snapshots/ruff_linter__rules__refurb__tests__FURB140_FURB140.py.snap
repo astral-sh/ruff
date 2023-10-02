@@ -137,10 +137,10 @@ FURB140.py:29:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 27 | # FURB140 (check it still flags starred arguments).
 28 | # See https://github.com/astral-sh/ruff/issues/7636
-29 | [print(*x, y) for x, y in zipped()]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-30 | (print(x, *y) for x, y in zipped())
-31 | {print(*x, *y) for x, y in zipped()}
+29 | [foo(*t) for t in [(85, 60), (100, 80)]]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
+30 | (foo(*t) for t in [(85, 60), (100, 80)])
+31 | {foo(*t) for t in [(85, 60), (100, 80)]}
    |
    = help: Replace with `itertools.starmap`
 
@@ -148,38 +148,38 @@ FURB140.py:29:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 26 26 | 
 27 27 | # FURB140 (check it still flags starred arguments).
 28 28 | # See https://github.com/astral-sh/ruff/issues/7636
-29    |-[print(*x, y) for x, y in zipped()]
-   29 |+list(sm(print, zipped()))
-30 30 | (print(x, *y) for x, y in zipped())
-31 31 | {print(*x, *y) for x, y in zipped()}
+29    |-[foo(*t) for t in [(85, 60), (100, 80)]]
+   29 |+list(sm(foo, [(85, 60), (100, 80)]))
+30 30 | (foo(*t) for t in [(85, 60), (100, 80)])
+31 31 | {foo(*t) for t in [(85, 60), (100, 80)]}
 32 32 | 
 
 FURB140.py:30:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 28 | # See https://github.com/astral-sh/ruff/issues/7636
-29 | [print(*x, y) for x, y in zipped()]
-30 | (print(x, *y) for x, y in zipped())
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-31 | {print(*x, *y) for x, y in zipped()}
+29 | [foo(*t) for t in [(85, 60), (100, 80)]]
+30 | (foo(*t) for t in [(85, 60), (100, 80)])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
+31 | {foo(*t) for t in [(85, 60), (100, 80)]}
    |
    = help: Replace with `itertools.starmap`
 
 ℹ Suggested fix
 27 27 | # FURB140 (check it still flags starred arguments).
 28 28 | # See https://github.com/astral-sh/ruff/issues/7636
-29 29 | [print(*x, y) for x, y in zipped()]
-30    |-(print(x, *y) for x, y in zipped())
-   30 |+sm(print, zipped())
-31 31 | {print(*x, *y) for x, y in zipped()}
+29 29 | [foo(*t) for t in [(85, 60), (100, 80)]]
+30    |-(foo(*t) for t in [(85, 60), (100, 80)])
+   30 |+sm(foo, [(85, 60), (100, 80)])
+31 31 | {foo(*t) for t in [(85, 60), (100, 80)]}
 32 32 | 
 33 33 | # Non-errors.
 
 FURB140.py:31:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
-29 | [print(*x, y) for x, y in zipped()]
-30 | (print(x, *y) for x, y in zipped())
-31 | {print(*x, *y) for x, y in zipped()}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
+29 | [foo(*t) for t in [(85, 60), (100, 80)]]
+30 | (foo(*t) for t in [(85, 60), (100, 80)])
+31 | {foo(*t) for t in [(85, 60), (100, 80)]}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
 32 | 
 33 | # Non-errors.
    |
@@ -187,54 +187,12 @@ FURB140.py:31:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 
 ℹ Suggested fix
 28 28 | # See https://github.com/astral-sh/ruff/issues/7636
-29 29 | [print(*x, y) for x, y in zipped()]
-30 30 | (print(x, *y) for x, y in zipped())
-31    |-{print(*x, *y) for x, y in zipped()}
-   31 |+set(sm(print, zipped()))
+29 29 | [foo(*t) for t in [(85, 60), (100, 80)]]
+30 30 | (foo(*t) for t in [(85, 60), (100, 80)])
+31    |-{foo(*t) for t in [(85, 60), (100, 80)]}
+   31 |+set(sm(foo, [(85, 60), (100, 80)]))
 32 32 | 
 33 33 | # Non-errors.
 34 34 | 
-
-FURB140.py:37:1: FURB140 [*] Use `itertools.starmap` instead of the generator
-   |
-35 | [print(x, int) for x, _ in zipped()]
-36 | 
-37 | [print(x, *y) for x, y in zipped()]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-38 | 
-39 | [print(x, y, 1) for x, y in zipped()]
-   |
-   = help: Replace with `itertools.starmap`
-
-ℹ Suggested fix
-34 34 | 
-35 35 | [print(x, int) for x, _ in zipped()]
-36 36 | 
-37    |-[print(x, *y) for x, y in zipped()]
-   37 |+list(sm(print, zipped()))
-38 38 | 
-39 39 | [print(x, y, 1) for x, y in zipped()]
-40 40 | 
-
-FURB140.py:45:1: FURB140 [*] Use `itertools.starmap` instead of the generator
-   |
-43 | [print(x + 1, y) for x, y in zipped()]
-44 | 
-45 | [print(x) for x in range(100)]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-46 | 
-47 | [print() for x, y in zipped()]
-   |
-   = help: Replace with `itertools.starmap`
-
-ℹ Suggested fix
-42 42 | 
-43 43 | [print(x + 1, y) for x, y in zipped()]
-44 44 | 
-45    |-[print(x) for x in range(100)]
-   45 |+list(sm(print, range(100)))
-46 46 | 
-47 47 | [print() for x, y in zipped()]
-48 48 | 
 
 

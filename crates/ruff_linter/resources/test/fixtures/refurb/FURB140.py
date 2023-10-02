@@ -26,9 +26,9 @@ from itertools import starmap as sm
 
 # FURB140 (check it still flags starred arguments).
 # See https://github.com/astral-sh/ruff/issues/7636
-[print(*x, y) for x, y in zipped()]
-(print(x, *y) for x, y in zipped())
-{print(*x, *y) for x, y in zipped()}
+[foo(*t) for t in [(85, 60), (100, 80)]]
+(foo(*t) for t in [(85, 60), (100, 80)])
+{foo(*t) for t in [(85, 60), (100, 80)]}
 
 # Non-errors.
 
@@ -47,3 +47,9 @@ from itertools import starmap as sm
 [print() for x, y in zipped()]
 
 [print(x, end=y) for x, y in zipped()]
+
+[print(*x, y) for x, y in zipped()]
+
+[print(x, *y) for x, y in zipped()]
+
+[print(*x, *y) for x, y in zipped()]

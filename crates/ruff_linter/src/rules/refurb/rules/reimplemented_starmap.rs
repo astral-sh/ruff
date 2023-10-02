@@ -101,17 +101,23 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
 
     // Here we want to check that `args` and `elts` are the same (same length, same elements,
     // same order).
-    if elts.len() != args.len()
-        || !std::iter::zip(elts, args).all(|(x, y)| {
-            ComparableExpr::from(x) == ComparableExpr::from(y) || {
-                // Check if y is x starred (i.e., `*x`).
-                if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = y {
-                    ComparableExpr::from(value.as_ref()) == ComparableExpr::from(x)
-                } else {
-                    false
-                }
+    if elts.len() != args.len() {
+        return;
+    }
+
+    // If there is only one element (and, thus, one argument), we can still do our fix if the
+    // argument is just the element starred; otherwise, bail.
+    if elts.len() == 1 {
+        if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = args.first().unwrap() {
+            if ComparableExpr::from(value.as_ref()) != ComparableExpr::from(elts.first().unwrap()) {
+                return;
             }
-        })
+        } else {
+            return;
+        }
+    // Otherwise, check that all elements are the same as the arguments.
+    } else if !std::iter::zip(elts, args)
+        .all(|(x, y)| ComparableExpr::from(x) == ComparableExpr::from(y))
     {
         return;
     }
