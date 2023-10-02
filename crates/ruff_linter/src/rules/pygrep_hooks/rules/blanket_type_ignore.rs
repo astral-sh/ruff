@@ -31,7 +31,7 @@ use ruff_text_size::TextSize;
 /// ```
 ///
 /// ## References
-/// - [mypy](https://mypy.readthedocs.io/en/stable/common_issues.html#spurious-errors-and-locally-silencing-the-checker)
+/// - [<ypy](https://mypy.readthedocs.io/en/stable/common_issues.html#spurious-errors-and-locally-silencing-the-checker)
 #[violation]
 pub struct BlanketTypeIgnore;
 

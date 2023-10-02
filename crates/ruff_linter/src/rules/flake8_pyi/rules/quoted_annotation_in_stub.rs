@@ -6,6 +6,26 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for quoted type annotations in stub (`.pyi`) files, which should be avoided.
+///
+/// ## Why is this bad?
+/// Stub files are evaluated using `annotations` semantics, as if
+/// `from __future__ import annotations` were included in the file. As such,
+/// quotes are never required for type annotations in stub files, and should be
+/// omitted.
+///
+/// ## Example
+/// ```python
+/// def function() -> "int":
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def function() -> int:
+///     ...
+/// ```
 #[violation]
 pub struct QuotedAnnotationInStub;
 

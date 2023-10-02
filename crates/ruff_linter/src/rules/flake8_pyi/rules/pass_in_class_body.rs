@@ -7,6 +7,32 @@ use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for the presence of the `pass` statement within a class body
+/// in a stub (`.pyi`) file.
+///
+/// ## Why is this bad?
+/// In stub files, class definitions are intended to provide type hints, but
+/// are never actually evaluated. As such, it's unnecessary to include a `pass`
+/// statement in a class body, since it has no effect.
+///
+/// Instead of `pass`, prefer `...` to indicate that the class body is empty
+/// and adhere to common stub file conventions.
+///
+/// ## Example
+/// ```python
+/// class MyClass:
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class MyClass:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Mypy documentation: Stub files](https://mypy.readthedocs.io/en/stable/stubs.html)
 #[violation]
 pub struct PassInClassBody;
 

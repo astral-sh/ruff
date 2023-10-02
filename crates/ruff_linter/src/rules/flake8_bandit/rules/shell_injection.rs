@@ -88,6 +88,32 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
     }
 }
 
+/// ## What it does
+/// Checks for method calls that set the `shell` parameter to `true` when
+/// invoking a subprocess.
+///
+/// ## Why is this bad?
+/// Setting the `shell` parameter to `true` when invoking a subprocess can
+/// introduce security vulnerabilities, as it allows shell metacharacters and
+/// whitespace to be passed to child processes, potentially leading to shell
+/// injection attacks. It is recommended to avoid using `shell=True` unless
+/// absolutely necessary, and when used, to ensure that all inputs are properly
+/// sanitized and quoted to prevent such vulnerabilities.
+///
+/// ## Known problems
+/// Prone to false positives as it is triggered on any function call with a
+/// `shell=True` parameter.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// user_input = input("Enter a command: ")
+/// subprocess.run(user_input, shell=True)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Security Considerations](https://docs.python.org/3/library/subprocess.html#security-considerations)
 #[violation]
 pub struct CallWithShellEqualsTrue;
 
@@ -98,6 +124,42 @@ impl Violation for CallWithShellEqualsTrue {
     }
 }
 
+/// ## What it does
+/// Checks for calls that start a process with a shell, providing guidance on
+/// whether the usage is safe or not.
+///
+/// ## Why is this bad?
+/// Starting a process with a shell can introduce security risks, such as
+/// code injection vulnerabilities. It's important to be aware of whether the
+/// usage of the shell is safe or not.
+///
+/// This rule triggers on functions like `os.system`, `popen`, etc., which
+/// start processes with a shell. It evaluates whether the provided command
+/// is a literal string or an expression. If the command is a literal string,
+/// it's considered safe. If the command is an expression, it's considered
+/// (potentially) unsafe.
+///
+/// ## Example
+/// ```python
+/// import os
+///
+/// # Safe usage (literal string)
+/// command = "ls -l"
+/// os.system(command)
+///
+/// # Potentially unsafe usage (expression)
+/// cmd = get_user_input()
+/// os.system(cmd)
+/// ```
+///
+/// ## Note
+/// The `subprocess` module provides more powerful facilities for spawning new
+/// processes and retrieving their results, and using that module is preferable
+/// to using `os.system` or similar functions. Consider replacing such usages
+/// with `subprocess.call` or related functions.
+///
+/// ## References
+/// - [Python documentation: `subprocess`](https://docs.python.org/3/library/subprocess.html)
 #[violation]
 pub struct StartProcessWithAShell {
     seems_safe: bool,
@@ -114,6 +176,26 @@ impl Violation for StartProcessWithAShell {
     }
 }
 
+/// ## What it does
+/// Checks for functions that start a process without a shell.
+///
+/// ## Why is this bad?
+/// The `subprocess` module provides more powerful facilities for spawning new
+/// processes and retrieving their results; using that module is preferable to
+/// using these functions.
+///
+/// ## Example
+/// ```python
+/// os.spawnlp(os.P_NOWAIT, "/bin/mycmd", "mycmd", "myarg")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// subprocess.Popen(["/bin/mycmd", "myarg"])
+/// ```
+///
+/// ## References
+/// - [Python documentation: Replacing the `os.spawn` family](https://docs.python.org/3/library/subprocess.html#replacing-the-os-spawn-family)
 #[violation]
 pub struct StartProcessWithNoShell;
 

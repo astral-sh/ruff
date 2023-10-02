@@ -5,6 +5,22 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for type aliases that do not use the CamelCase naming convention.
+///
+/// ## Why is this bad?
+/// It's conventional to use the CamelCase naming convention for type aliases,
+/// to distinguish them from other variables.
+///
+/// ## Example
+/// ```python
+/// type_alias_name: TypeAlias = int
+/// ```
+///
+/// Use instead:
+/// ```python
+/// TypeAliasName: TypeAlias = int
+/// ```
 #[violation]
 pub struct SnakeCaseTypeAlias {
     name: String,
@@ -18,6 +34,25 @@ impl Violation for SnakeCaseTypeAlias {
     }
 }
 
+/// ## What it does
+/// Checks for private type alias definitions suffixed with 'T'.
+///
+/// ## Why is this bad?
+/// It's conventional to use the 'T' suffix for type variables; the use of
+/// such a suffix implies that the object is a `TypeVar`.
+///
+/// Adding the 'T' suffix to a non-`TypeVar`, it can be misleading and should
+/// be avoided.
+///
+/// ## Example
+/// ```python
+/// MyTypeT = int
+/// ```
+///
+/// Use instead:
+/// ```python
+/// MyType = int
+/// ```
 #[violation]
 pub struct TSuffixedTypeAlias {
     name: String,
