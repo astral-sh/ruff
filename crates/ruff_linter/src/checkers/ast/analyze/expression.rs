@@ -449,6 +449,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::RedundantOpenModes) {
                 pyupgrade::rules::redundant_open_modes(checker, call);
             }
+            if checker.enabled(Rule::BadOpenMode) {
+                pylint::rules::bad_open_mode(checker, call);
+            }
             if checker.enabled(Rule::NativeLiterals) {
                 pyupgrade::rules::native_literals(
                     checker,
