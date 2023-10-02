@@ -2557,7 +2557,7 @@ pub struct FormatOptions {
     /// * `native`: Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     #[option(
         default = r#"lf"#,
-        value_type = r#""lf" | "crlf" | "auto" | "native""#,
+        value_type = r#""lf" | "cr-lf" | "auto" | "native""#,
         example = r#"
             # Automatically detect the line ending on a file per file basis.
             line-ending = "auto"
