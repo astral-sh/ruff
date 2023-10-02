@@ -1,30 +1,31 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{
+    self as ast, Constant, Expr, ExprAttribute, ExprCall, StmtContinue, StmtFor, StmtMatch,
+};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest, registry::AsRule};
 
 /// ## What it does
-/// TODO
+/// Checks for redundant and useless trailing `continue` statements.
 ///
 /// ## Why is this bad?
-/// TODO
-///
+/// Trailing `continue` statements are unnecessary and can be removed to simplify the code.
 ///
 /// ## Example
 /// ```python
-/// def func():
-///     while True:
+/// for x in range(10):
+///     if x:
 ///         pass
-///
+///     else:
 ///         continue
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def func():
-///     while True:
+/// for x in range(10):
+///     if x:
 ///         pass
 /// ```
 ///
@@ -34,68 +35,82 @@ use crate::{checkers::ast::Checker, importer::ImportRequest, registry::AsRule};
 #[violation]
 pub struct RedundantContinue;
 
-impl Violation for ImplicitCwd {
+impl Violation for RedundantContinue {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Don't explicitly continue if you are already at the end of the control flow")
     }
 }
 
-/// FURB133
-pub(crate) fn redundant_continue(checker: &mut Checker, continue_stmt: &ast::Continue) {}
-
-fn get_trailing_continue(node: Statement) -> impl Iterator<Item = Statement> {
+fn get_trailing_continue(node: &ast::Stmt) -> Vec<&ast::StmtContinue> {
     match node {
-        Statement::ContinueStmt(_) => vec![node].into_iter(),
-        Statement::MatchStmt { bodies, patterns } => bodies
-            .into_iter()
-            .zip(patterns.into_iter())
-            .flat_map(|(body, pattern)| match (&*body.body, pattern) {
-                (
-                    _,
-                    Pattern::AsPattern {
-                        pattern: None,
-                        name: None,
-                    },
-                ) => Vec::new().into_iter(),
-
-                (vec![Statement::ContinueStmt(_)], _) => vec![].into_iter(),
-
-                _ => get_trailing_continue(body.body.last().unwrap()),
-            }),
-        _ => {
-            let stmt = match node {
-                Statement::IfStmt {
-                    else_body: Block { body },
-                    ..
+        ast::Stmt::StmtContinue(_) => vec![node],
+        ast::Stmt::StmtMatch { bodies, patterns } => {
+            let mut continues = vec![];
+            for (body, pattern) in bodies.iter().zip(patterns) {
+                match (body.body.last(), pattern) {
+                    (
+                        _,
+                        ast::Pattern::AsPattern {
+                            pattern: None,
+                            name: None,
+                        },
+                    ) => (),
+                    (Some(ast::Stmt::StmtContinue(_)), _) => continue,
+                    _ => continues.extend(get_trailing_continue(body.body.last().unwrap())),
                 }
-                | Statement::WithStmt {
-                    body: Block { body },
-                    ..
-                } => body.last().unwrap(),
-                _ => return Vec::new().into_iter(),
-            };
-            get_trailing_continue(stmt)
+            }
+            continues
         }
+        ast::Stmt::IfStmt {
+            else_body: Some(ast::Block { body }),
+            ..
+        }
+        | ast::Stmt::WithStmt {
+            body: ast::Block { body },
+            ..
+        } => get_trailing_continue(body.last().unwrap()),
+        _ => vec![],
     }
 }
 
-fn check(node: Statement, errors: &mut Vec<Error>) {
+fn check(node: &ast::Stmt, errors: &mut Vec<Diagnostic>) {
     match node {
-        Statement::ForStmt {
-            body: Block { body },
+        ast::Stmt::ForStmt {
+            body: ast::Block { body },
             ..
         }
-        | Statement::WhileStmt {
-            body: Block { body },
+        | ast::Stmt::WhileStmt {
+            body: ast::Block { body },
             ..
         } => {
-            if let vec![stmt @ Statement::ContinueStmt(_)] = &*body {
-                return;
+            if body.len() > 1 {
+                if let Some(ast::Stmt::StmtContinue(_)) = body.last() {
+                    return;
+                }
             }
-
-            errors.extend(get_trailing_continue(body.last().unwrap()).map(ErrorInfo::from_node));
+            errors.extend(
+                get_trailing_continue(body.last().unwrap())
+                    .into_iter()
+                    .map(|x| Diagnostic::new(RedundantContinue, x.range())),
+            );
         }
         _ => (),
+    }
+}
+
+pub(crate) fn redundant_continue(checker: &mut Checker, continue_stmt: &ast::Continue) {
+    let mut errors = vec![];
+    check(continue_stmt, &mut errors);
+    for error in errors {
+        if checker.patch(error.kind.rule()) {
+            error.try_set_fix(|| {
+                Ok(Fix::suggested_edits(
+                    Edit::range_replacement("", error.range()),
+                    [],
+                ))
+            });
+        }
+        checker.diagnostics.push(error);
     }
 }
