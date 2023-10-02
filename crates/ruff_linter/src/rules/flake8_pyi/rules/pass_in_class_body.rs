@@ -9,14 +9,15 @@ use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for the presence of the `pass` statement within a class body
-/// in a stub file, which is not allowed according to the recommended
-/// convention for stub files.
+/// in a stub (`.pyi`) file.
 ///
 /// ## Why is this bad?
-/// In stub files, Python code is written to provide type hints and
-/// annotations without including actual runtime logic. The `pass` statement
-/// serves no purpose in a stub file and should be omitted to maintain
-/// consistency with the stub file convention.
+/// In stub files, class definitions are intended to provide type hints, but
+/// are never actually evaluated. As such, it's unnecessary to include a `pass`
+/// statement in a class body, since it has no effect.
+///
+/// Instead of `pass`, prefer `...` to indicate that the class body is empty
+/// and adhere to common stub file conventions.
 ///
 /// ## Example
 /// ```python
@@ -31,7 +32,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Mypy Stub Files Documentation](https://mypy.readthedocs.io/en/stable/stubs.html)
+/// - [Mypy documentation: Stub files](https://mypy.readthedocs.io/en/stable/stubs.html)
 #[violation]
 pub struct PassInClassBody;
 

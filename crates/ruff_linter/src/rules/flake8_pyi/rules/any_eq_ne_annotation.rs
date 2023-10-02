@@ -35,7 +35,7 @@ use crate::registry::AsRule;
 /// ```
 /// ## References
 /// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)
-/// - [Mypy documentation](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
+/// - [Mypy documentation: Any vs. object](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
 #[violation]
 pub struct AnyEqNeAnnotation {
     method_name: String,

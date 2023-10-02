@@ -9,9 +9,13 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of the `from __future__ import annotations` import
 /// statement in stub files.
 ///
-/// Why is this bad?
-/// Stub files already have the semantics of the annotations feature and thus
-/// this import statement is not required.
+/// ## Why is this bad?
+/// Stub files are already evaluated under `annotations` semantics. As such,
+/// the `from __future__ import annotations` import statement has no effect
+/// and should be omitted.
+///
+/// ## Resources
+/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
 #[violation]
 pub struct FutureAnnotationsInStub;
 
