@@ -661,7 +661,11 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator().line_start(stmt.start());
     if LineWidthBuilder::new(checker.settings.tab_size)
-        .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt.start())])
+        .add_str(
+            checker
+                .locator()
+                .slice(TextRange::new(line_start, stmt.start())),
+        )
         .add_str(&contents)
         > checker.settings.line_length
     {
@@ -965,7 +969,11 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator().line_start(stmt_if.start());
     if LineWidthBuilder::new(checker.settings.tab_size)
-        .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt_if.start())])
+        .add_str(
+            checker
+                .locator()
+                .slice(TextRange::new(line_start, stmt_if.start())),
+        )
         .add_str(&contents)
         > checker.settings.line_length
     {

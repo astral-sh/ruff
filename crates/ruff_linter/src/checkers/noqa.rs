@@ -230,7 +230,13 @@ fn delete_noqa(range: TextRange, locator: &Locator) -> Edit {
         Edit::deletion(range.start() - leading_space_len, line_range.end())
     }
     // Ex) `x = 1  # noqa  # type: ignore`
-    else if locator.contents()[usize::from(range.end() + trailing_space_len)..].starts_with('#') {
+    else if locator
+        .slice(TextRange::new(
+            range.end() + trailing_space_len,
+            line_range.end(),
+        ))
+        .starts_with('#')
+    {
         Edit::deletion(range.start(), range.end() + trailing_space_len)
     }
     // Ex) `x = 1  # noqa here`
