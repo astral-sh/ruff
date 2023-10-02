@@ -1260,8 +1260,7 @@ checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 [[package]]
 name = "libcst"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7773d520d4292e200ab1838f2daabe2feed7549f93b0a3c7582160a09e79ffde"
+source = "git+https://github.com/Instagram/LibCST.git?rev=03179b55ebe7e916f1722e18e8f0b87c01616d1f#03179b55ebe7e916f1722e18e8f0b87c01616d1f"
 dependencies = [
  "chic",
  "libcst_derive",
@@ -1275,8 +1274,7 @@ dependencies = [
 [[package]]
 name = "libcst_derive"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "520197c50ba477f258cd7005ec5ed3a7393693ae6bec664990c7c8d9306a7c0d"
+source = "git+https://github.com/Instagram/LibCST.git?rev=03179b55ebe7e916f1722e18e8f0b87c01616d1f#03179b55ebe7e916f1722e18e8f0b87c01616d1f"
 dependencies = [
  "quote",
  "syn 1.0.109",

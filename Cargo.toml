@@ -53,8 +53,7 @@ unicode-width = "0.1.11"
 uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 wsl = { version = "0.1.0" }
 
-# v1.0.1
-libcst = { version = "0.1.0", default-features = false }
+libcst = { git = "https://github.com/Instagram/LibCST.git", rev = "03179b55ebe7e916f1722e18e8f0b87c01616d1f", default-features = false }
 
 [profile.release]
 lto = "fat"
