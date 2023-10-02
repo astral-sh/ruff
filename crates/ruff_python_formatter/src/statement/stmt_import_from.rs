@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::parentheses::parenthesized;
+use crate::other::identifier::DotDelimitedIdentifier;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -31,7 +32,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
                     }
                     Ok(())
                 }),
-                module.as_ref().map(AsFormat::format),
+                module.as_ref().map(DotDelimitedIdentifier::new),
                 space(),
                 token("import"),
                 space(),
