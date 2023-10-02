@@ -402,7 +402,7 @@ pub(crate) fn lint_stdin(
             match fix_mode {
                 flags::FixMode::Apply => {
                     // Write the contents to stdout, regardless of whether any errors were fixed.
-                    io::stdout().write_all(transformed.source_code().as_bytes())?;
+                    transformed.write(&mut io::stdout().lock())?;
                 }
                 flags::FixMode::Diff => {
                     // But only write a diff if it's non-empty.
@@ -441,7 +441,7 @@ pub(crate) fn lint_stdin(
 
             // Write the contents to stdout anyway.
             if fix_mode.is_apply() {
-                io::stdout().write_all(source_kind.source_code().as_bytes())?;
+                source_kind.write(&mut io::stdout().lock())?;
             }
 
             (result, fixed)
