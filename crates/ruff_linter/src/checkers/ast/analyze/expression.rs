@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::rules::ruff::rules;
 use crate::rules::{
     flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
     flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
@@ -975,6 +976,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ExplicitFStringTypeConversion) {
                 ruff::rules::explicit_f_string_type_conversion(checker, expr, values);
+            }
+            if checker.enabled(Rule::FStringEqualToShorthand) {
+                ruff::rules::f_string_equal_to_shorthand(checker, expr, values);
             }
         }
         Expr::BinOp(ast::ExprBinOp {
