@@ -359,7 +359,7 @@ fn stdin_fix_when_no_issues_should_still_print_contents() {
 
 #[test]
 fn stdin_format_jupyter() {
-    let args = ["format", "--stdin-filename", "Jupyter.ipynb"];
+    let args = ["format", "--stdin-filename", "Jupyter.ipynb", "--isolated"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(args)
         .pass_stdin(r#"{
@@ -483,8 +483,6 @@ fn stdin_format_jupyter() {
 
     ----- stderr -----
     warning: `ruff format` is a work-in-progress, subject to change at any time, and intended only for experimentation.
-    warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
-    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
     "###);
 }
 

@@ -14,7 +14,6 @@ use filetime::FileTime;
 use log::{debug, error, warn};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
-use thiserror::Error;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
@@ -23,12 +22,12 @@ use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::{flags, LinterSettings};
-use ruff_linter::source_kind::SourceKind;
+use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_macros::CacheKey;
 use ruff_notebook::{Cell, Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
+use ruff_python_ast::{SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
@@ -82,15 +81,38 @@ impl Diagnostics {
         }
     }
 
-    /// Generate [`Diagnostics`] based on a [`SourceExtractionError`].
+    /// Generate [`Diagnostics`] based on a [`SourceError`].
     pub(crate) fn from_source_error(
-        err: &SourceExtractionError,
+        err: &SourceError,
         path: Option<&Path>,
         settings: &LinterSettings,
     ) -> Self {
-        let diagnostic = Diagnostic::from(err);
+        let diagnostic = match err {
+            // IO errors.
+            SourceError::Io(_)
+            | SourceError::Notebook(NotebookError::Io(_) | NotebookError::Json(_)) => {
+                Diagnostic::new(
+                    IOError {
+                        message: err.to_string(),
+                    },
+                    TextRange::default(),
+                )
+            }
+            // Syntax errors.
+            SourceError::Notebook(
+                NotebookError::InvalidJson(_)
+                | NotebookError::InvalidSchema(_)
+                | NotebookError::InvalidFormat(_),
+            ) => Diagnostic::new(
+                SyntaxError {
+                    message: err.to_string(),
+                },
+                TextRange::default(),
+            ),
+        };
+
         if settings.rules.enabled(diagnostic.kind.rule()) {
-            let name = path.map_or_else(|| "-".into(), std::path::Path::to_string_lossy);
+            let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
             let dummy = SourceFileBuilder::new(name, "").finish();
             Self::new(
                 vec![Message::from_diagnostic(
@@ -183,13 +205,12 @@ pub(crate) fn lint_path(
                 .iter_enabled()
                 .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
             {
-                let contents =
-                    match std::fs::read_to_string(path).map_err(SourceExtractionError::Io) {
-                        Ok(contents) => contents,
-                        Err(err) => {
-                            return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
-                        }
-                    };
+                let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
+                    Ok(contents) => contents,
+                    Err(err) => {
+                        return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
+                    }
+                };
                 let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
                 lint_pyproject_toml(source_file, settings)
             } else {
@@ -205,8 +226,8 @@ pub(crate) fn lint_path(
     };
 
     // Extract the sources from the file.
-    let LintSource(source_kind) = match LintSource::try_from_path(path, source_type) {
-        Ok(Some(sources)) => sources,
+    let source_kind = match SourceKind::from_path(path, source_type) {
+        Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
             return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
@@ -371,8 +392,8 @@ pub(crate) fn lint_stdin(
     };
 
     // Extract the sources from the file.
-    let LintSource(source_kind) = match LintSource::try_from_source_code(contents, source_type) {
-        Ok(Some(sources)) => sources,
+    let source_kind = match SourceKind::from_source_code(contents, source_type) {
+        Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
             return Ok(Diagnostics::from_source_error(&err, path, &settings.linter));
@@ -486,81 +507,4 @@ pub(crate) fn lint_stdin(
         imports,
         notebook_indexes,
     })
-}
-
-#[derive(Debug)]
-pub(crate) struct LintSource(pub(crate) SourceKind);
-
-impl LintSource {
-    /// Extract the lint [`LintSource`] from the given file path.
-    pub(crate) fn try_from_path(
-        path: &Path,
-        source_type: PySourceType,
-    ) -> Result<Option<LintSource>, SourceExtractionError> {
-        if source_type.is_ipynb() {
-            let notebook = Notebook::from_path(path)?;
-            Ok(notebook
-                .is_python_notebook()
-                .then_some(LintSource(SourceKind::IpyNotebook(notebook))))
-        } else {
-            // This is tested by ruff_cli integration test `unreadable_file`
-            let contents = std::fs::read_to_string(path)?;
-            Ok(Some(LintSource(SourceKind::Python(contents))))
-        }
-    }
-
-    /// Extract the lint [`LintSource`] from the raw string contents, optionally accompanied by a
-    /// file path indicating the path to the file from which the contents were read. If provided,
-    /// the file path should be used for diagnostics, but not for reading the file from disk.
-    pub(crate) fn try_from_source_code(
-        source_code: String,
-        source_type: PySourceType,
-    ) -> Result<Option<LintSource>, SourceExtractionError> {
-        if source_type.is_ipynb() {
-            let notebook = Notebook::from_source_code(&source_code)?;
-            Ok(notebook
-                .is_python_notebook()
-                .then_some(LintSource(SourceKind::IpyNotebook(notebook))))
-        } else {
-            Ok(Some(LintSource(SourceKind::Python(source_code))))
-        }
-    }
-}
-
-#[derive(Error, Debug)]
-pub(crate) enum SourceExtractionError {
-    /// The extraction failed due to an [`io::Error`].
-    #[error(transparent)]
-    Io(#[from] io::Error),
-    /// The extraction failed due to a [`NotebookError`].
-    #[error(transparent)]
-    Notebook(#[from] NotebookError),
-}
-
-impl From<&SourceExtractionError> for Diagnostic {
-    fn from(err: &SourceExtractionError) -> Self {
-        match err {
-            // IO errors.
-            SourceExtractionError::Io(_)
-            | SourceExtractionError::Notebook(NotebookError::Io(_) | NotebookError::Json(_)) => {
-                Diagnostic::new(
-                    IOError {
-                        message: err.to_string(),
-                    },
-                    TextRange::default(),
-                )
-            }
-            // Syntax errors.
-            SourceExtractionError::Notebook(
-                NotebookError::InvalidJson(_)
-                | NotebookError::InvalidSchema(_)
-                | NotebookError::InvalidFormat(_),
-            ) => Diagnostic::new(
-                SyntaxError {
-                    message: err.to_string(),
-                },
-                TextRange::default(),
-            ),
-        }
-    }
 }

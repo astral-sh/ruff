@@ -74,28 +74,27 @@ fn format_source_code(
 ) -> Result<FormatCommandResult, FormatCommandError> {
     // Read the source from stdin.
     let source_code = read_from_stdin()
-        .map_err(|err| FormatCommandError::Read(path.map(Into::into), err.into()))?;
-    let source_kind = SourceKind::from_source_code(source_code, source_type)
-        .map_err(|err| FormatCommandError::Read(path.map(Into::into), err))?;
+        .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err.into()))?;
 
-    // Format the source, and write to stdout regardless of the mode.
-    if let Some(formatted) = format_source(&source_kind, source_type, path, settings)? {
-        if mode.is_write() {
-            let mut writer = stdout().lock();
-            formatted
-                .write(&mut writer)
-                .map_err(|err| FormatCommandError::Write(path.map(Into::into), err))?;
+    let source_kind = match SourceKind::from_source_code(source_code, source_type) {
+        Ok(Some(source_kind)) => source_kind,
+        Ok(None) => return Ok(FormatCommandResult::Unchanged),
+        Err(err) => {
+            return Err(FormatCommandError::Read(path.map(Path::to_path_buf), err));
         }
+    };
 
-        Ok(FormatCommandResult::Formatted)
-    } else {
-        if mode.is_write() {
-            let mut writer = stdout().lock();
-            source_kind
-                .write(&mut writer)
-                .map_err(|err| FormatCommandError::Write(path.map(Into::into), err))?;
-        }
+    // Format the source.
+    let formatted = format_source(source_kind, source_type, path, settings)?;
 
-        Ok(FormatCommandResult::Unchanged)
+    // Write to stdout regardless of whether the source was formatted.
+    if mode.is_write() {
+        let mut writer = stdout().lock();
+        formatted
+            .source_kind()
+            .write(&mut writer)
+            .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
     }
+
+    Ok(FormatCommandResult::from(formatted))
 }
