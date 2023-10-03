@@ -286,10 +286,9 @@ pub(crate) fn lint_path(
                                     // mutated it.
                                     let src_notebook = source_kind.as_ipy_notebook().unwrap();
                                     let mut stdout = io::stdout().lock();
-                                    for ((idx, src_cell), dest_cell) in src_notebook
-                                        .cells()
-                                        .iter()
-                                        .enumerate()
+                                    // Cell indices are 1-based.
+                                    for ((idx, src_cell), dest_cell) in (1u32..)
+                                        .zip(src_notebook.cells().iter())
                                         .zip(dest_notebook.cells().iter())
                                     {
                                         let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) =
