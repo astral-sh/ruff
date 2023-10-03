@@ -237,14 +237,12 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
-    // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
-    //   print them to stdout, if we're reading from stdin) for [`Applicability::Automatic`] rules
-    //   only.
-    // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   fixes) for [`Applicability::Automatic`] rules only.
-    // - If `--fix--suggested` is set, the above rules will apply to both [`Applicability::Suggested`] and
-    //   [`Applicability::Automatic`] fixes.
-    // TODO: can't fix this until @zanieb changes the CLI
+    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem (or
+    //   print them to stdout, if we're reading from stdin).
+    // - If `--diff` or `--fix-only` are set, don't print any violations (only applicable fixes)
+    // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
+    //   `--fix--suggested` is set, then [`Applicablility::Suggested`] fixes are included.
+
     let fix_suggested = if fix_suggested {
         SuggestedFixes::Apply
     } else {
@@ -256,7 +254,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     } else if fix || fix_only {
         FixMode::Apply(fix_suggested)
     } else {
-        // We'll always generate all fixes, regardless of [`Applicability`], in `generate` mode
+        // Always generate all fixes, regardless of [`Applicability`], in `generate` mode
         FixMode::Generate(SuggestedFixes::Apply)
     };
 
