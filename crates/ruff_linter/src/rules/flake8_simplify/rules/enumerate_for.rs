@@ -8,14 +8,14 @@ use ruff_python_ast::traversal;
 
 use crate::checkers::ast::Checker;
 
-/// ### What it does
+/// ## What it does
 /// Checks for loops which has explicit loop-index variables that can be simplified by using `enumerate()`.
 ///
-/// ## Why this is bad ?
+/// ## Why this is bad?
 /// Using `enumerate()` is more readable and concise. It could lead to more efficient
 /// and less error-prone code.
 ///
-/// ### Example
+/// ## Example
 /// ```python
 /// sum = 0
 /// idx = 0
@@ -24,7 +24,7 @@ use crate::checkers::ast::Checker;
 ///   idx += 1
 /// ```
 ///
-/// Use `enumerate()` instead:
+/// Use instead:
 /// ```python
 /// sum = 0
 /// for idx, item in enumerate(items):
