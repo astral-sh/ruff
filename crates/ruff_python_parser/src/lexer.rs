@@ -620,7 +620,7 @@ impl<'source> Lexer<'source> {
                     }
                 }
                 '{' => {
-                    if self.cursor.second() == '{' {
+                    if self.cursor.second() == '{' && !fstring.is_in_format_spec(self.nesting) {
                         self.cursor.bump();
                         normalized
                             .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
@@ -2047,7 +2047,7 @@ def f(arg=%timeit a = b):
 
     #[test]
     fn test_fstring_with_format_spec() {
-        let source = r#"f"{foo:} {x=!s:.3f} {x:.{y}f} {'':*^{1:{1}}}""#;
+        let source = r#"f"{foo:} {x=!s:.3f} {x:.{y}f} {'':*^{1:{1}}} {x:{{1}.pop()}}""#;
         assert_debug_snapshot!(lex_source(source));
     }
 
