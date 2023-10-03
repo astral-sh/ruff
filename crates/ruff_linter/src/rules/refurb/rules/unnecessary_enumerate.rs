@@ -25,6 +25,14 @@ use crate::registry::AsRule;
 /// `range(len(...))` or the sequence itself, respectively, instead. This is
 /// more efficient and communicates the intent of the code more clearly.
 ///
+/// ## Known problems
+/// This rule is prone to false negatives due to type inference limitations;
+/// namely, it will only suggest a fix using the `len` builtin function if the
+/// sequence passed to `enumerate` is an instantiated as a list, set, dict, or
+/// tuple literal, or annotated as such with a type annotation. This is because
+/// the `len` builtin function is not defined for all object types (such as
+/// generators).
+///
 /// ## Example
 /// ```python
 /// for index, _ in enumerate(sequence):
