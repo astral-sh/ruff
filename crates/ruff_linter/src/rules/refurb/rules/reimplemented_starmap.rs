@@ -82,7 +82,7 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
     // ```
     //
     // `x, y, z, ...` are what we call `elts` for short.
-    let Some((elts, iter)) = match_comprehension(comprehension) else {
+    let Some(value) = match_comprehension_target(comprehension) else {
         return;
     };
 
@@ -99,27 +99,30 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
         return;
     };
 
-    // Here we want to check that `args` and `elts` are the same (same length, same elements,
-    // same order).
-    if elts.len() != args.len() {
-        return;
-    }
+    match value {
+        // Ex) `f(*x) for x in iter`
+        ComprehensionTarget::Name(name) => {
+            let [arg] = args else {
+                return;
+            };
 
-    // If there is only one element (and, thus, one argument), we can still do our fix if the
-    // argument is just the element starred; otherwise, bail.
-    if elts.len() == 1 {
-        if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = args.first().unwrap() {
-            if ComparableExpr::from(value.as_ref()) != ComparableExpr::from(elts.first().unwrap()) {
+            let Expr::Starred(ast::ExprStarred { value, .. }) = arg else {
+                return;
+            };
+
+            if ComparableExpr::from(value.as_ref()) != ComparableExpr::from(name) {
                 return;
             }
-        } else {
-            return;
         }
-    // Otherwise, check that all elements are the same as the arguments.
-    } else if !std::iter::zip(elts, args)
-        .all(|(x, y)| ComparableExpr::from(x) == ComparableExpr::from(y))
-    {
-        return;
+        // Ex) `f(x, y, z) for x, y, z in iter`
+        ComprehensionTarget::Tuple(tuple) => {
+            if tuple.elts.len() != args.len()
+                || !std::iter::zip(&tuple.elts, args)
+                    .all(|(x, y)| ComparableExpr::from(x) == ComparableExpr::from(y))
+            {
+                return;
+            }
+        }
     }
 
     let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
@@ -141,7 +144,7 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
             // - For list and set comprehensions, we'd want to wrap it with `list` and `set`
             //   correspondingly.
             let main_edit = Edit::range_replacement(
-                target.try_make_suggestion(starmap_name, iter, func, checker)?,
+                target.try_make_suggestion(starmap_name, &comprehension.iter, func, checker)?,
                 target.range(),
             );
             Ok(Fix::suggested_edits(import_edit, [main_edit]))
@@ -266,7 +269,7 @@ fn try_construct_call(
     // We can only do our fix if `builtin` identifier is still bound to
     // the built-in type.
     if !checker.semantic().is_builtin(builtin) {
-        bail!(format!("Can't use built-in `{builtin}` constructor"))
+        bail!("Can't use built-in `{builtin}` constructor")
     }
 
     // In general, we replace:
@@ -320,20 +323,22 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: &str) -> ast::ExprCall {
     }
 }
 
-/// Match that the given comprehension is `(x, y, z, ...) in iter`.
-fn match_comprehension(comprehension: &ast::Comprehension) -> Option<(&[Expr], &Expr)> {
+#[derive(Debug)]
+enum ComprehensionTarget<'a> {
+    /// E.g., `(x, y, z, ...)` in `(x, y, z, ...) in iter`.
+    Tuple(&'a ast::ExprTuple),
+    /// E.g., `x` in `x in iter`.
+    Name(&'a ast::ExprName),
+}
+
+/// Extract the target from the comprehension (e.g., `(x, y, z)` in `(x, y, z, ...) in iter`).
+fn match_comprehension_target(comprehension: &ast::Comprehension) -> Option<ComprehensionTarget> {
     if comprehension.is_async || !comprehension.ifs.is_empty() {
         return None;
     }
-
     match &comprehension.target {
-        // Get the elements of the tuple.
-        ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => Some((elts, &comprehension.iter)),
-        // If there is only one element, it might still be starred later on.
-        ast::Expr::Name(_) => {
-            let elt = std::slice::from_ref(&comprehension.target);
-            Some((elt, &comprehension.iter))
-        }
+        Expr::Tuple(tuple) => Some(ComprehensionTarget::Tuple(tuple)),
+        Expr::Name(name) => Some(ComprehensionTarget::Name(name)),
         _ => None,
     }
 }
