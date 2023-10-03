@@ -44,4 +44,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy playground/dist --project-name=ruff-playground --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}
+          # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
+          command: pages deploy playground/dist --project-name=ruff-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}
