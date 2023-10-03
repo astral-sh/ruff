@@ -2,7 +2,7 @@ use std::io::stdout;
 use std::path::Path;
 
 use anyhow::Result;
-use log::warn;
+use log::error;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -10,7 +10,7 @@ use ruff_workspace::resolver::python_file_at_path;
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
-use crate::commands::format::{format_source, FormatCommandError, FormatCommandResult, FormatMode};
+use crate::commands::format::{format_source, FormatCommandError, FormatMode, FormatResult};
 use crate::resolve::resolve;
 use crate::stdin::read_from_stdin;
 use crate::ExitStatus;
@@ -59,7 +59,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
             }
         },
         Err(err) => {
-            warn!("{err}");
+            error!("{err}");
             Ok(ExitStatus::Error)
         }
     }
@@ -71,14 +71,14 @@ fn format_source_code(
     settings: &FormatterSettings,
     source_type: PySourceType,
     mode: FormatMode,
-) -> Result<FormatCommandResult, FormatCommandError> {
+) -> Result<FormatResult, FormatCommandError> {
     // Read the source from stdin.
     let source_code = read_from_stdin()
         .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err.into()))?;
 
     let source_kind = match SourceKind::from_source_code(source_code, source_type) {
         Ok(Some(source_kind)) => source_kind,
-        Ok(None) => return Ok(FormatCommandResult::Unchanged),
+        Ok(None) => return Ok(FormatResult::Unchanged),
         Err(err) => {
             return Err(FormatCommandError::Read(path.map(Path::to_path_buf), err));
         }
@@ -96,5 +96,5 @@ fn format_source_code(
             .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
     }
 
-    Ok(FormatCommandResult::from(formatted))
+    Ok(FormatResult::from(formatted))
 }
