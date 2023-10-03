@@ -185,8 +185,8 @@ impl Printer {
             SerializationFormat::Text => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, &fixables))
-                    .with_show_fix_diff(self.flags.contains(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
+                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
+                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
