@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 ---
-LOG009.py:3:1: LOG009 [*] Use of undocumented `logging.WARN` constant
+LOG009.py:3:1: LOG009 [**] Use of undocumented `logging.WARN` constant
   |
 1 | import logging
 2 | 
@@ -20,7 +20,7 @@ LOG009.py:3:1: LOG009 [*] Use of undocumented `logging.WARN` constant
 5 5 | 
 6 6 | from logging import WARN, WARNING
 
-LOG009.py:8:1: LOG009 [*] Use of undocumented `logging.WARN` constant
+LOG009.py:8:1: LOG009 [**] Use of undocumented `logging.WARN` constant
   |
 6 | from logging import WARN, WARNING
 7 | 

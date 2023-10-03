@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP017.py:7:7: UP017 [*] Use `datetime.UTC` alias
+UP017.py:7:7: UP017 [**] Use `datetime.UTC` alias
   |
 6 | print(datetime.timezone(-1))
 7 | print(timezone.utc)
@@ -20,7 +20,7 @@ UP017.py:7:7: UP017 [*] Use `datetime.UTC` alias
 9 9 | 
 10 10 | print(datetime.timezone.utc)
 
-UP017.py:8:7: UP017 [*] Use `datetime.UTC` alias
+UP017.py:8:7: UP017 [**] Use `datetime.UTC` alias
    |
  6 | print(datetime.timezone(-1))
  7 | print(timezone.utc)
@@ -41,7 +41,7 @@ UP017.py:8:7: UP017 [*] Use `datetime.UTC` alias
 10 10 | print(datetime.timezone.utc)
 11 11 | print(dt.timezone.utc)
 
-UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
+UP017.py:10:7: UP017 [**] Use `datetime.UTC` alias
    |
  8 | print(tz.utc)
  9 | 
@@ -59,7 +59,7 @@ UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
    10 |+print(datetime.UTC)
 11 11 | print(dt.timezone.utc)
 
-UP017.py:11:7: UP017 [*] Use `datetime.UTC` alias
+UP017.py:11:7: UP017 [**] Use `datetime.UTC` alias
    |
 10 | print(datetime.timezone.utc)
 11 | print(dt.timezone.utc)

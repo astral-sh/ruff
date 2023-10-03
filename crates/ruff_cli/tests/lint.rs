@@ -40,7 +40,7 @@ inline-quotes = "single"
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
     Found 3 errors.
-    [*] 2 potentially fixable with the --fix option.
+    [*] 2 fixable with the --fix option.
 
     ----- stderr -----
     "###);
@@ -75,7 +75,7 @@ inline-quotes = "single"
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
     Found 3 errors.
-    [*] 2 potentially fixable with the --fix option.
+    [*] 2 fixable with the --fix option.
 
     ----- stderr -----
     "###);
@@ -110,7 +110,7 @@ inline-quotes = "single"
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
     Found 3 errors.
-    [*] 2 potentially fixable with the --fix option.
+    [*] 2 fixable with the --fix option.
 
     ----- stderr -----
     "###);
@@ -149,7 +149,7 @@ inline-quotes = "single"
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
     Found 3 errors.
-    [*] 2 potentially fixable with the --fix option.
+    [*] 2 fixable with the --fix option.
 
     ----- stderr -----
     "###);

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI053.pyi:3:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:3:14: PYI053 [**] String and bytes literals longer than 50 characters are not permitted
   |
 1 | def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
 2 | def f2(
@@ -21,7 +21,7 @@ PYI053.pyi:3:14: PYI053 [*] String and bytes literals longer than 50 characters 
 5 5 | def f3(
 6 6 |     x: str = "50 character stringgggggggggggggggggggggggggggggg\U0001f600",  # OK
 
-PYI053.pyi:9:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:9:14: PYI053 [**] String and bytes literals longer than 50 characters are not permitted
    |
  7 | ) -> None: ...
  8 | def f4(
@@ -42,7 +42,7 @@ PYI053.pyi:9:14: PYI053 [*] String and bytes literals longer than 50 characters 
 11 11 | def f5(
 12 12 |     x: bytes = b"50 character byte stringgggggggggggggggggggggggggg",  # OK
 
-PYI053.pyi:21:16: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:21:16: PYI053 [**] String and bytes literals longer than 50 characters are not permitted
    |
 19 | ) -> None: ...
 20 | def f8(
@@ -62,7 +62,7 @@ PYI053.pyi:21:16: PYI053 [*] String and bytes literals longer than 50 characters
 23 23 | 
 24 24 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
 
-PYI053.pyi:26:12: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:26:12: PYI053 [**] String and bytes literals longer than 50 characters are not permitted
    |
 24 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
 25 | 
@@ -83,7 +83,7 @@ PYI053.pyi:26:12: PYI053 [*] String and bytes literals longer than 50 characters
 28 28 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
 29 29 | 
 
-PYI053.pyi:30:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:30:14: PYI053 [**] String and bytes literals longer than 50 characters are not permitted
    |
 28 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
 29 | 

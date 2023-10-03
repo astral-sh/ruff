@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB148.py:14:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:14:17: FURB148 [**] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
 13 | # Errors
 14 | for index, _ in enumerate(books):
@@ -20,7 +20,7 @@ FURB148.py:14:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
 16 16 | 
 17 17 | for index, _ in enumerate(books, start=0):
 
-FURB148.py:17:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:17:17: FURB148 [**] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
 15 |     print(index)
 16 | 
@@ -40,7 +40,7 @@ FURB148.py:17:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
 19 19 | 
 20 20 | for index, _ in enumerate(books, 0):
 
-FURB148.py:20:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:20:17: FURB148 [**] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
 18 |     print(index)
 19 | 
@@ -100,7 +100,7 @@ FURB148.py:32:17: FURB148 `enumerate` value is unused, use `for x in range(len(y
    |
    = help: Replace with `range(len(...))`
 
-FURB148.py:35:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:35:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 33 |     print(book)
 34 | 
@@ -120,7 +120,7 @@ FURB148.py:35:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 37 37 | 
 38 38 | for _, book in enumerate(books, start=0):
 
-FURB148.py:38:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:38:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 36 |     print(book)
 37 | 
@@ -140,7 +140,7 @@ FURB148.py:38:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 40 40 | 
 41 41 | for _, book in enumerate(books, 0):
 
-FURB148.py:41:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:41:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 39 |     print(book)
 40 | 
@@ -160,7 +160,7 @@ FURB148.py:41:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 43 43 | 
 44 44 | for _, book in enumerate(books, start=1):
 
-FURB148.py:44:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:44:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 42 |     print(book)
 43 | 
@@ -180,7 +180,7 @@ FURB148.py:44:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 46 46 | 
 47 47 | for _, book in enumerate(books, 1):
 
-FURB148.py:47:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:47:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 45 |     print(book)
 46 | 
@@ -200,7 +200,7 @@ FURB148.py:47:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 49 49 | 
 50 50 | for _, book in enumerate(books, start=x):
 
-FURB148.py:50:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:50:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 48 |     print(book)
 49 | 
@@ -220,7 +220,7 @@ FURB148.py:50:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 52 52 | 
 53 53 | for _, book in enumerate(books, x):
 
-FURB148.py:53:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:53:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 51 |     print(book)
 52 | 
@@ -240,7 +240,7 @@ FURB148.py:53:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 55 55 | 
 56 56 | for index, (_, _) in enumerate(books):
 
-FURB148.py:56:22: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:56:22: FURB148 [**] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
 54 |     print(book)
 55 | 
@@ -260,7 +260,7 @@ FURB148.py:56:22: FURB148 [*] `enumerate` value is unused, use `for x in range(l
 58 58 | 
 59 59 | for (_, _), book in enumerate(books):
 
-FURB148.py:59:21: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:59:21: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 57 |     print(index)
 58 | 
@@ -280,7 +280,7 @@ FURB148.py:59:21: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 61 61 | 
 62 62 | for(index, _)in enumerate(books):
 
-FURB148.py:62:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:62:17: FURB148 [**] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
 60 |     print(book)
 61 | 
@@ -300,7 +300,7 @@ FURB148.py:62:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
 64 64 | 
 65 65 | for(index), _ in enumerate(books):
 
-FURB148.py:65:18: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:65:18: FURB148 [**] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
 63 |     print(index)
 64 | 
@@ -320,7 +320,7 @@ FURB148.py:65:18: FURB148 [*] `enumerate` value is unused, use `for x in range(l
 67 67 | 
 68 68 | for index, _ in enumerate(books_and_authors):
 
-FURB148.py:68:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:68:17: FURB148 [**] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
 66 |     print(index)
 67 | 
@@ -340,7 +340,7 @@ FURB148.py:68:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
 70 70 | 
 71 71 | for _, book in enumerate(books_and_authors):
 
-FURB148.py:71:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:71:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 69 |     print(index)
 70 | 
@@ -360,7 +360,7 @@ FURB148.py:71:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 73 73 | 
 74 74 | for index, _ in enumerate(books_set):
 
-FURB148.py:74:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:74:17: FURB148 [**] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
 72 |     print(book)
 73 | 
@@ -380,7 +380,7 @@ FURB148.py:74:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
 76 76 | 
 77 77 | for _, book in enumerate(books_set):
 
-FURB148.py:77:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:77:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 75 |     print(index)
 76 | 
@@ -400,7 +400,7 @@ FURB148.py:77:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 79 79 | 
 80 80 | for index, _ in enumerate(books_tuple):
 
-FURB148.py:80:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:80:17: FURB148 [**] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
 78 |     print(book)
 79 | 
@@ -420,7 +420,7 @@ FURB148.py:80:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
 82 82 | 
 83 83 | for _, book in enumerate(books_tuple):
 
-FURB148.py:83:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:83:16: FURB148 [**] `enumerate` index is unused, use `for x in y` instead
    |
 81 |     print(index)
 82 | 

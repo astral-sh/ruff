@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_errmsg/mod.rs
 ---
-EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:5:24: EM101 [**] Exception must not use a string literal, assign to variable first
   |
 4 | def f_a():
 5 |     raise RuntimeError("This is an example exception")
@@ -20,7 +20,7 @@ EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variabl
 7 8 | 
 8 9 | def f_a_short():
 
-EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:18:24: EM102 [**] Exception must not use an f-string literal, assign to variable first
    |
 16 | def f_b():
 17 |     example = "example"
@@ -40,7 +40,7 @@ EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to var
 20 21 | 
 21 22 | def f_c():
 
-EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:22:24: EM103 [**] Exception must not use a `.format()` string directly, assign to variable first
    |
 21 | def f_c():
 22 |     raise RuntimeError("This is an {example} exception".format(example="example"))
@@ -68,7 +68,7 @@ EM.py:32:24: EM101 Exception must not use a string literal, assign to variable f
    |
    = help: Assign to variable; remove string literal
 
-EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:39:24: EM101 [**] Exception must not use a string literal, assign to variable first
    |
 37 |         msg = "hello"
 38 | 
@@ -96,7 +96,7 @@ EM.py:46:28: EM101 Exception must not use a string literal, assign to variable f
    |
    = help: Assign to variable; remove string literal
 
-EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:51:28: EM101 [**] Exception must not use a string literal, assign to variable first
    |
 49 | def f_fix_indentation_check(foo):
 50 |     if foo:
@@ -118,7 +118,7 @@ EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variab
 53 54 |         if foo == "foo":
 54 55 |             raise RuntimeError(f"This is an exception: {foo}")
 
-EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:54:32: EM102 [**] Exception must not use an f-string literal, assign to variable first
    |
 52 |     else:
 53 |         if foo == "foo":
@@ -139,7 +139,7 @@ EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to var
 56 57 | 
 57 58 | 
 
-EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:55:24: EM103 [**] Exception must not use a `.format()` string directly, assign to variable first
    |
 53 |         if foo == "foo":
 54 |             raise RuntimeError(f"This is an exception: {foo}")

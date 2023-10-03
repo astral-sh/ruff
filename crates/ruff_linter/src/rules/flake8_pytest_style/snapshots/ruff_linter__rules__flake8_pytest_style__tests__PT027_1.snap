@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT027_1.py:11:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_1.py:11:14: PT027 [**] Use `pytest.raises` instead of unittest-style `assertRaises`
    |
 10 |     def test_errors(self):
 11 |         with self.assertRaises(ValueError):

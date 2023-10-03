@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+UP005.py:6:9: UP005 [**] `assertEquals` is deprecated, use `assertEqual`
   |
 4 | class Suite(unittest.TestCase):
 5 |     def test(self) -> None:
@@ -22,7 +22,7 @@ UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
 8 8 |         self.assertEqual(3, 4)
 9 9 |         self.failUnlessAlmostEqual(1, 1.1)
 
-UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+UP005.py:7:9: UP005 [**] `assertEquals` is deprecated, use `assertEqual`
   |
 5 |     def test(self) -> None:
 6 |         self.assertEquals (1, 2)
@@ -43,7 +43,7 @@ UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
 9 9 |         self.failUnlessAlmostEqual(1, 1.1)
 10 10 |         self.assertNotRegexpMatches("a", "b")
 
-UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
+UP005.py:9:9: UP005 [**] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
    |
  7 |         self.assertEquals(1, 2)
  8 |         self.assertEqual(3, 4)
@@ -61,7 +61,7 @@ UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmost
    9  |+        self.assertAlmostEqual(1, 1.1)
 10 10 |         self.assertNotRegexpMatches("a", "b")
 
-UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
+UP005.py:10:9: UP005 [**] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
    |
  8 |         self.assertEqual(3, 4)
  9 |         self.failUnlessAlmostEqual(1, 1.1)
