@@ -800,9 +800,8 @@ fn check_input_from_argfile() -> Result<()> {
 
 #[test]
 fn displays_fix_applicability_levels() {
-    // `--fix` should only apply automatic fixes, but should tell the user about `--fix --unautomatic` if
-    // there are remaining unautomatic fixes.
-    // TODO: this should be a failure but we don't have a way to track that
+    // `--fix` should only apply automatic fixes, but should tell the user about `--fix-suggested` if
+    // there are remaining fixes.
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args([
             "-",
