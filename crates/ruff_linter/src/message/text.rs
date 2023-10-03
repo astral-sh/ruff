@@ -141,11 +141,13 @@ impl Display for RuleCodeAndBody<'_> {
         let kind = &self.message.kind;
 
         if self.show_fix_status && self.message.fix.is_some() {
+            let indicator = self.message.fix.as_ref().unwrap().applicability().symbol();
+
             write!(
                 f,
                 "{code} {fix}{body}",
                 code = kind.rule().noqa_code().to_string().red().bold(),
-                fix = format_args!("[{}] ", "*".cyan()),
+                fix = format_args!("[{}] ", indicator.cyan()),
                 body = kind.body,
             )
         } else {

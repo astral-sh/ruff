@@ -31,6 +31,16 @@ pub enum Applicability {
     Automatic,
 }
 
+impl Applicability {
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            Self::Automatic => "*",
+            Self::Suggested => "**",
+            _ => "*",
+        }
+    }
+}
+
 /// Indicates the level of isolation required to apply a fix.
 #[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

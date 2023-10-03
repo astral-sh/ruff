@@ -478,29 +478,27 @@ impl<'a> FixableStatistics<'a> {
 
     /// Build the displayed fix status message depending on the types of the remaining fixes.
     fn violation_string(&self) -> String {
-        let prefix = format!("[{}]", "*".cyan());
-        let mut fix_status = prefix;
+        let automatic_prefix = format!("[{}]", Applicability::Automatic.symbol().cyan());
+        let suggested_prefix = format!("[{}]", Applicability::Suggested.symbol().cyan());
 
-        if self.automatic > 0 {
-            fix_status = format!(
-                "{fix_status} {} potentially fixable with the --fix option.",
-                self.automatic
-            );
+        if self.automatic > 0 && self.suggested > 0 {
+            format!(
+                "{automatic_prefix} {} fixable with the --fix option.\n\
+                {suggested_prefix} {} potentially fixable with the --fix-suggested option.",
+                self.automatic, self.suggested
+            )
+        } else if self.automatic > 0 {
+            format!(
+                "{automatic_prefix} {} fixable with the --fix option.",
+                self.automatic,
+            )
+        } else if self.suggested > 0 {
+            format!(
+                "{suggested_prefix} {} potentially fixable with the --fix-suggested option.",
+                self.suggested
+            )
+        } else {
+            String::new()
         }
-
-        if self.suggested > 0 {
-            let (line_break, extra_prefix) = if self.automatic > 0 {
-                ("\n", format!("[{}]", "*".cyan()))
-            } else {
-                ("", String::new())
-            };
-
-            let total = self.automatic + self.suggested;
-            fix_status = format!(
-            "{fix_status}{line_break}{extra_prefix} {total} potentially fixable with the --fix-suggested option."
-        );
-        }
-
-        fix_status
     }
 }

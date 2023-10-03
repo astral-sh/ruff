@@ -46,16 +46,16 @@ fn stdin_success() {
 fn stdin_error() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .pass_stdin("import os\n"), @r#"
+        .pass_stdin("import os\n"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
     -:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the --fix option.
 
     ----- stderr -----
-    "#);
+    "###);
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn stdin_filename() {
     ----- stdout -----
     F401.py:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the --fix option.
 
     ----- stderr -----
     "###);
@@ -87,7 +87,7 @@ fn stdin_source_type_py() {
     ----- stdout -----
     TCH.py:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the --fix option.
 
     ----- stderr -----
     "###);
@@ -789,7 +789,7 @@ fn check_input_from_argfile() -> Result<()> {
         ----- stdout -----
         /path/to/a.py:1:8: F401 [*] `os` imported but unused
         Found 1 error.
-        [*] 1 potentially fixable with the --fix option.
+        [*] 1 fixable with the --fix option.
 
         ----- stderr -----
         "###);
@@ -816,11 +816,11 @@ fn displays_fix_applicability_levels() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:1:14: F601 [**] Dictionary key literal `'a'` repeated
     -:2:7: UP034 [*] Avoid extraneous parentheses
     Found 2 errors.
-    [*] 1 potentially fixable with the --fix option.
-    [*] 2 potentially fixable with the --fix-suggested option.
+    [*] 1 fixable with the --fix option.
+    [**] 1 potentially fixable with the --fix-suggested option.
 
     ----- stderr -----
     "###);
@@ -835,9 +835,9 @@ fn displays_remaining_suggested_fixes() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:1:14: F601 [**] Dictionary key literal `'a'` repeated
     Found 1 error.
-    [*] 1 potentially fixable with the --fix-suggested option.
+    [**] 1 potentially fixable with the --fix-suggested option.
 
     ----- stderr -----
     "###);
@@ -889,11 +889,11 @@ fn fix_applies_automatic_and_suggested_fixes_with_fix_suggested() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:1:14: F601 [**] Dictionary key literal `'a'` repeated
     -:2:7: UP034 [*] Avoid extraneous parentheses
     Found 2 errors.
-    [*] 1 potentially fixable with the --fix option.
-    [*] 2 potentially fixable with the --fix-suggested option.
+    [*] 1 fixable with the --fix option.
+    [**] 1 potentially fixable with the --fix-suggested option.
 
     ----- stderr -----
     "###);
