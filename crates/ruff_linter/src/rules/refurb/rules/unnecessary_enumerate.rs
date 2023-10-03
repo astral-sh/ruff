@@ -29,9 +29,11 @@ use crate::registry::AsRule;
 /// This rule is prone to false negatives due to type inference limitations;
 /// namely, it will only suggest a fix using the `len` builtin function if the
 /// sequence passed to `enumerate` is an instantiated as a list, set, dict, or
-/// tuple literal, or annotated as such with a type annotation. This is because
-/// the `len` builtin function is not defined for all object types (such as
-/// generators).
+/// tuple literal, or annotated as such with a type annotation.
+///
+/// The `len` builtin function is not defined for all object types (such as
+/// generators), and so refactoring to use `len` over `enumerate` is not always
+/// safe.
 ///
 /// ## Example
 /// ```python
