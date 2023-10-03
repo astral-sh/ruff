@@ -428,20 +428,78 @@ pub(crate) fn lint_stdin(
                 flags::FixMode::Diff => {
                     // But only write a diff if it's non-empty.
                     if !fixed.is_empty() {
-                        let text_diff = TextDiff::from_lines(
-                            source_kind.source_code(),
-                            transformed.source_code(),
-                        );
-                        let mut unified_diff = text_diff.unified_diff();
-                        if let Some(path) = path {
-                            unified_diff
-                                .header(&fs::relativize_path(path), &fs::relativize_path(path));
-                        }
+                        match transformed.as_ref() {
+                            SourceKind::Python(_) => {
+                                let text_diff = TextDiff::from_lines(
+                                    source_kind.source_code(),
+                                    transformed.source_code(),
+                                );
+                                let mut unified_diff = text_diff.unified_diff();
+                                if let Some(path) = path {
+                                    unified_diff.header(
+                                        &fs::relativize_path(path),
+                                        &fs::relativize_path(path),
+                                    );
+                                }
 
-                        let mut stdout = io::stdout().lock();
-                        unified_diff.to_writer(&mut stdout)?;
-                        stdout.write_all(b"\n")?;
-                        stdout.flush()?;
+                                let mut stdout = io::stdout().lock();
+                                unified_diff.to_writer(&mut stdout)?;
+                                stdout.write_all(b"\n")?;
+                                stdout.flush()?;
+                            }
+                            SourceKind::IpyNotebook(dst_notebook) => {
+                                let src_notebook = source_kind.as_ipy_notebook().unwrap();
+                                let mut stdout = io::stdout().lock();
+                                // Cell indices are 1-based.
+                                for ((idx, src_cell), dest_cell) in (1u32..)
+                                    .zip(src_notebook.cells().iter())
+                                    .zip(dst_notebook.cells().iter())
+                                {
+                                    let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) =
+                                        (src_cell, dest_cell)
+                                    else {
+                                        continue;
+                                    };
+
+                                    let src_source_code = src_code_cell.source.to_string();
+                                    let dest_source_code = dest_code_cell.source.to_string();
+                                    let text_diff =
+                                        TextDiff::from_lines(&src_source_code, &dest_source_code);
+                                    let mut unified_diff = text_diff.unified_diff();
+
+                                    // Jupyter notebook cells don't necessarily have a newline
+                                    // at the end. For example,
+                                    //
+                                    // ```python
+                                    // print("hello")
+                                    // ```
+                                    //
+                                    // For a cell containing the above code, there'll only be one line,
+                                    // and it won't have a newline at the end. If it did, there'd be
+                                    // two lines, and the second line would be empty:
+                                    //
+                                    // ```python
+                                    // print("hello")
+                                    //
+                                    // ```
+                                    unified_diff.missing_newline_hint(false);
+
+                                    if let Some(path) = path {
+                                        unified_diff.header(
+                                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
+                                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
+                                        );
+                                    } else {
+                                        unified_diff
+                                            .header(&format!("cell {idx}"), &format!("cell {idx}"));
+                                    };
+
+                                    unified_diff.to_writer(&mut stdout)?;
+                                }
+                                stdout.write_all(b"\n")?;
+                                stdout.flush()?;
+                            }
+                        }
                     }
                 }
                 flags::FixMode::Generate => {}
