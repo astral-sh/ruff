@@ -24,25 +24,25 @@ pub(crate) struct FixResult {
     pub(crate) source_map: SourceMap,
 }
 
-/// Auto-fix errors in a file, and write the fixed source code to disk.
+/// Fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
     diagnostics: &[Diagnostic],
     locator: &Locator,
     fix_suggested: SuggestedFixes,
 ) -> Option<FixResult> {
+    let required_applicability = if fix_suggested.is_apply() {
+        Applicability::Suggested
+    } else {
+        Applicability::Automatic
+    };
+
     let mut with_fixes = diagnostics
         .iter()
-        .filter(|diag| {
-            let Some(ref fix) = diag.fix else {
-                return false;
-            };
-
-            // change this
-            if matches!(fix_suggested, SuggestedFixes::Apply) {
-                fix.applicability() >= Applicability::Suggested
-            } else {
-                fix.applicability() == Applicability::Automatic
-            }
+        .filter(|diagnostic| {
+            diagnostic
+                .fix
+                .as_ref()
+                .map_or(false, |fix| fix.applies(required_applicability))
         })
         .peekable();
 

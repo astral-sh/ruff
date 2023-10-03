@@ -166,8 +166,8 @@ impl Fix {
         self
     }
 
-    /// Return [`true`] if this [`Fix`] should be applied with a given [`Applicability`].
-    pub fn is_applied(&self, applicability: Applicability) -> bool {
+    /// Return [`true`] if this [`Fix`] should be applied with at a given [`Applicability`].
+    pub fn applies(&self, applicability: Applicability) -> bool {
         self.applicability >= applicability
     }
 }
