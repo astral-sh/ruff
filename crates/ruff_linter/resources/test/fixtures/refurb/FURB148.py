@@ -92,3 +92,9 @@ for index in range(len(books)):
 
 for book in books:
     print(book)
+
+# Generators don't support the len() function.
+# https://github.com/astral-sh/ruff/issues/7656
+a = (b for b in range(1, 100))
+for i, _ in enumerate(a):
+    print(i)
