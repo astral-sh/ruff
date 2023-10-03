@@ -566,6 +566,9 @@ impl<'source> Lexer<'source> {
         // Tracks the last offset of token value that has been written to `normalized`.
         let mut last_offset = self.offset();
 
+        // This isn't going to change for the duration of the loop.
+        let in_format_spec = fstring.is_in_format_spec(self.nesting);
+
         let mut in_named_unicode = false;
 
         loop {
@@ -585,6 +588,13 @@ impl<'source> Lexer<'source> {
                     });
                 }
                 '\n' | '\r' if !fstring.is_triple_quoted() => {
+                    // If we encounter a newline while we're in a format spec, then
+                    // we stop here and let the lexer emit the newline token.
+                    //
+                    // Relevant discussion: https://github.com/python/cpython/issues/110259
+                    if in_format_spec {
+                        break;
+                    }
                     return Err(LexicalError {
                         error: LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
                         location: self.offset(),
@@ -620,7 +630,7 @@ impl<'source> Lexer<'source> {
                     }
                 }
                 '{' => {
-                    if self.cursor.second() == '{' && !fstring.is_in_format_spec(self.nesting) {
+                    if self.cursor.second() == '{' && !in_format_spec {
                         self.cursor.bump();
                         normalized
                             .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
@@ -634,9 +644,7 @@ impl<'source> Lexer<'source> {
                     if in_named_unicode {
                         in_named_unicode = false;
                         self.cursor.bump();
-                    } else if self.cursor.second() == '}'
-                        && !fstring.is_in_format_spec(self.nesting)
-                    {
+                    } else if self.cursor.second() == '}' && !in_format_spec {
                         self.cursor.bump();
                         normalized
                             .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
@@ -2048,6 +2056,22 @@ def f(arg=%timeit a = b):
     #[test]
     fn test_fstring_with_format_spec() {
         let source = r#"f"{foo:} {x=!s:.3f} {x:.{y}f} {'':*^{1:{1}}} {x:{{1}.pop()}}""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_with_multiline_format_spec() {
+        let source = r"f'''__{
+    x:d
+}__'''
+f'''__{
+    x:a
+        b
+          c
+}__'''
+f'__{
+    x:d
+}__'";
         assert_debug_snapshot!(lex_source(source));
     }
 
