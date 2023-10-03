@@ -1,5 +1,13 @@
 books = ["Dune", "Foundation", "Neuromancer"]
 
+books_and_authors = {
+    "Dune": "Frank Herbert",
+    "Foundation": "Isaac Asimov",
+    "Neuromancer": "William Gibson",
+}
+
+books_set = {"Dune", "Foundation", "Neuromancer"}
+
 # Errors
 for index, _ in enumerate(books):
     print(index)
@@ -54,6 +62,18 @@ for(index, _)in enumerate(books):
 
 for(index), _ in enumerate(books):
     print(index)
+
+for index, _ in enumerate(books_and_authors):
+    print(index)
+
+for _, book in enumerate(books_and_authors):
+    print(book)
+
+for index, _ in enumerate(books_set):
+    print(index)
+
+for _, book in enumerate(books_set):
+    print(book)
 
 # OK
 for index, book in enumerate(books):
