@@ -9,17 +9,13 @@ use crate::edit::Edit;
 /// of enum values based on their order (see Rust's [enum
 /// documentation](https://doc.rust-lang.org/reference/items/enumerations.html)). This allows us to
 /// apply [`Fix`]es based on their [`Applicability`].
-#[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Applicability {
     /// The fix has a good chance of being incorrect or the code be incomplete.
     /// The fix may result in invalid code if it is applied.
     /// The fix should only be manually applied by the user.
     Manual,
-
-    /// The applicability of the fix is unknown or not relevant.
-    #[default]
-    Unspecified,
 
     /// The fix may be what the user intended, but it is uncertain.
     /// The fix should result in valid code if it is applied.
@@ -36,7 +32,7 @@ impl Applicability {
         match self {
             Self::Automatic => "*",
             Self::Suggested => "**",
-            _ => "*",
+            Self::Manual => "-",
         }
     }
 }
@@ -65,30 +61,6 @@ pub struct Fix {
 }
 
 impl Fix {
-    /// Create a new [`Fix`] with an unspecified applicability from an [`Edit`] element.
-    #[deprecated(
-        note = "Use `Fix::automatic`, `Fix::suggested`, or `Fix::manual` instead to specify an applicability."
-    )]
-    pub fn unspecified(edit: Edit) -> Self {
-        Self {
-            edits: vec![edit],
-            applicability: Applicability::Unspecified,
-            isolation_level: IsolationLevel::default(),
-        }
-    }
-
-    /// Create a new [`Fix`] with an unspecified applicability from multiple [`Edit`] elements.
-    #[deprecated(
-        note = "Use `Fix::automatic_edits`, `Fix::suggested_edits`, or `Fix::manual_edits` instead to specify an applicability."
-    )]
-    pub fn unspecified_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
-        Self {
-            edits: std::iter::once(edit).chain(rest).collect(),
-            applicability: Applicability::Unspecified,
-            isolation_level: IsolationLevel::default(),
-        }
-    }
-
     /// Create a new [`Fix`] with [automatic applicability](Applicability::Automatic) from an [`Edit`] element.
     pub fn automatic(edit: Edit) -> Self {
         Self {

@@ -55,7 +55,6 @@ impl Display for Diff<'_> {
             Applicability::Automatic => "Fix",
             Applicability::Suggested => "Suggested fix",
             Applicability::Manual => "Possible fix",
-            Applicability::Unspecified => "Suggested fix", /* For backwards compatibility, unspecified fixes are 'suggested' */
         };
         writeln!(f, "ℹ {}", message.blue())?;
 

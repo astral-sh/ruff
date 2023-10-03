@@ -160,14 +160,13 @@ mod tests {
     use crate::fix::{apply_fixes, FixResult};
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
-    #[allow(deprecated)]
     fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
         edit.into_iter()
             .map(|edit| Diagnostic {
-                // The choice of rule here is arbitrary.
+                // The choice of rule and fix applicability here is arbitarary
                 kind: MissingNewlineAtEndOfFile.into(),
                 range: edit.range(),
-                fix: Some(Fix::unspecified(edit)),
+                fix: Some(Fix::automatic(edit)),
                 parent: None,
             })
             .collect()
