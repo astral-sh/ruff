@@ -49,8 +49,14 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
     })
 }
 
-/// Returns `true` if the given class is a Pydantic `BaseModel` or `BaseSettings` subclass.
-pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+/// Returns `true` if the given class has "default copy" semantics.
+///
+/// For example, Pydantic `BaseModel` and `BaseSettings` subclassses copy attribute defaults on
+/// instance creation. As such, the use of mutable default values is safe for such classes.
+pub(super) fn has_default_copy_semantics(
+    class_def: &ast::StmtClassDef,
+    semantic: &SemanticModel,
+) -> bool {
     let Some(Arguments { args: bases, .. }) = class_def.arguments.as_deref() else {
         return false;
     };
@@ -59,7 +65,7 @@ pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &Semant
         semantic.resolve_call_path(expr).is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
-                ["pydantic", "BaseModel" | "BaseSettings"]
+                ["pydantic", "BaseModel" | "BaseSettings"] | ["msgspec", "Struct"]
             )
         })
     })
