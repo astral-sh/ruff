@@ -1,5 +1,4 @@
-use num_traits::identities::{One, Zero};
-use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, MatchCase, Operator, Stmt};
+use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, Int, MatchCase, Operator, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::rules::flake8_simplify::rules::ast_bool_op::is_same_expr;
@@ -144,7 +143,7 @@ fn get_candidate_loop_index<'a>(
         ..
     }) = value.as_ref()
     {
-        if value.is_zero() {
+        if matches!(*value, Int::ZERO) {
             return Some((prev_stmt, &targets[0]));
         }
     }
@@ -171,7 +170,7 @@ fn is_index_increment(stmt: &Stmt, index_var: &Expr) -> bool {
         ..
     }) = value.as_ref()
     {
-        if value.is_one() {
+        if matches!(*value, Int::ONE) {
             return true;
         }
     }
