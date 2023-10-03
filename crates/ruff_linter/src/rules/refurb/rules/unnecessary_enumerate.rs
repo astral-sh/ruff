@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Constant, Expr, Int};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set};
+use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
 use ruff_python_semantic::Binding;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -160,6 +160,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             if !is_list(binding, checker.semantic())
                 && !is_dict(binding, checker.semantic())
                 && !is_set(binding, checker.semantic())
+                && !is_tuple(binding, checker.semantic())
             {
                 return;
             }

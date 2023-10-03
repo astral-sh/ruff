@@ -8,6 +8,8 @@ books_and_authors = {
 
 books_set = {"Dune", "Foundation", "Neuromancer"}
 
+books_tuple = ("Dune", "Foundation", "Neuromancer")
+
 # Errors
 for index, _ in enumerate(books):
     print(index)
@@ -73,6 +75,12 @@ for index, _ in enumerate(books_set):
     print(index)
 
 for _, book in enumerate(books_set):
+    print(book)
+
+for index, _ in enumerate(books_tuple):
+    print(index)
+
+for _, book in enumerate(books_tuple):
     print(book)
 
 # OK
