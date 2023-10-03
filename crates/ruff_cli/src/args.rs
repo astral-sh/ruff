@@ -76,11 +76,11 @@ pub enum Command {
 pub struct CheckCommand {
     /// List of files or directories to check.
     pub files: Vec<PathBuf>,
-    /// Attempt to automatically fix lint violations.
-    /// Use `--no-fix` to disable.
+    /// Apply automatic fixes to resolve lint violations.
+    /// Use `--no-fix` to disable or `--fix-suggested` to include suggested fixes.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
-    /// Attempt to automatically fix both automatic and suggested lint violations.
+    /// Apply automatic and suggested fixes to resolve lint violations.
     #[arg(long, overrides_with_all(["fix", "no_fix"]))]
     fix_suggested: bool,
     #[clap(long, overrides_with_all(["fix", "fix_suggested"]), hide = true)]
@@ -103,8 +103,8 @@ pub struct CheckCommand {
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
     pub watch: bool,
-    /// Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`.
-    /// Use `--no-fix-only` to disable.
+    /// Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`.
+    /// Use `--no-fix-only` to disable or `--fix-suggested` to include suggested fixes.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
