@@ -423,6 +423,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "109") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::CompareWithTuple),
         (Flake8Simplify, "110") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::ReimplementedBuiltin),
         (Flake8Simplify, "112") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::UncapitalizedEnvironmentVariables),
+        (Flake8Simplify, "113") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::EnumerateForLoop),
         (Flake8Simplify, "114") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::IfWithSameArms),
         (Flake8Simplify, "115") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::OpenFileWithContextHandler),
         (Flake8Simplify, "116") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::IfElseBlockInsteadOfDictLookup),
