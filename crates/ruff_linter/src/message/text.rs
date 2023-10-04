@@ -140,24 +140,26 @@ impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let kind = &self.message.kind;
 
-        if self.show_fix_status && self.message.fix.is_some() {
-            let indicator = self.message.fix.as_ref().unwrap().applicability().symbol();
+        if let Some(fix) = self.message.fix.as_ref() {
+            if self.show_fix_status {
+                let indicator = fix.applicability().symbol();
 
-            write!(
-                f,
-                "{code} {fix}{body}",
-                code = kind.rule().noqa_code().to_string().red().bold(),
-                fix = format_args!("[{}] ", indicator.cyan()),
-                body = kind.body,
-            )
-        } else {
-            write!(
-                f,
-                "{code} {body}",
-                code = kind.rule().noqa_code().to_string().red().bold(),
-                body = kind.body,
-            )
-        }
+                return write!(
+                    f,
+                    "{code} {fix}{body}",
+                    code = kind.rule().noqa_code().to_string().red().bold(),
+                    fix = format_args!("[{}] ", indicator.cyan()),
+                    body = kind.body,
+                );
+            }
+        };
+
+        write!(
+            f,
+            "{code} {body}",
+            code = kind.rule().noqa_code().to_string().red().bold(),
+            body = kind.body,
+        )
     }
 }
 
