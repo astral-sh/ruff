@@ -5,7 +5,6 @@ use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -310,9 +309,10 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    // Locate duplicate `isinstance` calls, represented as a map from `ComparableExpr`
-    // to indices of the relevant `Expr` instances in `values`.
-    let mut duplicates: FxHashMap<ComparableExpr, Vec<usize>> = FxHashMap::default();
+    // Locate duplicate `isinstance` calls, represented as a vector of vectors
+    // of indices of the relevant `Expr` instances in `values`.
+    let mut duplicates: Vec<Vec<usize>> = Vec::new();
+    let mut last_target_option: Option<ComparableExpr> = None;
     for (index, call) in values.iter().enumerate() {
         // Verify that this is an `isinstance` call.
         let Expr::Call(ast::ExprCall {
@@ -326,34 +326,48 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             range: _,
         }) = &call
         else {
+            last_target_option = None;
             continue;
         };
         if args.len() != 2 {
+            last_target_option = None;
             continue;
         }
         if !keywords.is_empty() {
+            last_target_option = None;
             continue;
         }
         let Expr::Name(ast::ExprName { id: func_name, .. }) = func.as_ref() else {
+            last_target_option = None;
             continue;
         };
         if func_name != "isinstance" {
+            last_target_option = None;
             continue;
         }
         if !checker.semantic().is_builtin("isinstance") {
+            last_target_option = None;
             continue;
         }
 
         // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
         let target = &args[0];
-        duplicates
-            .entry(target.into())
-            .or_insert_with(Vec::new)
-            .push(index);
+        if let Some(ref last_target) = last_target_option {
+            if last_target == &Into::<ComparableExpr>::into(target) {
+                duplicates
+                    .last_mut()
+                    .expect("last_target should have a corresponding entry")
+                    .push(index);
+                continue;
+            }
+        }
+        last_target_option = Some(target.into());
+        duplicates.push(vec![index]);
     }
+    println!("{:?}", duplicates);
 
     // Generate a `Diagnostic` for each duplicate.
-    for indices in duplicates.values() {
+    for indices in duplicates {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
@@ -429,16 +443,13 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     let call = node2.into();
 
                     // Generate the combined `BoolOp`.
+                    let before = values.iter().take(indices[0]).map(Clone::clone);
+                    let after = values.iter().skip(indices[indices.len() - 1] + 1).map(Clone::clone);
                     let node = ast::ExprBoolOp {
                         op: BoolOp::Or,
-                        values: iter::once(call)
-                            .chain(
-                                values
-                                    .iter()
-                                    .enumerate()
-                                    .filter(|(index, _)| !indices.contains(index))
-                                    .map(|(_, elt)| elt.clone()),
-                            )
+                        values: before
+                            .chain(iter::once(call))
+                            .chain(after)
                             .collect(),
                         range: TextRange::default(),
                     };
