@@ -80,8 +80,9 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
         return;
     };
 
-    // Check if any of the expressions contain an `await` expression.
-    if contains_await(loop_.target) || contains_await(loop_.iter) || contains_await(loop_.test) {
+    // Check if any of the expressions contain an `await`, `yield`, or `yield from` expression.
+    // If so, turning the code into an any() or all() call would produce a SyntaxError.
+    if contains_yield_like(loop_.target) || contains_yield_like(loop_.test) {
         return;
     }
 
@@ -413,7 +414,9 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     generator.stmt(&node3.into())
 }
 
-/// Return `true` if the [`Expr`] contains an `await` expression.
-fn contains_await(expr: &Expr) -> bool {
+/// Return `true` if the [`Expr`] contains an `await`, `yield`, or `yield from` expression.
+fn contains_yield_like(expr: &Expr) -> bool {
     any_over_expr(expr, &Expr::is_await_expr)
+        || any_over_expr(expr, &Expr::is_yield_expr)
+        || any_over_expr(expr, &Expr::is_yield_from_expr)
 }
