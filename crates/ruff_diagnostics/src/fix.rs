@@ -5,10 +5,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::edit::Edit;
 
-/// Indicates confidence in the correctness of a suggested fix. Rust internally allows comparison
-/// of enum values based on their order (see Rust's [enum
-/// documentation](https://doc.rust-lang.org/reference/items/enumerations.html)). This allows us to
-/// apply [`Fix`]es based on their [`Applicability`].
+/// Indicates confidence in the correctness of a proposed fix.
 #[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Applicability {
