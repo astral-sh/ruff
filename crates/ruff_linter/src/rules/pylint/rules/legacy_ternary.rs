@@ -25,26 +25,26 @@ use crate::registry::AsRule;
 /// maximum = x if x >= y else y
 /// ```
 #[violation]
-pub struct ConsiderUsingTernary {
+pub struct LegacyTernary {
     ternary: String,
 }
 
-impl Violation for ConsiderUsingTernary {
+impl Violation for LegacyTernary {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConsiderUsingTernary { ternary } = self;
+        let LegacyTernary { ternary } = self;
         format!("Consider using ternary `{ternary}`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ConsiderUsingTernary { ternary } = self;
+        let LegacyTernary { ternary } = self;
         Some(format!("Use `{ternary}`"))
     }
 }
 
-pub(crate) fn consider_using_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
+pub(crate) fn legacy_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
     if !is_legacy_ternary(bool_op) {
         return;
     }
@@ -66,7 +66,7 @@ pub(crate) fn consider_using_ternary(checker: &mut Checker, bool_op: &ExprBoolOp
     let ternary = checker.generator().expr(&if_expr);
 
     let mut diagnostic = Diagnostic::new(
-        ConsiderUsingTernary {
+        LegacyTernary {
             ternary: ternary.clone(),
         },
         bool_op.range,

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-consider_using_ternary.py:16:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b'`
+legacy_ternary.py:16:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b'`
    |
 14 | # Ternary (Error)
 15 | 
@@ -22,7 +22,7 @@ consider_using_ternary.py:16:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2
 18 18 | 1<2 and 'a' or 'b' and 'c'
 19 19 | 
 
-consider_using_ternary.py:18:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b' and 'c'`
+legacy_ternary.py:18:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b' and 'c'`
    |
 16 | 1<2 and 'a' or 'b'
 17 | 
@@ -43,7 +43,7 @@ consider_using_ternary.py:18:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2
 20 20 | 1<2 and 'a' or 'b' or 'c'
 21 21 | 
 
-consider_using_ternary.py:20:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b' or 'c'`
+legacy_ternary.py:20:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b' or 'c'`
    |
 18 | 1<2 and 'a' or 'b' and 'c'
 19 | 
@@ -64,7 +64,7 @@ consider_using_ternary.py:20:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2
 22 22 | 1<2 and 'a' or 'b' or 'c' or (lambda x: x+1)
 23 23 | 
 
-consider_using_ternary.py:22:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b' or 'c' or (lambda x: x + 1)`
+legacy_ternary.py:22:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b' or 'c' or (lambda x: x + 1)`
    |
 20 | 1<2 and 'a' or 'b' or 'c'
 21 | 
@@ -85,7 +85,7 @@ consider_using_ternary.py:22:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2
 24 24 | 1<2 and 'a' or 'b' or (lambda x: x+1) or 'c'
 25 25 | 
 
-consider_using_ternary.py:24:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b' or (lambda x: x + 1) or 'c'`
+legacy_ternary.py:24:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b' or (lambda x: x + 1) or 'c'`
    |
 22 | 1<2 and 'a' or 'b' or 'c' or (lambda x: x+1)
 23 | 
@@ -106,7 +106,7 @@ consider_using_ternary.py:24:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2
 26 26 | (lambda x: x+1) and 'a' or 'b'
 27 27 | 
 
-consider_using_ternary.py:26:1: PLR1706 [*] Consider using ternary `'a' if (lambda x: x + 1) else 'b'`
+legacy_ternary.py:26:1: PLR1706 [*] Consider using ternary `'a' if (lambda x: x + 1) else 'b'`
    |
 24 | 1<2 and 'a' or 'b' or (lambda x: x+1) or 'c'
 25 | 
@@ -127,7 +127,7 @@ consider_using_ternary.py:26:1: PLR1706 [*] Consider using ternary `'a' if (lamb
 28 28 | 'a' and (lambda x: x+1) or 'orange'
 29 29 | 
 
-consider_using_ternary.py:28:1: PLR1706 [*] Consider using ternary `(lambda x: x + 1) if 'a' else 'orange'`
+legacy_ternary.py:28:1: PLR1706 [*] Consider using ternary `(lambda x: x + 1) if 'a' else 'orange'`
    |
 26 | (lambda x: x+1) and 'a' or 'b'
 27 | 
@@ -148,7 +148,7 @@ consider_using_ternary.py:28:1: PLR1706 [*] Consider using ternary `(lambda x: x
 30 30 | def has_oranges(oranges, apples=None) -> bool:
 31 31 |     return apples and False or oranges  # [simplify-boolean-expression]
 
-consider_using_ternary.py:31:12: PLR1706 [*] Consider using ternary `False if apples else oranges`
+legacy_ternary.py:31:12: PLR1706 [*] Consider using ternary `False if apples else oranges`
    |
 30 | def has_oranges(oranges, apples=None) -> bool:
 31 |     return apples and False or oranges  # [simplify-boolean-expression]
@@ -168,7 +168,7 @@ consider_using_ternary.py:31:12: PLR1706 [*] Consider using ternary `False if ap
 33 33 | a = 1
 34 34 | b = 2
 
-consider_using_ternary.py:36:1: PLR1706 [*] Consider using ternary `b if a else c`
+legacy_ternary.py:36:1: PLR1706 [*] Consider using ternary `b if a else c`
    |
 34 | b = 2
 35 | c = 3

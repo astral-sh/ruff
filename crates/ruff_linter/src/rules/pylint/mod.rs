@@ -36,7 +36,7 @@ mod tests {
         Path::new("repeated_isinstance_calls.py")
     )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
-    #[test_case(Rule::ConsiderUsingTernary, Path::new("consider_using_ternary.py"))]
+    #[test_case(Rule::LegacyTernary, Path::new("legacy_ternary.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
