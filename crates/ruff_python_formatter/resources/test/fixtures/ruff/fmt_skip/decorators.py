@@ -17,3 +17,16 @@ class Test:
 def test():
     pass
 
+
+# Regression test for https://github.com/astral-sh/ruff/issues/7735
+@decorator1
+@decorator2
+class Foo:  # fmt: skip
+    pass
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/7735
+@decorator1
+@decorator2
+def foo():  # fmt: skip
+    pass

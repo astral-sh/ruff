@@ -31,6 +31,15 @@ if isinstance(a, bool) or isinstance(b, str):
 if isinstance(a, int) or isinstance(a.b, float):
     pass
 
+# OK
+if isinstance(a, int) or unrelated_condition or isinstance(a, float):
+    pass
+
+if x or isinstance(a, int) or isinstance(a, float):
+    pass
+
+if x or y or isinstance(a, int) or isinstance(a, float) or z:
+    pass
 
 def f():
     # OK
