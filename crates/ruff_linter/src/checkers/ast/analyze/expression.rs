@@ -1415,6 +1415,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::RepeatedEqualityComparison) {
                 pylint::rules::repeated_equality_comparison(checker, bool_op);
             }
+            if checker.enabled(Rule::ConsiderUsingTernary) {
+                pylint::rules::consider_using_ternary(checker, bool_op);
+            }
         }
         _ => {}
     };
