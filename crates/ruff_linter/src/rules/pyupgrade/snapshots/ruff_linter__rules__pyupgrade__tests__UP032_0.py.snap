@@ -956,4 +956,20 @@ UP032_0.py:202:1: UP032 Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
+UP032_0.py:209:1: UP032 [*] Use f-string instead of `format` call
+    |
+207 | # The fixed string will exceed the line length, but it's still smaller than the
+208 | # existing line length, so it's fine.
+209 | "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+    |
+    = help: Convert to f-string
+
+ℹ Suggested fix
+206 206 | 
+207 207 | # The fixed string will exceed the line length, but it's still smaller than the
+208 208 | # existing line length, so it's fine.
+209     |-"<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
+    209 |+f"<Customer: {self.internal_ids}, {self.external_ids}, {self.properties}, {self.tags}, {self.others}>"
+
 

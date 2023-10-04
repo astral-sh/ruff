@@ -3,16 +3,18 @@
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::{
     has_leading_content, is_python_whitespace, PythonWhitespace, SimpleTokenKind, SimpleTokenizer,
 };
-use ruff_source_file::{Locator, NewlineWithTrailingNewline};
+use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::fix::codemods;
+use crate::line_width::{LineLength, LineWidthBuilder, TabSize};
 
 /// Return the `Fix` to use when deleting a `Stmt`.
 ///
@@ -283,6 +285,75 @@ pub(crate) fn pad(content: String, range: TextRange, locator: &Locator) -> Strin
         range.start(),
         locator,
     )
+}
+
+/// Returns `true` if the fix fits within the maximum configured line length.
+pub(crate) fn fits(
+    fix: &str,
+    node: AnyNodeRef,
+    locator: &Locator,
+    line_length: LineLength,
+    tab_size: TabSize,
+) -> bool {
+    all_lines_fit(fix, node, locator, line_length.value() as usize, tab_size)
+}
+
+/// Returns `true` if the fix fits within the maximum configured line length, or produces lines that
+/// are shorter than the maximum length of the existing AST node.
+pub(crate) fn fits_or_shrinks(
+    fix: &str,
+    node: AnyNodeRef,
+    locator: &Locator,
+    line_length: LineLength,
+    tab_size: TabSize,
+) -> bool {
+    // Use the larger of the line length limit, or the longest line in the existing AST node.
+    let line_length = std::iter::once(line_length.value() as usize)
+        .chain(
+            locator
+                .slice(locator.lines_range(node.range()))
+                .universal_newlines()
+                .map(|line| LineWidthBuilder::new(tab_size).add_str(&line).get()),
+        )
+        .max()
+        .unwrap_or(line_length.value() as usize);
+
+    all_lines_fit(fix, node, locator, line_length, tab_size)
+}
+
+/// Returns `true` if all lines in the fix are shorter than the given line length.
+fn all_lines_fit(
+    fix: &str,
+    node: AnyNodeRef,
+    locator: &Locator,
+    line_length: usize,
+    tab_size: TabSize,
+) -> bool {
+    let prefix = locator.slice(TextRange::new(
+        locator.line_start(node.start()),
+        node.start(),
+    ));
+
+    // Ensure that all lines are shorter than the line length limit.
+    fix.universal_newlines().enumerate().all(|(idx, line)| {
+        // If `template` is a multiline string, `col_offset` should only be applied to the first
+        // line:
+        // ```
+        // a = """{}        -> offset = col_offset (= 4)
+        // {}               -> offset = 0
+        // """.format(0, 1) -> offset = 0
+        // ```
+        let measured_length = if idx == 0 {
+            LineWidthBuilder::new(tab_size)
+                .add_str(prefix)
+                .add_str(&line)
+                .get()
+        } else {
+            LineWidthBuilder::new(tab_size).add_str(&line).get()
+        };
+
+        measured_length <= line_length
+    })
 }
 
 #[cfg(test)]

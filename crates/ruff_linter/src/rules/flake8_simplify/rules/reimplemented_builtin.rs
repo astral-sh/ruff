@@ -1,15 +1,15 @@
-use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Comprehension, Constant, Expr, ExprContext, Stmt, UnaryOp,
-};
-use ruff_text_size::{Ranged, TextRange};
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::traversal;
+use ruff_python_ast::{
+    self as ast, Arguments, CmpOp, Comprehension, Constant, Expr, ExprContext, Stmt, UnaryOp,
+};
 use ruff_python_codegen::Generator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::fits;
 use crate::line_width::LineWidthBuilder;
 use crate::registry::AsRule;
 
@@ -98,16 +98,13 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
             );
 
             // Don't flag if the resulting expression would exceed the maximum line length.
-            let line_start = checker.locator().line_start(stmt.start());
-            if LineWidthBuilder::new(checker.settings.tab_size)
-                .add_str(
-                    checker
-                        .locator()
-                        .slice(TextRange::new(line_start, stmt.start())),
-                )
-                .add_str(&contents)
-                > checker.settings.line_length
-            {
+            if !fits(
+                &contents,
+                stmt.into(),
+                checker.locator(),
+                checker.settings.line_length,
+                checker.settings.tab_size,
+            ) {
                 return;
             }
 
