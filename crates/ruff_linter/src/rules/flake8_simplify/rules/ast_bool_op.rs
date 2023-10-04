@@ -12,6 +12,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{contains_effect, Truthiness};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_codegen::Generator;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -298,6 +299,42 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
     None
 }
 
+/// If `call` is an `isinstance()` call, return its target.
+fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
+    // Verify that this is an `isinstance` call.
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments:
+            Arguments {
+                args,
+                keywords,
+                range: _,
+            },
+        range: _,
+    }) = &call
+    else {
+        return None;
+    };
+    if args.len() != 2 {
+        return None;
+    }
+    if !keywords.is_empty() {
+        return None;
+    }
+    let Expr::Name(ast::ExprName { id: func_name, .. }) = func.as_ref() else {
+        return None;
+    };
+    if func_name != "isinstance" {
+        return None;
+    }
+    if !semantic.is_builtin("isinstance") {
+        return None;
+    }
+
+    // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
+    Some(&args[0])
+}
+
 /// SIM101
 pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
@@ -314,44 +351,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     let mut duplicates: Vec<Vec<usize>> = Vec::new();
     let mut last_target_option: Option<ComparableExpr> = None;
     for (index, call) in values.iter().enumerate() {
-        // Verify that this is an `isinstance` call.
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                },
-            range: _,
-        }) = &call
-        else {
+        let Some(target) = isinstance_target(&call, checker.semantic()) else {
             last_target_option = None;
             continue;
         };
-        if args.len() != 2 {
-            last_target_option = None;
-            continue;
-        }
-        if !keywords.is_empty() {
-            last_target_option = None;
-            continue;
-        }
-        let Expr::Name(ast::ExprName { id: func_name, .. }) = func.as_ref() else {
-            last_target_option = None;
-            continue;
-        };
-        if func_name != "isinstance" {
-            last_target_option = None;
-            continue;
-        }
-        if !checker.semantic().is_builtin("isinstance") {
-            last_target_option = None;
-            continue;
-        }
 
-        // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
-        let target = &args[0];
         if last_target_option
             .as_ref()
             .is_some_and(|last_target| *last_target == ComparableExpr::from(target))
