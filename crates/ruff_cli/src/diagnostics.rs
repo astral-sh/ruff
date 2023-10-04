@@ -1,8 +1,7 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
-use std::fs::{write, File};
+use std::fs::File;
 use std::io;
-use std::io::{BufWriter, Write};
 use std::ops::AddAssign;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -13,7 +12,6 @@ use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
 use rustc_hash::FxHashMap;
-use similar::TextDiff;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
@@ -25,7 +23,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_macros::CacheKey;
-use ruff_notebook::{Cell, Notebook, NotebookError, NotebookIndex};
+use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
@@ -250,72 +248,13 @@ pub(crate) fn lint_path(
         {
             if !fixed.is_empty() {
                 match fix_mode {
-                    flags::FixMode::Apply => match transformed.as_ref() {
-                        SourceKind::Python(transformed) => {
-                            write(path, transformed.as_bytes())?;
-                        }
-                        SourceKind::IpyNotebook(notebook) => {
-                            let mut writer = BufWriter::new(File::create(path)?);
-                            notebook.write(&mut writer)?;
-                        }
-                    },
+                    flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
                     flags::FixMode::Diff => {
-                        match transformed.as_ref() {
-                            SourceKind::Python(transformed) => {
-                                let mut stdout = io::stdout().lock();
-                                TextDiff::from_lines(source_kind.source_code(), transformed)
-                                    .unified_diff()
-                                    .header(&fs::relativize_path(path), &fs::relativize_path(path))
-                                    .to_writer(&mut stdout)?;
-                                stdout.write_all(b"\n")?;
-                                stdout.flush()?;
-                            }
-                            SourceKind::IpyNotebook(dest_notebook) => {
-                                // We need to load the notebook again, since we might've
-                                // mutated it.
-                                let src_notebook = source_kind.as_ipy_notebook().unwrap();
-                                let mut stdout = io::stdout().lock();
-                                // Cell indices are 1-based.
-                                for ((idx, src_cell), dest_cell) in (1u32..)
-                                    .zip(src_notebook.cells().iter())
-                                    .zip(dest_notebook.cells().iter())
-                                {
-                                    let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) =
-                                        (src_cell, dest_cell)
-                                    else {
-                                        continue;
-                                    };
-                                    TextDiff::from_lines(
-                                        &src_code_cell.source.to_string(),
-                                        &dest_code_cell.source.to_string(),
-                                    )
-                                    .unified_diff()
-                                    // Jupyter notebook cells don't necessarily have a newline
-                                    // at the end. For example,
-                                    //
-                                    // ```python
-                                    // print("hello")
-                                    // ```
-                                    //
-                                    // For a cell containing the above code, there'll only be one line,
-                                    // and it won't have a newline at the end. If it did, there'd be
-                                    // two lines, and the second line would be empty:
-                                    //
-                                    // ```python
-                                    // print("hello")
-                                    //
-                                    // ```
-                                    .missing_newline_hint(false)
-                                    .header(
-                                        &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                        &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                    )
-                                    .to_writer(&mut stdout)?;
-                                }
-                                stdout.write_all(b"\n")?;
-                                stdout.flush()?;
-                            }
-                        }
+                        source_kind.diff(
+                            transformed.as_ref(),
+                            Some(path),
+                            &mut io::stdout().lock(),
+                        )?;
                     }
                     flags::FixMode::Generate => {}
                 }
@@ -428,78 +367,7 @@ pub(crate) fn lint_stdin(
                 flags::FixMode::Diff => {
                     // But only write a diff if it's non-empty.
                     if !fixed.is_empty() {
-                        match transformed.as_ref() {
-                            SourceKind::Python(_) => {
-                                let text_diff = TextDiff::from_lines(
-                                    source_kind.source_code(),
-                                    transformed.source_code(),
-                                );
-                                let mut unified_diff = text_diff.unified_diff();
-                                if let Some(path) = path {
-                                    unified_diff.header(
-                                        &fs::relativize_path(path),
-                                        &fs::relativize_path(path),
-                                    );
-                                }
-
-                                let mut stdout = io::stdout().lock();
-                                unified_diff.to_writer(&mut stdout)?;
-                                stdout.write_all(b"\n")?;
-                                stdout.flush()?;
-                            }
-                            SourceKind::IpyNotebook(dst_notebook) => {
-                                let src_notebook = source_kind.as_ipy_notebook().unwrap();
-                                let mut stdout = io::stdout().lock();
-                                // Cell indices are 1-based.
-                                for ((idx, src_cell), dest_cell) in (1u32..)
-                                    .zip(src_notebook.cells().iter())
-                                    .zip(dst_notebook.cells().iter())
-                                {
-                                    let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) =
-                                        (src_cell, dest_cell)
-                                    else {
-                                        continue;
-                                    };
-
-                                    let src_source_code = src_code_cell.source.to_string();
-                                    let dest_source_code = dest_code_cell.source.to_string();
-                                    let text_diff =
-                                        TextDiff::from_lines(&src_source_code, &dest_source_code);
-                                    let mut unified_diff = text_diff.unified_diff();
-
-                                    // Jupyter notebook cells don't necessarily have a newline
-                                    // at the end. For example,
-                                    //
-                                    // ```python
-                                    // print("hello")
-                                    // ```
-                                    //
-                                    // For a cell containing the above code, there'll only be one line,
-                                    // and it won't have a newline at the end. If it did, there'd be
-                                    // two lines, and the second line would be empty:
-                                    //
-                                    // ```python
-                                    // print("hello")
-                                    //
-                                    // ```
-                                    unified_diff.missing_newline_hint(false);
-
-                                    if let Some(path) = path {
-                                        unified_diff.header(
-                                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                        );
-                                    } else {
-                                        unified_diff
-                                            .header(&format!("cell {idx}"), &format!("cell {idx}"));
-                                    };
-
-                                    unified_diff.to_writer(&mut stdout)?;
-                                }
-                                stdout.write_all(b"\n")?;
-                                stdout.flush()?;
-                            }
-                        }
+                        source_kind.diff(transformed.as_ref(), path, &mut io::stdout().lock())?;
                     }
                 }
                 flags::FixMode::Generate => {}
