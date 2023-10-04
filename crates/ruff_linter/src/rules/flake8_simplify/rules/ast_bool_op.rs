@@ -364,7 +364,6 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         last_target_option = Some(target.into());
         duplicates.push(vec![index]);
     }
-    println!("{:?}", duplicates);
 
     // Generate a `Diagnostic` for each duplicate.
     for indices in duplicates {
@@ -444,13 +443,13 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
                     // Generate the combined `BoolOp`.
                     let before = values.iter().take(indices[0]).map(Clone::clone);
-                    let after = values.iter().skip(indices[indices.len() - 1] + 1).map(Clone::clone);
+                    let after = values
+                        .iter()
+                        .skip(indices[indices.len() - 1] + 1)
+                        .map(Clone::clone);
                     let node = ast::ExprBoolOp {
                         op: BoolOp::Or,
-                        values: before
-                            .chain(iter::once(call))
-                            .chain(after)
-                            .collect(),
+                        values: before.chain(iter::once(call)).chain(after).collect(),
                         range: TextRange::default(),
                     };
                     let bool_op = node.into();
