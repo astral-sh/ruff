@@ -44,34 +44,32 @@ impl Violation for ConsiderUsingTernary {
     }
 }
 
-pub(crate) fn consider_using_ternary(
-    checker: &mut Checker,
-    bool_op: &ExprBoolOp,
-) {
+pub(crate) fn consider_using_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
     if !is_legacy_ternary(bool_op) {
         return;
     }
 
-    let if_expr = Expr::IfExp(
-        ExprIfExp {
-            test: Box::new(bool_op.values[0].as_bool_op_expr().unwrap().values[0].clone()),
-            body: Box::new(bool_op.values[0].as_bool_op_expr().unwrap().values[1].clone()),
-            orelse: Box::new(if bool_op.values.len() == 2 { bool_op.values[1].clone() } else {
-                Expr::BoolOp(
-                    ExprBoolOp {
-                        op: BoolOp::Or,
-                        values: bool_op.values[1..].to_vec(),
-                        range: TextRange::default(),
-                    }
-                )
-            }),
-            range: TextRange::default(),
-        }
-    );
+    let if_expr = Expr::IfExp(ExprIfExp {
+        test: Box::new(bool_op.values[0].as_bool_op_expr().unwrap().values[0].clone()),
+        body: Box::new(bool_op.values[0].as_bool_op_expr().unwrap().values[1].clone()),
+        orelse: Box::new(if bool_op.values.len() == 2 {
+            bool_op.values[1].clone()
+        } else {
+            Expr::BoolOp(ExprBoolOp {
+                op: BoolOp::Or,
+                values: bool_op.values[1..].to_vec(),
+                range: TextRange::default(),
+            })
+        }),
+        range: TextRange::default(),
+    });
     let ternary = checker.generator().expr(&if_expr);
 
     let mut diagnostic = Diagnostic::new(
-        ConsiderUsingTernary { ternary: ternary.clone() }, bool_op.range,
+        ConsiderUsingTernary {
+            ternary: ternary.clone(),
+        },
+        bool_op.range,
     );
 
     if checker.patch(diagnostic.kind.rule()) {
@@ -114,8 +112,8 @@ fn is_str_legacy_ternary(s: &str) -> bool {
 fn test_is_legacy_ternary() {
     // positive
     assert!(is_str_legacy_ternary("1<2 and 'a' or 'b'"));
-    assert!(is_str_legacy_ternary("1<2 and 'a' or 'b' and 'd'"));  // 'a' if 1<2 else 'b' and 'd'
-    assert!(is_str_legacy_ternary("1<2 and 'a' or 'b' or 'd'"));  // 'a' if 1<2 else 'b' or 'd'
+    assert!(is_str_legacy_ternary("1<2 and 'a' or 'b' and 'd'")); // 'a' if 1<2 else 'b' and 'd'
+    assert!(is_str_legacy_ternary("1<2 and 'a' or 'b' or 'd'")); // 'a' if 1<2 else 'b' or 'd'
 
     // negative
     assert!(!is_str_legacy_ternary("1<2 and 'a'"));
