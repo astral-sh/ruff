@@ -443,8 +443,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     let call = node2.into();
 
                     // Generate the combined `BoolOp`.
-                    let before = values.iter().take(indices[0]).cloned();
-                    let after = values.iter().skip(indices[indices.len() - 1] + 1).cloned();
+                    let [first, .., last] = indices.as_slice() else {
+                        unreachable!("Indices should have at least two elements")
+                    };
+                    let before = values.iter().take(*first).cloned();
+                    let after = values.iter().skip(last + 1).cloned();
                     let node = ast::ExprBoolOp {
                         op: BoolOp::Or,
                         values: before.chain(iter::once(call)).chain(after).collect(),
