@@ -1,18 +1,19 @@
 use log::error;
-use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
-};
-use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
+use ruff_python_ast::{
+    self as ast, Arguments, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::{Locator, UniversalNewlines};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidthBuilder;
@@ -286,10 +287,9 @@ fn is_main_check(expr: &Expr) -> bool {
 ///     if yyy:
 ///      # ^^^ returns this expression
 ///         z = 1
-///       # ^^^^^ and this statement
 ///         ...
 /// ```
-fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
+fn find_last_nested_if(body: &[Stmt]) -> Option<&Expr> {
     let [Stmt::If(ast::StmtIf {
         test,
         body: inner_body,
@@ -302,16 +302,48 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     if !elif_else_clauses.is_empty() {
         return None;
     }
-    find_last_nested_if(inner_body).or_else(|| {
-        Some((
-            test,
-            inner_body.last().expect("Expected body to be non-empty"),
-        ))
-    })
+    find_last_nested_if(inner_body).or(Some(test))
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) enum NestedIf<'a> {
+    If(&'a ast::StmtIf),
+    Elif(&'a ElifElseClause),
+}
+
+impl<'a> NestedIf<'a> {
+    pub(super) fn body(self) -> &'a [Stmt] {
+        match self {
+            NestedIf::If(stmt_if) => &stmt_if.body,
+            NestedIf::Elif(clause) => &clause.body,
+        }
+    }
+
+    pub(super) fn is_elif(self) -> bool {
+        matches!(self, NestedIf::Elif(..))
+    }
+}
+
+impl Ranged for NestedIf<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            NestedIf::If(stmt_if) => stmt_if.range(),
+            NestedIf::Elif(clause) => clause.range(),
+        }
+    }
+}
+
+impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a> {
+    fn from(value: &NestedIf<'a>) -> Self {
+        match value {
+            NestedIf::If(stmt_if) => (*stmt_if).into(),
+            NestedIf::Elif(clause) => (*clause).into(),
+        }
+    }
 }
 
 /// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
-fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
+fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf> {
     let ast::StmtIf {
         test,
         body,
@@ -321,15 +353,15 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
 
     // It must be the last condition, otherwise there could be another `elif` or `else` that only
     // depends on the outer of the two conditions
-    let (test, body, range, is_elif) = if let Some(clause) = elif_else_clauses.last() {
+    let (test, nested_if) = if let Some(clause) = elif_else_clauses.last() {
         if let Some(test) = &clause.test {
-            (test, &clause.body, clause.range(), true)
+            (test, NestedIf::Elif(clause))
         } else {
             // The last condition is an `else` (different rule)
             return None;
         }
     } else {
-        (test.as_ref(), body, stmt_if.range(), false)
+        (test.as_ref(), NestedIf::If(stmt_if))
     };
 
     // The nested if must be the only child, otherwise there is at least one more statement that
@@ -354,7 +386,7 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
         return None;
     }
 
-    Some((body, range, is_elif))
+    Some(nested_if)
 }
 
 /// SIM102
@@ -363,21 +395,22 @@ pub(crate) fn nested_if_statements(
     stmt_if: &ast::StmtIf,
     parent: Option<&Stmt>,
 ) {
-    let Some((body, range, is_elif)) = nested_if_body(stmt_if) else {
+    let Some(nested_if) = nested_if_body(stmt_if) else {
         return;
     };
 
     // Find the deepest nested if-statement, to inform the range.
-    let Some((test, _first_stmt)) = find_last_nested_if(body) else {
+    let Some(test) = find_last_nested_if(nested_if.body()) else {
         return;
     };
 
     // Check if the parent is already emitting a larger diagnostic including this if statement
     if let Some(Stmt::If(stmt_if)) = parent {
-        if let Some((body, _range, _is_elif)) = nested_if_body(stmt_if) {
+        if let Some(nested_if) = nested_if_body(stmt_if) {
             // In addition to repeating the `nested_if_body` and `find_last_nested_if` check, we
             // also need to be the first child in the parent
-            if matches!(&body[0], Stmt::If(inner) if inner == stmt_if)
+            let body = nested_if.body();
+            if matches!(&body[0], Stmt::If(inner) if *inner == *stmt_if)
                 && find_last_nested_if(body).is_some()
             {
                 return;
@@ -392,22 +425,23 @@ pub(crate) fn nested_if_statements(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(CollapsibleIf, TextRange::new(range.start(), colon.end()));
+    let mut diagnostic = Diagnostic::new(
+        CollapsibleIf,
+        TextRange::new(nested_if.start(), colon.end()),
+    );
     if checker.patch(diagnostic.kind.rule()) {
         // The fixer preserves comments in the nested body, but removes comments between
         // the outer and inner if statements.
-        let nested_if = &body[0];
         if !checker
             .indexer()
             .comment_ranges()
-            .intersects(TextRange::new(range.start(), nested_if.start()))
+            .intersects(TextRange::new(
+                nested_if.start(),
+                nested_if.body()[0].start(),
+            ))
         {
-            match fix_if::fix_nested_if_statements(
-                checker.locator(),
-                checker.stylist(),
-                range,
-                is_elif,
-            ) {
+            match fix_if::fix_nested_if_statements(checker.locator(), checker.stylist(), nested_if)
+            {
                 Ok(edit) => {
                     if edit
                         .content()

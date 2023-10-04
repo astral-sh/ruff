@@ -10,11 +10,12 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast::whitespace;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::Ranged;
 
 use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
+use crate::rules::flake8_simplify::rules::ast_if::NestedIf;
 
 fn parenthesize_and_operand(expr: Expression) -> Expression {
     match &expr {
@@ -32,23 +33,22 @@ fn parenthesize_and_operand(expr: Expression) -> Expression {
 }
 
 /// (SIM102) Convert `if a: if b:` to `if a and b:`.
-pub(crate) fn fix_nested_if_statements(
+pub(super) fn fix_nested_if_statements(
     locator: &Locator,
     stylist: &Stylist,
-    range: TextRange,
-    is_elif: bool,
+    nested_if: NestedIf,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, &range) else {
+    let Some(outer_indent) = whitespace::indentation(locator, &nested_if) else {
         bail!("Unable to fix multiline statement");
     };
 
     // Extract the module text.
-    let contents = locator.lines(range);
+    let contents = locator.lines(nested_if.range());
 
     // If this is an `elif`, we have to remove the `elif` keyword for now. (We'll
     // restore the `el` later on.)
-    let module_text = if is_elif {
+    let module_text = if nested_if.is_elif() {
         Cow::Owned(contents.replacen("elif", "if", 1))
     } else {
         Cow::Borrowed(contents)
@@ -121,12 +121,12 @@ pub(crate) fn fix_nested_if_statements(
             .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
             .unwrap()
     };
-    let contents = if is_elif {
+    let contents = if nested_if.is_elif() {
         Cow::Owned(module_text.replacen("if", "elif", 1))
     } else {
         Cow::Borrowed(module_text)
     };
 
-    let range = locator.lines_range(range);
+    let range = locator.lines_range(nested_if.range());
     Ok(Edit::range_replacement(contents.to_string(), range))
 }
