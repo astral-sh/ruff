@@ -351,7 +351,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     let mut duplicates: Vec<Vec<usize>> = Vec::new();
     let mut last_target_option: Option<ComparableExpr> = None;
     for (index, call) in values.iter().enumerate() {
-        let Some(target) = isinstance_target(&call, checker.semantic()) else {
+        let Some(target) = isinstance_target(call, checker.semantic()) else {
             last_target_option = None;
             continue;
         };
