@@ -816,11 +816,10 @@ fn displays_fix_applicability_levels() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 [**] Dictionary key literal `'a'` repeated
+    -:1:14: F601 Dictionary key literal `'a'` repeated
     -:2:7: UP034 [*] Avoid extraneous parentheses
     Found 2 errors.
-    [*] 1 fixable with the --fix option.
-    [**] 1 potentially fixable with the --unsafe-fixes option.
+    [*] 1 fixable with the --fix option (1 hidden fix can be enabled with the --unsafe-fixes option).
 
     ----- stderr -----
     "###);
@@ -835,9 +834,9 @@ fn displays_remaining_unsafe_fixes() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 [**] Dictionary key literal `'a'` repeated
+    -:1:14: F601 Dictionary key literal `'a'` repeated
     Found 1 error.
-    [**] 1 potentially fixable with the --unsafe-fixes option.
+    1 hidden fix can be enabled with the --unsafe-fixes option.
 
     ----- stderr -----
     "###);

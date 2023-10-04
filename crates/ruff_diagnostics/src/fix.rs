@@ -30,11 +30,8 @@ pub enum Applicability {
 
 impl Applicability {
     pub fn symbol(&self) -> &'static str {
-        match self {
-            Self::Automatic => "*",
-            Self::Suggested => "**",
-            _ => "*",
-        }
+        // Uses a constant for now for all kinds but we can match self and use different symbols
+        "*"
     }
 }
 

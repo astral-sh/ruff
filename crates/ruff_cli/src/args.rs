@@ -80,7 +80,7 @@ pub struct CheckCommand {
     /// Use `--no-fix` to disable or `--unsafe-fixes` to include suggested fixes.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
-    /// Apply unsafe fixes to resolve lint violations.
+    /// Include fixes that may not retain the original intent of the code.
     #[arg(long)]
     unsafe_fixes: bool,
     #[clap(long, overrides_with_all(["fix"]), hide = true)]

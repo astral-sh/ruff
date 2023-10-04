@@ -6,7 +6,7 @@ pub enum FixMode {
 }
 
 impl FixMode {
-    pub fn suggested_fixes(&self) -> &UnsafeFixes {
+    pub fn unsafe_fixes(&self) -> &UnsafeFixes {
         match self {
             FixMode::Generate(suggested) => suggested,
             FixMode::Apply(suggested) => suggested,

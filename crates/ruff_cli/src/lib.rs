@@ -241,7 +241,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     //   print them to stdout, if we're reading from stdin).
     // - If `--diff` or `--fix-only` are set, don't print any violations (only applicable fixes)
     // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
-    //   `--fix--suggested` is set, then [`Applicablility::Suggested`] fixes are included.
+    //   `--unsafe-fixes` is set, then [`Applicablility::Suggested`] fixes are included.
 
     let unsafe_fixes = if unsafe_fixes {
         UnsafeFixes::Enabled
@@ -269,6 +269,9 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     }
     if show_source {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
+    }
+    if unsafe_fixes.is_enabled() {
+        printer_flags |= PrinterFlags::SHOW_UNSAFE_FIXES;
     }
     if cli.ecosystem_ci {
         warn_user!(

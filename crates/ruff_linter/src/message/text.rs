@@ -22,11 +22,13 @@ bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
         /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS = 0b0000_0001;
+        const SHOW_FIX_STATUS    = 0b0000_0001;
         /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF   = 0b0000_0010;
+        const SHOW_FIX_DIFF      = 0b0000_0010;
         /// Whether to show the source code of a diagnostic.
-        const SHOW_SOURCE     = 0b0000_0100;
+        const SHOW_SOURCE        = 0b0000_0100;
+        /// Whether to show unsafe fixes.
+        const SHOW_UNSAFE_FIXES  = 0b0000_1000;
     }
 }
 
@@ -52,6 +54,13 @@ impl TextEmitter {
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
         self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
+        self
+    }
+
+    #[must_use]
+    pub fn with_show_unsafe_fixes(mut self, show_unsafe_fixes: bool) -> Self {
+        self.flags
+            .set(EmitterFlags::SHOW_UNSAFE_FIXES, show_unsafe_fixes);
         self
     }
 }
@@ -106,7 +115,8 @@ impl Emitter for TextEmitter {
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
                     message,
-                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS)
+                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS),
+                    show_unsafe_fixes: self.flags.intersects(EmitterFlags::SHOW_UNSAFE_FIXES)
                 }
             )?;
 
@@ -135,6 +145,7 @@ impl Emitter for TextEmitter {
 pub(super) struct RuleCodeAndBody<'a> {
     pub(crate) message: &'a Message,
     pub(crate) show_fix_status: bool,
+    pub(crate) show_unsafe_fixes: bool,
 }
 
 impl Display for RuleCodeAndBody<'_> {
@@ -142,8 +153,13 @@ impl Display for RuleCodeAndBody<'_> {
         let kind = &self.message.kind;
         if self.show_fix_status {
             if let Some(fix) = self.message.fix.as_ref() {
-                // Do not display an indicator for manual fixes
-                if fix.applicability() > Applicability::Manual {
+                let required_applicability = if self.show_unsafe_fixes {
+                    Applicability::Suggested
+                } else {
+                    Applicability::Automatic
+                };
+                // Do not display an indicator for unapplicable fixes
+                if fix.applies(required_applicability) {
                     let indicator = fix.applicability().symbol();
 
                     return write!(
@@ -362,6 +378,17 @@ mod tests {
         let mut emitter = TextEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true);
+        let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn fix_status_unsafe() {
+        let mut emitter = TextEmitter::default()
+            .with_show_fix_status(true)
+            .with_show_source(true)
+            .with_show_unsafe_fixes(true);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);
