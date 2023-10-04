@@ -7,7 +7,7 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-/// ## What is does
+/// ## What it does
 /// Checks if pre-python 2.5 ternary syntax is used.
 ///
 /// ## Why is this bad?
