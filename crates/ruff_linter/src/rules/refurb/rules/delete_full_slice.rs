@@ -71,7 +71,7 @@ pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete)
         // Fix is only supported for single-target deletions.
         if checker.patch(diagnostic.kind.rule()) && delete.targets.len() == 1 {
             let replacement = generate_method_call(name, "clear", checker.generator());
-            diagnostic.set_fix(Fix::suggested(Edit::replacement(
+            diagnostic.set_fix(Fix::automatic_unsafe(Edit::replacement(
                 replacement,
                 delete.start(),
                 delete.end(),

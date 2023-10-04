@@ -118,7 +118,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
             if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("any") {
-                diagnostic.set_fix(Fix::suggested(Edit::replacement(
+                diagnostic.set_fix(Fix::automatic_unsafe(Edit::replacement(
                     contents,
                     stmt.start(),
                     terminal.stmt.end(),
@@ -204,7 +204,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
             if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("all") {
-                diagnostic.set_fix(Fix::suggested(Edit::replacement(
+                diagnostic.set_fix(Fix::automatic_unsafe(Edit::replacement(
                     contents,
                     stmt.start(),
                     terminal.stmt.end(),

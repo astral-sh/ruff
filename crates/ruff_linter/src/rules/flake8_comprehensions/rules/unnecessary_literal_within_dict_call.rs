@@ -98,7 +98,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(
                 checker.locator(),
                 checker.stylist(),
             )
-            .map(Fix::suggested)
+            .map(Fix::automatic_unsafe)
         });
     }
     checker.diagnostics.push(diagnostic);

@@ -85,7 +85,7 @@ pub(crate) fn redundant_tuple_in_exception_handler(
             // ```
             // Otherwise, the output will be invalid syntax, since we're removing a set of
             // parentheses.
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
                 pad(
                     checker.generator().expr(elt),
                     type_.range(),

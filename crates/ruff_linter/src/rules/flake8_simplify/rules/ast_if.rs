@@ -452,7 +452,7 @@ pub(crate) fn nested_if_statements(
                                 <= checker.settings.line_length
                         })
                     {
-                        diagnostic.set_fix(Fix::suggested(edit));
+                        diagnostic.set_fix(Fix::automatic_unsafe(edit));
                     }
                 }
                 Err(err) => error!("Failed to fix nested if: {err}"),
@@ -558,7 +558,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(Box::new(if_test.clone())),
                     range: TextRange::default(),
                 };
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                     checker.generator().stmt(&node.into()),
                     range,
                 )));
@@ -583,7 +583,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(Box::new(node1.into())),
                     range: TextRange::default(),
                 };
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                     checker.generator().stmt(&node2.into()),
                     range,
                 )));
@@ -714,7 +714,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !checker.indexer().has_comments(stmt, checker.locator()) {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                 contents,
                 stmt.range(),
             )));
@@ -1022,7 +1022,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !checker.indexer().has_comments(stmt_if, checker.locator()) {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                 contents,
                 stmt_if.range(),
             )));

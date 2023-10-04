@@ -108,7 +108,7 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
             // We only suggest a fix when all appends in a group are clumped together. If they're
             // non-consecutive, fixing them is much more difficult.
             if checker.patch(diagnostic.kind.rule()) && group.is_consecutive {
-                diagnostic.set_fix(Fix::suggested(Edit::replacement(
+                diagnostic.set_fix(Fix::automatic_unsafe(Edit::replacement(
                     replacement,
                     group.start(),
                     group.end(),

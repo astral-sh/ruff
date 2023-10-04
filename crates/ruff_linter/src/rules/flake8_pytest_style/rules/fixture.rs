@@ -700,7 +700,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                     && arguments.args.is_empty()
                     && arguments.keywords.is_empty()
                 {
-                    let fix = Fix::automatic(Edit::deletion(func.end(), decorator.end()));
+                    let fix = Fix::automatic_safe(Edit::deletion(func.end(), decorator.end()));
                     pytest_fixture_parentheses(
                         checker,
                         decorator,
@@ -735,7 +735,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                                     edits::Parentheses::Preserve,
                                     checker.locator().contents(),
                                 )
-                                .map(Fix::suggested)
+                                .map(Fix::automatic_unsafe)
                             });
                         }
                         checker.diagnostics.push(diagnostic);
@@ -746,7 +746,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
         _ => {
             if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if checker.settings.flake8_pytest_style.fixture_parentheses {
-                    let fix = Fix::automatic(Edit::insertion(
+                    let fix = Fix::automatic_safe(Edit::insertion(
                         Parentheses::Empty.to_string(),
                         decorator.end(),
                     ));
@@ -839,9 +839,9 @@ fn check_fixture_returns(
                 ))
             });
             if let Some(return_type_edit) = return_type_edit {
-                diagnostic.set_fix(Fix::automatic_edits(yield_edit, [return_type_edit]));
+                diagnostic.set_fix(Fix::automatic_safe_edits(yield_edit, [return_type_edit]));
             } else {
-                diagnostic.set_fix(Fix::automatic(yield_edit));
+                diagnostic.set_fix(Fix::automatic_safe(yield_edit));
             }
         }
         checker.diagnostics.push(diagnostic);
@@ -914,7 +914,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
                     Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let range = checker.locator().full_lines_range(expr.range());
-                    diagnostic.set_fix(Fix::automatic(Edit::range_deletion(range)));
+                    diagnostic.set_fix(Fix::automatic_safe(Edit::range_deletion(range)));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -926,7 +926,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
                     Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let line_range = checker.locator().full_lines_range(expr.range());
-                    diagnostic.set_fix(Fix::automatic(Edit::range_deletion(line_range)));
+                    diagnostic.set_fix(Fix::automatic_safe(Edit::range_deletion(line_range)));
                 }
                 checker.diagnostics.push(diagnostic);
             }

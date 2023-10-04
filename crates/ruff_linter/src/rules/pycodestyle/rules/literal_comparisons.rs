@@ -287,7 +287,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             checker.locator(),
         );
         for diagnostic in &mut diagnostics {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                 content.to_string(),
                 compare.range(),
             )));

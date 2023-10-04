@@ -63,7 +63,7 @@ pub(crate) fn slice_copy(checker: &mut Checker, subscript: &ast::ExprSubscript) 
     let mut diagnostic = Diagnostic::new(SliceCopy, subscript.range());
     if checker.patch(diagnostic.kind.rule()) {
         let replacement = generate_method_call(name, "copy", checker.generator());
-        diagnostic.set_fix(Fix::suggested(Edit::replacement(
+        diagnostic.set_fix(Fix::automatic_unsafe(Edit::replacement(
             replacement,
             subscript.start(),
             subscript.end(),

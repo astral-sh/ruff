@@ -498,7 +498,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     if checker.patch(diagnostic.kind.rule())
         && !checker.indexer().comment_ranges().intersects(right.range())
     {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
             contents,
             expr.range(),
         )));

@@ -201,7 +201,7 @@ pub(crate) fn invalid_string_characters(
         let location = range.start() + TextSize::try_from(column).unwrap();
         let range = TextRange::at(location, c.text_len());
 
-        diagnostics.push(Diagnostic::new(rule, range).with_fix(Fix::automatic(
+        diagnostics.push(Diagnostic::new(rule, range).with_fix(Fix::automatic_safe(
             Edit::range_replacement(replacement.to_string(), range),
         )));
     }

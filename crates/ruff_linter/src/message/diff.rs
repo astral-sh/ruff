@@ -6,7 +6,7 @@ use colored::{Color, ColoredString, Colorize, Styles};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 
-use ruff_diagnostics::{Applicability, Fix};
+use ruff_diagnostics::{Applicability, Fix, Safety};
 use ruff_source_file::{OneIndexed, SourceFile};
 
 use crate::message::Message;
@@ -52,10 +52,12 @@ impl Display for Diff<'_> {
         let diff = TextDiff::from_lines(self.source_code.source_text(), &output);
 
         let message = match self.fix.applicability() {
-            Applicability::Automatic => "Fix",
-            Applicability::Suggested => "Suggested fix",
-            Applicability::Manual => "Possible fix",
-            Applicability::Unspecified => "Suggested fix", /* For backwards compatibility, unspecified fixes are 'suggested' */
+            // TODO(zanieb): Adjust this messaging once it's user-facing
+            Applicability::Automatic(safety) => match safety {
+                Safety::Safe => "Fix",
+                Safety::Unsafe => "Unsafe fix",
+            },
+            Applicability::Manual => "Manual fix",
         };
         writeln!(f, "ℹ {}", message.blue())?;
 

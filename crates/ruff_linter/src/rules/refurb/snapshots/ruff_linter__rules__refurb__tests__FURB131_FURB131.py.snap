@@ -9,7 +9,7 @@ FURB131.py:11:1: FURB131 [*] Prefer `clear` over deleting a full slice
    |
    = help: Replace with `clear()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 8  8  | # these should match
 9  9  | 
 10 10 | # FURB131
@@ -27,7 +27,7 @@ FURB131.py:15:1: FURB131 [*] Prefer `clear` over deleting a full slice
    |
    = help: Replace with `clear()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 12 12 | 
 13 13 | 
 14 14 | # FURB131
@@ -62,7 +62,7 @@ FURB131.py:28:5: FURB131 [*] Prefer `clear` over deleting a full slice
    |
    = help: Replace with `clear()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 25 25 | 
 26 26 | def yes_one(x: list[int]):
 27 27 |     # FURB131
@@ -81,7 +81,7 @@ FURB131.py:33:5: FURB131 [*] Prefer `clear` over deleting a full slice
    |
    = help: Replace with `clear()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 30 30 | 
 31 31 | def yes_two(x: dict[int, str]):
 32 32 |     # FURB131
@@ -100,7 +100,7 @@ FURB131.py:38:5: FURB131 [*] Prefer `clear` over deleting a full slice
    |
    = help: Replace with `clear()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 35 35 | 
 36 36 | def yes_three(x: List[int]):
 37 37 |     # FURB131
@@ -119,7 +119,7 @@ FURB131.py:43:5: FURB131 [*] Prefer `clear` over deleting a full slice
    |
    = help: Replace with `clear()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 40 40 | 
 41 41 | def yes_four(x: Dict[int, str]):
 42 42 |     # FURB131

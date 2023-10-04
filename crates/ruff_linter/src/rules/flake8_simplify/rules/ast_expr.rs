@@ -217,7 +217,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             range: TextRange::default(),
         };
         let new_env_var = node.into();
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
             checker.generator().expr(&new_env_var),
             slice.range(),
         )));
@@ -276,7 +276,7 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
             expected,
             expr.range(),
         )));

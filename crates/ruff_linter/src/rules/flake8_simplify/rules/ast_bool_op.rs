@@ -461,7 +461,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
                     // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                     // multiple duplicates, the fixes will conflict.
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                         checker.generator().expr(&bool_op),
                         expr.range(),
                     )));
@@ -582,7 +582,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                 };
                 node.into()
             };
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                 checker.generator().expr(&in_expr),
                 expr.range(),
             )));
@@ -639,7 +639,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                         "False".to_string(),
                         expr.range(),
                     )));
@@ -698,7 +698,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                         "True".to_string(),
                         expr.range(),
                     )));
@@ -851,7 +851,7 @@ pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::suggested(edit));
+            diagnostic.set_fix(Fix::automatic_unsafe(edit));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -868,7 +868,7 @@ pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::suggested(edit));
+            diagnostic.set_fix(Fix::automatic_unsafe(edit));
         }
         checker.diagnostics.push(diagnostic);
     }
