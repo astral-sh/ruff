@@ -1,10 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::ExprConstant;
 use ruff_python_ast::{CmpOp, Constant, Expr};
 use ruff_text_size::Ranged;
-
-use crate::rules::pycodestyle::helpers::generate_comparison;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
