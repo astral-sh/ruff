@@ -12,11 +12,11 @@ use ruff_python_ast::{
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::{Locator, UniversalNewlines};
+use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::line_width::LineWidthBuilder;
+use crate::fix::edits::fits;
 use crate::registry::AsRule;
 use crate::rules::flake8_simplify::rules::fix_if;
 
@@ -443,15 +443,15 @@ pub(crate) fn nested_if_statements(
             match fix_if::fix_nested_if_statements(checker.locator(), checker.stylist(), nested_if)
             {
                 Ok(edit) => {
-                    if edit
-                        .content()
-                        .unwrap_or_default()
-                        .universal_newlines()
-                        .all(|line| {
-                            LineWidthBuilder::new(checker.settings.tab_size).add_str(&line)
-                                <= checker.settings.line_length
-                        })
-                    {
+                    if edit.content().map_or(true, |content| {
+                        fits(
+                            content,
+                            (&nested_if).into(),
+                            checker.locator(),
+                            checker.settings.line_length,
+                            checker.settings.tab_size,
+                        )
+                    }) {
                         diagnostic.set_fix(Fix::suggested(edit));
                     }
                 }
@@ -693,16 +693,13 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     let contents = checker.generator().stmt(&ternary);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    let line_start = checker.locator().line_start(stmt.start());
-    if LineWidthBuilder::new(checker.settings.tab_size)
-        .add_str(
-            checker
-                .locator()
-                .slice(TextRange::new(line_start, stmt.start())),
-        )
-        .add_str(&contents)
-        > checker.settings.line_length
-    {
+    if !fits(
+        &contents,
+        stmt.into(),
+        checker.locator(),
+        checker.settings.line_length,
+        checker.settings.tab_size,
+    ) {
         return;
     }
 
@@ -1001,16 +998,13 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     let contents = checker.generator().stmt(&node5.into());
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    let line_start = checker.locator().line_start(stmt_if.start());
-    if LineWidthBuilder::new(checker.settings.tab_size)
-        .add_str(
-            checker
-                .locator()
-                .slice(TextRange::new(line_start, stmt_if.start())),
-        )
-        .add_str(&contents)
-        > checker.settings.line_length
-    {
+    if !fits(
+        &contents,
+        stmt_if.into(),
+        checker.locator(),
+        checker.settings.line_length,
+        checker.settings.tab_size,
+    ) {
         return;
     }
 
