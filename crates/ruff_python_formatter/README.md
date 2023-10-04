@@ -428,7 +428,7 @@ In particular, Ruff will always insert parentheses around tuples that expand ove
     (a, b),
     (
         c,
-        c,
+        d,
     ),
 )
 ```
