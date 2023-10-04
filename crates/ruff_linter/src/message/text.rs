@@ -7,6 +7,7 @@ use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, Sou
 use bitflags::bitflags;
 use colored::Colorize;
 
+use ruff_diagnostics::Applicability;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -139,18 +140,20 @@ pub(super) struct RuleCodeAndBody<'a> {
 impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let kind = &self.message.kind;
+        if self.show_fix_status {
+            if let Some(fix) = self.message.fix.as_ref() {
+                // Do not display an indicator for manual fixes
+                if fix.applicability() > Applicability::Manual {
+                    let indicator = fix.applicability().symbol();
 
-        if let Some(fix) = self.message.fix.as_ref() {
-            if self.show_fix_status {
-                let indicator = fix.applicability().symbol();
-
-                return write!(
-                    f,
-                    "{code} {fix}{body}",
-                    code = kind.rule().noqa_code().to_string().red().bold(),
-                    fix = format_args!("[{}] ", indicator.cyan()),
-                    body = kind.body,
-                );
+                    return write!(
+                        f,
+                        "{code} {fix}{body}",
+                        code = kind.rule().noqa_code().to_string().red().bold(),
+                        fix = format_args!("[{}] ", indicator.cyan()),
+                        body = kind.body,
+                    );
+                }
             }
         };
 
