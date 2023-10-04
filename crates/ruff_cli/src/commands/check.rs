@@ -284,7 +284,7 @@ mod test {
             &CliOverrides::default(),
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
-            flags::FixMode::Generate(flags::SuggestedFixes::Apply),
+            flags::FixMode::Generate(flags::UnsafeFixes::Enabled),
         )
         .unwrap();
         let mut output = Vec::new();

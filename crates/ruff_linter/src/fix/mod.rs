@@ -9,7 +9,7 @@ use ruff_source_file::Locator;
 
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
-use crate::settings::flags::SuggestedFixes;
+use crate::settings::flags::UnsafeFixes;
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
@@ -28,9 +28,9 @@ pub(crate) struct FixResult {
 pub(crate) fn fix_file(
     diagnostics: &[Diagnostic],
     locator: &Locator,
-    fix_suggested: SuggestedFixes,
+    unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
-    let required_applicability = if fix_suggested.is_apply() {
+    let required_applicability = if unsafe_fixes.is_enabled() {
         Applicability::Suggested
     } else {
         Applicability::Automatic

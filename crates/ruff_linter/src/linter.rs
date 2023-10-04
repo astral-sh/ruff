@@ -423,7 +423,7 @@ pub fn lint_fix<'a>(
     settings: &LinterSettings,
     source_kind: &'a SourceKind,
     source_type: PySourceType,
-    fix_suggested: flags::SuggestedFixes,
+    unsafe_fixes: flags::UnsafeFixes,
 ) -> Result<FixerResult<'a>> {
     let mut transformed = Cow::Borrowed(source_kind);
 
@@ -496,7 +496,7 @@ pub fn lint_fix<'a>(
             code: fixed_contents,
             fixes: applied,
             source_map,
-        }) = fix_file(&result.data.0, &locator, fix_suggested)
+        }) = fix_file(&result.data.0, &locator, unsafe_fixes)
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.

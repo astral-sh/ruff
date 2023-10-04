@@ -158,7 +158,7 @@ pub(crate) fn test_contents<'a>(
         }) = fix_file(
             &diagnostics,
             &Locator::new(transformed.source_code()),
-            flags::SuggestedFixes::Apply,
+            flags::UnsafeFixes::Enabled,
         ) {
             if iterations < max_iterations() {
                 iterations += 1;

@@ -1,12 +1,12 @@
 #[derive(Debug, Copy, Clone, Hash, is_macro::Is)]
 pub enum FixMode {
-    Generate(SuggestedFixes),
-    Apply(SuggestedFixes),
-    Diff(SuggestedFixes),
+    Generate(UnsafeFixes),
+    Apply(UnsafeFixes),
+    Diff(UnsafeFixes),
 }
 
 impl FixMode {
-    pub fn suggested_fixes(&self) -> &SuggestedFixes {
+    pub fn suggested_fixes(&self) -> &UnsafeFixes {
         match self {
             FixMode::Generate(suggested) => suggested,
             FixMode::Apply(suggested) => suggested,
@@ -16,9 +16,9 @@ impl FixMode {
 }
 
 #[derive(Debug, Copy, Clone, Hash, is_macro::Is)]
-pub enum SuggestedFixes {
-    Apply,
-    Disable,
+pub enum UnsafeFixes {
+    Enabled,
+    Disabled,
 }
 
 #[derive(Debug, Copy, Clone, Hash, result_like::BoolLike)]

@@ -128,7 +128,7 @@
       }
     },
     "fix": {
-      "description": "Enable fix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags). Only includes automatic fixes unless `--fix-suggested` is provided.",
+      "description": "Enable fix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags). Only includes automatic fixes unless `--unsafe-fixes` is provided.",
       "type": [
         "boolean",
         "null"
@@ -136,13 +136,6 @@
     },
     "fix-only": {
       "description": "Like `fix`, but disables reporting on leftover violation. Implies `fix`.",
-      "type": [
-        "boolean",
-        "null"
-      ]
-    },
-    "fix-suggested": {
-      "description": "Enable application of suggested fixes.",
       "type": [
         "boolean",
         "null"
@@ -644,6 +637,13 @@
       "items": {
         "$ref": "#/definitions/RuleSelector"
       }
+    },
+    "unsafe-fixes": {
+      "description": "Enable application of suggested fixes.",
+      "type": [
+        "boolean",
+        "null"
+      ]
     }
   },
   "additionalProperties": false,

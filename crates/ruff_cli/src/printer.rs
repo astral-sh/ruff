@@ -20,7 +20,7 @@ use ruff_linter::message::{
 };
 use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
-use ruff_linter::settings::flags::{self, SuggestedFixes};
+use ruff_linter::settings::flags::{self, UnsafeFixes};
 use ruff_linter::settings::types::SerializationFormat;
 
 use crate::diagnostics::Diagnostics;
@@ -439,11 +439,11 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>
 struct FixableStatistics<'a> {
     automatic: u32,
     suggested: u32,
-    apply_suggested: &'a SuggestedFixes,
+    apply_suggested: &'a UnsafeFixes,
 }
 
 impl<'a> FixableStatistics<'a> {
-    fn new(diagnostics: &Diagnostics, apply_suggested: &'a SuggestedFixes) -> Self {
+    fn new(diagnostics: &Diagnostics, apply_suggested: &'a UnsafeFixes) -> Self {
         let mut automatic = 0;
         let mut suggested = 0;
 
@@ -466,8 +466,8 @@ impl<'a> FixableStatistics<'a> {
 
     fn fixes_are_applicable(&self) -> bool {
         match self.apply_suggested {
-            SuggestedFixes::Apply => self.automatic > 0 || self.suggested > 0,
-            SuggestedFixes::Disable => self.automatic > 0,
+            UnsafeFixes::Enabled => self.automatic > 0 || self.suggested > 0,
+            UnsafeFixes::Disabled => self.automatic > 0,
         }
     }
 
@@ -484,7 +484,7 @@ impl<'a> FixableStatistics<'a> {
         if self.automatic > 0 && self.suggested > 0 {
             format!(
                 "{automatic_prefix} {} fixable with the --fix option.\n\
-                {suggested_prefix} {} potentially fixable with the --fix-suggested option.",
+                {suggested_prefix} {} potentially fixable with the --unsafe-fixes option.",
                 self.automatic, self.suggested
             )
         } else if self.automatic > 0 {
@@ -494,7 +494,7 @@ impl<'a> FixableStatistics<'a> {
             )
         } else if self.suggested > 0 {
             format!(
-                "{suggested_prefix} {} potentially fixable with the --fix-suggested option.",
+                "{suggested_prefix} {} potentially fixable with the --unsafe-fixes option.",
                 self.suggested
             )
         } else {

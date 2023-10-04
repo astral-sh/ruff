@@ -89,7 +89,7 @@ pub struct Options {
 
     /// Enable fix behavior by-default when running `ruff` (overridden
     /// by the `--fix` and `--no-fix` command-line flags).
-    /// Only includes automatic fixes unless `--fix-suggested` is provided.
+    /// Only includes automatic fixes unless `--unsafe-fixes` is provided.
     #[option(default = "false", value_type = "bool", example = "fix = true")]
     pub fix: Option<bool>,
 
@@ -97,9 +97,9 @@ pub struct Options {
     #[option(
         default = "false",
         value_type = "bool",
-        example = "fix-suggested = true"
+        example = "unsafe-fixes = true"
     )]
-    pub fix_suggested: Option<bool>,
+    pub unsafe_fixes: Option<bool>,
 
     /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
     #[option(default = "false", value_type = "bool", example = "fix-only = true")]

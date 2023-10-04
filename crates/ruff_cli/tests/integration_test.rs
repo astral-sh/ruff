@@ -800,7 +800,7 @@ fn check_input_from_argfile() -> Result<()> {
 
 #[test]
 fn displays_fix_applicability_levels() {
-    // `--fix` should only apply automatic fixes, but should tell the user about `--fix-suggested` if
+    // `--fix` should only apply safe fixes, but should tell the user about `--unsafe-fixes` if
     // there are remaining fixes.
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args([
@@ -820,14 +820,14 @@ fn displays_fix_applicability_levels() {
     -:2:7: UP034 [*] Avoid extraneous parentheses
     Found 2 errors.
     [*] 1 fixable with the --fix option.
-    [**] 1 potentially fixable with the --fix-suggested option.
+    [**] 1 potentially fixable with the --unsafe-fixes option.
 
     ----- stderr -----
     "###);
 }
 
 #[test]
-fn displays_remaining_suggested_fixes() {
+fn displays_remaining_unsafe_fixes() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["-", "--output-format", "text", "--no-cache", "--isolated", "--select", "F601"])
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
@@ -837,15 +837,15 @@ fn displays_remaining_suggested_fixes() {
     ----- stdout -----
     -:1:14: F601 [**] Dictionary key literal `'a'` repeated
     Found 1 error.
-    [**] 1 potentially fixable with the --fix-suggested option.
+    [**] 1 potentially fixable with the --unsafe-fixes option.
 
     ----- stderr -----
     "###);
 }
 
 #[test]
-fn fix_applies_automatic_fixes_only() {
-    // `--fix` should only apply automatic fixes. Since we're runnnig in `stdin` mode, output shouldn't
+fn fix_applies_safe_fixes_only() {
+    // `--fix` should only apply safe fixes. Since we're runnnig in `stdin` mode, output shouldn't
     // be printed.
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
@@ -853,7 +853,8 @@ fn fix_applies_automatic_fixes_only() {
                 "-",
                 "--output-format",
                 "text",
-                "--isolated","--no-cache", 
+                "--isolated",
+                "--no-cache", 
                 "--select",
                 "F601,UP034",
                 "--fix",
@@ -871,47 +872,46 @@ fn fix_applies_automatic_fixes_only() {
 }
 
 #[test]
-fn fix_applies_automatic_and_suggested_fixes_with_fix_suggested() {
+fn fix_applies_safe_and_unsafe_fixes_with_unsafe_fixes() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
             .args([
                 "-",
                 "--output-format",
                 "text",
-                "--isolated","--no-cache", 
+                "--isolated",
+                "--no-cache", 
                 "--select",
                 "F601,UP034",
                 "--fix",
-                "--fix-suggested",
+                "--unsafe-fixes",
             ])
             .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
             @r###"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    -:1:14: F601 [**] Dictionary key literal `'a'` repeated
-    -:2:7: UP034 [*] Avoid extraneous parentheses
-    Found 2 errors.
-    [*] 1 fixable with the --fix option.
-    [**] 1 potentially fixable with the --fix-suggested option.
+    x = {'a': 1}
+    print('foo')
 
     ----- stderr -----
     "###);
 }
 
 #[test]
-fn diff_shows_automatic_and_suggested_fixes_with_fix_suggested() {
+fn diff_shows_safe_and_unsafe_fixes_with_unsafe_fixes() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
             .args([
                 "-",
                 "--output-format",
                 "text",
-                "--isolated","--no-cache",
+                "--isolated",
+                "--no-cache",
                 "--select",
                 "F601,UP034",
                 "--diff",
-                "--fix-suggested",
+                "--unsafe-fixes",
             ])
             .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
             @r###"
@@ -931,14 +931,15 @@ fn diff_shows_automatic_and_suggested_fixes_with_fix_suggested() {
 }
 
 #[test]
-fn diff_shows_automatic_fixes_only() {
+fn diff_shows_safe_fixes_only() {
     assert_cmd_snapshot!(
     Command::new(get_cargo_bin(BIN_NAME))
         .args([
             "-",
             "--output-format",
             "text",
-            "--isolated","--no-cache",
+            "--isolated",
+            "--no-cache",
             "--select",
             "F601,UP034",
             "--diff",
@@ -960,18 +961,19 @@ fn diff_shows_automatic_fixes_only() {
 }
 
 #[test]
-fn fix_only_applies_automatic_and_suggested_fixes_with_fix_suggested() {
+fn fix_only_applies_safe_and_unsafe_fixes_with_unsafe_fixes() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
         .args([
             "-",
             "--output-format",
             "text",
-            "--isolated","--no-cache", 
+            "--isolated",
+            "--no-cache", 
             "--select",
             "F601,UP034",
             "--fix-only",
-            "--fix-suggested",
+            "--unsafe-fixes",
         ])
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -986,14 +988,15 @@ fn fix_only_applies_automatic_and_suggested_fixes_with_fix_suggested() {
 }
 
 #[test]
-fn fix_only_applies_automatic_fixes_only() {
+fn fix_only_applies_safe_fixes_only() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
         .args([
             "-",
             "--output-format",
             "text",
-            "--isolated","--no-cache", 
+            "--isolated",
+            "--no-cache", 
             "--select",
             "F601,UP034",
             "--fix-only",

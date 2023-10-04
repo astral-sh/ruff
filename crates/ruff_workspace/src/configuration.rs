@@ -63,7 +63,7 @@ pub struct Configuration {
     pub cache_dir: Option<PathBuf>,
     pub extend: Option<PathBuf>,
     pub fix: Option<bool>,
-    pub fix_suggested: Option<bool>,
+    pub unsafe_fixes: Option<bool>,
     pub fix_only: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub preview: Option<PreviewMode>,
@@ -137,7 +137,7 @@ impl Configuration {
                 .clone()
                 .unwrap_or_else(|| cache_dir(project_root)),
             fix: self.fix.unwrap_or(false),
-            fix_suggested: self.fix_suggested.unwrap_or(false),
+            unsafe_fixes: self.unsafe_fixes.unwrap_or(false),
             fix_only: self.fix_only.unwrap_or(false),
             output_format: self.output_format.unwrap_or_default(),
             show_fixes: self.show_fixes.unwrap_or(false),
@@ -367,7 +367,7 @@ impl Configuration {
             }),
             fix: options.fix,
             fix_only: options.fix_only,
-            fix_suggested: options.fix_suggested,
+            unsafe_fixes: options.unsafe_fixes,
             output_format: options.output_format.or_else(|| {
                 options
                     .format
@@ -421,7 +421,7 @@ impl Configuration {
             include: self.include.or(config.include),
             fix: self.fix.or(config.fix),
             fix_only: self.fix_only.or(config.fix_only),
-            fix_suggested: self.fix_suggested.or(config.fix_suggested),
+            unsafe_fixes: self.unsafe_fixes.or(config.unsafe_fixes),
             output_format: self.output_format.or(config.output_format),
             force_exclude: self.force_exclude.or(config.force_exclude),
             line_length: self.line_length.or(config.line_length),

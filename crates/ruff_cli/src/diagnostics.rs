@@ -242,7 +242,7 @@ pub(crate) fn lint_path(
         },
         fixed,
     ) = match fix_mode {
-        flags::FixMode::Apply(fix_suggested) | flags::FixMode::Diff(fix_suggested) => {
+        flags::FixMode::Apply(unsafe_fixes) | flags::FixMode::Diff(unsafe_fixes) => {
             if let Ok(FixerResult {
                 result,
                 transformed,
@@ -254,7 +254,7 @@ pub(crate) fn lint_path(
                 settings,
                 &source_kind,
                 source_type,
-                fix_suggested,
+                unsafe_fixes,
             ) {
                 if !fixed.is_empty() {
                     match fix_mode {
@@ -421,7 +421,7 @@ pub(crate) fn lint_stdin(
         },
         fixed,
     ) = match fix_mode {
-        flags::FixMode::Apply(fix_suggested) | flags::FixMode::Diff(fix_suggested) => {
+        flags::FixMode::Apply(unsafe_fixes) | flags::FixMode::Diff(unsafe_fixes) => {
             if let Ok(FixerResult {
                 result,
                 transformed,
@@ -433,7 +433,7 @@ pub(crate) fn lint_stdin(
                 &settings.linter,
                 &source_kind,
                 source_type,
-                fix_suggested,
+                unsafe_fixes,
             ) {
                 match fix_mode {
                     flags::FixMode::Apply(_) => {

@@ -10,7 +10,7 @@ use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
-use ruff_linter::settings::flags::{FixMode, SuggestedFixes};
+use ruff_linter::settings::flags::{FixMode, UnsafeFixes};
 use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
@@ -228,7 +228,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let Settings {
         fix,
         fix_only,
-        fix_suggested,
+        unsafe_fixes,
         output_format,
         show_fixes,
         show_source,
@@ -243,19 +243,19 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
     //   `--fix--suggested` is set, then [`Applicablility::Suggested`] fixes are included.
 
-    let fix_suggested = if fix_suggested {
-        SuggestedFixes::Apply
+    let unsafe_fixes = if unsafe_fixes {
+        UnsafeFixes::Enabled
     } else {
-        SuggestedFixes::Disable
+        UnsafeFixes::Disabled
     };
 
     let fix_mode = if cli.diff {
-        FixMode::Diff(fix_suggested)
+        FixMode::Diff(unsafe_fixes)
     } else if fix || fix_only {
-        FixMode::Apply(fix_suggested)
+        FixMode::Apply(unsafe_fixes)
     } else {
         // Always generate all fixes, regardless of [`Applicability`], in `generate` mode
-        FixMode::Generate(SuggestedFixes::Apply)
+        FixMode::Generate(UnsafeFixes::Enabled)
     };
 
     let cache = !cli.no_cache;

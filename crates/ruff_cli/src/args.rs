@@ -76,14 +76,14 @@ pub enum Command {
 pub struct CheckCommand {
     /// List of files or directories to check.
     pub files: Vec<PathBuf>,
-    /// Apply automatic fixes to resolve lint violations.
-    /// Use `--no-fix` to disable or `--fix-suggested` to include suggested fixes.
+    /// Apply fixes to resolve lint violations.
+    /// Use `--no-fix` to disable or `--unsafe-fixes` to include suggested fixes.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
-    /// Apply automatic and suggested fixes to resolve lint violations.
-    #[arg(long, overrides_with_all(["fix", "no_fix"]))]
-    fix_suggested: bool,
-    #[clap(long, overrides_with_all(["fix", "fix_suggested"]), hide = true)]
+    /// Apply unsafe fixes to resolve lint violations.
+    #[arg(long)]
+    unsafe_fixes: bool,
+    #[clap(long, overrides_with_all(["fix"]), hide = true)]
     no_fix: bool,
     /// Show violations with source code.
     /// Use `--no-show-source` to disable.
@@ -104,7 +104,7 @@ pub struct CheckCommand {
     #[arg(short, long)]
     pub watch: bool,
     /// Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`.
-    /// Use `--no-fix-only` to disable or `--fix-suggested` to include suggested fixes.
+    /// Use `--no-fix-only` to disable or `--unsafe-fixes` to include suggested fixes.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
@@ -500,7 +500,7 @@ impl CheckCommand {
                 cache_dir: self.cache_dir,
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
-                fix_suggested: Some(self.fix_suggested),
+                unsafe_fixes: Some(self.unsafe_fixes),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 output_format: self.output_format.or(self.format),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
@@ -603,7 +603,7 @@ pub struct CliOverrides {
     pub cache_dir: Option<PathBuf>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
-    pub fix_suggested: Option<bool>,
+    pub unsafe_fixes: Option<bool>,
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
@@ -629,8 +629,8 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(fix_only) = &self.fix_only {
             config.fix_only = Some(*fix_only);
         }
-        if self.fix_suggested.is_some() {
-            config.fix_suggested = self.fix_suggested;
+        if self.unsafe_fixes.is_some() {
+            config.unsafe_fixes = self.unsafe_fixes;
         }
         config.lint.rule_selections.push(RuleSelection {
             select: self.select.clone(),

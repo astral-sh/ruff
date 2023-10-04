@@ -193,9 +193,9 @@ Arguments:
 
 Options:
       --fix
-          Apply automatic fixes to resolve lint violations. Use `--no-fix` to disable or `--fix-suggested` to include suggested fixes
-      --fix-suggested
-          Apply automatic and suggested fixes to resolve lint violations
+          Apply fixes to resolve lint violations. Use `--no-fix` to disable or `--unsafe-fixes` to include suggested fixes
+      --unsafe-fixes
+          Apply unsafe fixes to resolve lint violations
       --show-source
           Show violations with source code. Use `--no-show-source` to disable
       --show-fixes
@@ -205,7 +205,7 @@ Options:
   -w, --watch
           Run in watch mode by re-running whenever files change
       --fix-only
-          Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`. Use `--no-fix-only` to disable or `--fix-suggested` to include suggested fixes
+          Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`. Use `--no-fix-only` to disable or `--unsafe-fixes` to include suggested fixes
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
