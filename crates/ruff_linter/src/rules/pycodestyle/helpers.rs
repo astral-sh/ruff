@@ -9,7 +9,7 @@ pub(super) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }
 
-pub(super) fn generate_comparison(
+pub(crate) fn generate_comparison(
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],
