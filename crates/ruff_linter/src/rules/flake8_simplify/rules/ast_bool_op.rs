@@ -352,17 +352,18 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
         // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
         let target = &args[0];
-        if let Some(ref last_target) = last_target_option {
-            if last_target == &Into::<ComparableExpr>::into(target) {
-                duplicates
-                    .last_mut()
-                    .expect("last_target should have a corresponding entry")
-                    .push(index);
-                continue;
-            }
+        if last_target_option
+            .as_ref()
+            .is_some_and(|last_target| *last_target == ComparableExpr::from(target))
+        {
+            duplicates
+                .last_mut()
+                .expect("last_target should have a corresponding entry")
+                .push(index);
+        } else {
+            last_target_option = Some(target.into());
+            duplicates.push(vec![index]);
         }
-        last_target_option = Some(target.into());
-        duplicates.push(vec![index]);
     }
 
     // Generate a `Diagnostic` for each duplicate.
@@ -442,11 +443,8 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     let call = node2.into();
 
                     // Generate the combined `BoolOp`.
-                    let before = values.iter().take(indices[0]).map(Clone::clone);
-                    let after = values
-                        .iter()
-                        .skip(indices[indices.len() - 1] + 1)
-                        .map(Clone::clone);
+                    let before = values.iter().take(indices[0]).cloned();
+                    let after = values.iter().skip(indices[indices.len() - 1] + 1).cloned();
                     let node = ast::ExprBoolOp {
                         op: BoolOp::Or,
                         values: before.chain(iter::once(call)).chain(after).collect(),
