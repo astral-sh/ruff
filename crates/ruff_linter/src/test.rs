@@ -26,6 +26,7 @@ use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
+use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
 use ruff_notebook::Notebook;
@@ -158,7 +159,7 @@ pub(crate) fn test_contents<'a>(
         }) = fix_file(
             &diagnostics,
             &Locator::new(transformed.source_code()),
-            flags::UnsafeFixes::Enabled,
+            UnsafeFixes::Enabled,
         ) {
             if iterations < max_iterations() {
                 iterations += 1;

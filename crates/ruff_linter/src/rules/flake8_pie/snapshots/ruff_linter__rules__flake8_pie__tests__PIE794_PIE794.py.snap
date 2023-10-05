@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-PIE794.py:4:5: PIE794 [**] Class field `name` is defined multiple times
+PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
   |
 2 |     name = StringField()
 3 |     # ....
@@ -21,7 +21,7 @@ PIE794.py:4:5: PIE794 [**] Class field `name` is defined multiple times
 6 5 |     def remove(self) -> None:
 7 6 |         ...
 
-PIE794.py:13:5: PIE794 [**] Class field `name` is defined multiple times
+PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
    |
 11 |     name: str = StringField()
 12 |     # ....
@@ -41,7 +41,7 @@ PIE794.py:13:5: PIE794 [**] Class field `name` is defined multiple times
 15 14 |     def foo(self) -> None:
 16 15 |         ...
 
-PIE794.py:23:5: PIE794 [**] Class field `bar` is defined multiple times
+PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
    |
 21 |     foo: bool = BooleanField()
 22 |     # ...
@@ -59,7 +59,7 @@ PIE794.py:23:5: PIE794 [**] Class field `bar` is defined multiple times
 25 24 | 
 26 25 | class User(BaseModel):
 
-PIE794.py:40:5: PIE794 [**] Class field `bar` is defined multiple times
+PIE794.py:40:5: PIE794 [*] Class field `bar` is defined multiple times
    |
 38 |     foo: bool = BooleanField()
 39 |     # ...

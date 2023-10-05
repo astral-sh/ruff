@@ -10,8 +10,8 @@ use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
-use ruff_linter::settings::flags::{FixMode, UnsafeFixes};
-use ruff_linter::settings::types::SerializationFormat;
+use ruff_linter::settings::flags::FixMode;
+use ruff_linter::settings::types::{SerializationFormat, UnsafeFixes};
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
@@ -243,19 +243,12 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
     //   `--unsafe-fixes` is set, then [`Applicablility::Suggested`] fixes are included.
 
-    let unsafe_fixes = if unsafe_fixes {
-        UnsafeFixes::Enabled
-    } else {
-        UnsafeFixes::Disabled
-    };
-
     let fix_mode = if cli.diff {
-        FixMode::Diff(unsafe_fixes)
+        FixMode::Diff
     } else if fix || fix_only {
-        FixMode::Apply(unsafe_fixes)
+        FixMode::Apply
     } else {
-        // Always generate all fixes, regardless of [`Applicability`], in `generate` mode
-        FixMode::Generate(UnsafeFixes::Enabled)
+        FixMode::Generate
     };
 
     let cache = !cli.no_cache;
@@ -396,7 +389,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(fix_mode, FixMode::Apply(_) | FixMode::Diff(_))) {
+        if !(is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff)) {
             if cli.statistics {
                 printer.write_statistics(&diagnostics, &mut writer)?;
             } else {

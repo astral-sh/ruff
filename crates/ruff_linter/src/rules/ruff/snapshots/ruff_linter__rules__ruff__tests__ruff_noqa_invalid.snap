@@ -14,7 +14,7 @@ ruff_noqa_invalid.py:1:8: F401 [*] `os` imported but unused
 3 2 | 
 4 3 | def f():
 
-ruff_noqa_invalid.py:5:5: F841 [**] Local variable `x` is assigned to but never used
+ruff_noqa_invalid.py:5:5: F841 [*] Local variable `x` is assigned to but never used
   |
 4 | def f():
 5 |     x = 1

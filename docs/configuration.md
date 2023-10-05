@@ -196,6 +196,8 @@ Options:
           Apply fixes to resolve lint violations. Use `--no-fix` to disable or `--unsafe-fixes` to include suggested fixes
       --unsafe-fixes
           Include fixes that may not retain the original intent of the code
+      --no-unsafe-fixes
+
       --show-source
           Show violations with source code. Use `--no-show-source` to disable
       --show-fixes

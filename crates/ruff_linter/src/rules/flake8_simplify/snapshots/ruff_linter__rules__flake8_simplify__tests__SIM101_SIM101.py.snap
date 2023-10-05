@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM101.py:1:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:1:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   |
 1 | if isinstance(a, int) or isinstance(a, float):  # SIM101
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
@@ -16,7 +16,7 @@ SIM101.py:1:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a sin
 3 3 | 
 4 4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
 
-SIM101.py:4:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:4:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   |
 2 |     pass
 3 | 
@@ -36,7 +36,7 @@ SIM101.py:4:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a sin
 6 6 | 
 7 7 | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 
-SIM101.py:7:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:7:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   |
 5 |     pass
 6 | 
@@ -56,7 +56,7 @@ SIM101.py:7:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a sin
 9 9 | 
 10 10 | if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
 
-SIM101.py:10:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:10:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
  8 |     pass
  9 | 
@@ -76,7 +76,7 @@ SIM101.py:10:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a si
 12 12 | 
 13 13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
 
-SIM101.py:13:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:13:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
 11 |     pass
 12 | 
@@ -96,7 +96,7 @@ SIM101.py:13:4: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a si
 15 15 | 
 16 16 | if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
 
-SIM101.py:16:5: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:16:5: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
 14 |     pass
 15 | 
@@ -116,7 +116,7 @@ SIM101.py:16:5: SIM101 [**] Multiple `isinstance` calls for `a`, merge into a si
 18 18 | 
 19 19 | if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
 
-SIM101.py:19:4: SIM101 [**] Multiple `isinstance` calls for expression, merge into a single call
+SIM101.py:19:4: SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
    |
 17 |     pass
 18 | 

@@ -99,7 +99,7 @@ impl PythonVersion {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
 pub enum PreviewMode {
     #[default]
     Disabled,
@@ -112,6 +112,23 @@ impl From<bool> for PreviewMode {
             PreviewMode::Enabled
         } else {
             PreviewMode::Disabled
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, CacheKey, Default, PartialEq, Eq, is_macro::Is)]
+pub enum UnsafeFixes {
+    #[default]
+    Disabled,
+    Enabled,
+}
+
+impl From<bool> for UnsafeFixes {
+    fn from(version: bool) -> Self {
+        if version {
+            UnsafeFixes::Enabled
+        } else {
+            UnsafeFixes::Disabled
         }
     }
 }

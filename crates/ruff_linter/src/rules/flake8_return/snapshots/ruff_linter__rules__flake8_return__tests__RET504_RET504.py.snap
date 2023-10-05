@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
 ---
-RET504.py:6:12: RET504 [**] Unnecessary assignment to `a` before `return` statement
+RET504.py:6:12: RET504 [*] Unnecessary assignment to `a` before `return` statement
   |
 4 | def x():
 5 |     a = 1
@@ -21,7 +21,7 @@ RET504.py:6:12: RET504 [**] Unnecessary assignment to `a` before `return` statem
 8 7 | 
 9 8 | # Can be refactored false positives
 
-RET504.py:23:12: RET504 [**] Unnecessary assignment to `formatted` before `return` statement
+RET504.py:23:12: RET504 [*] Unnecessary assignment to `formatted` before `return` statement
    |
 21 |     # clean up after any blank components
 22 |     formatted = formatted.replace("()", "").replace("  ", " ").strip()
@@ -41,7 +41,7 @@ RET504.py:23:12: RET504 [**] Unnecessary assignment to `formatted` before `retur
 25 24 | 
 26 25 | # https://github.com/afonasev/flake8-return/issues/47#issue-641117366
 
-RET504.py:246:12: RET504 [**] Unnecessary assignment to `queryset` before `return` statement
+RET504.py:246:12: RET504 [*] Unnecessary assignment to `queryset` before `return` statement
     |
 244 |     queryset = Model.filter(a=1)
 245 |     queryset = queryset.filter(c=3)
@@ -61,7 +61,7 @@ RET504.py:246:12: RET504 [**] Unnecessary assignment to `queryset` before `retur
 248 247 | 
 249 248 | def get_queryset():
 
-RET504.py:251:12: RET504 [**] Unnecessary assignment to `queryset` before `return` statement
+RET504.py:251:12: RET504 [*] Unnecessary assignment to `queryset` before `return` statement
     |
 249 | def get_queryset():
 250 |     queryset = Model.filter(a=1)
@@ -81,7 +81,7 @@ RET504.py:251:12: RET504 [**] Unnecessary assignment to `queryset` before `retur
 253 252 | 
 254 253 | # Function arguments
 
-RET504.py:269:12: RET504 [**] Unnecessary assignment to `val` before `return` statement
+RET504.py:269:12: RET504 [*] Unnecessary assignment to `val` before `return` statement
     |
 267 |         return val
 268 |     val = 1
@@ -101,7 +101,7 @@ RET504.py:269:12: RET504 [**] Unnecessary assignment to `val` before `return` st
 271 270 | 
 272 271 | def str_to_bool(val):
 
-RET504.py:321:12: RET504 [**] Unnecessary assignment to `x` before `return` statement
+RET504.py:321:12: RET504 [*] Unnecessary assignment to `x` before `return` statement
     |
 319 |     with open("foo.txt", "r") as f:
 320 |         x = f.read()
@@ -121,7 +121,7 @@ RET504.py:321:12: RET504 [**] Unnecessary assignment to `x` before `return` stat
 323 322 | 
 324 323 | def foo():
 
-RET504.py:342:12: RET504 [**] Unnecessary assignment to `b` before `return` statement
+RET504.py:342:12: RET504 [*] Unnecessary assignment to `b` before `return` statement
     |
 340 |     a = 1
 341 |     b=a
@@ -141,7 +141,7 @@ RET504.py:342:12: RET504 [**] Unnecessary assignment to `b` before `return` stat
 344 343 | 
 345 344 | def foo():
 
-RET504.py:348:12: RET504 [**] Unnecessary assignment to `b` before `return` statement
+RET504.py:348:12: RET504 [*] Unnecessary assignment to `b` before `return` statement
     |
 346 |     a = 1
 347 |     b =a
@@ -161,7 +161,7 @@ RET504.py:348:12: RET504 [**] Unnecessary assignment to `b` before `return` stat
 350 349 | 
 351 350 | def foo():
 
-RET504.py:354:12: RET504 [**] Unnecessary assignment to `b` before `return` statement
+RET504.py:354:12: RET504 [*] Unnecessary assignment to `b` before `return` statement
     |
 352 |     a = 1
 353 |     b= a
@@ -181,7 +181,7 @@ RET504.py:354:12: RET504 [**] Unnecessary assignment to `b` before `return` stat
 356 355 | 
 357 356 | def foo():
 
-RET504.py:359:12: RET504 [**] Unnecessary assignment to `a` before `return` statement
+RET504.py:359:12: RET504 [*] Unnecessary assignment to `a` before `return` statement
     |
 357 | def foo():
 358 |     a = 1  # Comment
@@ -201,7 +201,7 @@ RET504.py:359:12: RET504 [**] Unnecessary assignment to `a` before `return` stat
 361 360 | 
 362 361 | # Regression test for: https://github.com/astral-sh/ruff/issues/7098
 
-RET504.py:365:12: RET504 [**] Unnecessary assignment to `D` before `return` statement
+RET504.py:365:12: RET504 [*] Unnecessary assignment to `D` before `return` statement
     |
 363 | def mavko_debari(P_kbar):
 364 |     D=0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-strict.py:27:21: TCH002 [**] Move third-party import `pkg.A` into a type-checking block
+strict.py:27:21: TCH002 [*] Move third-party import `pkg.A` into a type-checking block
    |
 25 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
 26 |     import pkg
@@ -30,7 +30,7 @@ strict.py:27:21: TCH002 [**] Move third-party import `pkg.A` into a type-checkin
 29 32 |     def test(value: A):
 30 33 |         return pkg.B()
 
-strict.py:35:21: TCH002 [**] Move third-party import `pkg.A` into a type-checking block
+strict.py:35:21: TCH002 [*] Move third-party import `pkg.A` into a type-checking block
    |
 33 | def f():
 34 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
@@ -60,7 +60,7 @@ strict.py:35:21: TCH002 [**] Move third-party import `pkg.A` into a type-checkin
 37 41 |     def test(value: A):
 38 42 |         return B()
 
-strict.py:54:25: TCH002 [**] Move third-party import `pkg.bar.A` into a type-checking block
+strict.py:54:25: TCH002 [*] Move third-party import `pkg.bar.A` into a type-checking block
    |
 52 |     # In un-strict mode, this _should_ raise an error, since `pkg.bar` isn't used at runtime
 53 |     import pkg
@@ -89,7 +89,7 @@ strict.py:54:25: TCH002 [**] Move third-party import `pkg.bar.A` into a type-che
 56 59 |     def test(value: A):
 57 60 |         return pkg.B()
 
-strict.py:62:12: TCH002 [**] Move third-party import `pkg` into a type-checking block
+strict.py:62:12: TCH002 [*] Move third-party import `pkg` into a type-checking block
    |
 60 | def f():
 61 |     # In un-strict mode, this shouldn't raise an error, since `pkg.bar` is used at runtime.
@@ -117,7 +117,7 @@ strict.py:62:12: TCH002 [**] Move third-party import `pkg` into a type-checking 
 64 67 | 
 65 68 |     def test(value: pkg.A):
 
-strict.py:71:23: TCH002 [**] Move third-party import `pkg.foo` into a type-checking block
+strict.py:71:23: TCH002 [*] Move third-party import `pkg.foo` into a type-checking block
    |
 69 | def f():
 70 |     # In un-strict mode, this shouldn't raise an error, since `pkg.foo.bar` is used at runtime.
@@ -145,7 +145,7 @@ strict.py:71:23: TCH002 [**] Move third-party import `pkg.foo` into a type-check
 73 76 | 
 74 77 |     def test(value: F.Foo):
 
-strict.py:80:12: TCH002 [**] Move third-party import `pkg` into a type-checking block
+strict.py:80:12: TCH002 [*] Move third-party import `pkg` into a type-checking block
    |
 78 | def f():
 79 |     # In un-strict mode, this shouldn't raise an error, since `pkg.foo.bar` is used at runtime.
@@ -173,7 +173,7 @@ strict.py:80:12: TCH002 [**] Move third-party import `pkg` into a type-checking 
 82 85 | 
 83 86 |     def test(value: pkg.A):
 
-strict.py:91:12: TCH002 [**] Move third-party import `pkg` into a type-checking block
+strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking block
    |
 89 |     # Note that `pkg` is a prefix of `pkgfoo` which are both different modules. This is
 90 |     # testing the implementation.
@@ -201,7 +201,7 @@ strict.py:91:12: TCH002 [**] Move third-party import `pkg` into a type-checking 
 93 96 | 
 94 97 |     def test(value: pkg.A):
 
-strict.py:101:23: TCH002 [**] Move third-party import `pkg.foo` into a type-checking block
+strict.py:101:23: TCH002 [*] Move third-party import `pkg.foo` into a type-checking block
     |
  99 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
 100 |     import pkg.bar as B

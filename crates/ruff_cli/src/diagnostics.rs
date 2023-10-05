@@ -21,6 +21,7 @@ use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
+use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
@@ -170,6 +171,7 @@ pub(crate) fn lint_path(
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     // Check the cache.
     // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
@@ -242,7 +244,7 @@ pub(crate) fn lint_path(
         },
         fixed,
     ) = match fix_mode {
-        flags::FixMode::Apply(unsafe_fixes) | flags::FixMode::Diff(unsafe_fixes) => {
+        flags::FixMode::Apply | flags::FixMode::Diff => {
             if let Ok(FixerResult {
                 result,
                 transformed,
@@ -251,14 +253,14 @@ pub(crate) fn lint_path(
                 path,
                 package,
                 noqa,
+                unsafe_fixes,
                 settings,
                 &source_kind,
                 source_type,
-                unsafe_fixes,
             ) {
                 if !fixed.is_empty() {
                     match fix_mode {
-                        flags::FixMode::Apply(_) => match transformed.as_ref() {
+                        flags::FixMode::Apply => match transformed.as_ref() {
                             SourceKind::Python(transformed) => {
                                 write(path, transformed.as_bytes())?;
                             }
@@ -267,7 +269,7 @@ pub(crate) fn lint_path(
                                 notebook.write(&mut writer)?;
                             }
                         },
-                        flags::FixMode::Diff(_) => {
+                        flags::FixMode::Diff => {
                             match transformed.as_ref() {
                                 SourceKind::Python(transformed) => {
                                     let mut stdout = io::stdout().lock();
@@ -328,7 +330,7 @@ pub(crate) fn lint_path(
                                 }
                             }
                         }
-                        flags::FixMode::Generate(_) => {}
+                        flags::FixMode::Generate => {}
                     }
                 }
                 (result, fixed)
@@ -339,7 +341,7 @@ pub(crate) fn lint_path(
                 (result, fixed)
             }
         }
-        flags::FixMode::Generate(_) => {
+        flags::FixMode::Generate => {
             let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
             let fixed = FxHashMap::default();
             (result, fixed)
@@ -421,7 +423,7 @@ pub(crate) fn lint_stdin(
         },
         fixed,
     ) = match fix_mode {
-        flags::FixMode::Apply(unsafe_fixes) | flags::FixMode::Diff(unsafe_fixes) => {
+        flags::FixMode::Apply | flags::FixMode::Diff => {
             if let Ok(FixerResult {
                 result,
                 transformed,
@@ -430,17 +432,17 @@ pub(crate) fn lint_stdin(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
                 noqa,
+                settings.unsafe_fixes,
                 &settings.linter,
                 &source_kind,
                 source_type,
-                unsafe_fixes,
             ) {
                 match fix_mode {
-                    flags::FixMode::Apply(_) => {
+                    flags::FixMode::Apply => {
                         // Write the contents to stdout, regardless of whether any errors were fixed.
                         io::stdout().write_all(transformed.source_code().as_bytes())?;
                     }
-                    flags::FixMode::Diff(_) => {
+                    flags::FixMode::Diff => {
                         // But only write a diff if it's non-empty.
                         if !fixed.is_empty() {
                             let text_diff = TextDiff::from_lines(
@@ -459,7 +461,7 @@ pub(crate) fn lint_stdin(
                             stdout.flush()?;
                         }
                     }
-                    flags::FixMode::Generate(_) => {}
+                    flags::FixMode::Generate => {}
                 }
 
                 (result, fixed)
@@ -483,7 +485,7 @@ pub(crate) fn lint_stdin(
                 (result, fixed)
             }
         }
-        flags::FixMode::Generate(_) => {
+        flags::FixMode::Generate => {
             let result = lint_only(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,

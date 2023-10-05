@@ -9,6 +9,7 @@ use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
+    UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -80,11 +81,13 @@ pub struct CheckCommand {
     /// Use `--no-fix` to disable or `--unsafe-fixes` to include suggested fixes.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
-    /// Include fixes that may not retain the original intent of the code.
-    #[arg(long)]
-    unsafe_fixes: bool,
     #[clap(long, overrides_with_all(["fix"]), hide = true)]
     no_fix: bool,
+    /// Include fixes that may not retain the original intent of the code.
+    #[arg(long, overrides_with("no_unsafe_fixes"))]
+    unsafe_fixes: bool,
+    #[arg(long, overrides_with("unsafe_fixes"))]
+    no_unsafe_fixes: bool,
     /// Show violations with source code.
     /// Use `--no-show-source` to disable.
     #[arg(long, overrides_with("no_show_source"))]
@@ -500,7 +503,8 @@ impl CheckCommand {
                 cache_dir: self.cache_dir,
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
-                unsafe_fixes: Some(self.unsafe_fixes),
+                unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
+                    .map(UnsafeFixes::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 output_format: self.output_format.or(self.format),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
@@ -603,7 +607,7 @@ pub struct CliOverrides {
     pub cache_dir: Option<PathBuf>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
-    pub unsafe_fixes: Option<bool>,
+    pub unsafe_fixes: Option<UnsafeFixes>,
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,

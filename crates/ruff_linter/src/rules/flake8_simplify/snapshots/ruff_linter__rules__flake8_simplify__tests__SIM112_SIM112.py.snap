@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM112.py:4:12: SIM112 [**] Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:4:12: SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
   |
 3 | # Bad
 4 | os.environ['foo']
@@ -65,7 +65,7 @@ SIM112.py:12:22: SIM112 Use capitalized environment variable `FOO` instead of `f
    |
    = help: Replace `foo` with `FOO`
 
-SIM112.py:14:18: SIM112 [**] Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:14:18: SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
    |
 12 | env = os.environ.get('foo')
 13 | 
@@ -96,7 +96,7 @@ SIM112.py:16:26: SIM112 Use capitalized environment variable `FOO` instead of `f
    |
    = help: Replace `foo` with `FOO`
 
-SIM112.py:19:22: SIM112 [**] Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:19:22: SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
    |
 17 |     pass
 18 | 

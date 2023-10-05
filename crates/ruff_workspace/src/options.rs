@@ -93,7 +93,7 @@ pub struct Options {
     #[option(default = "false", value_type = "bool", example = "fix = true")]
     pub fix: Option<bool>,
 
-    /// Enable application of suggested fixes.
+    /// Enable application of unsafe fixes.
     #[option(
         default = "false",
         value_type = "bool",

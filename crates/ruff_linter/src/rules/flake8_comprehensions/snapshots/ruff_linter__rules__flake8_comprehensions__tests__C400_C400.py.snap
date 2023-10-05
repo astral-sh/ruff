@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C400.py:1:5: C400 [**] Unnecessary generator (rewrite as a `list` comprehension)
+C400.py:1:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
 1 | x = list(x for x in range(3))
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ C400
@@ -17,7 +17,7 @@ C400.py:1:5: C400 [**] Unnecessary generator (rewrite as a `list` comprehension)
 3 3 |     x for x in range(3)
 4 4 | )
 
-C400.py:2:5: C400 [**] Unnecessary generator (rewrite as a `list` comprehension)
+C400.py:2:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
 1 |   x = list(x for x in range(3))
 2 |   x = list(

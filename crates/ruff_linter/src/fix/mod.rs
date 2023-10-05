@@ -9,7 +9,7 @@ use ruff_source_file::Locator;
 
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
-use crate::settings::flags::UnsafeFixes;
+use crate::settings::types::UnsafeFixes;
 
 pub(crate) mod codemods;
 pub(crate) mod edits;

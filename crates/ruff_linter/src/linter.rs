@@ -32,6 +32,7 @@ use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
+use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs};
@@ -420,10 +421,10 @@ pub fn lint_fix<'a>(
     path: &Path,
     package: Option<&Path>,
     noqa: flags::Noqa,
+    unsafe_fixes: UnsafeFixes,
     settings: &LinterSettings,
     source_kind: &'a SourceKind,
     source_type: PySourceType,
-    unsafe_fixes: flags::UnsafeFixes,
 ) -> Result<FixerResult<'a>> {
     let mut transformed = Cow::Borrowed(source_kind);
 

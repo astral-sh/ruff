@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB132.py:12:1: FURB132 [**] Use `s.discard("x")` instead of check and `remove`
+FURB132.py:12:1: FURB132 [*] Use `s.discard("x")` instead of check and `remove`
    |
 11 |   # FURB132
 12 | / if "x" in s:
@@ -21,7 +21,7 @@ FURB132.py:12:1: FURB132 [**] Use `s.discard("x")` instead of check and `remove`
 15 14 | 
 16 15 | # FURB132
 
-FURB132.py:22:1: FURB132 [**] Use `s3.discard("x")` instead of check and `remove`
+FURB132.py:22:1: FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
    |
 21 |   # FURB132
 22 | / if "x" in s3:
@@ -41,7 +41,7 @@ FURB132.py:22:1: FURB132 [**] Use `s3.discard("x")` instead of check and `remove
 25 24 | 
 26 25 | var = "y"
 
-FURB132.py:28:1: FURB132 [**] Use `s.discard(var)` instead of check and `remove`
+FURB132.py:28:1: FURB132 [*] Use `s.discard(var)` instead of check and `remove`
    |
 26 |   var = "y"
 27 |   # FURB132
@@ -62,7 +62,7 @@ FURB132.py:28:1: FURB132 [**] Use `s.discard(var)` instead of check and `remove`
 31 30 | 
 32 31 | if f"{var}:{var}" in s:
 
-FURB132.py:32:1: FURB132 [**] Use `s.discard(f"{var}:{var}")` instead of check and `remove`
+FURB132.py:32:1: FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check and `remove`
    |
 32 | / if f"{var}:{var}" in s:
 33 | |     s.remove(f"{var}:{var}")

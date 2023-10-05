@@ -11,7 +11,7 @@ B007.py:6:5: B007 Loop control variable `i` not used within loop body
   |
   = help: Rename unused `i` to `_i`
 
-B007.py:18:13: B007 [**] Loop control variable `k` not used within loop body
+B007.py:18:13: B007 [*] Loop control variable `k` not used within loop body
    |
 16 | for i in range(10):
 17 |     for j in range(10):
@@ -39,7 +39,7 @@ B007.py:30:5: B007 Loop control variable `i` not used within loop body
    |
    = help: Rename unused `i` to `_i`
 
-B007.py:30:13: B007 [**] Loop control variable `k` not used within loop body
+B007.py:30:13: B007 [*] Loop control variable `k` not used within loop body
    |
 30 | for i, (j, (k, l)) in strange_generator():  # i, k not used
    |             ^ B007
@@ -99,7 +99,7 @@ B007.py:46:10: B007 Loop control variable `bar` may not be used within loop body
    |
    = help: Rename unused `bar` to `_bar`
 
-B007.py:52:14: B007 [**] Loop control variable `bar` not used within loop body
+B007.py:52:14: B007 [*] Loop control variable `bar` not used within loop body
    |
 50 | def f():
 51 |     # Fixable.
@@ -131,7 +131,7 @@ B007.py:59:14: B007 Loop control variable `bar` not used within loop body
    |
    = help: Rename unused `bar` to `_bar`
 
-B007.py:68:14: B007 [**] Loop control variable `bar` not used within loop body
+B007.py:68:14: B007 [*] Loop control variable `bar` not used within loop body
    |
 66 | def f():
 67 |     # Fixable.

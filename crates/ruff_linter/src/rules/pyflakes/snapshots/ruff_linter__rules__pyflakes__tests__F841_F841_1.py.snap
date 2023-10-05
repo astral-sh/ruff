@@ -17,7 +17,7 @@ F841_1.py:6:8: F841 Local variable `y` is assigned to but never used
   |
   = help: Remove assignment to unused variable `y`
 
-F841_1.py:16:14: F841 [**] Local variable `coords` is assigned to but never used
+F841_1.py:16:14: F841 [*] Local variable `coords` is assigned to but never used
    |
 15 | def f():
 16 |     (x, y) = coords = 1, 2  # this triggers F841 on coords
@@ -35,7 +35,7 @@ F841_1.py:16:14: F841 [**] Local variable `coords` is assigned to but never used
 18 18 | 
 19 19 | def f():
 
-F841_1.py:20:5: F841 [**] Local variable `coords` is assigned to but never used
+F841_1.py:20:5: F841 [*] Local variable `coords` is assigned to but never used
    |
 19 | def f():
 20 |     coords = (x, y) = 1, 2  # this triggers F841 on coords

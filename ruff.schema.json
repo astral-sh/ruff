@@ -639,7 +639,7 @@
       }
     },
     "unsafe-fixes": {
-      "description": "Enable application of suggested fixes.",
+      "description": "Enable application of unsafe fixes.",
       "type": [
         "boolean",
         "null"

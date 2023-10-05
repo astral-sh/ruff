@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E731.py:3:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:3:5: E731 [*] Do not assign a `lambda` expression, use a `def`
   |
 1 | def scope():
 2 |     # E731
@@ -20,7 +20,7 @@ E731.py:3:5: E731 [**] Do not assign a `lambda` expression, use a `def`
 5 6 | 
 6 7 | def scope():
 
-E731.py:8:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:8:5: E731 [*] Do not assign a `lambda` expression, use a `def`
   |
 6 | def scope():
 7 |     # E731
@@ -40,7 +40,7 @@ E731.py:8:5: E731 [**] Do not assign a `lambda` expression, use a `def`
 10 11 | 
 11 12 | def scope():
 
-E731.py:14:9: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:14:9: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 12 |     # E731
 13 |     while False:
@@ -60,7 +60,7 @@ E731.py:14:9: E731 [**] Do not assign a `lambda` expression, use a `def`
 16 17 | 
 17 18 | def scope():
 
-E731.py:19:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:19:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 17 | def scope():
 18 |     # E731
@@ -80,7 +80,7 @@ E731.py:19:5: E731 [**] Do not assign a `lambda` expression, use a `def`
 21 22 | 
 22 23 | def scope():
 
-E731.py:24:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:24:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 22 | def scope():
 23 |     # E731
@@ -182,7 +182,7 @@ E731.py:75:9: E731 Do not assign a `lambda` expression, use a `def`
 77 78 | 
 78 79 | 
 
-E731.py:86:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:86:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 84 |     # ParamSpec cannot be used in this context, so do not preserve the annotation.
 85 |     P = ParamSpec("P")
@@ -202,7 +202,7 @@ E731.py:86:5: E731 [**] Do not assign a `lambda` expression, use a `def`
 88 89 | 
 89 90 | def scope():
 
-E731.py:94:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 92 |     from typing import Callable
 93 | 
@@ -222,7 +222,7 @@ E731.py:94:5: E731 [**] Do not assign a `lambda` expression, use a `def`
 96 97 | 
 97 98 | def scope():
 
-E731.py:102:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 100 |     from typing import Callable
 101 | 
@@ -242,7 +242,7 @@ E731.py:102:5: E731 [**] Do not assign a `lambda` expression, use a `def`
 104 105 | 
 105 106 | def scope():
 
-E731.py:110:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 108 |     from typing import Callable
 109 | 
@@ -262,7 +262,7 @@ E731.py:110:5: E731 [**] Do not assign a `lambda` expression, use a `def`
 112 113 | 
 113 114 | # Let's use the `Callable` type from `collections.abc` instead.
 
-E731.py:119:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 117 |     from collections.abc import Callable
 118 | 
@@ -282,7 +282,7 @@ E731.py:119:5: E731 [**] Do not assign a `lambda` expression, use a `def`
 121 122 | 
 122 123 | def scope():
 
-E731.py:127:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 125 |     from collections.abc import Callable
 126 | 
@@ -302,7 +302,7 @@ E731.py:127:5: E731 [**] Do not assign a `lambda` expression, use a `def`
 129 130 | 
 130 131 | def scope():
 
-E731.py:135:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 133 |     from collections.abc import Callable
 134 | 
@@ -362,7 +362,7 @@ E731.py:140:5: E731 Do not assign a `lambda` expression, use a `def`
 142 143 | 
 143 144 | # Regression test for: https://github.com/astral-sh/ruff/issues/7141
 
-E731.py:147:5: E731 [**] Do not assign a `lambda` expression, use a `def`
+E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 145 |       # E731
 146 |   

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 ---
-LOG002.py:11:11: LOG002 [**] Use `__name__` with `logging.getLogger()`
+LOG002.py:11:11: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
 10 | # LOG002
 11 | getLogger(__file__)
@@ -20,7 +20,7 @@ LOG002.py:11:11: LOG002 [**] Use `__name__` with `logging.getLogger()`
 13 13 | 
 14 14 | logging.getLogger(__cached__)
 
-LOG002.py:12:24: LOG002 [**] Use `__name__` with `logging.getLogger()`
+LOG002.py:12:24: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
 10 | # LOG002
 11 | getLogger(__file__)
@@ -41,7 +41,7 @@ LOG002.py:12:24: LOG002 [**] Use `__name__` with `logging.getLogger()`
 14 14 | logging.getLogger(__cached__)
 15 15 | getLogger(name=__cached__)
 
-LOG002.py:14:19: LOG002 [**] Use `__name__` with `logging.getLogger()`
+LOG002.py:14:19: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
 12 | logging.getLogger(name=__file__)
 13 | 
@@ -61,7 +61,7 @@ LOG002.py:14:19: LOG002 [**] Use `__name__` with `logging.getLogger()`
 16 16 | 
 17 17 | 
 
-LOG002.py:15:16: LOG002 [**] Use `__name__` with `logging.getLogger()`
+LOG002.py:15:16: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
 14 | logging.getLogger(__cached__)
 15 | getLogger(name=__cached__)

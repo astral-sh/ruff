@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM108.py:2:1: SIM108 [**] Use ternary operator `b = c if a else d` instead of `if`-`else`-block
+SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `if`-`else`-block
   |
 1 |   # SIM108
 2 | / if a:
@@ -25,7 +25,7 @@ SIM108.py:2:1: SIM108 [**] Use ternary operator `b = c if a else d` instead of `
 7 4 | # OK
 8 5 | b = c if a else d
 
-SIM108.py:30:5: SIM108 [**] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
+SIM108.py:30:5: SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
    |
 28 |       pass
 29 |   else:
@@ -64,7 +64,7 @@ SIM108.py:58:1: SIM108 Use ternary operator `abc = x if x > 0 else -x` instead o
    |
    = help: Replace `if`-`else`-block with `abc = x if x > 0 else -x`
 
-SIM108.py:82:1: SIM108 [**] Use ternary operator `b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"` instead of `if`-`else`-block
+SIM108.py:82:1: SIM108 [*] Use ternary operator `b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"` instead of `if`-`else`-block
    |
 81 |   # SIM108
 82 | / if a:

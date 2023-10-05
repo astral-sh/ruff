@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF015.py:4:1: RUF015 [**] Prefer `next(iter(x))` over single element slice
+RUF015.py:4:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
 3 | # RUF015
 4 | list(x)[0]
@@ -21,7 +21,7 @@ RUF015.py:4:1: RUF015 [**] Prefer `next(iter(x))` over single element slice
 6 6 | list(i for i in x)[0]
 7 7 | [i for i in x][0]
 
-RUF015.py:5:1: RUF015 [**] Prefer `next(iter(x))` over single element slice
+RUF015.py:5:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
 3 | # RUF015
 4 | list(x)[0]
@@ -42,7 +42,7 @@ RUF015.py:5:1: RUF015 [**] Prefer `next(iter(x))` over single element slice
 7 7 | [i for i in x][0]
 8 8 | 
 
-RUF015.py:6:1: RUF015 [**] Prefer `next(iter(x))` over single element slice
+RUF015.py:6:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
 4 | list(x)[0]
 5 | tuple(x)[0]
@@ -62,7 +62,7 @@ RUF015.py:6:1: RUF015 [**] Prefer `next(iter(x))` over single element slice
 8 8 | 
 9 9 | # OK (not indexing (solely) the first element)
 
-RUF015.py:7:1: RUF015 [**] Prefer `next(iter(x))` over single element slice
+RUF015.py:7:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
 5 | tuple(x)[0]
 6 | list(i for i in x)[0]
@@ -83,7 +83,7 @@ RUF015.py:7:1: RUF015 [**] Prefer `next(iter(x))` over single element slice
 9 9 | # OK (not indexing (solely) the first element)
 10 10 | list(x)
 
-RUF015.py:29:1: RUF015 [**] Prefer `next(i + 1 for i in x)` over single element slice
+RUF015.py:29:1: RUF015 [*] Prefer `next(i + 1 for i in x)` over single element slice
    |
 28 | # RUF015 (doesn't mirror the underlying list)
 29 | [i + 1 for i in x][0]
@@ -103,7 +103,7 @@ RUF015.py:29:1: RUF015 [**] Prefer `next(i + 1 for i in x)` over single element 
 31 31 | [(i, i + 1) for i in x][0]
 32 32 | 
 
-RUF015.py:30:1: RUF015 [**] Prefer `next(i for i in x if i > 5)` over single element slice
+RUF015.py:30:1: RUF015 [*] Prefer `next(i for i in x if i > 5)` over single element slice
    |
 28 | # RUF015 (doesn't mirror the underlying list)
 29 | [i + 1 for i in x][0]
@@ -123,7 +123,7 @@ RUF015.py:30:1: RUF015 [**] Prefer `next(i for i in x if i > 5)` over single ele
 32 32 | 
 33 33 | # RUF015 (multiple generators)
 
-RUF015.py:31:1: RUF015 [**] Prefer `next((i, i + 1) for i in x)` over single element slice
+RUF015.py:31:1: RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single element slice
    |
 29 | [i + 1 for i in x][0]
 30 | [i for i in x if i > 5][0]
@@ -144,7 +144,7 @@ RUF015.py:31:1: RUF015 [**] Prefer `next((i, i + 1) for i in x)` over single ele
 33 33 | # RUF015 (multiple generators)
 34 34 | y = range(10)
 
-RUF015.py:35:1: RUF015 [**] Prefer `next(i + j for i in x for j in y)` over single element slice
+RUF015.py:35:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over single element slice
    |
 33 | # RUF015 (multiple generators)
 34 | y = range(10)
@@ -165,7 +165,7 @@ RUF015.py:35:1: RUF015 [**] Prefer `next(i + j for i in x for j in y)` over sing
 37 37 | # RUF015
 38 38 | list(range(10))[0]
 
-RUF015.py:38:1: RUF015 [**] Prefer `next(iter(range(10)))` over single element slice
+RUF015.py:38:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
    |
 37 | # RUF015
 38 | list(range(10))[0]
@@ -185,7 +185,7 @@ RUF015.py:38:1: RUF015 [**] Prefer `next(iter(range(10)))` over single element s
 40 40 | list(x["y"])[0]
 41 41 | 
 
-RUF015.py:39:1: RUF015 [**] Prefer `next(iter(x.y))` over single element slice
+RUF015.py:39:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
 37 | # RUF015
 38 | list(range(10))[0]
@@ -205,7 +205,7 @@ RUF015.py:39:1: RUF015 [**] Prefer `next(iter(x.y))` over single element slice
 41 41 | 
 42 42 | # RUF015 (multi-line)
 
-RUF015.py:40:1: RUF015 [**] Prefer `next(iter(x["y"]))` over single element slice
+RUF015.py:40:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
    |
 38 | list(range(10))[0]
 39 | list(x.y)[0]
@@ -226,7 +226,7 @@ RUF015.py:40:1: RUF015 [**] Prefer `next(iter(x["y"]))` over single element slic
 42 42 | # RUF015 (multi-line)
 43 43 | revision_heads_map_ast = [
 
-RUF015.py:43:26: RUF015 [**] Prefer `next(...)` over single element slice
+RUF015.py:43:26: RUF015 [*] Prefer `next(...)` over single element slice
    |
 42 |   # RUF015 (multi-line)
 43 |   revision_heads_map_ast = [

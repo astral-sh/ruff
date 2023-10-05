@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM117.py:2:1: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   |
 1 |   # SIM117
 2 | / with A() as a:
@@ -22,7 +22,7 @@ SIM117.py:2:1: SIM117 [**] Use a single `with` statement with multiple contexts 
 6 5 | # SIM117
 7 6 | with A():
 
-SIM117.py:7:1: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
  6 |   # SIM117
  7 | / with A():
@@ -59,7 +59,7 @@ SIM117.py:13:1: SIM117 Use a single `with` statement with multiple contexts inst
    |
    = help: Combine `with` statements
 
-SIM117.py:19:1: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 18 |   # SIM117
 19 | / with A() as a:
@@ -85,7 +85,7 @@ SIM117.py:19:1: SIM117 [**] Use a single `with` statement with multiple contexts
 24 23 | # OK
 25 24 | with A() as a:
 
-SIM117.py:47:1: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:47:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 46 |   # SIM117
 47 | / async with A() as a:
@@ -108,7 +108,7 @@ SIM117.py:47:1: SIM117 [**] Use a single `with` statement with multiple contexts
 51 50 | while True:
 52 51 |     # SIM117
 
-SIM117.py:53:5: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 51 |   while True:
 52 |       # SIM117
@@ -146,7 +146,7 @@ SIM117.py:53:5: SIM117 [**] Use a single `with` statement with multiple contexts
 66 65 | 
 67 66 | # SIM117
 
-SIM117.py:68:1: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 67 |   # SIM117
 68 | / with (
@@ -173,7 +173,7 @@ SIM117.py:68:1: SIM117 [**] Use a single `with` statement with multiple contexts
 75 74 | # SIM117
 76 75 | with A() as a:
 
-SIM117.py:76:1: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 75 |   # SIM117
 76 | / with A() as a:
@@ -205,7 +205,7 @@ SIM117.py:76:1: SIM117 [**] Use a single `with` statement with multiple contexts
 83 82 | # SIM117
 84 83 | with (
 
-SIM117.py:84:1: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 83 |   # SIM117
 84 | / with (
@@ -239,7 +239,7 @@ SIM117.py:84:1: SIM117 [**] Use a single `with` statement with multiple contexts
 94 91 | # SIM117 (auto-fixable)
 95 92 | with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
 
-SIM117.py:95:1: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:95:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 94 |   # SIM117 (auto-fixable)
 95 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
@@ -284,7 +284,7 @@ SIM117.py:106:5: SIM117 Use a single `with` statement with multiple contexts ins
     |
     = help: Combine `with` statements
 
-SIM117.py:126:1: SIM117 [**] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:126:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
     |
 125 |   # SIM117
 126 | / with A() as a:

@@ -106,7 +106,7 @@ constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
 
-constant_literals.py:14:4: E712 [**] Comparison to `False` should be `cond is False` or `if not cond:`
+constant_literals.py:14:4: E712 [*] Comparison to `False` should be `cond is False` or `if not cond:`
    |
 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 |     pass
@@ -127,7 +127,7 @@ constant_literals.py:14:4: E712 [**] Comparison to `False` should be `cond is Fa
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
 
-constant_literals.py:14:13: E711 [**] Comparison to `None` should be `cond is None`
+constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is None`
    |
 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 |     pass
@@ -148,7 +148,7 @@ constant_literals.py:14:13: E711 [**] Comparison to `None` should be `cond is No
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
 
-constant_literals.py:16:4: E711 [**] Comparison to `None` should be `cond is None`
+constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None`
    |
 14 | if False == None:  # E711, E712 (fix)
 15 |     pass
@@ -168,7 +168,7 @@ constant_literals.py:16:4: E711 [**] Comparison to `None` should be `cond is Non
 18 18 | 
 19 19 | ###
 
-constant_literals.py:16:12: E712 [**] Comparison to `False` should be `cond is False` or `if not cond:`
+constant_literals.py:16:12: E712 [*] Comparison to `False` should be `cond is False` or `if not cond:`
    |
 14 | if False == None:  # E711, E712 (fix)
 15 |     pass

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP014.py:5:1: UP014 [**] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
   |
 4 | # with complex annotations
 5 | MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
@@ -23,7 +23,7 @@ UP014.py:5:1: UP014 [**] Convert `MyType` from `NamedTuple` functional to class 
 7 9 | # with namespace
 8 10 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
 
-UP014.py:8:1: UP014 [**] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
  7 | # with namespace
  8 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
@@ -45,7 +45,7 @@ UP014.py:8:1: UP014 [**] Convert `MyType` from `NamedTuple` functional to class 
 10 12 | # invalid identifiers (OK)
 11 13 | MyType = NamedTuple("MyType", [("x-y", int), ("b", tuple[str, ...])])
 
-UP014.py:14:1: UP014 [**] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:14:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
 13 | # no fields
 14 | MyType = typing.NamedTuple("MyType")
@@ -66,7 +66,7 @@ UP014.py:14:1: UP014 [**] Convert `MyType` from `NamedTuple` functional to class
 16 17 | # empty fields
 17 18 | MyType = typing.NamedTuple("MyType", [])
 
-UP014.py:17:1: UP014 [**] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:17:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
 16 | # empty fields
 17 | MyType = typing.NamedTuple("MyType", [])
@@ -87,7 +87,7 @@ UP014.py:17:1: UP014 [**] Convert `MyType` from `NamedTuple` functional to class
 19 20 | # keywords
 20 21 | MyType = typing.NamedTuple("MyType", a=int, b=tuple[str, ...])
 
-UP014.py:20:1: UP014 [**] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:20:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
 19 | # keywords
 20 | MyType = typing.NamedTuple("MyType", a=int, b=tuple[str, ...])

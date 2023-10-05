@@ -66,7 +66,7 @@ F601.py:17:5: F601 Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-F601.py:18:5: F601 [**] Dictionary key literal `"a"` repeated
+F601.py:18:5: F601 [*] Dictionary key literal `"a"` repeated
    |
 16 |     "a": 2,
 17 |     "a": 3,
@@ -107,7 +107,7 @@ F601.py:24:5: F601 Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-F601.py:25:5: F601 [**] Dictionary key literal `"a"` repeated
+F601.py:25:5: F601 [*] Dictionary key literal `"a"` repeated
    |
 23 |     "a": 2,
 24 |     "a": 3,
@@ -137,7 +137,7 @@ F601.py:26:5: F601 Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-F601.py:31:5: F601 [**] Dictionary key literal `"a"` repeated
+F601.py:31:5: F601 [*] Dictionary key literal `"a"` repeated
    |
 29 | x = {
 30 |     "a": 1,
@@ -211,7 +211,7 @@ F601.py:43:5: F601 Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-F601.py:45:5: F601 [**] Dictionary key literal `"a"` repeated
+F601.py:45:5: F601 [*] Dictionary key literal `"a"` repeated
    |
 43 |     "a": 3,
 44 |     a: 3,
@@ -231,7 +231,7 @@ F601.py:45:5: F601 [**] Dictionary key literal `"a"` repeated
 47 46 | }
 48 47 | 
 
-F601.py:49:14: F601 [**] Dictionary key literal `"a"` repeated
+F601.py:49:14: F601 [*] Dictionary key literal `"a"` repeated
    |
 47 | }
 48 | 
@@ -251,7 +251,7 @@ F601.py:49:14: F601 [**] Dictionary key literal `"a"` repeated
 51 51 | 
 52 52 | x = {
 
-F601.py:50:22: F601 [**] Dictionary key literal `"a"` repeated
+F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
    |
 49 | x = {"a": 1, "a": 1}
 50 | x = {"a": 1, "b": 2, "a": 1}
@@ -281,7 +281,7 @@ F601.py:54:5: F601 Dictionary key literal `('a', 'b')` repeated
    |
    = help: Remove repeated key literal `('a', 'b')`
 
-F601.py:58:19: F601 [**] Dictionary key literal `"x"` repeated
+F601.py:58:19: F601 [*] Dictionary key literal `"x"` repeated
    |
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/4897
 58 | t={"x":"test123", "x":("test123")}
@@ -300,7 +300,7 @@ F601.py:58:19: F601 [**] Dictionary key literal `"x"` repeated
 59 59 | 
 60 60 | t={"x":("test123"), "x":"test123"}
 
-F601.py:60:21: F601 [**] Dictionary key literal `"x"` repeated
+F601.py:60:21: F601 [*] Dictionary key literal `"x"` repeated
    |
 58 | t={"x":"test123", "x":("test123")}
 59 | 

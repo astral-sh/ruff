@@ -242,7 +242,7 @@ annotation_presence.py:154:10: ANN401 Dynamically typed expressions (typing.Any)
     |          ^^^^^^^^^^^^^^^^^^^^^^^^ ANN401
     |
 
-annotation_presence.py:159:9: ANN204 [**] Missing return type annotation for special method `__init__`
+annotation_presence.py:159:9: ANN204 [*] Missing return type annotation for special method `__init__`
     |
 157 | class Foo:
 158 |     @decorator()
@@ -262,7 +262,7 @@ annotation_presence.py:159:9: ANN204 [**] Missing return type annotation for spe
 161 161 | 
 162 162 | 
 
-annotation_presence.py:165:9: ANN204 [**] Missing return type annotation for special method `__init__`
+annotation_presence.py:165:9: ANN204 [*] Missing return type annotation for special method `__init__`
     |
 163 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
 164 | class Class:
