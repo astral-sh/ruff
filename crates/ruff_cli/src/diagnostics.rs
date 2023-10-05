@@ -192,7 +192,7 @@ pub(crate) fn lint_path(
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
     let caching = match cache {
-        Some(cache) if noqa.into() && fix_mode.is_generate() => {
+        Some(cache) if noqa.into() && fix_mode.is_generate() && parser.is_auto() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
