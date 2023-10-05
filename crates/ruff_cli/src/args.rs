@@ -8,7 +8,8 @@ use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
-    FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
+    FilePattern, ParserType, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion,
+    SerializationFormat,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -345,6 +346,10 @@ pub struct CheckCommand {
     /// Dev-only argument to show fixes
     #[arg(long, hide = true)]
     pub ecosystem_ci: bool,
+
+    /// Override file format
+    #[arg(long, hide = true)]
+    pub parser: Option<ParserType>,
 }
 
 #[derive(Clone, Debug, clap::Parser)]
@@ -471,6 +476,7 @@ impl CheckCommand {
                 statistics: self.statistics,
                 stdin_filename: self.stdin_filename,
                 watch: self.watch,
+                parser: self.parser,
             },
             CliOverrides {
                 dummy_variable_rgx: self.dummy_variable_rgx,
@@ -561,6 +567,7 @@ pub struct CheckArguments {
     pub statistics: bool,
     pub stdin_filename: Option<PathBuf>,
     pub watch: bool,
+    pub parser: Option<ParserType>,
 }
 
 /// CLI settings that are distinct from configuration (commands, lists of files,

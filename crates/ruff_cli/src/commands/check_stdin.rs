@@ -17,6 +17,7 @@ pub(crate) fn check_stdin(
     overrides: &CliOverrides,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    parser: flags::Parser,
 ) -> Result<Diagnostics> {
     if let Some(filename) = filename {
         if !python_file_at_path(filename, pyproject_config, overrides)? {
@@ -34,6 +35,7 @@ pub(crate) fn check_stdin(
         &pyproject_config.settings,
         noqa,
         fix_mode,
+        parser,
     )?;
     diagnostics.messages.sort_unstable();
     Ok(diagnostics)

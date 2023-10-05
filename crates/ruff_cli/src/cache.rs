@@ -410,6 +410,7 @@ mod tests {
                     Some(&cache),
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
+                    flags::Parser::Auto,
                 )
                 .unwrap();
                 if diagnostics
@@ -455,6 +456,7 @@ mod tests {
                 Some(&cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
+                flags::Parser::Auto,
             )
             .unwrap();
         }
@@ -712,6 +714,7 @@ mod tests {
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
+                flags::Parser::Auto,
             )
         }
     }

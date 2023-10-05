@@ -36,6 +36,7 @@ pub(crate) fn check(
     cache: flags::Cache,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    parser: flags::Parser,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -119,7 +120,16 @@ pub(crate) fn check(
                         }
                     });
 
-                    lint_path(path, package, &settings.linter, cache, noqa, fix_mode).map_err(|e| {
+                    lint_path(
+                        path,
+                        package,
+                        &settings.linter,
+                        cache,
+                        noqa,
+                        fix_mode,
+                        parser,
+                    )
+                    .map_err(|e| {
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
@@ -199,9 +209,10 @@ fn lint_path(
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    parser: flags::Parser,
 ) -> Result<Diagnostics> {
     let result = catch_unwind(|| {
-        crate::diagnostics::lint_path(path, package, settings, cache, noqa, fix_mode)
+        crate::diagnostics::lint_path(path, package, settings, cache, noqa, fix_mode, parser)
     });
 
     match result {
@@ -285,6 +296,7 @@ mod test {
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,
+            flags::Parser::Auto,
         )
         .unwrap();
         let mut output = Vec::new();

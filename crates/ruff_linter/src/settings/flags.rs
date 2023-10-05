@@ -16,3 +16,16 @@ pub enum Cache {
     Enabled,
     Disabled,
 }
+
+#[derive(Debug, Copy, Clone, Hash, is_macro::Is)]
+pub enum Parser {
+    Auto,
+    Python,
+    Ipynb,
+}
+
+impl Default for Parser {
+    fn default() -> Self {
+        Self::Auto
+    }
+}

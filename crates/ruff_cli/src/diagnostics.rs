@@ -162,6 +162,19 @@ impl AddAssign for Diagnostics {
     }
 }
 
+fn parser_source_type(
+    parser: flags::Parser,
+    source_type: ruff_python_ast::PySourceType,
+) -> ruff_python_ast::PySourceType {
+    match (parser, source_type) {
+        (flags::Parser::Auto, _) => source_type,
+        (flags::Parser::Ipynb, _) => ruff_python_ast::PySourceType::Ipynb,
+        (flags::Parser::Python, ruff_python_ast::PySourceType::Stub) => {
+            ruff_python_ast::PySourceType::Stub
+        }
+        (flags::Parser::Python, _) => ruff_python_ast::PySourceType::Python,
+    }
+}
 /// Lint the source code at the given `Path`.
 pub(crate) fn lint_path(
     path: &Path,
@@ -170,6 +183,7 @@ pub(crate) fn lint_path(
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    parser: flags::Parser,
 ) -> Result<Diagnostics> {
     // Check the cache.
     // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
@@ -222,7 +236,7 @@ pub(crate) fn lint_path(
             });
         }
         SourceType::Toml(_) => return Ok(Diagnostics::default()),
-        SourceType::Python(source_type) => source_type,
+        SourceType::Python(source_type) => parser_source_type(parser, source_type),
     };
 
     // Extract the sources from the file.
@@ -385,11 +399,13 @@ pub(crate) fn lint_stdin(
     settings: &Settings,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    parser: flags::Parser,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
     let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
         return Ok(Diagnostics::default());
     };
+    let source_type = parser_source_type(parser, source_type);
 
     // Extract the sources from the file.
     let source_kind = match SourceKind::from_source_code(contents, source_type) {

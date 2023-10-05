@@ -11,7 +11,7 @@ use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
 use ruff_linter::settings::flags;
-use ruff_linter::settings::types::SerializationFormat;
+use ruff_linter::settings::types::{ParserType, SerializationFormat};
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
@@ -259,6 +259,12 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     if show_source {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
+    let parser = match cli.parser {
+        Some(ParserType::Ipynb) => flags::Parser::Ipynb,
+        Some(ParserType::Py) => flags::Parser::Python,
+        None => flags::Parser::Auto,
+    };
+
     if cli.ecosystem_ci {
         warn_user!(
             "The formatting of fixes emitted by this option is a work-in-progress, subject to \
@@ -318,6 +324,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             cache.into(),
             noqa.into(),
             fix_mode,
+            parser,
         )?;
         printer.write_continuously(&mut writer, &messages)?;
 
@@ -350,6 +357,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         cache.into(),
                         noqa.into(),
                         fix_mode,
+                        flags::Parser::Auto,
                     )?;
                     printer.write_continuously(&mut writer, &messages)?;
                 }
@@ -367,6 +375,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 &overrides,
                 noqa.into(),
                 fix_mode,
+                parser,
             )?
         } else {
             commands::check::check(
@@ -376,6 +385,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 cache.into(),
                 noqa.into(),
                 fix_mode,
+                parser,
             )?
         };
 

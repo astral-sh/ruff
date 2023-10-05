@@ -317,3 +317,12 @@ impl Deref for Version {
 /// [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) for
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ParserType {
+    Py,
+    Ipynb,
+}
