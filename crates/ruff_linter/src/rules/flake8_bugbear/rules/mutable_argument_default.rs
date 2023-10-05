@@ -200,5 +200,8 @@ fn move_initialization(
     }
 
     let initialization_edit = Edit::insertion(content, pos);
-    Some(Fix::manual_edits(default_edit, [initialization_edit]))
+    Some(Fix::never_applies_edits(
+        default_edit,
+        [initialization_edit],
+    ))
 }

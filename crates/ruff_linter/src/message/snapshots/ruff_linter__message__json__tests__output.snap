@@ -11,7 +11,7 @@ expression: content
     },
     "filename": "fib.py",
     "fix": {
-      "applicability": "Suggested",
+      "applicability": "sometimes",
       "edits": [
         {
           "content": "",
@@ -43,7 +43,7 @@ expression: content
     },
     "filename": "fib.py",
     "fix": {
-      "applicability": "Suggested",
+      "applicability": "sometimes",
       "edits": [
         {
           "content": "",

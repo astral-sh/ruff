@@ -106,7 +106,7 @@ pub(crate) fn useless_return(
     if checker.patch(diagnostic.kind.rule()) {
         let edit =
             fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(
+        diagnostic.set_fix(Fix::always_applies(edit).isolate(Checker::isolation(
             checker.semantic().current_statement_id(),
         )));
     }

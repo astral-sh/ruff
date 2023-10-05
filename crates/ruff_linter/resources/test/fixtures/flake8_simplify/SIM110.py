@@ -185,3 +185,24 @@ async def f():
         if check(x):
             return True
     return False
+
+async def f():
+    # SIM110
+    for x in await iterable:
+        if check(x):
+            return True
+    return False
+
+def f():
+    # OK (can't turn this into any() because the yield would end up inside a genexp)
+    for x in iterable:
+        if (yield check(x)):
+            return True
+    return False
+
+def f():
+    # OK (same)
+    for x in iterable:
+        if (yield from check(x)):
+            return True
+    return False

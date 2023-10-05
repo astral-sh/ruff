@@ -1,8 +1,7 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
-use std::fs::{write, File};
+use std::fs::File;
 use std::io;
-use std::io::{BufWriter, Write};
 use std::ops::AddAssign;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -13,7 +12,6 @@ use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
 use rustc_hash::FxHashMap;
-use similar::TextDiff;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
@@ -26,7 +24,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_macros::CacheKey;
-use ruff_notebook::{Cell, Notebook, NotebookError, NotebookIndex};
+use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};

@@ -319,7 +319,7 @@ fn directive_errors(
         );
 
         if settings.rules.should_fix(Rule::InvalidTodoCapitalization) {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                 "TODO".to_string(),
                 directive.range,
             )));

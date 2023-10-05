@@ -170,7 +170,7 @@ pub(crate) fn compound_statements(
                     let mut diagnostic =
                         Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
                     if settings.rules.should_fix(Rule::UselessSemicolon) {
-                        diagnostic.set_fix(Fix::automatic(Edit::deletion(
+                        diagnostic.set_fix(Fix::always_applies(Edit::deletion(
                             indexer
                                 .preceded_by_continuations(start, locator)
                                 .unwrap_or(start),

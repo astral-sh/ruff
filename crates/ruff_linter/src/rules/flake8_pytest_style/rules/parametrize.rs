@@ -352,7 +352,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                                 format!("({})", checker.generator().expr(&node)),
                                 name_range,
                             )));
@@ -387,7 +387,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                                 checker.generator().expr(&node),
                                 name_range,
                             )));
@@ -419,7 +419,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                                 checker.generator().expr(&node),
                                 expr.range(),
                             )));
@@ -435,10 +435,9 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker.generator()) {
-                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                    content,
-                                    expr.range(),
-                                )));
+                                diagnostic.set_fix(Fix::sometimes_applies(
+                                    Edit::range_replacement(content, expr.range()),
+                                ));
                             }
                         }
                         checker.diagnostics.push(diagnostic);
@@ -467,7 +466,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                                 format!("({})", checker.generator().expr(&node)),
                                 expr.range(),
                             )));
@@ -483,10 +482,9 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker.generator()) {
-                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                    content,
-                                    expr.range(),
-                                )));
+                                diagnostic.set_fix(Fix::sometimes_applies(
+                                    Edit::range_replacement(content, expr.range()),
+                                ));
                             }
                         }
                         checker.diagnostics.push(diagnostic);
@@ -598,8 +596,9 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                             .comment_ranges()
                             .intersects(deletion_range)
                         {
-                            diagnostic
-                                .set_fix(Fix::suggested(Edit::range_deletion(deletion_range)));
+                            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_deletion(
+                                deletion_range,
+                            )));
                         }
                     }
                 }
@@ -620,7 +619,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
 
     if checker.patch(diagnostic.kind.rule()) {
         let node = value.clone();
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
             checker.generator().expr(&node),
             expr.range(),
         )));

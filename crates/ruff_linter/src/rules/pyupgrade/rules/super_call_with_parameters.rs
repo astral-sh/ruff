@@ -129,7 +129,7 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::deletion(
+        diagnostic.set_fix(Fix::sometimes_applies(Edit::deletion(
             call.arguments.start() + TextSize::new(1),
             call.arguments.end() - TextSize::new(1),
         )));

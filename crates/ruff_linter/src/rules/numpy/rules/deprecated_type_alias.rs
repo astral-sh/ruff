@@ -80,7 +80,7 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
                 _ => type_name,
             };
             if checker.semantic().is_builtin(type_name) {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                     type_name.to_string(),
                     expr.range(),
                 )));

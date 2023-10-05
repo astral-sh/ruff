@@ -185,13 +185,14 @@ fn create_check<T: Ranged>(
     );
     if patch {
         if let Some(content) = replacement_value {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                 content.to_string(),
                 mode_param.range(),
             )));
         } else {
             diagnostic.try_set_fix(|| {
-                create_remove_param_fix(locator, expr, mode_param, source_type).map(Fix::automatic)
+                create_remove_param_fix(locator, expr, mode_param, source_type)
+                    .map(Fix::always_applies)
             });
         }
     }
