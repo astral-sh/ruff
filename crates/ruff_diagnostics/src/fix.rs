@@ -10,15 +10,15 @@ use crate::edit::Edit;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Applicability {
-    /// The fix can always be applied.
+    /// The fix is safe and can always be applied.
     /// The fix is definitely what the user intended, or it maintains the exact meaning of the code.
     Always,
 
-    /// The fix can be applied with user opt-in.
+    /// The fix is unsafe and should only be applied with user opt-in.
     /// The fix may be what the user intended, but it is uncertain; the resulting code will have valid syntax.
     Sometimes,
 
-    /// The fix should only be manually applied by the user.
+    /// The fix is unsafe and should only be manually applied by the user.
     /// The fix is likely to be incorrect or the resulting code may have invalid syntax.
     Never,
 }
@@ -47,7 +47,7 @@ pub struct Fix {
 }
 
 impl Fix {
-    /// Create a new [`Fix`] with [safe applicability](Applicability::Always) from an [`Edit`] element.
+    /// Create a new [`Fix`] that can [always](Applicability::Always) be applied from an [`Edit`] element.
     pub fn always_applies(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
@@ -56,7 +56,7 @@ impl Fix {
         }
     }
 
-    /// Create a new [`Fix`] with [safe applicability](Applicability::Always) from multiple [`Edit`] elements.
+    /// Create a new [`Fix`] that can [always](Applicability::Always) be applied from multiple [`Edit`] elements.
     pub fn always_applies_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
@@ -67,7 +67,7 @@ impl Fix {
         }
     }
 
-    /// Create a new [`Fix`] with [unsafe applicability](Applicable::Sometimes) from an [`Edit`] element.
+    /// Create a new [`Fix`] that can [sometimes](Applicability::Sometimes) be applied from an [`Edit`] element.
     pub fn sometimes_applies(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
@@ -76,7 +76,7 @@ impl Fix {
         }
     }
 
-    /// Create a new [`Fix`] with [unsafe applicability](Applicability::Sometimes) from multiple [`Edit`] elements.
+    /// Create a new [`Fix`] that can [sometimes](Applicability::Sometimes) be applied from multiple [`Edit`] elements.
     pub fn sometimes_applies_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
@@ -87,7 +87,7 @@ impl Fix {
         }
     }
 
-    /// Create a new [`Fix`] with [manual applicability](Applicability::Never) from an [`Edit`] element.
+    /// Create a new [`Fix`] that should [never](Applicability::Never) be applied from an [`Edit`] element .
     pub fn never_applies(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
@@ -96,7 +96,7 @@ impl Fix {
         }
     }
 
-    /// Create a new [`Fix`] with [manual applicability](Applicability::Never) from multiple [`Edit`] elements.
+    /// Create a new [`Fix`] that should [never](Applicability::Never) be applied from multiple [`Edit`] elements.
     pub fn never_applies_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
