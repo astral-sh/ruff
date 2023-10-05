@@ -18,6 +18,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
+    #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(
@@ -36,7 +37,6 @@ mod tests {
         Path::new("repeated_isinstance_calls.py")
     )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
-    #[test_case(Rule::LegacyTernary, Path::new("legacy_ternary.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
