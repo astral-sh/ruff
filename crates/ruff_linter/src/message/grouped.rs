@@ -34,6 +34,12 @@ impl GroupedEmitter {
         self.show_source = show_source;
         self
     }
+
+    #[must_use]
+    pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
+        self.unsafe_fixes = unsafe_fixes;
+        self
+    }
 }
 
 impl Emitter for GroupedEmitter {
@@ -201,6 +207,7 @@ mod tests {
 
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::GroupedEmitter;
+    use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
@@ -223,6 +230,17 @@ mod tests {
         let mut emitter = GroupedEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true);
+        let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn fix_status_unsafe() {
+        let mut emitter = GroupedEmitter::default()
+            .with_show_fix_status(true)
+            .with_show_source(true)
+            .with_unsafe_fixes(UnsafeFixes::Enabled);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

@@ -205,6 +205,7 @@ impl Printer {
                 GroupedEmitter::default()
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .with_show_fix_status(show_fix_status(self.fix_mode, &fixables))
+                    .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
