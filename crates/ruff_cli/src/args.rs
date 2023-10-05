@@ -78,15 +78,16 @@ pub struct CheckCommand {
     /// List of files or directories to check.
     pub files: Vec<PathBuf>,
     /// Apply fixes to resolve lint violations.
-    /// Use `--no-fix` to disable or `--unsafe-fixes` to include suggested fixes.
+    /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
-    #[clap(long, overrides_with_all(["fix"]), hide = true)]
+    #[clap(long, overrides_with("fix"), hide = true)]
     no_fix: bool,
     /// Include fixes that may not retain the original intent of the code.
+    /// Use `--no-unsafe-fixes` to disable.
     #[arg(long, overrides_with("no_unsafe_fixes"))]
     unsafe_fixes: bool,
-    #[arg(long, overrides_with("unsafe_fixes"))]
+    #[arg(long, overrides_with("unsafe_fixes"), hide = true)]
     no_unsafe_fixes: bool,
     /// Show violations with source code.
     /// Use `--no-show-source` to disable.
@@ -107,7 +108,7 @@ pub struct CheckCommand {
     #[arg(short, long)]
     pub watch: bool,
     /// Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`.
-    /// Use `--no-fix-only` to disable or `--unsafe-fixes` to include suggested fixes.
+    /// Use `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
