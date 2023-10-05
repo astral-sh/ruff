@@ -57,3 +57,7 @@ result_f = (
     ),
     2
 )
+
+# https://github.com/astral-sh/ruff/issues/6841
+x = f'''a{""}b'''
+y = f'''c{1}d"""e'''
