@@ -1662,14 +1662,14 @@ FStringFormatSpec: ast::Expr = {
 };
 
 FStringConversion: (TextSize, ast::ConversionFlag) = {
-    <location:@L> "!" <s:name> =>? {
+    <location:@L> "!" <name_location:@L> <s:name> =>? {
         let conversion = match s.as_str() {
             "s" => ast::ConversionFlag::Str,
             "r" => ast::ConversionFlag::Repr,
             "a" => ast::ConversionFlag::Ascii,
             _ => Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
-                location,
+                location: name_location,
             })?
         };
         Ok((location, conversion))
