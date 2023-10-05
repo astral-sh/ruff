@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{BoolOp, Expr, ExprBoolOp, ExprIfExp};
+use ruff_python_ast::{Expr, ExprBoolOp, ExprIfExp};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -52,15 +52,7 @@ pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
     let if_expr = Expr::IfExp(ExprIfExp {
         test: Box::new(bool_op.values[0].as_bool_op_expr().unwrap().values[0].clone()),
         body: Box::new(bool_op.values[0].as_bool_op_expr().unwrap().values[1].clone()),
-        orelse: Box::new(if bool_op.values.len() == 2 {
-            bool_op.values[1].clone()
-        } else {
-            Expr::BoolOp(ExprBoolOp {
-                op: BoolOp::Or,
-                values: bool_op.values[1..].to_vec(),
-                range: TextRange::default(),
-            })
-        }),
+        orelse: Box::new(bool_op.values[1].clone()),
         range: TextRange::default(),
     });
     let ternary = checker.generator().expr(&if_expr);
