@@ -170,6 +170,75 @@ expression: lex_source(source)
     ),
     (
         Newline,
-        86..86,
+        86..87,
+    ),
+    (
+        FStringStart,
+        87..89,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        89..91,
+    ),
+    (
+        Lbrace,
+        91..92,
+    ),
+    (
+        NonLogicalNewline,
+        92..93,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        97..98,
+    ),
+    (
+        Colon,
+        98..99,
+    ),
+    (
+        FStringMiddle {
+            value: "a",
+            is_raw: false,
+        },
+        99..100,
+    ),
+    (
+        NonLogicalNewline,
+        100..101,
+    ),
+    (
+        Name {
+            name: "b",
+        },
+        109..110,
+    ),
+    (
+        NonLogicalNewline,
+        110..111,
+    ),
+    (
+        Rbrace,
+        111..112,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        112..114,
+    ),
+    (
+        FStringEnd,
+        114..115,
+    ),
+    (
+        Newline,
+        115..116,
     ),
 ]

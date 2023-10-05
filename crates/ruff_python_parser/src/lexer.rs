@@ -1202,6 +1202,9 @@ impl<'source> Lexer<'source> {
                         self.state = State::AfterNewline;
                         Tok::Newline
                     } else {
+                        if let Some(fstring) = self.fstrings.current_mut() {
+                            fstring.try_end_format_spec(self.nesting);
+                        }
                         Tok::NonLogicalNewline
                     },
                     self.token_range(),
@@ -1215,6 +1218,9 @@ impl<'source> Lexer<'source> {
                         self.state = State::AfterNewline;
                         Tok::Newline
                     } else {
+                        if let Some(fstring) = self.fstrings.current_mut() {
+                            fstring.try_end_format_spec(self.nesting);
+                        }
                         Tok::NonLogicalNewline
                     },
                     self.token_range(),
@@ -2061,6 +2067,8 @@ def f(arg=%timeit a = b):
 
     #[test]
     fn test_fstring_with_multiline_format_spec() {
+        // The last f-string is invalid syntactically but we should still lex it.
+        // Note that the `b` is a `Name` token and not a `FStringMiddle` token.
         let source = r"f'''__{
     x:d
 }__'''
@@ -2071,7 +2079,12 @@ f'''__{
 }__'''
 f'__{
     x:d
-}__'";
+}__'
+f'__{
+    x:a
+        b
+}__'
+";
         assert_debug_snapshot!(lex_source(source));
     }
 
