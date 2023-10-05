@@ -88,7 +88,7 @@ impl fmt::Display for CmpOpExt {
 pub(super) fn is_and_or_ternary(bool_op: &ExprBoolOp) -> bool {
     let and_op = &bool_op.values[0];
     if !and_op.is_bool_op_expr() {
-        return false
+        return false;
     }
     let false_value = &bool_op.values[1];
     let and_values = &and_op.as_bool_op_expr().unwrap().values;

@@ -1,3 +1,4 @@
+pub(crate) use and_or_ternary::*;
 pub(crate) use assert_on_string_literal::*;
 pub(crate) use await_outside_async::*;
 pub(crate) use bad_dunder_method_name::*;
@@ -23,7 +24,6 @@ pub(crate) use invalid_envvar_value::*;
 pub(crate) use invalid_str_return::*;
 pub(crate) use invalid_string_characters::*;
 pub(crate) use iteration_over_set::*;
-pub(crate) use and_or_ternary::*;
 pub(crate) use load_before_global_declaration::*;
 pub(crate) use logging::*;
 pub(crate) use magic_value_comparison::*;
@@ -58,6 +58,7 @@ pub(crate) use useless_return::*;
 pub(crate) use yield_from_in_async_function::*;
 pub(crate) use yield_in_init::*;
 
+mod and_or_ternary;
 mod assert_on_string_literal;
 mod await_outside_async;
 mod bad_dunder_method_name;
@@ -83,7 +84,6 @@ mod invalid_envvar_value;
 mod invalid_str_return;
 mod invalid_string_characters;
 mod iteration_over_set;
-mod and_or_ternary;
 mod load_before_global_declaration;
 mod logging;
 mod magic_value_comparison;
