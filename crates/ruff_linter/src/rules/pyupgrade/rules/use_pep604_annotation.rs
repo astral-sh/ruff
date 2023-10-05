@@ -79,7 +79,7 @@ pub(crate) fn use_pep604_annotation(
                         // Invalid type annotation.
                     }
                     _ => {
-                        diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                             pad(
                                 checker.generator().expr(&optional(slice)),
                                 expr.range(),
@@ -100,7 +100,7 @@ pub(crate) fn use_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                             pad(
                                 checker.generator().expr(&union(elts)),
                                 expr.range(),
@@ -111,7 +111,7 @@ pub(crate) fn use_pep604_annotation(
                     }
                     _ => {
                         // Single argument.
-                        diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                             pad(
                                 checker.locator().slice(slice).to_string(),
                                 expr.range(),

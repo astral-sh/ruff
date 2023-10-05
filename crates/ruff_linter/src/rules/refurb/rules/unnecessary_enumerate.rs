@@ -149,7 +149,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                     ),
                     stmt_for.target.range(),
                 );
-                diagnostic.set_fix(Fix::sometimes_safe_edits(replace_iter, [replace_target]));
+                diagnostic.set_fix(Fix::sometimes_applies_edits(replace_iter, [replace_target]));
             }
 
             checker.diagnostics.push(diagnostic);
@@ -212,7 +212,8 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                         stmt_for.target.range(),
                     );
 
-                    diagnostic.set_fix(Fix::sometimes_safe_edits(replace_iter, [replace_target]));
+                    diagnostic
+                        .set_fix(Fix::sometimes_applies_edits(replace_iter, [replace_target]));
                 }
             }
             checker.diagnostics.push(diagnostic);

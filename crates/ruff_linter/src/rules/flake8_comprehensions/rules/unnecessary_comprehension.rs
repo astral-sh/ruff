@@ -67,7 +67,7 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
-                .map(Fix::sometimes_safe)
+                .map(Fix::sometimes_applies)
         });
     }
     checker.diagnostics.push(diagnostic);

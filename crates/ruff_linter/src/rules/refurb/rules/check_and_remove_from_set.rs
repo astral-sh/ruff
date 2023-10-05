@@ -113,7 +113,7 @@ pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::St
         if_stmt.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::sometimes_safe(Edit::replacement(
+        diagnostic.set_fix(Fix::sometimes_applies(Edit::replacement(
             make_suggestion(check_set, check_element, checker.generator()),
             if_stmt.start(),
             if_stmt.end(),

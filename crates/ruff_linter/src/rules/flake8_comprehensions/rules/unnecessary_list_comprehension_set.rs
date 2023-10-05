@@ -61,7 +61,7 @@ pub(crate) fn unnecessary_list_comprehension_set(
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
                 fixes::fix_unnecessary_list_comprehension_set(expr, checker)
-                    .map(Fix::sometimes_safe)
+                    .map(Fix::sometimes_applies)
             });
         }
         checker.diagnostics.push(diagnostic);

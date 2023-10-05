@@ -100,7 +100,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
             format!("self.{target}"),
             expr.range(),
         )));

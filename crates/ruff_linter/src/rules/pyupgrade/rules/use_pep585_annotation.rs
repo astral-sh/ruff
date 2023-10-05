@@ -92,7 +92,7 @@ pub(crate) fn use_pep585_annotation(
                 ModuleMember::BuiltIn(name) => {
                     // Built-in type, like `list`.
                     if checker.semantic().is_builtin(name) {
-                        diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                             (*name).to_string(),
                             expr.range(),
                         )));
@@ -107,7 +107,7 @@ pub(crate) fn use_pep585_annotation(
                             checker.semantic(),
                         )?;
                         let reference_edit = Edit::range_replacement(binding, expr.range());
-                        Ok(Fix::sometimes_safe_edits(import_edit, [reference_edit]))
+                        Ok(Fix::sometimes_applies_edits(import_edit, [reference_edit]))
                     });
                 }
             }

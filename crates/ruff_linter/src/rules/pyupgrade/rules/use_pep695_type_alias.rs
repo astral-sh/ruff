@@ -132,7 +132,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
             })
         };
 
-        diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
             checker.generator().stmt(&Stmt::from(StmtTypeAlias {
                 range: TextRange::default(),
                 name: target.clone(),

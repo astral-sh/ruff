@@ -139,7 +139,7 @@ pub(crate) fn organize_imports(
 
     let mut diagnostic = Diagnostic::new(UnsortedImports, range);
     if settings.rules.should_fix(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
             indent(&expected, indentation).to_string(),
             range,
         )));

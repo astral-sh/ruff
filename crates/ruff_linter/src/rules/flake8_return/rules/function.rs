@@ -346,7 +346,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range);
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+            diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                 "return".to_string(),
                 stmt.range(),
             )));
@@ -363,7 +363,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range);
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+            diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                 "return None".to_string(),
                 stmt.range,
             )));
@@ -415,7 +415,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist().line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.set_fix(Fix::sometimes_safe(Edit::insertion(
+                        diagnostic.set_fix(Fix::sometimes_applies(Edit::insertion(
                             content,
                             end_of_last_statement(stmt, checker.locator()),
                         )));
@@ -437,7 +437,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist().line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.set_fix(Fix::sometimes_safe(Edit::insertion(
+                        diagnostic.set_fix(Fix::sometimes_applies(Edit::insertion(
                             content,
                             end_of_last_statement(stmt, checker.locator()),
                         )));
@@ -473,7 +473,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     content.push_str(checker.stylist().line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
-                    diagnostic.set_fix(Fix::sometimes_safe(Edit::insertion(
+                    diagnostic.set_fix(Fix::sometimes_applies(Edit::insertion(
                         content,
                         end_of_last_statement(stmt, checker.locator()),
                     )));
@@ -567,7 +567,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     ),
                 );
 
-                Ok(Fix::sometimes_safe_edits(replace_assign, [delete_return]))
+                Ok(Fix::sometimes_applies_edits(
+                    replace_assign,
+                    [delete_return],
+                ))
             });
         }
         checker.diagnostics.push(diagnostic);

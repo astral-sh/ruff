@@ -110,7 +110,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
                     ),
                     stmt_for.target.range(),
                 );
-                diagnostic.set_fix(Fix::sometimes_safe_edits(
+                diagnostic.set_fix(Fix::sometimes_applies_edits(
                     replace_attribute,
                     [replace_target],
                 ));
@@ -135,7 +135,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
                     ),
                     stmt_for.target.range(),
                 );
-                diagnostic.set_fix(Fix::sometimes_safe_edits(
+                diagnostic.set_fix(Fix::sometimes_applies_edits(
                     replace_attribute,
                     [replace_target],
                 ));

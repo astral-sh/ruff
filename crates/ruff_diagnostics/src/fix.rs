@@ -48,7 +48,7 @@ pub struct Fix {
 
 impl Fix {
     /// Create a new [`Fix`] with [safe applicability](Applicability::Always) from an [`Edit`] element.
-    pub fn always_safe(edit: Edit) -> Self {
+    pub fn always_applies(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
             applicability: Applicability::Always,
@@ -57,7 +57,7 @@ impl Fix {
     }
 
     /// Create a new [`Fix`] with [safe applicability](Applicability::Always) from multiple [`Edit`] elements.
-    pub fn always_safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    pub fn always_applies_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
@@ -68,7 +68,7 @@ impl Fix {
     }
 
     /// Create a new [`Fix`] with [unsafe applicability](Applicable::Sometimes) from an [`Edit`] element.
-    pub fn sometimes_safe(edit: Edit) -> Self {
+    pub fn sometimes_applies(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
             applicability: Applicability::Sometimes,
@@ -77,7 +77,7 @@ impl Fix {
     }
 
     /// Create a new [`Fix`] with [unsafe applicability](Applicability::Sometimes) from multiple [`Edit`] elements.
-    pub fn sometimes_safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    pub fn sometimes_applies_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
@@ -88,7 +88,7 @@ impl Fix {
     }
 
     /// Create a new [`Fix`] with [manual applicability](Applicability::Never) from an [`Edit`] element.
-    pub fn never_safe(edit: Edit) -> Self {
+    pub fn never_applies(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
             applicability: Applicability::Never,
@@ -97,7 +97,7 @@ impl Fix {
     }
 
     /// Create a new [`Fix`] with [manual applicability](Applicability::Never) from multiple [`Edit`] elements.
-    pub fn never_safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    pub fn never_applies_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {

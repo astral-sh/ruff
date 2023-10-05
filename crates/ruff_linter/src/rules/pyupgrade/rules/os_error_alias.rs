@@ -83,7 +83,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().is_builtin("OSError") {
-            diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+            diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                 "OSError".to_string(),
                 target.range(),
             )));
@@ -135,7 +135,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
                 format!("({})", checker.generator().expr(&node.into()))
             };
 
-            diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+            diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                 pad(content, tuple.range(), checker.locator()),
                 tuple.range(),
             )));

@@ -632,7 +632,7 @@ pub(crate) fn deprecated_import(
         );
         if checker.patch(Rule::DeprecatedImport) {
             if let Some(content) = fix {
-                diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
+                diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                     content,
                     stmt.range(),
                 )));

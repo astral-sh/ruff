@@ -103,7 +103,7 @@ fn fix_banned_relative_import(
         range: TextRange::default(),
     };
     let content = generator.stmt(&node.into());
-    Some(Fix::sometimes_safe(Edit::range_replacement(
+    Some(Fix::sometimes_applies(Edit::range_replacement(
         content,
         stmt.range(),
     )))

@@ -197,7 +197,7 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
         ) {
             let mut diagnostic = Diagnostic::new(LoggingWarn, range);
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+                diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                     "warning".to_string(),
                     range,
                 )));

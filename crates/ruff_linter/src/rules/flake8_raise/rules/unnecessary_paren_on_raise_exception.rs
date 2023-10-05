@@ -87,12 +87,12 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
                 .next()
                 .is_some_and(char::is_alphanumeric)
             {
-                diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+                diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                     " ".to_string(),
                     arguments.range(),
                 )));
             } else {
-                diagnostic.set_fix(Fix::always_safe(Edit::range_deletion(arguments.range())));
+                diagnostic.set_fix(Fix::always_applies(Edit::range_deletion(arguments.range())));
             }
         }
         checker.diagnostics.push(diagnostic);

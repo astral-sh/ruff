@@ -91,7 +91,7 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
             capitalized_word,
             TextRange::at(body.start(), first_word.text_len()),
         )));

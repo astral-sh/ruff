@@ -293,7 +293,7 @@ fn generate_fix(
         range: TextRange::default(),
     });
 
-    Fix::sometimes_safe_edits(
+    Fix::sometimes_applies_edits(
         Edit::insertion(
             format!(
                 "{}{}{}",

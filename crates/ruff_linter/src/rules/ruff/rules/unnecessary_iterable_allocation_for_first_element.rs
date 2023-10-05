@@ -97,7 +97,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
             format!("next({iterable})"),
             *range,
         )));

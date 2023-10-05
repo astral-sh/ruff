@@ -112,7 +112,7 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
         .unwrap_or(iterable.range()),
     );
 
-    Ok(Fix::sometimes_safe_edits(
+    Ok(Fix::sometimes_applies_edits(
         Edit::range_replacement(
             format!("{reduce_binding}({iadd_binding}, {iterable}, [])"),
             call.range(),

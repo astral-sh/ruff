@@ -289,7 +289,7 @@ fn fix_always_false_branch(
                 let stmt = checker.semantic().current_statement();
                 let parent = checker.semantic().current_statement_parent();
                 let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-                Some(Fix::sometimes_safe(edit))
+                Some(Fix::sometimes_applies(edit))
             }
             // If we have an `if` and an `elif`, turn the `elif` into an `if`
             Some(ElifElseClause {
@@ -304,7 +304,7 @@ fn fix_always_false_branch(
                         == "elif"
                 );
                 let end_location = range.start() + ("elif".text_len() - "if".text_len());
-                Some(Fix::sometimes_safe(Edit::deletion(
+                Some(Fix::sometimes_applies(Edit::deletion(
                     stmt_if.start(),
                     end_location,
                 )))
@@ -317,7 +317,7 @@ fn fix_always_false_branch(
                 let end = body.last()?;
                 if indentation(checker.locator(), start).is_none() {
                     // Inline `else` block (e.g., `else: x = 1`).
-                    Some(Fix::sometimes_safe(Edit::range_replacement(
+                    Some(Fix::sometimes_applies(Edit::range_replacement(
                         checker
                             .locator()
                             .slice(TextRange::new(start.start(), end.end()))
@@ -339,7 +339,7 @@ fn fix_always_false_branch(
                             .ok()
                         })
                         .map(|contents| {
-                            Fix::sometimes_safe(Edit::replacement(
+                            Fix::sometimes_applies(Edit::replacement(
                                 contents,
                                 checker.locator().line_start(stmt_if.start()),
                                 stmt_if.end(),
@@ -366,7 +366,7 @@ fn fix_always_false_branch(
                 .iter()
                 .map(Ranged::start)
                 .find(|start| *start > branch.start());
-            Some(Fix::sometimes_safe(Edit::deletion(
+            Some(Fix::sometimes_applies(Edit::deletion(
                 branch.start(),
                 next_start.unwrap_or(branch.end()),
             )))
@@ -394,7 +394,7 @@ fn fix_always_true_branch(
             let end = branch.body.last()?;
             if indentation(checker.locator(), start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
-                Some(Fix::sometimes_safe(Edit::range_replacement(
+                Some(Fix::sometimes_applies(Edit::range_replacement(
                     checker
                         .locator()
                         .slice(TextRange::new(start.start(), end.end()))
@@ -413,7 +413,7 @@ fn fix_always_true_branch(
                         .ok()
                     })
                     .map(|contents| {
-                        Fix::sometimes_safe(Edit::replacement(
+                        Fix::sometimes_applies(Edit::replacement(
                             contents,
                             checker.locator().line_start(stmt_if.start()),
                             stmt_if.end(),
@@ -428,7 +428,7 @@ fn fix_always_true_branch(
             let text = checker
                 .locator()
                 .slice(TextRange::new(branch.test.end(), end.end()));
-            Some(Fix::sometimes_safe(Edit::range_replacement(
+            Some(Fix::sometimes_applies(Edit::range_replacement(
                 format!("else{text}"),
                 TextRange::new(branch.start(), stmt_if.end()),
             )))

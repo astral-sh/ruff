@@ -142,7 +142,7 @@ pub(crate) fn avoidable_escaped_quote(
                             quote = quotes_settings.inline_quotes.opposite().as_char(),
                             value = unescape_string(string_contents)
                         );
-                        diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                             fixed_contents,
                             tok_range,
                         )));
@@ -216,7 +216,7 @@ pub(crate) fn avoidable_escaped_quote(
                                 tok_range,
                             ),
                         ));
-                    diagnostic.set_fix(Fix::always_safe_edits(
+                    diagnostic.set_fix(Fix::always_applies_edits(
                         fstring_start_edit,
                         fstring_middle_and_end_edits,
                     ));

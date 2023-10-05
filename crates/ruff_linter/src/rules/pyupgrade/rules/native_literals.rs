@@ -185,7 +185,7 @@ pub(crate) fn native_literals(
             if checker.patch(diagnostic.kind.rule()) {
                 let constant = Constant::from(literal_type);
                 let content = checker.generator().constant(&constant);
-                diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+                diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                     content,
                     call.range(),
                 )));
@@ -223,7 +223,7 @@ pub(crate) fn native_literals(
 
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+                diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                     content,
                     call.range(),
                 )));

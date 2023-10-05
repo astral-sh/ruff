@@ -72,7 +72,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
                 if let Some(parent @ Expr::BinOp(ast::ExprBinOp { left, right, .. })) = parent {
                     // Replace the parent with its non-duplicate child.
                     let child = if expr == left.as_ref() { right } else { left };
-                    diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
                         checker.locator().slice(child.as_ref()).to_string(),
                         parent.range(),
                     )));

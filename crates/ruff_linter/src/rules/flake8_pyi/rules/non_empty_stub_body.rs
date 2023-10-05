@@ -70,7 +70,7 @@ pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
 
     let mut diagnostic = Diagnostic::new(NonEmptyStubBody, stmt.range());
     if checker.patch(Rule::NonEmptyStubBody) {
-        diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
             format!("..."),
             stmt.range(),
         )));
