@@ -121,8 +121,7 @@ impl Printer {
                     writeln!(writer, "Found {remaining} error{s}.")?;
                 }
 
-                if let Some(fixables) = FixableStatistics::try_from(diagnostics, self.unsafe_fixes)
-                {
+                if let Some(fixables) = FixableSummary::try_from(diagnostics, self.unsafe_fixes) {
                     writeln!(writer, "{fixables}")?;
                 }
             } else {
@@ -171,7 +170,7 @@ impl Printer {
         }
 
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
-        let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
+        let fixables = FixableSummary::try_from(diagnostics, self.unsafe_fixes);
 
         match self.format {
             SerializationFormat::Json => {
@@ -355,7 +354,7 @@ impl Printer {
             );
         }
 
-        let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
+        let fixables = FixableSummary::try_from(diagnostics, self.unsafe_fixes);
 
         if !diagnostics.messages.is_empty() {
             if self.log_level >= LogLevel::Default {
@@ -389,13 +388,13 @@ fn num_digits(n: usize) -> usize {
 }
 
 /// Return `true` if the [`Printer`] should indicate that a rule is fixable.
-fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics>) -> bool {
+fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableSummary>) -> bool {
     // If we're in application mode, avoid indicating that a rule is fixable.
     // If the specific violation were truly fixable, it would've been fixed in
     // this pass! (We're occasionally unable to determine whether a specific
     // violation is fixable without trying to fix it, so if fix is not
     // enabled, we may inadvertently indicate that a rule is fixable.)
-    (!fix_mode.is_apply()) && fixables.is_some_and(FixableStatistics::any_applicable_fixes)
+    (!fix_mode.is_apply()) && fixables.is_some_and(FixableSummary::any_applicable_fixes)
 }
 
 fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
@@ -439,15 +438,15 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>
     Ok(())
 }
 
-/// Container for the number of [applicable][Applicability] fixes.
+/// Summarizes [applicable][ruff_diagnostics::Applicability] fixes.
 #[derive(Debug)]
-struct FixableStatistics {
+struct FixableSummary {
     applicable: u32,
     unapplicable: u32,
     unsafe_fixes: UnsafeFixes,
 }
 
-impl FixableStatistics {
+impl FixableSummary {
     fn try_from(diagnostics: &Diagnostics, unsafe_fixes: UnsafeFixes) -> Option<Self> {
         let mut applicable = 0;
         let mut unapplicable = 0;
@@ -478,7 +477,7 @@ impl FixableStatistics {
     }
 }
 
-impl Display for FixableStatistics {
+impl Display for FixableSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let fix_prefix = format!("[{}]", "*".cyan());
 
