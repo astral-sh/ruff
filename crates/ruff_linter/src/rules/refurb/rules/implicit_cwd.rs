@@ -14,7 +14,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest, registry::AsRule};
 ///
 /// ## Example
 /// ```python
-/// cwd = Path.resolve()
+/// cwd = Path().resolve()
 /// ```
 ///
 /// Use instead:
