@@ -182,7 +182,7 @@ pub(crate) fn negation_with_equal_op(
             comparators: comparators.clone(),
             range: TextRange::default(),
         };
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
             checker.generator().expr(&node.into()),
             expr.range(),
         )));
@@ -239,7 +239,7 @@ pub(crate) fn negation_with_not_equal_op(
             comparators: comparators.clone(),
             range: TextRange::default(),
         };
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
             checker.generator().expr(&node.into()),
             expr.range(),
         )));
@@ -272,7 +272,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
     );
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().in_boolean_test() {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                 checker.locator().slice(operand.as_ref()).to_string(),
                 expr.range(),
             )));
@@ -291,7 +291,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
                 },
                 range: TextRange::default(),
             };
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                 checker.generator().expr(&node1.into()),
                 expr.range(),
             )));

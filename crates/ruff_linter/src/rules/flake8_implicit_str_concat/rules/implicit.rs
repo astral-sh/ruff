@@ -169,7 +169,7 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
     let concatenation = format!("{a_leading_quote}{a_body}{b_body}{a_trailing_quote}");
     let range = TextRange::new(a_range.start(), b_range.end());
 
-    Some(Fix::automatic(Edit::range_replacement(
+    Some(Fix::always_applies(Edit::range_replacement(
         concatenation,
         range,
     )))

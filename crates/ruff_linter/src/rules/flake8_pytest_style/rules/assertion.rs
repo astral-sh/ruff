@@ -292,7 +292,7 @@ pub(crate) fn unittest_assertion(
                         && !checker.indexer().comment_ranges().intersects(expr.range())
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                                 checker.generator().stmt(&stmt),
                                 parenthesized_range(
                                     expr.into(),
@@ -401,7 +401,7 @@ pub(crate) fn unittest_raises_assertion(
                     checker.semantic(),
                 )?;
                 let edit = Edit::range_replacement(format!("{binding}({args})"), call.range());
-                Ok(Fix::suggested_edits(import_edit, [edit]))
+                Ok(Fix::sometimes_applies_edits(import_edit, [edit]))
             });
         }
     }
@@ -756,7 +756,7 @@ pub(crate) fn composite_condition(
             {
                 diagnostic.try_set_fix(|| {
                     fix_composite_condition(stmt, checker.locator(), checker.stylist())
-                        .map(Fix::suggested)
+                        .map(Fix::sometimes_applies)
                 });
             }
         }

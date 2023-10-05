@@ -116,7 +116,7 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, fix: bool, context: &mut Lo
                     let mut diagnostic = Diagnostic::new(kind, token.range());
 
                     if fix {
-                        diagnostic.set_fix(Fix::automatic(Edit::insertion(
+                        diagnostic.set_fix(Fix::always_applies(Edit::insertion(
                             " ".to_string(),
                             token.end(),
                         )));

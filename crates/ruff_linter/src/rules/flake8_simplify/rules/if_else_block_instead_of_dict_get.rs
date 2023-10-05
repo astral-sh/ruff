@@ -186,7 +186,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !checker.indexer().has_comments(stmt_if, checker.locator()) {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                 contents,
                 stmt_if.range(),
             )));

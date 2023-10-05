@@ -125,9 +125,12 @@ pub(crate) fn lambda_assignment(
                     .get_all(id)
                     .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
             {
-                diagnostic.set_fix(Fix::manual(Edit::range_replacement(indented, stmt.range())));
+                diagnostic.set_fix(Fix::never_applies(Edit::range_replacement(
+                    indented,
+                    stmt.range(),
+                )));
             } else {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                     indented,
                     stmt.range(),
                 )));

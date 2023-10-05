@@ -105,7 +105,7 @@ pub(crate) fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
             let mut diagnostic = Diagnostic::new(EndsInPeriod, docstring.range());
             // Best-effort fix: avoid adding a period after other punctuation marks.
             if checker.patch(diagnostic.kind.rule()) && !trimmed.ends_with([':', ';']) {
-                diagnostic.set_fix(Fix::suggested(Edit::insertion(
+                diagnostic.set_fix(Fix::sometimes_applies(Edit::insertion(
                     ".".to_string(),
                     line.start() + trimmed.text_len(),
                 )));

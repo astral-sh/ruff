@@ -117,7 +117,7 @@ fn add_required_import(
         TextRange::default(),
     );
     if settings.rules.should_fix(Rule::MissingRequiredImport) {
-        diagnostic.set_fix(Fix::automatic(
+        diagnostic.set_fix(Fix::always_applies(
             Importer::new(python_ast, locator, stylist)
                 .add_import(required_import, TextSize::default()),
         ));

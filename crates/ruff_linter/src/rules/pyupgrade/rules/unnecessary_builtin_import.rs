@@ -136,7 +136,7 @@ pub(crate) fn unnecessary_builtin_import(
                 checker.stylist(),
                 checker.indexer(),
             )?;
-            Ok(Fix::suggested(edit).isolate(Checker::isolation(
+            Ok(Fix::sometimes_applies(edit).isolate(Checker::isolation(
                 checker.semantic().current_statement_parent_id(),
             )))
         });

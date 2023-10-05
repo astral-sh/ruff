@@ -88,7 +88,7 @@ pub(crate) fn unnecessary_collection_call(
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_collection_call(expr, checker).map(Fix::suggested)
+            fixes::fix_unnecessary_collection_call(expr, checker).map(Fix::sometimes_applies)
         });
     }
     checker.diagnostics.push(diagnostic);

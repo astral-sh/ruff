@@ -419,7 +419,7 @@ pub(crate) fn f_strings(
             .comment_ranges()
             .intersects(call.arguments.range())
     {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
             contents,
             call.range(),
         )));
