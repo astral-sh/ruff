@@ -244,7 +244,7 @@ mod test {
     use std::os::unix::fs::OpenOptionsExt;
 
     use anyhow::Result;
-    use ruff_linter::settings::types::UnsafeFixes;
+    
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 

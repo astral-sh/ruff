@@ -7,7 +7,7 @@ use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, Sou
 use bitflags::bitflags;
 use colored::Colorize;
 
-use ruff_diagnostics::Applicability;
+
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -17,6 +17,7 @@ use crate::line_width::{LineWidthBuilder, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
+use crate::settings::types::UnsafeFixes;
 
 bitflags! {
     #[derive(Default)]
@@ -153,20 +154,19 @@ impl Display for RuleCodeAndBody<'_> {
         let kind = &self.message.kind;
         if self.show_fix_status {
             if let Some(fix) = self.message.fix.as_ref() {
-                let required_applicability = if self.show_unsafe_fixes {
-                    Applicability::Suggested
+                let unsafe_fixes = if self.show_unsafe_fixes {
+                    UnsafeFixes::Enabled
                 } else {
-                    Applicability::Automatic
+                    UnsafeFixes::Disabled
                 };
-                // Do not display an indicator for unapplicable fixes
-                if fix.applies(required_applicability) {
-                    let indicator = fix.applicability().symbol();
 
+                // Do not display an indicator for unapplicable fixes
+                if fix.applies(unsafe_fixes.required_applicability()) {
                     return write!(
                         f,
                         "{code} {fix}{body}",
                         code = kind.rule().noqa_code().to_string().red().bold(),
-                        fix = format_args!("[{}] ", indicator.cyan()),
+                        fix = format_args!("[{}] ", "*".cyan()),
                         body = kind.body,
                     );
                 }

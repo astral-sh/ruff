@@ -443,7 +443,7 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>
     Ok(())
 }
 
-/// Contains the number of [`Applicability::Automatic`] and [`Applicability::Suggested`] fixes
+/// Contains the number of [`Applicability::Always`] and [`Applicability::Sometimes`] fixes
 struct FixableStatistics {
     safe_count: u32,
     unsafe_count: u32,
@@ -457,9 +457,9 @@ impl FixableStatistics {
 
         for message in &diagnostics.messages {
             if let Some(fix) = &message.fix {
-                if fix.applicability() == Applicability::Suggested {
+                if fix.applicability() == Applicability::Sometimes {
                     unsafe_count += 1;
-                } else if fix.applicability() == Applicability::Automatic {
+                } else if fix.applicability() == Applicability::Always {
                     safe_count += 1;
                 }
             }
@@ -482,7 +482,7 @@ impl FixableStatistics {
 
     /// Build the displayed fix status message depending on the types of the remaining fixes.
     fn violation_string(&self) -> Option<String> {
-        let fix_prefix = format!("[{}]", Applicability::Automatic.symbol().cyan());
+        let fix_prefix = format!("[{}]", "*".cyan());
 
         if self.show_unsafe_fixes {
             let fixable_count = self.safe_count + self.unsafe_count;

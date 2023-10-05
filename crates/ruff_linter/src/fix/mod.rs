@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
 use ruff_source_file::Locator;
 
 use crate::linter::FixTable;
@@ -30,11 +30,7 @@ pub(crate) fn fix_file(
     locator: &Locator,
     unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
-    let required_applicability = if unsafe_fixes.is_enabled() {
-        Applicability::Suggested
-    } else {
-        Applicability::Automatic
-    };
+    let required_applicability = unsafe_fixes.required_applicability();
 
     let mut with_fixes = diagnostics
         .iter()

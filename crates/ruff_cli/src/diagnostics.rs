@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
+use ruff_linter::settings::types::UnsafeFixes;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -19,7 +20,6 @@ use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
@@ -241,109 +241,44 @@ pub(crate) fn lint_path(
             error: parse_error,
         },
         fixed,
-    ) = match fix_mode {
-        flags::FixMode::Apply | flags::FixMode::Diff => {
-            if let Ok(FixerResult {
-                result,
-                transformed,
-                fixed,
-            }) = lint_fix(
-                path,
-                package,
-                noqa,
-                unsafe_fixes,
-                settings,
-                &source_kind,
-                source_type,
-            ) {
-                if !fixed.is_empty() {
-                    match fix_mode {
-                        flags::FixMode::Apply => match transformed.as_ref() {
-                            SourceKind::Python(transformed) => {
-                                write(path, transformed.as_bytes())?;
-                            }
-                            SourceKind::IpyNotebook(notebook) => {
-                                let mut writer = BufWriter::new(File::create(path)?);
-                                notebook.write(&mut writer)?;
-                            }
-                        },
-                        flags::FixMode::Diff => {
-                            match transformed.as_ref() {
-                                SourceKind::Python(transformed) => {
-                                    let mut stdout = io::stdout().lock();
-                                    TextDiff::from_lines(source_kind.source_code(), transformed)
-                                        .unified_diff()
-                                        .header(
-                                            &fs::relativize_path(path),
-                                            &fs::relativize_path(path),
-                                        )
-                                        .to_writer(&mut stdout)?;
-                                    stdout.write_all(b"\n")?;
-                                    stdout.flush()?;
-                                }
-                                SourceKind::IpyNotebook(dest_notebook) => {
-                                    // We need to load the notebook again, since we might've
-                                    // mutated it.
-                                    let src_notebook = source_kind.as_ipy_notebook().unwrap();
-                                    let mut stdout = io::stdout().lock();
-                                    // Cell indices are 1-based.
-                                    for ((idx, src_cell), dest_cell) in (1u32..)
-                                        .zip(src_notebook.cells().iter())
-                                        .zip(dest_notebook.cells().iter())
-                                    {
-                                        let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) =
-                                            (src_cell, dest_cell)
-                                        else {
-                                            continue;
-                                        };
-                                        TextDiff::from_lines(
-                                            &src_code_cell.source.to_string(),
-                                            &dest_code_cell.source.to_string(),
-                                        )
-                                        .unified_diff()
-                                        // Jupyter notebook cells don't necessarily have a newline
-                                        // at the end. For example,
-                                        //
-                                        // ```python
-                                        // print("hello")
-                                        // ```
-                                        //
-                                        // For a cell containing the above code, there'll only be one line,
-                                        // and it won't have a newline at the end. If it did, there'd be
-                                        // two lines, and the second line would be empty:
-                                        //
-                                        // ```python
-                                        // print("hello")
-                                        //
-                                        // ```
-                                        .missing_newline_hint(false)
-                                        .header(
-                                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                        )
-                                        .to_writer(&mut stdout)?;
-                                    }
-                                    stdout.write_all(b"\n")?;
-                                    stdout.flush()?;
-                                }
-                            }
-                        }
-                        flags::FixMode::Generate => {}
+    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
+        if let Ok(FixerResult {
+            result,
+            transformed,
+            fixed,
+        }) = lint_fix(
+            path,
+            package,
+            noqa,
+            unsafe_fixes,
+            settings,
+            &source_kind,
+            source_type,
+        ) {
+            if !fixed.is_empty() {
+                match fix_mode {
+                    flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
+                    flags::FixMode::Diff => {
+                        source_kind.diff(
+                            transformed.as_ref(),
+                            Some(path),
+                            &mut io::stdout().lock(),
+                        )?;
                     }
+                    flags::FixMode::Generate => {}
                 }
-                (result, fixed)
-            } else {
-                // If we fail to fix, lint the original source code.
-                let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
-                let fixed = FxHashMap::default();
-                (result, fixed)
             }
-        }
-        flags::FixMode::Generate => {
+            (result, fixed)
+        } else {
+            // If we fail to fix, lint the original source code.
             let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
             let fixed = FxHashMap::default();
             (result, fixed)
         }
+    } else {
+        let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
+        let fixed = FxHashMap::default();
+        (result, fixed)
     };
 
     let imports = imports.unwrap_or_default();
@@ -394,7 +329,7 @@ pub(crate) fn lint_path(
 pub(crate) fn lint_stdin(
     path: Option<&Path>,
     package: Option<&Path>,
-    contents: &str,
+    contents: String,
     settings: &Settings,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
@@ -405,7 +340,7 @@ pub(crate) fn lint_stdin(
     };
 
     // Extract the sources from the file.
-    let source_kind = match SourceKind::from_source_code(contents.to_string(), source_type) {
+    let source_kind = match SourceKind::from_source_code(contents, source_type) {
         Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
@@ -420,70 +355,37 @@ pub(crate) fn lint_stdin(
             error: parse_error,
         },
         fixed,
-    ) = match fix_mode {
-        flags::FixMode::Apply | flags::FixMode::Diff => {
-            if let Ok(FixerResult {
-                result,
-                transformed,
-                fixed,
-            }) = lint_fix(
-                path.unwrap_or_else(|| Path::new("-")),
-                package,
-                noqa,
-                settings.unsafe_fixes,
-                &settings.linter,
-                &source_kind,
-                source_type,
-            ) {
-                match fix_mode {
-                    flags::FixMode::Apply => {
-                        // Write the contents to stdout, regardless of whether any errors were fixed.
-                        io::stdout().write_all(transformed.source_code().as_bytes())?;
-                    }
-                    flags::FixMode::Diff => {
-                        // But only write a diff if it's non-empty.
-                        if !fixed.is_empty() {
-                            let text_diff = TextDiff::from_lines(
-                                source_kind.source_code(),
-                                transformed.source_code(),
-                            );
-                            let mut unified_diff = text_diff.unified_diff();
-                            if let Some(path) = path {
-                                unified_diff
-                                    .header(&fs::relativize_path(path), &fs::relativize_path(path));
-                            }
-
-                            let mut stdout = io::stdout().lock();
-                            unified_diff.to_writer(&mut stdout)?;
-                            stdout.write_all(b"\n")?;
-                            stdout.flush()?;
-                        }
-                    }
-                    flags::FixMode::Generate => {}
+    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
+        if let Ok(FixerResult {
+            result,
+            transformed,
+            fixed,
+        }) = lint_fix(
+            path.unwrap_or_else(|| Path::new("-")),
+            package,
+            noqa,
+            settings.unsafe_fixes,
+            &settings.linter,
+            &source_kind,
+            source_type,
+        ) {
+            match fix_mode {
+                flags::FixMode::Apply => {
+                    // Write the contents to stdout, regardless of whether any errors were fixed.
+                    transformed.write(&mut io::stdout().lock())?;
                 }
-
-                (result, fixed)
-            } else {
-                // If we fail to fix, lint the original source code.
-                let result = lint_only(
-                    path.unwrap_or_else(|| Path::new("-")),
-                    package,
-                    &settings.linter,
-                    noqa,
-                    &source_kind,
-                    source_type,
-                );
-                let fixed = FxHashMap::default();
-
-                // Write the contents to stdout anyway.
-                if fix_mode.is_apply() {
-                    io::stdout().write_all(contents.as_bytes())?;
+                flags::FixMode::Diff => {
+                    // But only write a diff if it's non-empty.
+                    if !fixed.is_empty() {
+                        source_kind.diff(transformed.as_ref(), path, &mut io::stdout().lock())?;
+                    }
                 }
-
-                (result, fixed)
+                flags::FixMode::Generate => {}
             }
-        }
-        flags::FixMode::Generate => {
+
+            (result, fixed)
+        } else {
+            // If we fail to fix, lint the original source code.
             let result = lint_only(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
@@ -493,8 +395,25 @@ pub(crate) fn lint_stdin(
                 source_type,
             );
             let fixed = FxHashMap::default();
+
+            // Write the contents to stdout anyway.
+            if fix_mode.is_apply() {
+                source_kind.write(&mut io::stdout().lock())?;
+            }
+
             (result, fixed)
         }
+    } else {
+        let result = lint_only(
+            path.unwrap_or_else(|| Path::new("-")),
+            package,
+            &settings.linter,
+            noqa,
+            &source_kind,
+            source_type,
+        );
+        let fixed = FxHashMap::default();
+        (result, fixed)
     };
 
     let imports = imports.unwrap_or_default();

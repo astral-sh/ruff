@@ -7,6 +7,7 @@ use std::string::ToString;
 use anyhow::{bail, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
+use ruff_diagnostics::Applicability;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -129,6 +130,15 @@ impl From<bool> for UnsafeFixes {
             UnsafeFixes::Enabled
         } else {
             UnsafeFixes::Disabled
+        }
+    }
+}
+
+impl UnsafeFixes {
+    pub fn required_applicability(&self) -> Applicability {
+        match self {
+            Self::Enabled => Applicability::Sometimes,
+            Self::Disabled => Applicability::Always,
         }
     }
 }

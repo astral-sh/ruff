@@ -241,9 +241,81 @@ fn stdin_fix_jupyter() {
     success: true
     exit_code: 0
     ----- stdout -----
-    print(1)
-
-
+    {
+     "cells": [
+      {
+       "cell_type": "code",
+       "execution_count": 1,
+       "id": "dccc687c-96e2-4604-b957-a8a89b5bec06",
+       "metadata": {},
+       "outputs": [],
+       "source": []
+      },
+      {
+       "cell_type": "markdown",
+       "id": "19e1b029-f516-4662-a9b9-623b93edac1a",
+       "metadata": {},
+       "source": [
+        "Foo"
+       ]
+      },
+      {
+       "cell_type": "code",
+       "execution_count": 2,
+       "id": "cdce7b92-b0fb-4c02-86f6-e233b26fa84f",
+       "metadata": {},
+       "outputs": [],
+       "source": []
+      },
+      {
+       "cell_type": "code",
+       "execution_count": 3,
+       "id": "e40b33d2-7fe4-46c5-bdf0-8802f3052565",
+       "metadata": {},
+       "outputs": [
+        {
+         "name": "stdout",
+         "output_type": "stream",
+         "text": [
+          "1\n"
+         ]
+        }
+       ],
+       "source": [
+        "print(1)"
+       ]
+      },
+      {
+       "cell_type": "code",
+       "execution_count": null,
+       "id": "a1899bc8-d46f-4ec0-b1d1-e1ca0f04bf60",
+       "metadata": {},
+       "outputs": [],
+       "source": []
+      }
+     ],
+     "metadata": {
+      "kernelspec": {
+       "display_name": "Python 3 (ipykernel)",
+       "language": "python",
+       "name": "python3"
+      },
+      "language_info": {
+       "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+       },
+       "file_extension": ".py",
+       "mimetype": "text/x-python",
+       "name": "python",
+       "nbconvert_exporter": "python",
+       "pygments_lexer": "ipython3",
+       "version": "3.11.2"
+      }
+     },
+     "nbformat": 4,
+     "nbformat_minor": 5
+    }
     ----- stderr -----
     "###);
 }
@@ -918,10 +990,10 @@ fn diff_shows_safe_and_unsafe_fixes_with_unsafe_fixes() {
     exit_code: 1
     ----- stdout -----
     @@ -1,2 +1,2 @@
-    -x = {'a': 1, 'a': 1}
-    -print(('foo'))
-    +x = {'a': 1}
-    +print('foo')
+    -x = {'a': 1}
+    -print('foo')
+    +x = {'a': 1, 'a': 1}
+    +print(('foo'))
 
 
     ----- stderr -----
@@ -950,8 +1022,8 @@ fn diff_shows_safe_fixes_only() {
     ----- stdout -----
     @@ -1,2 +1,2 @@
      x = {'a': 1, 'a': 1}
-    -print(('foo'))
-    +print('foo')
+    -print('foo')
+    +print(('foo'))
 
 
     ----- stderr -----
