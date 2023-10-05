@@ -78,7 +78,7 @@ pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().is_builtin("NotImplementedError") {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
                 "NotImplementedError".to_string(),
                 expr.range(),
             )));

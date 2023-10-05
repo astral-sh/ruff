@@ -145,7 +145,7 @@ pub(crate) fn multiple_with_statements(
                                 checker.settings.tab_size,
                             )
                         }) {
-                            diagnostic.set_fix(Fix::suggested(edit));
+                            diagnostic.set_fix(Fix::sometimes_applies(edit));
                         }
                     }
                     Err(err) => error!("Failed to fix nested with: {err}"),

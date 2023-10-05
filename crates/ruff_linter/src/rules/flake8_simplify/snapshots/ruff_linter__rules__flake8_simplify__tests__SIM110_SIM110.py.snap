@@ -14,7 +14,7 @@ SIM110.py:3:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead o
   |
   = help: Replace with `return any(check(x) for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | def f():
 2 2 |     # SIM110
 3   |-    for x in iterable:
@@ -39,7 +39,7 @@ SIM110.py:25:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
    |
    = help: Replace with `return all(not check(x) for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 22 22 | 
 23 23 | def f():
 24 24 |     # SIM111
@@ -65,7 +65,7 @@ SIM110.py:33:5: SIM110 [*] Use `return all(x.is_empty() for x in iterable)` inst
    |
    = help: Replace with `return all(x.is_empty() for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 30 30 | 
 31 31 | def f():
 32 32 |     # SIM111
@@ -92,7 +92,7 @@ SIM110.py:55:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead 
    |
    = help: Replace with `return any(check(x) for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 52 52 | 
 53 53 | def f():
 54 54 |     # SIM110
@@ -120,7 +120,7 @@ SIM110.py:64:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
    |
    = help: Replace with `return all(not check(x) for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 61 61 | 
 62 62 | def f():
 63 63 |     # SIM111
@@ -149,7 +149,7 @@ SIM110.py:73:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead 
    |
    = help: Replace with `return any(check(x) for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 70 70 | 
 71 71 | def f():
 72 72 |     # SIM110
@@ -178,7 +178,7 @@ SIM110.py:83:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
    |
    = help: Replace with `return all(not check(x) for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 80 80 | 
 81 81 | def f():
 82 82 |     # SIM111
@@ -230,7 +230,7 @@ SIM110.py:144:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
     |
     = help: Replace with `return any(check(x) for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 141 141 |     x = 1
 142 142 | 
 143 143 |     # SIM110
@@ -255,7 +255,7 @@ SIM110.py:154:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` ins
     |
     = help: Replace with `return all(not check(x) for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 151 151 |     x = 1
 152 152 | 
 153 153 |     # SIM111
@@ -281,7 +281,7 @@ SIM110.py:162:5: SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ
     |
     = help: Replace with `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 159 159 | 
 160 160 | def f():
 161 161 |     # SIM110
@@ -309,7 +309,7 @@ SIM110.py:184:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
     |
     = help: Replace with `return any(check(x) for x in iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 181 181 | 
 182 182 | async def f():
 183 183 |     # SIM110
@@ -337,7 +337,7 @@ SIM110.py:191:5: SIM110 [*] Use `return any(check(x) for x in await iterable)` i
     |
     = help: Replace with `return any(check(x) for x in await iterable)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 188 188 | 
 189 189 | async def f():
 190 190 |     # SIM110

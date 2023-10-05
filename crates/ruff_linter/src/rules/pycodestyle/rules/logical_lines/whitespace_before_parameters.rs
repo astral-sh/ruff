@@ -83,7 +83,7 @@ pub(crate) fn whitespace_before_parameters(
             let mut diagnostic = Diagnostic::new(kind, TextRange::new(start, end));
 
             if fix {
-                diagnostic.set_fix(Fix::automatic(Edit::deletion(start, end)));
+                diagnostic.set_fix(Fix::automatic_safe(Edit::deletion(start, end)));
             }
             context.push_diagnostic(diagnostic);
         }

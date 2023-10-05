@@ -175,7 +175,9 @@ import os
         },
         "filename": "-",
         "fix": {
-          "applicability": "Automatic",
+          "applicability": {
+            "automatic": "safe"
+          },
           "edits": [
             {
               "content": "",

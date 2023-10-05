@@ -159,7 +159,7 @@ pub(crate) fn if_expr_with_true_false(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if test.is_compare_expr() {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                 checker
                     .locator()
                     .slice(
@@ -175,7 +175,7 @@ pub(crate) fn if_expr_with_true_false(
                 expr.range(),
             )));
         } else if checker.semantic().is_builtin("bool") {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                 checker.generator().expr(
                     &ast::ExprCall {
                         func: Box::new(
@@ -216,7 +216,7 @@ pub(crate) fn if_expr_with_false_true(
 
     let mut diagnostic = Diagnostic::new(IfExprWithFalseTrue, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
             checker.generator().expr(
                 &ast::ExprUnaryOp {
                     op: UnaryOp::Not,
@@ -279,7 +279,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
             orelse: Box::new(node),
             range: TextRange::default(),
         };
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
             checker.generator().expr(&node3.into()),
             expr.range(),
         )));

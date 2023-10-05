@@ -159,7 +159,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                     );
                     if checker.patch(diagnostic.kind.rule()) {
                         if !seen_values.insert(comparable_value) {
-                            diagnostic.set_fix(Fix::suggested(Edit::deletion(
+                            diagnostic.set_fix(Fix::automatic_unsafe(Edit::deletion(
                                 parenthesized_range(
                                     (&dict.values[i - 1]).into(),
                                     dict.into(),
@@ -193,7 +193,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                     if checker.patch(diagnostic.kind.rule()) {
                         let comparable_value: ComparableExpr = (&dict.values[i]).into();
                         if !seen_values.insert(comparable_value) {
-                            diagnostic.set_fix(Fix::suggested(Edit::deletion(
+                            diagnostic.set_fix(Fix::automatic_unsafe(Edit::deletion(
                                 parenthesized_range(
                                     (&dict.values[i - 1]).into(),
                                     dict.into(),

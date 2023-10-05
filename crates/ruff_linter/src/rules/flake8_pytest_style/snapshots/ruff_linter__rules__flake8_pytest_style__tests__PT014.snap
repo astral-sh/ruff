@@ -10,7 +10,7 @@ PT014.py:4:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.para
   |
   = help: Remove duplicate test case
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | import pytest
 2 2 | 
 3 3 | 
@@ -29,7 +29,7 @@ PT014.py:14:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 | c = 3
 12 12 | 
 13 13 | 
@@ -48,7 +48,7 @@ PT014.py:14:41: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 | c = 3
 12 12 | 
 13 13 | 
@@ -67,7 +67,7 @@ PT014.py:14:44: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 | c = 3
 12 12 | 
 13 13 | 
@@ -97,7 +97,7 @@ PT014.py:32:39: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-ℹ Suggested fix
+ℹ Unsafe fix
 29 29 |     ...
 30 30 | 
 31 31 | 
@@ -116,7 +116,7 @@ PT014.py:32:48: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-ℹ Suggested fix
+ℹ Unsafe fix
 29 29 |     ...
 30 30 | 
 31 31 | 
@@ -137,7 +137,7 @@ PT014.py:42:10: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-ℹ Suggested fix
+ℹ Unsafe fix
 39 39 |     [
 40 40 |         a,
 41 41 |         b,
@@ -157,7 +157,7 @@ PT014.py:44:11: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-ℹ Suggested fix
+ℹ Unsafe fix
 41 41 |         b,
 42 42 |         (a),
 43 43 |         c,

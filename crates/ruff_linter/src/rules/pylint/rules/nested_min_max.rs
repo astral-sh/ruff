@@ -171,7 +171,7 @@ pub(crate) fn nested_min_max(
                     },
                     range: TextRange::default(),
                 });
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                     checker.generator().expr(&flattened_expr),
                     expr.range(),
                 )));

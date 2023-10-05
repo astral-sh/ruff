@@ -127,7 +127,7 @@ pub(crate) fn lambda_assignment(
             {
                 diagnostic.set_fix(Fix::manual(Edit::range_replacement(indented, stmt.range())));
             } else {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
                     indented,
                     stmt.range(),
                 )));

@@ -10,7 +10,7 @@ RUF100_0.py:9:12: RUF100 [*] Unused blanket `noqa` directive
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 6  6  |     b = 2  # noqa: F841
 7  7  | 
 8  8  |     # Invalid
@@ -30,7 +30,7 @@ RUF100_0.py:13:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 10 10 |     print(c)
 11 11 | 
 12 12 |     # Invalid
@@ -50,7 +50,7 @@ RUF100_0.py:16:12: RUF100 [*] Unused `noqa` directive (unused: `F841`, `E501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 13 13 |     d = 1  # noqa: E501
 14 14 | 
 15 15 |     # Invalid
@@ -70,7 +70,7 @@ RUF100_0.py:19:12: RUF100 [*] Unused `noqa` directive (unused: `F841`, `W191`; n
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 16 16 |     d = 1  # noqa: F841, E501
 17 17 | 
 18 18 |     # Invalid (and unimplemented or not enabled)
@@ -90,7 +90,7 @@ RUF100_0.py:22:12: RUF100 [*] Unused `noqa` directive (unused: `F841`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 19 19 |     d = 1  # noqa: F841, W191, F821
 20 20 | 
 21 21 |     # Invalid (but external)
@@ -111,7 +111,7 @@ RUF100_0.py:26:10: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 23 23 | 
 24 24 |     # fmt: off
 25 25 |     # Invalid - no space before #
@@ -130,7 +130,7 @@ RUF100_0.py:29:5: F841 [*] Local variable `d` is assigned to but never used
    |
    = help: Remove assignment to unused variable `d`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 26 26 |     d = 1# noqa: E501
 27 27 | 
 28 28 |     # Invalid - many spaces before #
@@ -148,7 +148,7 @@ RUF100_0.py:29:33: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 26 26 |     d = 1# noqa: E501
 27 27 | 
 28 28 |     # Invalid - many spaces before #
@@ -168,7 +168,7 @@ RUF100_0.py:55:6: RUF100 [*] Unused `noqa` directive (unused: `F841`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 52 52 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
 53 53 | 
 54 54 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
@@ -188,7 +188,7 @@ RUF100_0.py:63:6: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 60 60 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
 61 61 | 
 62 62 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
@@ -208,7 +208,7 @@ RUF100_0.py:71:6: RUF100 [*] Unused blanket `noqa` directive
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 68 68 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
 69 69 | 
 70 70 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
@@ -254,7 +254,7 @@ RUF100_0.py:90:92: RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Suggested fix
+ℹ Unsafe fix
 87 87 | 
 88 88 | print(sys.path)
 89 89 | 

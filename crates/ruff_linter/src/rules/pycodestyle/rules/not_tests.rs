@@ -95,7 +95,7 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
             if checker.enabled(Rule::NotInTest) {
                 let mut diagnostic = Diagnostic::new(NotInTest, unary_op.operand.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
                         pad(
                             generate_comparison(
                                 left,
@@ -118,7 +118,7 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
             if checker.enabled(Rule::NotIsTest) {
                 let mut diagnostic = Diagnostic::new(NotIsTest, unary_op.operand.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
                         pad(
                             generate_comparison(
                                 left,

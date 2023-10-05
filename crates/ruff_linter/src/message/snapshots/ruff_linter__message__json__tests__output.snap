@@ -11,7 +11,9 @@ expression: content
     },
     "filename": "fib.py",
     "fix": {
-      "applicability": "Suggested",
+      "applicability": {
+        "automatic": "unsafe"
+      },
       "edits": [
         {
           "content": "",
@@ -43,7 +45,9 @@ expression: content
     },
     "filename": "fib.py",
     "fix": {
-      "applicability": "Suggested",
+      "applicability": {
+        "automatic": "unsafe"
+      },
       "edits": [
         {
           "content": "",

@@ -177,7 +177,7 @@ fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_ki
 
             if checker.patch(diagnostic.kind.rule()) {
                 if checker.semantic().is_builtin("object") {
-                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
                         "object".to_string(),
                         annotation.range(),
                     )));
