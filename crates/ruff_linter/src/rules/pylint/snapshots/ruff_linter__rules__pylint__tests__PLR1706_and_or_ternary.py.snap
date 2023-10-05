@@ -1,0 +1,122 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+and_or_ternary.py:35:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b'`
+   |
+33 | # Ternary (Error)
+34 | 
+35 | 1<2 and 'a' or 'b'
+   | ^^^^^^^^^^^^^^^^^^ PLR1706
+36 | 
+37 | (lambda x: x+1) and 'a' or 'b'
+   |
+   = help: Use `'a' if 1 < 2 else 'b'`
+
+ℹ Fix
+32 32 | 
+33 33 | # Ternary (Error)
+34 34 | 
+35    |-1<2 and 'a' or 'b'
+   35 |+'a' if 1 < 2 else 'b'
+36 36 | 
+37 37 | (lambda x: x+1) and 'a' or 'b'
+38 38 | 
+
+and_or_ternary.py:37:1: PLR1706 [*] Consider using ternary `'a' if (lambda x: x + 1) else 'b'`
+   |
+35 | 1<2 and 'a' or 'b'
+36 | 
+37 | (lambda x: x+1) and 'a' or 'b'
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1706
+38 | 
+39 | 'a' and (lambda x: x+1) or 'orange'
+   |
+   = help: Use `'a' if (lambda x: x + 1) else 'b'`
+
+ℹ Fix
+34 34 | 
+35 35 | 1<2 and 'a' or 'b'
+36 36 | 
+37    |-(lambda x: x+1) and 'a' or 'b'
+   37 |+'a' if (lambda x: x + 1) else 'b'
+38 38 | 
+39 39 | 'a' and (lambda x: x+1) or 'orange'
+40 40 | 
+
+and_or_ternary.py:39:1: PLR1706 [*] Consider using ternary `(lambda x: x + 1) if 'a' else 'orange'`
+   |
+37 | (lambda x: x+1) and 'a' or 'b'
+38 | 
+39 | 'a' and (lambda x: x+1) or 'orange'
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1706
+40 | 
+41 | val = '#0000FF'
+   |
+   = help: Use `(lambda x: x + 1) if 'a' else 'orange'`
+
+ℹ Fix
+36 36 | 
+37 37 | (lambda x: x+1) and 'a' or 'b'
+38 38 | 
+39    |-'a' and (lambda x: x+1) or 'orange'
+   39 |+(lambda x: x + 1) if 'a' else 'orange'
+40 40 | 
+41 41 | val = '#0000FF'
+42 42 | (len(val) == 7 and val[0] == "#") or val in {'green'}
+
+and_or_ternary.py:42:1: PLR1706 [*] Consider using ternary `val[0] == '#' if len(val) == 7 else val in {'green'}`
+   |
+41 | val = '#0000FF'
+42 | (len(val) == 7 and val[0] == "#") or val in {'green'}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1706
+43 | 
+44 | marker = 'marker'
+   |
+   = help: Use `val[0] == '#' if len(val) == 7 else val in {'green'}`
+
+ℹ Fix
+39 39 | 'a' and (lambda x: x+1) or 'orange'
+40 40 | 
+41 41 | val = '#0000FF'
+42    |-(len(val) == 7 and val[0] == "#") or val in {'green'}
+   42 |+val[0] == '#' if len(val) == 7 else val in {'green'}
+43 43 | 
+44 44 | marker = 'marker'
+45 45 | isinstance(marker, dict) and 'field' in marker or marker in {}
+
+and_or_ternary.py:45:1: PLR1706 [*] Consider using ternary `'field' in marker if isinstance(marker, dict) else marker in {}`
+   |
+44 | marker = 'marker'
+45 | isinstance(marker, dict) and 'field' in marker or marker in {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1706
+46 | 
+47 | def has_oranges(oranges, apples=None) -> bool:
+   |
+   = help: Use `'field' in marker if isinstance(marker, dict) else marker in {}`
+
+ℹ Fix
+42 42 | (len(val) == 7 and val[0] == "#") or val in {'green'}
+43 43 | 
+44 44 | marker = 'marker'
+45    |-isinstance(marker, dict) and 'field' in marker or marker in {}
+   45 |+'field' in marker if isinstance(marker, dict) else marker in {}
+46 46 | 
+47 47 | def has_oranges(oranges, apples=None) -> bool:
+48 48 |     return apples and False or oranges
+
+and_or_ternary.py:48:12: PLR1706 [*] Consider using ternary `False if apples else oranges`
+   |
+47 | def has_oranges(oranges, apples=None) -> bool:
+48 |     return apples and False or oranges
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1706
+   |
+   = help: Use `False if apples else oranges`
+
+ℹ Fix
+45 45 | isinstance(marker, dict) and 'field' in marker or marker in {}
+46 46 | 
+47 47 | def has_oranges(oranges, apples=None) -> bool:
+48    |-    return apples and False or oranges
+   48 |+    return False if apples else oranges
+
+
