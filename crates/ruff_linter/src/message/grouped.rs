@@ -13,12 +13,13 @@ use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
+use crate::settings::types::UnsafeFixes;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
     show_fix_status: bool,
     show_source: bool,
-    show_unsafe_fixes: bool,
+    unsafe_fixes: UnsafeFixes,
 }
 
 impl GroupedEmitter {
@@ -69,7 +70,7 @@ impl Emitter for GroupedEmitter {
                         notebook_index: context.notebook_index(message.filename()),
                         message,
                         show_fix_status: self.show_fix_status,
-                        show_unsafe_fixes: self.show_unsafe_fixes,
+                        unsafe_fixes: self.unsafe_fixes,
                         show_source: self.show_source,
                         row_length,
                         column_length,
@@ -91,7 +92,7 @@ impl Emitter for GroupedEmitter {
 struct DisplayGroupedMessage<'a> {
     message: MessageWithLocation<'a>,
     show_fix_status: bool,
-    show_unsafe_fixes: bool,
+    unsafe_fixes: UnsafeFixes,
     show_source: bool,
     row_length: NonZeroUsize,
     column_length: NonZeroUsize,
@@ -142,7 +143,7 @@ impl Display for DisplayGroupedMessage<'_> {
             code_and_body = RuleCodeAndBody {
                 message,
                 show_fix_status: self.show_fix_status,
-                show_unsafe_fixes: self.show_unsafe_fixes
+                unsafe_fixes: self.unsafe_fixes
             },
         )?;
 

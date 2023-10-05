@@ -298,7 +298,7 @@ pub(crate) fn print_jupyter_messages(
         .with_show_fix_status(true)
         .with_show_fix_diff(true)
         .with_show_source(true)
-        .with_show_unsafe_fixes(true)
+        .with_unsafe_fixes(UnsafeFixes::Enabled)
         .emit(
             &mut output,
             messages,
@@ -319,7 +319,7 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
         .with_show_fix_status(true)
         .with_show_fix_diff(true)
         .with_show_source(true)
-        .with_show_unsafe_fixes(true)
+        .with_unsafe_fixes(UnsafeFixes::Enabled)
         .emit(
             &mut output,
             messages,

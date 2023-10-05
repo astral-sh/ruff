@@ -7,7 +7,6 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
-use ruff_diagnostics::Applicability;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
 
@@ -21,7 +20,7 @@ use ruff_linter::message::{
 use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
 use ruff_linter::settings::flags::{self};
-use ruff_linter::settings::types::SerializationFormat;
+use ruff_linter::settings::types::{SerializationFormat, UnsafeFixes};
 
 use crate::diagnostics::Diagnostics;
 
@@ -36,8 +35,6 @@ bitflags! {
         const SHOW_FIX_SUMMARY = 0b0000_0100;
         /// Whether to show a diff of each fixed violation when emitting diagnostics.
         const SHOW_FIX_DIFF = 0b0000_1000;
-        /// Whether to include unsafe fixes when emitting diagnostics.
-        const SHOW_UNSAFE_FIXES = 0b0001_0000;
     }
 }
 
@@ -76,6 +73,7 @@ pub(crate) struct Printer {
     format: SerializationFormat,
     log_level: LogLevel,
     fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
     flags: Flags,
 }
 
@@ -84,12 +82,14 @@ impl Printer {
         format: SerializationFormat,
         log_level: LogLevel,
         fix_mode: flags::FixMode,
+        unsafe_fixes: UnsafeFixes,
         flags: Flags,
     ) -> Self {
         Self {
             format,
             log_level,
             fix_mode,
+            unsafe_fixes,
             flags,
         }
     }
@@ -121,10 +121,7 @@ impl Printer {
                     writeln!(writer, "Found {remaining} error{s}.")?;
                 }
 
-                let fixables = FixableStatistics::new(
-                    diagnostics,
-                    self.flags.intersects(Flags::SHOW_UNSAFE_FIXES),
-                );
+                let fixables = FixableStatistics::new(diagnostics, self.unsafe_fixes);
                 if let Some(violation_message) = fixables.violation_string() {
                     writeln!(writer, "{violation_message}")?;
                 }
@@ -174,8 +171,7 @@ impl Printer {
         }
 
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
-        let fixables =
-            FixableStatistics::new(diagnostics, self.flags.intersects(Flags::SHOW_UNSAFE_FIXES));
+        let fixables = FixableStatistics::new(diagnostics, self.unsafe_fixes);
 
         match self.format {
             SerializationFormat::Json => {
@@ -192,7 +188,7 @@ impl Printer {
                     .with_show_fix_status(show_fix_status(self.fix_mode, &fixables))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
-                    .with_show_unsafe_fixes(self.flags.intersects(Flags::SHOW_UNSAFE_FIXES))
+                    .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
@@ -358,8 +354,7 @@ impl Printer {
             );
         }
 
-        let fixables =
-            FixableStatistics::new(diagnostics, self.flags.intersects(Flags::SHOW_UNSAFE_FIXES));
+        let fixables = FixableStatistics::new(diagnostics, self.unsafe_fixes);
 
         if !diagnostics.messages.is_empty() {
             if self.log_level >= LogLevel::Default {
@@ -370,7 +365,7 @@ impl Printer {
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.fix_mode, &fixables))
                 .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
-                .with_show_unsafe_fixes(self.flags.intersects(Flags::SHOW_UNSAFE_FIXES))
+                .with_unsafe_fixes(self.unsafe_fixes)
                 .emit(writer, &diagnostics.messages, &context)?;
         }
         writer.flush()?;
@@ -444,74 +439,71 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>
 }
 
 /// Contains the number of [`Applicability::Always`] and [`Applicability::Sometimes`] fixes
+#[derive(Debug)]
 struct FixableStatistics {
-    safe_count: u32,
-    unsafe_count: u32,
-    show_unsafe_fixes: bool,
+    applicable: u32,
+    unapplicable: u32,
+    unsafe_fixes: UnsafeFixes,
 }
 
 impl FixableStatistics {
-    fn new(diagnostics: &Diagnostics, show_unsafe_fixes: bool) -> Self {
-        let mut safe_count = 0;
-        let mut unsafe_count = 0;
+    fn new(diagnostics: &Diagnostics, unsafe_fixes: UnsafeFixes) -> Self {
+        let mut applicable = 0;
+        let mut unapplicable = 0;
 
         for message in &diagnostics.messages {
             if let Some(fix) = &message.fix {
-                if fix.applicability() == Applicability::Sometimes {
-                    unsafe_count += 1;
-                } else if fix.applicability() == Applicability::Always {
-                    safe_count += 1;
+                if fix.applies(unsafe_fixes.required_applicability()) {
+                    applicable += 1;
+                } else {
+                    unapplicable += 1;
                 }
             }
         }
 
         Self {
-            safe_count,
-            unsafe_count,
-            show_unsafe_fixes,
+            applicable,
+            unapplicable,
+            unsafe_fixes,
         }
     }
 
     fn any_fixes_applicable(&self) -> bool {
-        if self.show_unsafe_fixes {
-            self.safe_count > 0 || self.unsafe_count > 0
-        } else {
-            self.safe_count > 0
-        }
+        return self.applicable > 0;
     }
 
     /// Build the displayed fix status message depending on the types of the remaining fixes.
     fn violation_string(&self) -> Option<String> {
         let fix_prefix = format!("[{}]", "*".cyan());
 
-        if self.show_unsafe_fixes {
-            let fixable_count = self.safe_count + self.unsafe_count;
-            if fixable_count > 0 {
+        if self.unsafe_fixes.is_enabled() {
+            if self.applicable > 0 {
                 Some(format!(
-                    "{fix_prefix} {fixable_count} fixable with the --fix option.",
+                    "{fix_prefix} {} fixable with the --fix option.",
+                    self.applicable
                 ))
             } else {
                 None
             }
         } else {
-            if self.safe_count > 0 && self.unsafe_count > 0 {
-                let es = if self.unsafe_count == 1 { "" } else { "es" };
+            if self.applicable > 0 && self.unapplicable > 0 {
+                let es = if self.unapplicable == 1 { "" } else { "es" };
                 Some(
                     format!(
                         "{fix_prefix} {} fixable with the --fix option ({} hidden fix{es} can be enabled with the --unsafe-fixes option).",
-                        self.safe_count, self.unsafe_count
+                        self.applicable, self.unapplicable
                     )
                 )
-            } else if self.safe_count > 0 {
+            } else if self.applicable > 0 {
                 Some(format!(
                     "{fix_prefix} {} fixable with the --fix option.",
-                    self.safe_count,
+                    self.applicable,
                 ))
-            } else if self.unsafe_count > 0 {
-                let es = if self.unsafe_count == 1 { "" } else { "es" };
+            } else if self.unapplicable > 0 {
+                let es = if self.unapplicable == 1 { "" } else { "es" };
                 Some(format!(
                     "{} hidden fix{es} can be enabled with the --unsafe-fixes option.",
-                    self.unsafe_count
+                    self.unapplicable
                 ))
             } else {
                 None

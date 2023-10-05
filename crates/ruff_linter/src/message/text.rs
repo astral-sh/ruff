@@ -7,7 +7,6 @@ use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, Sou
 use bitflags::bitflags;
 use colored::Colorize;
 
-
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -28,14 +27,13 @@ bitflags! {
         const SHOW_FIX_DIFF      = 0b0000_0010;
         /// Whether to show the source code of a diagnostic.
         const SHOW_SOURCE        = 0b0000_0100;
-        /// Whether to show unsafe fixes.
-        const SHOW_UNSAFE_FIXES  = 0b0000_1000;
     }
 }
 
 #[derive(Default)]
 pub struct TextEmitter {
     flags: EmitterFlags,
+    unsafe_fixes: UnsafeFixes,
 }
 
 impl TextEmitter {
@@ -59,9 +57,8 @@ impl TextEmitter {
     }
 
     #[must_use]
-    pub fn with_show_unsafe_fixes(mut self, show_unsafe_fixes: bool) -> Self {
-        self.flags
-            .set(EmitterFlags::SHOW_UNSAFE_FIXES, show_unsafe_fixes);
+    pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
+        self.unsafe_fixes = unsafe_fixes;
         self
     }
 }
@@ -117,7 +114,7 @@ impl Emitter for TextEmitter {
                 code_and_body = RuleCodeAndBody {
                     message,
                     show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS),
-                    show_unsafe_fixes: self.flags.intersects(EmitterFlags::SHOW_UNSAFE_FIXES)
+                    unsafe_fixes: self.unsafe_fixes,
                 }
             )?;
 
@@ -146,7 +143,7 @@ impl Emitter for TextEmitter {
 pub(super) struct RuleCodeAndBody<'a> {
     pub(crate) message: &'a Message,
     pub(crate) show_fix_status: bool,
-    pub(crate) show_unsafe_fixes: bool,
+    pub(crate) unsafe_fixes: UnsafeFixes,
 }
 
 impl Display for RuleCodeAndBody<'_> {
@@ -154,14 +151,8 @@ impl Display for RuleCodeAndBody<'_> {
         let kind = &self.message.kind;
         if self.show_fix_status {
             if let Some(fix) = self.message.fix.as_ref() {
-                let unsafe_fixes = if self.show_unsafe_fixes {
-                    UnsafeFixes::Enabled
-                } else {
-                    UnsafeFixes::Disabled
-                };
-
                 // Do not display an indicator for unapplicable fixes
-                if fix.applies(unsafe_fixes.required_applicability()) {
+                if fix.applies(self.unsafe_fixes.required_applicability()) {
                     return write!(
                         f,
                         "{code} {fix}{body}",
@@ -364,6 +355,7 @@ mod tests {
 
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::TextEmitter;
+    use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
@@ -388,7 +380,7 @@ mod tests {
         let mut emitter = TextEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true)
-            .with_show_unsafe_fixes(true);
+            .with_unsafe_fixes(UnsafeFixes::Enabled);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

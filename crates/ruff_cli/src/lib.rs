@@ -11,7 +11,7 @@ use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
 use ruff_linter::settings::flags::FixMode;
-use ruff_linter::settings::types::{SerializationFormat};
+use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
@@ -263,9 +263,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     if show_source {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
-    if unsafe_fixes.is_enabled() {
-        printer_flags |= PrinterFlags::SHOW_UNSAFE_FIXES;
-    }
     if cli.ecosystem_ci {
         warn_user!(
             "The formatting of fixes emitted by this option is a work-in-progress, subject to \
@@ -297,7 +294,13 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(output_format, log_level, fix_mode, printer_flags);
+    let printer = Printer::new(
+        output_format,
+        log_level,
+        fix_mode,
+        unsafe_fixes,
+        printer_flags,
+    );
 
     if cli.watch {
         if output_format != SerializationFormat::Text {
