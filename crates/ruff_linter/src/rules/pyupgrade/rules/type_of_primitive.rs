@@ -76,7 +76,7 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     if checker.patch(diagnostic.kind.rule()) {
         let builtin = primitive.builtin();
         if checker.semantic().is_builtin(&builtin) {
-            diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
+            diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
                 pad(primitive.builtin(), expr.range(), checker.locator()),
                 expr.range(),
             )));

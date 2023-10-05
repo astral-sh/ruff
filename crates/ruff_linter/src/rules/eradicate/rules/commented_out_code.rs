@@ -68,7 +68,7 @@ pub(crate) fn commented_out_code(
             let mut diagnostic = Diagnostic::new(CommentedOutCode, *range);
 
             if settings.rules.should_fix(Rule::CommentedOutCode) {
-                diagnostic.set_fix(Fix::manual(Edit::range_deletion(
+                diagnostic.set_fix(Fix::never_safe(Edit::range_deletion(
                     locator.full_lines_range(*range),
                 )));
             }

@@ -134,7 +134,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 range: TextRange::default(),
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::automatic_unsafe(Edit::range_replacement(
+            Ok(Fix::sometimes_safe(Edit::range_replacement(
                 content,
                 expr.range(),
             )))
@@ -156,7 +156,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 ctx: ast::ExprContext::Load,
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::automatic_unsafe_edits(
+            Ok(Fix::sometimes_safe_edits(
                 Edit::range_replacement(content, expr.range()),
                 [import_edit],
             ))

@@ -12,7 +12,7 @@ PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
   |
   = help: Remove duplicate field definition for `name`
 
-ℹ Unsafe fix
+ℹ Suggested fix
 1 1 | class Foo(BaseModel):
 2 2 |     name = StringField()
 3 3 |     # ....
@@ -32,7 +32,7 @@ PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
    |
    = help: Remove duplicate field definition for `name`
 
-ℹ Unsafe fix
+ℹ Suggested fix
 10 10 | class Foo(BaseModel):
 11 11 |     name: str = StringField()
 12 12 |     # ....
@@ -50,7 +50,7 @@ PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
    |
    = help: Remove duplicate field definition for `bar`
 
-ℹ Unsafe fix
+ℹ Suggested fix
 20 20 |     bar: str = StringField()
 21 21 |     foo: bool = BooleanField()
 22 22 |     # ...
@@ -68,7 +68,7 @@ PIE794.py:40:5: PIE794 [*] Class field `bar` is defined multiple times
    |
    = help: Remove duplicate field definition for `bar`
 
-ℹ Unsafe fix
+ℹ Suggested fix
 37 37 |     bar: str = StringField()
 38 38 |     foo: bool = BooleanField()
 39 39 |     # ...

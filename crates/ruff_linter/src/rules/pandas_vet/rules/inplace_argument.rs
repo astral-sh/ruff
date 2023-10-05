@@ -135,7 +135,7 @@ fn convert_inplace_argument_to_assignment(
     )
     .ok()?;
 
-    Some(Fix::automatic_unsafe_edits(
+    Some(Fix::sometimes_safe_edits(
         insert_assignment,
         [remove_argument],
     ))

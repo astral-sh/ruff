@@ -1293,7 +1293,7 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
         _ => whitespace_after_arg,
     };
 
-    Ok(Fix::automatic_unsafe(Edit::range_replacement(
+    Ok(Fix::sometimes_safe(Edit::range_replacement(
         tree.codegen_stylist(stylist),
         expr.range(),
     )))

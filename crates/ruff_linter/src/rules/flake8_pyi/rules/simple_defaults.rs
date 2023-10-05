@@ -535,7 +535,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
                 let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
                         "...".to_string(),
                         default.range(),
                     )));
@@ -572,7 +572,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Param
                 let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
                         "...".to_string(),
                         default.range(),
                     )));
@@ -607,7 +607,7 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
             "...".to_string(),
             value.range(),
         )));
@@ -643,7 +643,7 @@ pub(crate) fn annotated_assignment_default_in_stub(
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
             "...".to_string(),
             value.range(),
         )));
@@ -748,7 +748,7 @@ pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr,
                 target.start(),
                 checker.semantic(),
             )?;
-            Ok(Fix::automatic_unsafe_edits(
+            Ok(Fix::sometimes_safe_edits(
                 Edit::range_replacement(format!("{id}: {binding}"), target.range()),
                 [import_edit],
             ))

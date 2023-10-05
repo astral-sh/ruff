@@ -69,7 +69,7 @@ pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docst
         // characters, avoid applying the fix.
         if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed)
         {
-            diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
+            diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
                 trimmed.to_string(),
                 TextRange::at(body.start(), line.text_len()),
             )));

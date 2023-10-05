@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for QuotedAnnotationInStub {
 pub(crate) fn quoted_annotation_in_stub(checker: &mut Checker, annotation: &str, range: TextRange) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotationInStub, range);
     if checker.patch(Rule::QuotedAnnotationInStub) {
-        diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
             annotation.to_string(),
             range,
         )));

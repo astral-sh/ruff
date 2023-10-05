@@ -101,7 +101,7 @@ pub(crate) fn invalid_literal_comparison(
                             None
                         }
                     } {
-                        diagnostic.set_fix(Fix::automatic_safe(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::always_safe(Edit::range_replacement(
                             content,
                             located_op.range + expr.start(),
                         )));

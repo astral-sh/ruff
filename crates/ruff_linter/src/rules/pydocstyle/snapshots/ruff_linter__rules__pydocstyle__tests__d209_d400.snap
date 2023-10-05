@@ -28,7 +28,7 @@ D209_D400.py:2:5: D400 [*] First line should end with a period
   |
   = help: Add period
 
-ℹ Unsafe fix
+ℹ Suggested fix
 1 1 | def lorem():
 2 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
 3   |-    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""

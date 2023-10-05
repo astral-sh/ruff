@@ -114,7 +114,7 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
             .unwrap_or(iter.range()),
         );
         let contents = format!("yield from {contents}");
-        diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
+        diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
             contents,
             stmt_for.range(),
         )));

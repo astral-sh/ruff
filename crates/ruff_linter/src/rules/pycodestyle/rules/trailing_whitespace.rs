@@ -93,7 +93,7 @@ pub(crate) fn trailing_whitespace(
                 if settings.rules.should_fix(Rule::BlankLineWithWhitespace) {
                     // Remove any preceding continuations, to avoid introducing a potential
                     // syntax error.
-                    diagnostic.set_fix(Fix::automatic_safe(Edit::range_deletion(TextRange::new(
+                    diagnostic.set_fix(Fix::always_safe(Edit::range_deletion(TextRange::new(
                         indexer
                             .preceded_by_continuations(line.start(), locator)
                             .unwrap_or(range.start()),
@@ -105,7 +105,7 @@ pub(crate) fn trailing_whitespace(
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
             let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
             if settings.rules.should_fix(Rule::TrailingWhitespace) {
-                diagnostic.set_fix(Fix::automatic_safe(Edit::range_deletion(range)));
+                diagnostic.set_fix(Fix::always_safe(Edit::range_deletion(range)));
             }
             return Some(diagnostic);
         }

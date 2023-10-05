@@ -22,7 +22,7 @@ ruff_noqa_invalid.py:5:5: F841 [*] Local variable `x` is assigned to but never u
   |
   = help: Remove assignment to unused variable `x`
 
-ℹ Unsafe fix
+ℹ Suggested fix
 2 2 | 
 3 3 | 
 4 4 | def f():

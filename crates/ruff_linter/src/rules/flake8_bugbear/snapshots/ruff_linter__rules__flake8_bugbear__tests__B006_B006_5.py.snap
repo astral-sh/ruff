@@ -9,7 +9,7 @@ B006_5.py:5:49: B006 [*] Do not use mutable data structures for argument default
   |
   = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 2 2 | # https://github.com/astral-sh/ruff/issues/7616
 3 3 | 
 4 4 | 
@@ -30,7 +30,7 @@ B006_5.py:9:61: B006 [*] Do not use mutable data structures for argument default
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 6  6  |     import os
 7  7  | 
 8  8  | 
@@ -53,7 +53,7 @@ B006_5.py:15:50: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 12 12 |     return 2
 13 13 | 
 14 14 | 
@@ -76,7 +76,7 @@ B006_5.py:21:54: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 18 18 |     import itertools
 19 19 | 
 20 20 | 
@@ -98,7 +98,7 @@ B006_5.py:25:55: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 22 22 |     from os import path
 23 23 | 
 24 24 | 
@@ -121,7 +121,7 @@ B006_5.py:30:66: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 27 27 |     from sys import version_info
 28 28 | 
 29 29 | 
@@ -144,7 +144,7 @@ B006_5.py:35:59: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 32 32 |     from sys import version_info
 33 33 | 
 34 34 | 
@@ -167,7 +167,7 @@ B006_5.py:40:49: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 37 37 |     import os
 38 38 | 
 39 39 | 
@@ -190,7 +190,7 @@ B006_5.py:45:49: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 42 42 |     import os; import sys
 43 43 | 
 44 44 | 
@@ -212,7 +212,7 @@ B006_5.py:50:49: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 47 47 |     import os; import sys; x = 1
 48 48 | 
 49 49 | 
@@ -234,7 +234,7 @@ B006_5.py:55:49: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 52 52 |     import os; import sys
 53 53 | 
 54 54 | 
@@ -255,7 +255,7 @@ B006_5.py:59:49: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 56 56 |     import os; import sys
 57 57 | 
 58 58 | 
@@ -275,7 +275,7 @@ B006_5.py:63:49: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Manual fix
+ℹ Possible fix
 60 60 |     import os; import sys; x = 1
 61 61 | 
 62 62 | 

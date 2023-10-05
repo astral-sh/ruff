@@ -178,7 +178,7 @@ def fibonacci(n):
             },
             TextRange::new(TextSize::from(7), TextSize::from(9)),
         )
-        .with_fix(Fix::automatic_unsafe(Edit::range_deletion(TextRange::new(
+        .with_fix(Fix::sometimes_safe(Edit::range_deletion(TextRange::new(
             TextSize::from(0),
             TextSize::from(10),
         ))));
@@ -193,7 +193,7 @@ def fibonacci(n):
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
         )
-        .with_fix(Fix::automatic_unsafe(Edit::deletion(
+        .with_fix(Fix::sometimes_safe(Edit::deletion(
             TextSize::from(94),
             TextSize::from(99),
         )));

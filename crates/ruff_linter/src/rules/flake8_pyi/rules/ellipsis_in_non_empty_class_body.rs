@@ -66,7 +66,7 @@ pub(crate) fn ellipsis_in_non_empty_class_body(checker: &mut Checker, body: &[St
             if checker.patch(diagnostic.kind.rule()) {
                 let edit =
                     fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
-                diagnostic.set_fix(Fix::automatic_safe(edit).isolate(Checker::isolation(
+                diagnostic.set_fix(Fix::always_safe(edit).isolate(Checker::isolation(
                     checker.semantic().current_statement_id(),
                 )));
             }

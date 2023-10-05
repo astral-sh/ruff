@@ -148,7 +148,7 @@ pub(crate) fn suppressible_exception(
                 );
                 let remove_handler =
                     Edit::range_deletion(checker.locator().full_lines_range(*range));
-                Ok(Fix::automatic_unsafe_edits(
+                Ok(Fix::sometimes_safe_edits(
                     import_edit,
                     [replace_try, remove_handler],
                 ))

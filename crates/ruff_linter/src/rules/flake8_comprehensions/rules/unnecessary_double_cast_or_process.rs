@@ -137,7 +137,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
                     checker.locator(),
                     checker.stylist(),
                 )
-                .map(Fix::automatic_unsafe)
+                .map(Fix::sometimes_safe)
             });
         }
         checker.diagnostics.push(diagnostic);

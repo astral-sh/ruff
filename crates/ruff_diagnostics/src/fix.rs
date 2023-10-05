@@ -10,26 +10,17 @@ use crate::edit::Edit;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Applicability {
-    /// The fix can be applied programmatically.
-    /// The fix is likely to be correct and the resulting code will have valid syntax.
-    Automatic(Safety),
+    /// The fix can always be applied.
+    /// The fix is definitely what the user intended, or it maintains the exact meaning of the code.
+    Always,
+
+    /// The fix can be applied with user opt-in.
+    /// The fix may be what the user intended, but it is uncertain; the resulting code will have valid syntax.
+    Sometimes,
 
     /// The fix should only be manually applied by the user.
     /// The fix is likely to be incorrect or the resulting code may have invalid syntax.
-    Manual,
-}
-
-/// Indicates the safety of applying a fix.
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[serde(rename_all = "lowercase")]
-pub enum Safety {
-    /// The fix is definitely what the user intended, or it maintains the exact meaning of the code.
-    /// This fix can be automatically applied.
-    Safe,
-    /// The fix may be what the user intended, but it is uncertain.
-    /// The fix can be applied with user opt-in.
-    Unsafe,
+    Never,
 }
 
 /// Indicates the level of isolation required to apply a fix.
@@ -56,62 +47,62 @@ pub struct Fix {
 }
 
 impl Fix {
-    /// Create a new [`Fix`] with [safe applicability](Applicability::Automatic(Safety::Safe)) from an [`Edit`] element.
-    pub fn automatic_safe(edit: Edit) -> Self {
+    /// Create a new [`Fix`] with [safe applicability](Applicability::Always) from an [`Edit`] element.
+    pub fn always_safe(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Automatic(Safety::Safe),
+            applicability: Applicability::Always,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with [safe applicability](Applicability::Automatic(Safety::Safe)) from multiple [`Edit`] elements.
-    pub fn automatic_safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] with [safe applicability](Applicability::Always) from multiple [`Edit`] elements.
+    pub fn always_safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Automatic(Safety::Safe),
+            applicability: Applicability::Always,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with [unsafe applicability](Applicable::Automatic(Safety::Unsafe)) from an [`Edit`] element.
-    pub fn automatic_unsafe(edit: Edit) -> Self {
+    /// Create a new [`Fix`] with [unsafe applicability](Applicable::Sometimes) from an [`Edit`] element.
+    pub fn sometimes_safe(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Automatic(Safety::Unsafe),
+            applicability: Applicability::Sometimes,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with [unsafe applicability](Applicability::Automatic(Safety::Unsafe)) from multiple [`Edit`] elements.
-    pub fn automatic_unsafe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] with [unsafe applicability](Applicability::Sometimes) from multiple [`Edit`] elements.
+    pub fn sometimes_safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Automatic(Safety::Unsafe),
+            applicability: Applicability::Sometimes,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with [manual applicability](Applicability::Manual) from an [`Edit`] element.
-    pub fn manual(edit: Edit) -> Self {
+    /// Create a new [`Fix`] with [manual applicability](Applicability::Never) from an [`Edit`] element.
+    pub fn never_safe(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Manual,
+            applicability: Applicability::Never,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with [manual applicability](Applicability::Manual) from multiple [`Edit`] elements.
-    pub fn manual_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] with [manual applicability](Applicability::Never) from multiple [`Edit`] elements.
+    pub fn never_safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Manual,
+            applicability: Applicability::Never,
             isolation_level: IsolationLevel::default(),
         }
     }

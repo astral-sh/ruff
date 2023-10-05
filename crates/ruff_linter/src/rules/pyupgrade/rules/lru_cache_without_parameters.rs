@@ -78,7 +78,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
                 TextRange::new(func.end(), decorator.end()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic_safe(Edit::range_deletion(arguments.range())));
+                diagnostic.set_fix(Fix::always_safe(Edit::range_deletion(arguments.range())));
             }
             checker.diagnostics.push(diagnostic);
         }

@@ -90,9 +90,9 @@ pub(crate) fn unnecessary_call_around_sorted(
                 checker.stylist(),
             )?;
             if outer.id == "reversed" {
-                Ok(Fix::automatic_unsafe(edit))
+                Ok(Fix::sometimes_safe(edit))
             } else {
-                Ok(Fix::automatic_safe(edit))
+                Ok(Fix::always_safe(edit))
             }
         });
     }

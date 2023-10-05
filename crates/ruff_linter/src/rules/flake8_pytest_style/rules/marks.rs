@@ -152,13 +152,13 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, call_pat
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                let fix = Fix::automatic_safe(Edit::deletion(func.end(), decorator.end()));
+                let fix = Fix::always_safe(Edit::deletion(func.end(), decorator.end()));
                 pytest_mark_parentheses(checker, decorator, call_path, fix, "", "()");
             }
         }
         _ => {
             if checker.settings.flake8_pytest_style.mark_parentheses {
-                let fix = Fix::automatic_safe(Edit::insertion("()".to_string(), decorator.end()));
+                let fix = Fix::always_safe(Edit::insertion("()".to_string(), decorator.end()));
                 pytest_mark_parentheses(checker, decorator, call_path, fix, "()", "");
             }
         }
@@ -185,9 +185,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, call_
     if !has_parameters {
         let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_deletion(
-                decorator.range(),
-            )));
+            diagnostic.set_fix(Fix::sometimes_safe(Edit::range_deletion(decorator.range())));
         }
         checker.diagnostics.push(diagnostic);
     }

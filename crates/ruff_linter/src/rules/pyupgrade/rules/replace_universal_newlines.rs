@@ -74,10 +74,10 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::Expr
                         Parentheses::Preserve,
                         checker.locator().contents(),
                     )
-                    .map(Fix::automatic_unsafe)
+                    .map(Fix::sometimes_safe)
                 });
             } else {
-                diagnostic.set_fix(Fix::automatic_unsafe(Edit::range_replacement(
+                diagnostic.set_fix(Fix::sometimes_safe(Edit::range_replacement(
                     "text".to_string(),
                     arg.range(),
                 )));

@@ -100,7 +100,7 @@ pub(crate) fn unnecessary_literal_within_list_call(
                 checker.locator(),
                 checker.stylist(),
             )
-            .map(Fix::automatic_unsafe)
+            .map(Fix::sometimes_safe)
         });
     }
     checker.diagnostics.push(diagnostic);
