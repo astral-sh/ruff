@@ -202,3 +202,8 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 "{}".format(
     1  # comment
 )
+
+
+# The fixed string will exceed the line length, but it's still smaller than the
+# existing line length, so it's fine.
+"<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)

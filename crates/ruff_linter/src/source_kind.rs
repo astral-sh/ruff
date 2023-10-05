@@ -2,12 +2,15 @@ use std::io;
 use std::io::Write;
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
+use similar::TextDiff;
 use thiserror::Error;
 
 use ruff_diagnostics::SourceMap;
-use ruff_notebook::{Notebook, NotebookError};
+use ruff_notebook::{Cell, Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
+
+use crate::fs;
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum SourceKind {
@@ -81,6 +84,77 @@ impl SourceKind {
                 notebook.write(writer)?;
                 Ok(())
             }
+        }
+    }
+
+    /// Write a diff of the transformed source file to `stdout`.
+    pub fn diff(&self, other: &Self, path: Option<&Path>, writer: &mut dyn Write) -> Result<()> {
+        match (self, other) {
+            (SourceKind::Python(src), SourceKind::Python(dst)) => {
+                let text_diff = TextDiff::from_lines(dst, src);
+                let mut unified_diff = text_diff.unified_diff();
+
+                if let Some(path) = path {
+                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                }
+
+                unified_diff.to_writer(&mut *writer)?;
+
+                writer.write_all(b"\n")?;
+                writer.flush()?;
+
+                Ok(())
+            }
+            (SourceKind::IpyNotebook(src), SourceKind::IpyNotebook(dst)) => {
+                // Cell indices are 1-based.
+                for ((idx, src_cell), dst_cell) in
+                    (1u32..).zip(src.cells().iter()).zip(dst.cells().iter())
+                {
+                    let (Cell::Code(src_cell), Cell::Code(dst_cell)) = (src_cell, dst_cell) else {
+                        continue;
+                    };
+
+                    let src_source_code = src_cell.source.to_string();
+                    let dst_source_code = dst_cell.source.to_string();
+
+                    let text_diff = TextDiff::from_lines(&src_source_code, &dst_source_code);
+                    let mut unified_diff = text_diff.unified_diff();
+
+                    // Jupyter notebook cells don't necessarily have a newline
+                    // at the end. For example,
+                    //
+                    // ```python
+                    // print("hello")
+                    // ```
+                    //
+                    // For a cell containing the above code, there'll only be one line,
+                    // and it won't have a newline at the end. If it did, there'd be
+                    // two lines, and the second line would be empty:
+                    //
+                    // ```python
+                    // print("hello")
+                    //
+                    // ```
+                    unified_diff.missing_newline_hint(false);
+
+                    if let Some(path) = path {
+                        unified_diff.header(
+                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
+                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
+                        );
+                    } else {
+                        unified_diff.header(&format!("cell {idx}"), &format!("cell {idx}"));
+                    };
+
+                    unified_diff.to_writer(&mut *writer)?;
+                }
+
+                writer.write_all(b"\n")?;
+                writer.flush()?;
+
+                Ok(())
+            }
+            _ => bail!("cannot diff Python source code with Jupyter notebook source code"),
         }
     }
 }
