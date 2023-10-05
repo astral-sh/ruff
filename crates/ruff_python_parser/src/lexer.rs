@@ -767,17 +767,13 @@ impl<'source> Lexer<'source> {
     // This is the main entry point. Call this function to retrieve the next token.
     // This function is used by the iterator implementation.
     pub fn next_token(&mut self) -> LexResult {
-        if let Some(fstring) = self.fstrings.current_mut() {
-            if self.state.is_after_non_logical_newline() && fstring.is_in_format_spec(self.nesting)
-            {
-                fstring.try_end_format_spec(self.nesting);
-            } else if !fstring.is_in_expression(self.nesting) {
+        if let Some(fstring) = self.fstrings.current() {
+            if !fstring.is_in_expression(self.nesting) {
                 match self.lex_fstring_middle_or_end() {
                     Ok(Some(tok)) => {
                         if tok == Tok::FStringEnd {
                             self.fstrings.pop();
                         }
-                        self.state = State::Other;
                         return Ok((tok, self.token_range()));
                     }
                     Err(e) => {
@@ -1206,7 +1202,9 @@ impl<'source> Lexer<'source> {
                         self.state = State::AfterNewline;
                         Tok::Newline
                     } else {
-                        self.state = State::AfterNonLogicalNewline;
+                        if let Some(fstring) = self.fstrings.current_mut() {
+                            fstring.try_end_format_spec(self.nesting);
+                        }
                         Tok::NonLogicalNewline
                     },
                     self.token_range(),
@@ -1220,7 +1218,9 @@ impl<'source> Lexer<'source> {
                         self.state = State::AfterNewline;
                         Tok::Newline
                     } else {
-                        self.state = State::AfterNonLogicalNewline;
+                        if let Some(fstring) = self.fstrings.current_mut() {
+                            fstring.try_end_format_spec(self.nesting);
+                        }
                         Tok::NonLogicalNewline
                     },
                     self.token_range(),
@@ -1400,9 +1400,6 @@ enum State {
     /// The lexer is at the start of a new logical line but **after** the indentation
     NonEmptyLogicalLine,
 
-    /// Lexer is right after a `NonLogicalNewline` token.
-    AfterNonLogicalNewline,
-
     /// Lexer is right after an equal token
     AfterEqual,
 
@@ -1417,10 +1414,6 @@ impl State {
 
     const fn is_new_logical_line(self) -> bool {
         matches!(self, State::AfterNewline | State::NonEmptyLogicalLine)
-    }
-
-    const fn is_after_non_logical_newline(self) -> bool {
-        matches!(self, State::AfterNonLogicalNewline)
     }
 
     const fn is_after_equal(self) -> bool {
