@@ -1290,6 +1290,11 @@ match foo:
 
 f"\{foo}\{bar:\}"
 f"\\{{foo\\}}"
+f"""{
+    foo:x
+        y
+        z
+}"""
 "#
             .trim(),
             "<test>",

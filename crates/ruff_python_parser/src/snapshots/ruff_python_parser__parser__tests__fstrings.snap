@@ -845,4 +845,53 @@ expression: parse_ast
             ),
         },
     ),
+    Expr(
+        StmtExpr {
+            range: 304..344,
+            value: FString(
+                ExprFString {
+                    range: 304..344,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 308..341,
+                                value: Name(
+                                    ExprName {
+                                        range: 314..317,
+                                        id: "foo",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: Some(
+                                    FString(
+                                        ExprFString {
+                                            range: 318..340,
+                                            values: [
+                                                Constant(
+                                                    ExprConstant {
+                                                        range: 318..340,
+                                                        value: Str(
+                                                            StringConstant {
+                                                                value: "x\n        y\n        z\n",
+                                                                unicode: false,
+                                                                implicit_concatenated: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
 ]
