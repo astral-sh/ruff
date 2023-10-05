@@ -52,7 +52,7 @@ fn stdin_error() {
     ----- stdout -----
     -:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -69,7 +69,7 @@ fn stdin_filename() {
     ----- stdout -----
     F401.py:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -87,7 +87,7 @@ fn stdin_source_type_py() {
     ----- stdout -----
     TCH.py:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -861,7 +861,7 @@ fn check_input_from_argfile() -> Result<()> {
         ----- stdout -----
         /path/to/a.py:1:8: F401 [*] `os` imported but unused
         Found 1 error.
-        [*] 1 fixable with the --fix option.
+        [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
         "###);
@@ -891,7 +891,7 @@ fn displays_fix_applicability_levels() {
     -:1:14: F601 Dictionary key literal `'a'` repeated
     -:2:7: UP034 [*] Avoid extraneous parentheses
     Found 2 errors.
-    [*] 1 fixable with the --fix option (1 hidden fix can be enabled with the --unsafe-fixes option).
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
@@ -908,7 +908,7 @@ fn displays_remaining_unsafe_fixes() {
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
     Found 1 error.
-    1 hidden fix can be enabled with the --unsafe-fixes option.
+    1 hidden fix can be enabled with the `--unsafe-fixes` option.
 
     ----- stderr -----
     "###);

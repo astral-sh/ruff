@@ -492,14 +492,14 @@ impl Display for FixableSummary {
                 let es = if self.unapplicable == 1 { "" } else { "es" };
                 write!(
                     f,
-                    "{fix_prefix} {} fixable with the --fix option ({} hidden fix{es} can be enabled with the --unsafe-fixes option).",
+                    "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
                     self.applicable, self.unapplicable
                 )
             } else if self.applicable > 0 {
                 // Only applicable fixes
                 write!(
                     f,
-                    "{fix_prefix} {} fixable with the --fix option.",
+                    "{fix_prefix} {} fixable with the `--fix` option.",
                     self.applicable,
                 )
             } else {
@@ -507,7 +507,7 @@ impl Display for FixableSummary {
                 let es = if self.unapplicable == 1 { "" } else { "es" };
                 write!(
                     f,
-                    "{} hidden fix{es} can be enabled with the --unsafe-fixes option.",
+                    "{} hidden fix{es} can be enabled with the `--unsafe-fixes` option.",
                     self.unapplicable
                 )
             }
