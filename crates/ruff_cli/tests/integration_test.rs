@@ -425,8 +425,8 @@ fn stdin_override_parser_ipynb() {
     success: false
     exit_code: 1
     ----- stdout -----
-    Jupyter.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
-    Jupyter.ipynb:cell 3:1:8: F401 [*] `sys` imported but unused
+    Jupyter.py:cell 1:1:8: F401 [*] `os` imported but unused
+    Jupyter.py:cell 3:1:8: F401 [*] `sys` imported but unused
     Found 2 errors.
     [*] 2 potentially fixable with the --fix option.
     
