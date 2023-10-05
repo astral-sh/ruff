@@ -32,3 +32,16 @@ sorted(sorted(x, key=lambda y: y))
 sorted(sorted(x, key=lambda y: y), key=lambda x: x)
 sorted(sorted(x), reverse=True)
 sorted(sorted(x, reverse=False), reverse=True)
+
+# Preserve trailing comments.
+xxxxxxxxxxx_xxxxx_xxxxx = sorted(
+    list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),
+    # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx, xxx xxxxxx3 xxxxxxxxx xx
+    # xx xxxx xxxxxxx xxxx xxx xxxxxxxx Nxxx
+    key=lambda xxxxx: xxxxx or "",
+)
+
+xxxxxxxxxxx_xxxxx_xxxxx = sorted(
+    list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx
+    key=lambda xxxxx: xxxxx or "",
+)

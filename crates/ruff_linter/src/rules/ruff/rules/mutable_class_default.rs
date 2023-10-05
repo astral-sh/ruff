@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
-    is_class_var_annotation, is_dataclass, is_final_annotation, is_pydantic_model,
+    has_default_copy_semantics, is_class_var_annotation, is_dataclass, is_final_annotation,
     is_special_attribute,
 };
 
@@ -64,8 +64,8 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                     && !is_immutable_annotation(annotation, checker.semantic(), &[])
                     && !is_dataclass(class_def, checker.semantic())
                 {
-                    // Avoid Pydantic models, which end up copying defaults on instance creation.
-                    if is_pydantic_model(class_def, checker.semantic()) {
+                    // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
+                    if has_default_copy_semantics(class_def, checker.semantic()) {
                         return;
                     }
 
@@ -78,8 +78,8 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                 if !targets.iter().all(is_special_attribute)
                     && is_mutable_expr(value, checker.semantic())
                 {
-                    // Avoid Pydantic models, which end up copying defaults on instance creation.
-                    if is_pydantic_model(class_def, checker.semantic()) {
+                    // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
+                    if has_default_copy_semantics(class_def, checker.semantic()) {
                         return;
                     }
 

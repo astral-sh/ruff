@@ -181,7 +181,7 @@ C414.py:10:1: C414 [*] Unnecessary `sorted` call within `set()`
 8  8  | set(tuple(x))
 9  9  | set(sorted(x))
 10    |-set(sorted(x, key=lambda y: y))
-   10 |+set(x, )
+   10 |+set(x)
 11 11 | set(reversed(x))
 12 12 | sorted(list(x))
 13 13 | sorted(tuple(x))
@@ -378,11 +378,10 @@ C414.py:19:1: C414 [*] Unnecessary `list` call within `tuple()`
 21    |-        [x, 3, "hell"\
    20 |+    [x, 3, "hell"\
 22 21 |         "o"]
-23 22 |     )
-24    |-)
+23    |-    )
+24 22 | )
 25 23 | set(set())
 26 24 | set(list())
-27 25 | set(tuple())
 
 C414.py:25:1: C414 [*] Unnecessary `set` call within `set()`
    |
@@ -466,5 +465,53 @@ C414.py:28:1: C414 [*] Unnecessary `reversed` call within `sorted()`
 29 29 | 
 30 30 | # Nested sorts with differing keyword arguments. Not flagged.
 31 31 | sorted(sorted(x, key=lambda y: y))
+
+C414.py:37:27: C414 [*] Unnecessary `list` call within `sorted()`
+   |
+36 |   # Preserve trailing comments.
+37 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
+   |  ___________________________^
+38 | |     list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),
+39 | |     # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx, xxx xxxxxx3 xxxxxxxxx xx
+40 | |     # xx xxxx xxxxxxx xxxx xxx xxxxxxxx Nxxx
+41 | |     key=lambda xxxxx: xxxxx or "",
+42 | | )
+   | |_^ C414
+43 |   
+44 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
+   |
+   = help: Remove the inner `list` call
+
+ℹ Suggested fix
+35 35 | 
+36 36 | # Preserve trailing comments.
+37 37 | xxxxxxxxxxx_xxxxx_xxxxx = sorted(
+38    |-    list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),
+   38 |+    x_xxxx_xxxxxxxxxxx_xxxxx.xxxx(),
+39 39 |     # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx, xxx xxxxxx3 xxxxxxxxx xx
+40 40 |     # xx xxxx xxxxxxx xxxx xxx xxxxxxxx Nxxx
+41 41 |     key=lambda xxxxx: xxxxx or "",
+
+C414.py:44:27: C414 [*] Unnecessary `list` call within `sorted()`
+   |
+42 |   )
+43 |   
+44 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
+   |  ___________________________^
+45 | |     list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx
+46 | |     key=lambda xxxxx: xxxxx or "",
+47 | | )
+   | |_^ C414
+   |
+   = help: Remove the inner `list` call
+
+ℹ Suggested fix
+42 42 | )
+43 43 | 
+44 44 | xxxxxxxxxxx_xxxxx_xxxxx = sorted(
+45    |-    list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx
+   45 |+    x_xxxx_xxxxxxxxxxx_xxxxx.xxxx(),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx
+46 46 |     key=lambda xxxxx: xxxxx or "",
+47 47 | )
 
 

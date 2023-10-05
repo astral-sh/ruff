@@ -7,6 +7,7 @@ use libcst_native::{
     RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
+use std::iter;
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::Expr;
@@ -823,14 +824,20 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
     outer_call.args = match outer_call.args.split_first() {
         Some((first, rest)) => {
             let inner_call = match_call(&first.value)?;
-            inner_call
+            if let Some(arg) = inner_call
                 .args
                 .iter()
-                .filter(|argument| argument.keyword.is_none())
-                .take(1)
-                .chain(rest.iter())
-                .cloned()
-                .collect::<Vec<_>>()
+                .find(|argument| argument.keyword.is_none())
+            {
+                let mut arg = arg.clone();
+                arg.comma = first.comma.clone();
+                arg.whitespace_after_arg = first.whitespace_after_arg.clone();
+                iter::once(arg)
+                    .chain(rest.iter().cloned())
+                    .collect::<Vec<_>>()
+            } else {
+                rest.to_vec()
+            }
         }
         None => bail!("Expected at least one argument in outer function call"),
     };

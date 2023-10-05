@@ -485,6 +485,14 @@ impl BuiltinTypeChecker for SetChecker {
     const EXPR_TYPE: PythonType = PythonType::Set;
 }
 
+struct TupleChecker;
+
+impl BuiltinTypeChecker for TupleChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "tuple";
+    const TYPING_NAME: &'static str = "Tuple";
+    const EXPR_TYPE: PythonType = PythonType::Tuple;
+}
+
 /// Test whether the given binding (and the given name) can be considered a list.
 /// For this, we check what value might be associated with it through it's initialization and
 /// what annotation it has (we consider `list` and `typing.List`).
@@ -504,6 +512,14 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// what annotation it has (we consider `set` and `typing.Set`).
 pub fn is_set(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<SetChecker>(binding, semantic)
+}
+
+/// Test whether the given binding (and the given name) can be considered a
+/// tuple. For this, we check what value might be associated with it through
+/// it's initialization and what annotation it has (we consider `tuple` and
+/// `typing.Tuple`).
+pub fn is_tuple(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<TupleChecker>(binding, semantic)
 }
 
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].

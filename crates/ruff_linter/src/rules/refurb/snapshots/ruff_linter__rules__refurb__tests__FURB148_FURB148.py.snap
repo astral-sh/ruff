@@ -1,323 +1,443 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB148.py:4:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
-  |
-3 | # Errors
-4 | for index, _ in enumerate(books):
-  |                 ^^^^^^^^^ FURB148
-5 |     print(index)
-  |
-  = help: Replace with `range(len(...))`
-
-ℹ Suggested fix
-1 1 | books = ["Dune", "Foundation", "Neuromancer"]
-2 2 | 
-3 3 | # Errors
-4   |-for index, _ in enumerate(books):
-  4 |+for index in range(len(books)):
-5 5 |     print(index)
-6 6 | 
-7 7 | for index, _ in enumerate(books, start=0):
-
-FURB148.py:7:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
-  |
-5 |     print(index)
-6 | 
-7 | for index, _ in enumerate(books, start=0):
-  |                 ^^^^^^^^^ FURB148
-8 |     print(index)
-  |
-  = help: Replace with `range(len(...))`
-
-ℹ Suggested fix
-4 4 | for index, _ in enumerate(books):
-5 5 |     print(index)
-6 6 | 
-7   |-for index, _ in enumerate(books, start=0):
-  7 |+for index in range(len(books)):
-8 8 |     print(index)
-9 9 | 
-10 10 | for index, _ in enumerate(books, 0):
-
-FURB148.py:10:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:14:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
- 8 |     print(index)
- 9 | 
-10 | for index, _ in enumerate(books, 0):
+13 | # Errors
+14 | for index, _ in enumerate(books):
    |                 ^^^^^^^^^ FURB148
-11 |     print(index)
+15 |     print(index)
    |
    = help: Replace with `range(len(...))`
 
 ℹ Suggested fix
-7  7  | for index, _ in enumerate(books, start=0):
-8  8  |     print(index)
-9  9  | 
-10    |-for index, _ in enumerate(books, 0):
-   10 |+for index in range(len(books)):
-11 11 |     print(index)
+11 11 | books_tuple = ("Dune", "Foundation", "Neuromancer")
 12 12 | 
-13 13 | for index, _ in enumerate(books, start=1):
+13 13 | # Errors
+14    |-for index, _ in enumerate(books):
+   14 |+for index in range(len(books)):
+15 15 |     print(index)
+16 16 | 
+17 17 | for index, _ in enumerate(books, start=0):
 
-FURB148.py:13:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:17:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
-11 |     print(index)
-12 | 
-13 | for index, _ in enumerate(books, start=1):
+15 |     print(index)
+16 | 
+17 | for index, _ in enumerate(books, start=0):
    |                 ^^^^^^^^^ FURB148
-14 |     print(index)
+18 |     print(index)
    |
    = help: Replace with `range(len(...))`
 
-FURB148.py:16:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
+ℹ Suggested fix
+14 14 | for index, _ in enumerate(books):
+15 15 |     print(index)
+16 16 | 
+17    |-for index, _ in enumerate(books, start=0):
+   17 |+for index in range(len(books)):
+18 18 |     print(index)
+19 19 | 
+20 20 | for index, _ in enumerate(books, 0):
+
+FURB148.py:20:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
-14 |     print(index)
-15 | 
-16 | for index, _ in enumerate(books, 1):
+18 |     print(index)
+19 | 
+20 | for index, _ in enumerate(books, 0):
    |                 ^^^^^^^^^ FURB148
-17 |     print(index)
+21 |     print(index)
    |
    = help: Replace with `range(len(...))`
 
-FURB148.py:19:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
+ℹ Suggested fix
+17 17 | for index, _ in enumerate(books, start=0):
+18 18 |     print(index)
+19 19 | 
+20    |-for index, _ in enumerate(books, 0):
+   20 |+for index in range(len(books)):
+21 21 |     print(index)
+22 22 | 
+23 23 | for index, _ in enumerate(books, start=1):
+
+FURB148.py:23:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
    |
-17 |     print(index)
-18 | 
-19 | for index, _ in enumerate(books, start=x):
+21 |     print(index)
+22 | 
+23 | for index, _ in enumerate(books, start=1):
    |                 ^^^^^^^^^ FURB148
-20 |     print(book)
+24 |     print(index)
    |
    = help: Replace with `range(len(...))`
 
-FURB148.py:22:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:26:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
    |
-20 |     print(book)
-21 | 
-22 | for index, _ in enumerate(books, x):
+24 |     print(index)
+25 | 
+26 | for index, _ in enumerate(books, 1):
    |                 ^^^^^^^^^ FURB148
-23 |     print(book)
+27 |     print(index)
    |
    = help: Replace with `range(len(...))`
 
-FURB148.py:25:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:29:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
    |
-23 |     print(book)
-24 | 
-25 | for _, book in enumerate(books):
+27 |     print(index)
+28 | 
+29 | for index, _ in enumerate(books, start=x):
+   |                 ^^^^^^^^^ FURB148
+30 |     print(book)
+   |
+   = help: Replace with `range(len(...))`
+
+FURB148.py:32:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
+   |
+30 |     print(book)
+31 | 
+32 | for index, _ in enumerate(books, x):
+   |                 ^^^^^^^^^ FURB148
+33 |     print(book)
+   |
+   = help: Replace with `range(len(...))`
+
+FURB148.py:35:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+   |
+33 |     print(book)
+34 | 
+35 | for _, book in enumerate(books):
    |                ^^^^^^^^^ FURB148
-26 |     print(book)
+36 |     print(book)
    |
    = help: Remove `enumerate`
 
 ℹ Suggested fix
-22 22 | for index, _ in enumerate(books, x):
-23 23 |     print(book)
-24 24 | 
-25    |-for _, book in enumerate(books):
-   25 |+for book in books:
-26 26 |     print(book)
-27 27 | 
-28 28 | for _, book in enumerate(books, start=0):
+32 32 | for index, _ in enumerate(books, x):
+33 33 |     print(book)
+34 34 | 
+35    |-for _, book in enumerate(books):
+   35 |+for book in books:
+36 36 |     print(book)
+37 37 | 
+38 38 | for _, book in enumerate(books, start=0):
 
-FURB148.py:28:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:38:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
    |
-26 |     print(book)
-27 | 
-28 | for _, book in enumerate(books, start=0):
+36 |     print(book)
+37 | 
+38 | for _, book in enumerate(books, start=0):
    |                ^^^^^^^^^ FURB148
-29 |     print(book)
+39 |     print(book)
    |
    = help: Remove `enumerate`
 
 ℹ Suggested fix
-25 25 | for _, book in enumerate(books):
-26 26 |     print(book)
-27 27 | 
-28    |-for _, book in enumerate(books, start=0):
-   28 |+for book in books:
-29 29 |     print(book)
-30 30 | 
-31 31 | for _, book in enumerate(books, 0):
+35 35 | for _, book in enumerate(books):
+36 36 |     print(book)
+37 37 | 
+38    |-for _, book in enumerate(books, start=0):
+   38 |+for book in books:
+39 39 |     print(book)
+40 40 | 
+41 41 | for _, book in enumerate(books, 0):
 
-FURB148.py:31:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:41:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
    |
-29 |     print(book)
-30 | 
-31 | for _, book in enumerate(books, 0):
+39 |     print(book)
+40 | 
+41 | for _, book in enumerate(books, 0):
    |                ^^^^^^^^^ FURB148
-32 |     print(book)
+42 |     print(book)
    |
    = help: Remove `enumerate`
 
 ℹ Suggested fix
-28 28 | for _, book in enumerate(books, start=0):
-29 29 |     print(book)
-30 30 | 
-31    |-for _, book in enumerate(books, 0):
-   31 |+for book in books:
-32 32 |     print(book)
-33 33 | 
-34 34 | for _, book in enumerate(books, start=1):
+38 38 | for _, book in enumerate(books, start=0):
+39 39 |     print(book)
+40 40 | 
+41    |-for _, book in enumerate(books, 0):
+   41 |+for book in books:
+42 42 |     print(book)
+43 43 | 
+44 44 | for _, book in enumerate(books, start=1):
 
-FURB148.py:34:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:44:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
    |
-32 |     print(book)
-33 | 
-34 | for _, book in enumerate(books, start=1):
+42 |     print(book)
+43 | 
+44 | for _, book in enumerate(books, start=1):
    |                ^^^^^^^^^ FURB148
-35 |     print(book)
+45 |     print(book)
    |
    = help: Remove `enumerate`
 
 ℹ Suggested fix
-31 31 | for _, book in enumerate(books, 0):
-32 32 |     print(book)
-33 33 | 
-34    |-for _, book in enumerate(books, start=1):
-   34 |+for book in books:
-35 35 |     print(book)
-36 36 | 
-37 37 | for _, book in enumerate(books, 1):
+41 41 | for _, book in enumerate(books, 0):
+42 42 |     print(book)
+43 43 | 
+44    |-for _, book in enumerate(books, start=1):
+   44 |+for book in books:
+45 45 |     print(book)
+46 46 | 
+47 47 | for _, book in enumerate(books, 1):
 
-FURB148.py:37:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:47:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
    |
-35 |     print(book)
-36 | 
-37 | for _, book in enumerate(books, 1):
+45 |     print(book)
+46 | 
+47 | for _, book in enumerate(books, 1):
    |                ^^^^^^^^^ FURB148
-38 |     print(book)
+48 |     print(book)
    |
    = help: Remove `enumerate`
 
 ℹ Suggested fix
-34 34 | for _, book in enumerate(books, start=1):
-35 35 |     print(book)
-36 36 | 
-37    |-for _, book in enumerate(books, 1):
-   37 |+for book in books:
-38 38 |     print(book)
-39 39 | 
-40 40 | for _, book in enumerate(books, start=x):
+44 44 | for _, book in enumerate(books, start=1):
+45 45 |     print(book)
+46 46 | 
+47    |-for _, book in enumerate(books, 1):
+   47 |+for book in books:
+48 48 |     print(book)
+49 49 | 
+50 50 | for _, book in enumerate(books, start=x):
 
-FURB148.py:40:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:50:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
    |
-38 |     print(book)
-39 | 
-40 | for _, book in enumerate(books, start=x):
+48 |     print(book)
+49 | 
+50 | for _, book in enumerate(books, start=x):
    |                ^^^^^^^^^ FURB148
-41 |     print(book)
+51 |     print(book)
    |
    = help: Remove `enumerate`
 
 ℹ Suggested fix
-37 37 | for _, book in enumerate(books, 1):
-38 38 |     print(book)
-39 39 | 
-40    |-for _, book in enumerate(books, start=x):
-   40 |+for book in books:
-41 41 |     print(book)
-42 42 | 
-43 43 | for _, book in enumerate(books, x):
+47 47 | for _, book in enumerate(books, 1):
+48 48 |     print(book)
+49 49 | 
+50    |-for _, book in enumerate(books, start=x):
+   50 |+for book in books:
+51 51 |     print(book)
+52 52 | 
+53 53 | for _, book in enumerate(books, x):
 
-FURB148.py:43:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:53:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
    |
-41 |     print(book)
-42 | 
-43 | for _, book in enumerate(books, x):
+51 |     print(book)
+52 | 
+53 | for _, book in enumerate(books, x):
    |                ^^^^^^^^^ FURB148
-44 |     print(book)
+54 |     print(book)
    |
    = help: Remove `enumerate`
 
 ℹ Suggested fix
-40 40 | for _, book in enumerate(books, start=x):
-41 41 |     print(book)
-42 42 | 
-43    |-for _, book in enumerate(books, x):
-   43 |+for book in books:
-44 44 |     print(book)
-45 45 | 
-46 46 | for index, (_, _) in enumerate(books):
+50 50 | for _, book in enumerate(books, start=x):
+51 51 |     print(book)
+52 52 | 
+53    |-for _, book in enumerate(books, x):
+   53 |+for book in books:
+54 54 |     print(book)
+55 55 | 
+56 56 | for index, (_, _) in enumerate(books):
 
-FURB148.py:46:22: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:56:22: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
-44 |     print(book)
-45 | 
-46 | for index, (_, _) in enumerate(books):
+54 |     print(book)
+55 | 
+56 | for index, (_, _) in enumerate(books):
    |                      ^^^^^^^^^ FURB148
-47 |     print(index)
+57 |     print(index)
    |
    = help: Replace with `range(len(...))`
 
 ℹ Suggested fix
-43 43 | for _, book in enumerate(books, x):
-44 44 |     print(book)
-45 45 | 
-46    |-for index, (_, _) in enumerate(books):
-   46 |+for index in range(len(books)):
-47 47 |     print(index)
-48 48 | 
-49 49 | for (_, _), book in enumerate(books):
+53 53 | for _, book in enumerate(books, x):
+54 54 |     print(book)
+55 55 | 
+56    |-for index, (_, _) in enumerate(books):
+   56 |+for index in range(len(books)):
+57 57 |     print(index)
+58 58 | 
+59 59 | for (_, _), book in enumerate(books):
 
-FURB148.py:49:21: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:59:21: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
    |
-47 |     print(index)
-48 | 
-49 | for (_, _), book in enumerate(books):
+57 |     print(index)
+58 | 
+59 | for (_, _), book in enumerate(books):
    |                     ^^^^^^^^^ FURB148
-50 |     print(book)
+60 |     print(book)
    |
    = help: Remove `enumerate`
 
 ℹ Suggested fix
-46 46 | for index, (_, _) in enumerate(books):
-47 47 |     print(index)
-48 48 | 
-49    |-for (_, _), book in enumerate(books):
-   49 |+for book in books:
-50 50 |     print(book)
-51 51 | 
-52 52 | for(index, _)in enumerate(books):
+56 56 | for index, (_, _) in enumerate(books):
+57 57 |     print(index)
+58 58 | 
+59    |-for (_, _), book in enumerate(books):
+   59 |+for book in books:
+60 60 |     print(book)
+61 61 | 
+62 62 | for(index, _)in enumerate(books):
 
-FURB148.py:52:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:62:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
-50 |     print(book)
-51 | 
-52 | for(index, _)in enumerate(books):
+60 |     print(book)
+61 | 
+62 | for(index, _)in enumerate(books):
    |                 ^^^^^^^^^ FURB148
-53 |     print(index)
+63 |     print(index)
    |
    = help: Replace with `range(len(...))`
 
 ℹ Suggested fix
-49 49 | for (_, _), book in enumerate(books):
-50 50 |     print(book)
-51 51 | 
-52    |-for(index, _)in enumerate(books):
-   52 |+for index in range(len(books)):
-53 53 |     print(index)
-54 54 | 
-55 55 | for(index), _ in enumerate(books):
+59 59 | for (_, _), book in enumerate(books):
+60 60 |     print(book)
+61 61 | 
+62    |-for(index, _)in enumerate(books):
+   62 |+for index in range(len(books)):
+63 63 |     print(index)
+64 64 | 
+65 65 | for(index), _ in enumerate(books):
 
-FURB148.py:55:18: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:65:18: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
-53 |     print(index)
-54 | 
-55 | for(index), _ in enumerate(books):
+63 |     print(index)
+64 | 
+65 | for(index), _ in enumerate(books):
    |                  ^^^^^^^^^ FURB148
-56 |     print(index)
+66 |     print(index)
    |
    = help: Replace with `range(len(...))`
 
 ℹ Suggested fix
-52 52 | for(index, _)in enumerate(books):
-53 53 |     print(index)
-54 54 | 
-55    |-for(index), _ in enumerate(books):
-   55 |+for index in range(len(books)):
-56 56 |     print(index)
-57 57 | 
-58 58 | # OK
+62 62 | for(index, _)in enumerate(books):
+63 63 |     print(index)
+64 64 | 
+65    |-for(index), _ in enumerate(books):
+   65 |+for index in range(len(books)):
+66 66 |     print(index)
+67 67 | 
+68 68 | for index, _ in enumerate(books_and_authors):
+
+FURB148.py:68:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+   |
+66 |     print(index)
+67 | 
+68 | for index, _ in enumerate(books_and_authors):
+   |                 ^^^^^^^^^ FURB148
+69 |     print(index)
+   |
+   = help: Replace with `range(len(...))`
+
+ℹ Suggested fix
+65 65 | for(index), _ in enumerate(books):
+66 66 |     print(index)
+67 67 | 
+68    |-for index, _ in enumerate(books_and_authors):
+   68 |+for index in range(len(books_and_authors)):
+69 69 |     print(index)
+70 70 | 
+71 71 | for _, book in enumerate(books_and_authors):
+
+FURB148.py:71:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+   |
+69 |     print(index)
+70 | 
+71 | for _, book in enumerate(books_and_authors):
+   |                ^^^^^^^^^ FURB148
+72 |     print(book)
+   |
+   = help: Remove `enumerate`
+
+ℹ Suggested fix
+68 68 | for index, _ in enumerate(books_and_authors):
+69 69 |     print(index)
+70 70 | 
+71    |-for _, book in enumerate(books_and_authors):
+   71 |+for book in books_and_authors:
+72 72 |     print(book)
+73 73 | 
+74 74 | for index, _ in enumerate(books_set):
+
+FURB148.py:74:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+   |
+72 |     print(book)
+73 | 
+74 | for index, _ in enumerate(books_set):
+   |                 ^^^^^^^^^ FURB148
+75 |     print(index)
+   |
+   = help: Replace with `range(len(...))`
+
+ℹ Suggested fix
+71 71 | for _, book in enumerate(books_and_authors):
+72 72 |     print(book)
+73 73 | 
+74    |-for index, _ in enumerate(books_set):
+   74 |+for index in range(len(books_set)):
+75 75 |     print(index)
+76 76 | 
+77 77 | for _, book in enumerate(books_set):
+
+FURB148.py:77:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+   |
+75 |     print(index)
+76 | 
+77 | for _, book in enumerate(books_set):
+   |                ^^^^^^^^^ FURB148
+78 |     print(book)
+   |
+   = help: Remove `enumerate`
+
+ℹ Suggested fix
+74 74 | for index, _ in enumerate(books_set):
+75 75 |     print(index)
+76 76 | 
+77    |-for _, book in enumerate(books_set):
+   77 |+for book in books_set:
+78 78 |     print(book)
+79 79 | 
+80 80 | for index, _ in enumerate(books_tuple):
+
+FURB148.py:80:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+   |
+78 |     print(book)
+79 | 
+80 | for index, _ in enumerate(books_tuple):
+   |                 ^^^^^^^^^ FURB148
+81 |     print(index)
+   |
+   = help: Replace with `range(len(...))`
+
+ℹ Suggested fix
+77 77 | for _, book in enumerate(books_set):
+78 78 |     print(book)
+79 79 | 
+80    |-for index, _ in enumerate(books_tuple):
+   80 |+for index in range(len(books_tuple)):
+81 81 |     print(index)
+82 82 | 
+83 83 | for _, book in enumerate(books_tuple):
+
+FURB148.py:83:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+   |
+81 |     print(index)
+82 | 
+83 | for _, book in enumerate(books_tuple):
+   |                ^^^^^^^^^ FURB148
+84 |     print(book)
+   |
+   = help: Remove `enumerate`
+
+ℹ Suggested fix
+80 80 | for index, _ in enumerate(books_tuple):
+81 81 |     print(index)
+82 82 | 
+83    |-for _, book in enumerate(books_tuple):
+   83 |+for book in books_tuple:
+84 84 |     print(book)
+85 85 | 
+86 86 | # OK
 
 

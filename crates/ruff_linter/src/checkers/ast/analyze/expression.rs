@@ -414,13 +414,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.enabled(Rule::FString) {
-                                        pyupgrade::rules::f_strings(
-                                            checker,
-                                            call,
-                                            &summary,
-                                            value,
-                                            checker.settings.line_length,
-                                        );
+                                        pyupgrade::rules::f_strings(checker, call, &summary, value);
                                     }
                                 }
                             }
@@ -680,9 +674,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::UnnecessarySubscriptReversal) {
-                flake8_comprehensions::rules::unnecessary_subscript_reversal(
-                    checker, expr, func, args,
-                );
+                flake8_comprehensions::rules::unnecessary_subscript_reversal(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryMap) {
                 flake8_comprehensions::rules::unnecessary_map(

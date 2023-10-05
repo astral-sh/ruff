@@ -69,7 +69,7 @@ export default function SourceEditor({
                     edits: check.fix.edits.map((edit) => ({
                       resource: model.uri,
                       versionId: model.getVersionId(),
-                      edit: {
+                      textEdit: {
                         range: {
                           startLineNumber: edit.location.row,
                           startColumn: edit.location.column,
