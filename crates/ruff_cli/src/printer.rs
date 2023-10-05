@@ -395,7 +395,7 @@ fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics
     // this pass! (We're occasionally unable to determine whether a specific
     // violation is fixable without trying to fix it, so if fix is not
     // enabled, we may inadvertently indicate that a rule is fixable.)
-    (!fix_mode.is_apply()) && fixables.is_some_and(|fixables| fixables.any_applicable_fixes())
+    (!fix_mode.is_apply()) && fixables.is_some_and(FixableStatistics::any_applicable_fixes)
 }
 
 fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
@@ -474,7 +474,7 @@ impl FixableStatistics {
     }
 
     fn any_applicable_fixes(&self) -> bool {
-        return self.applicable > 0;
+        self.applicable > 0
     }
 }
 
