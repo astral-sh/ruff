@@ -1022,7 +1022,7 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
     print('foo')
 
     ----- stderr -----
-    Fixed 1 error.
+    Fixed 1 error (1 additional fix available with `--unsafe-fixes`).
     "###);
 }
 
@@ -1080,7 +1080,7 @@ fn diff_shows_safe_fixes_by_default() {
 
 
     ----- stderr -----
-    Would fix 1 error.
+    Would fix 1 error (1 additional fix available with `--unsafe-fixes`).
     "###
     );
 }
