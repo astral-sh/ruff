@@ -6,21 +6,21 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::edit::Edit;
 
 /// Indicates if a fix can be applied.
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Applicability {
-    /// The fix is safe and can always be applied.
-    /// The fix is definitely what the user intended, or it maintains the exact meaning of the code.
-    Always,
+    /// The fix is unsafe and should only be manually applied by the user.
+    /// The fix is likely to be incorrect or the resulting code may have invalid syntax.
+    Never,
 
     /// The fix is unsafe and should only be applied with user opt-in.
     /// The fix may be what the user intended, but it is uncertain; the resulting code will have valid syntax.
     Sometimes,
 
-    /// The fix is unsafe and should only be manually applied by the user.
-    /// The fix is likely to be incorrect or the resulting code may have invalid syntax.
-    Never,
+    /// The fix is safe and can always be applied.
+    /// The fix is definitely what the user intended, or it maintains the exact meaning of the code.
+    Always,
 }
 
 /// Indicates the level of isolation required to apply a fix.
@@ -132,5 +132,10 @@ impl Fix {
     pub fn isolate(mut self, isolation: IsolationLevel) -> Self {
         self.isolation_level = isolation;
         self
+    }
+
+    /// Return [`true`] if this [`Fix`] should be applied with at a given [`Applicability`].
+    pub fn applies(&self, applicability: Applicability) -> bool {
+        self.applicability >= applicability
     }
 }

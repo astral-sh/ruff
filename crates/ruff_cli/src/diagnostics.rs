@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
+use ruff_linter::settings::types::UnsafeFixes;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -168,6 +169,7 @@ pub(crate) fn lint_path(
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     // Check the cache.
     // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
@@ -244,8 +246,15 @@ pub(crate) fn lint_path(
             result,
             transformed,
             fixed,
-        }) = lint_fix(path, package, noqa, settings, &source_kind, source_type)
-        {
+        }) = lint_fix(
+            path,
+            package,
+            noqa,
+            unsafe_fixes,
+            settings,
+            &source_kind,
+            source_type,
+        ) {
             if !fixed.is_empty() {
                 match fix_mode {
                     flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
@@ -355,6 +364,7 @@ pub(crate) fn lint_stdin(
             path.unwrap_or_else(|| Path::new("-")),
             package,
             noqa,
+            settings.unsafe_fixes,
             &settings.linter,
             &source_kind,
             source_type,

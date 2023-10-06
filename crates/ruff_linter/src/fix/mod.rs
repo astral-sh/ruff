@@ -9,6 +9,7 @@ use ruff_source_file::Locator;
 
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
+use crate::settings::types::UnsafeFixes;
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
@@ -23,11 +24,22 @@ pub(crate) struct FixResult {
     pub(crate) source_map: SourceMap,
 }
 
-/// Auto-fix errors in a file, and write the fixed source code to disk.
-pub(crate) fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<FixResult> {
+/// Fix errors in a file, and write the fixed source code to disk.
+pub(crate) fn fix_file(
+    diagnostics: &[Diagnostic],
+    locator: &Locator,
+    unsafe_fixes: UnsafeFixes,
+) -> Option<FixResult> {
+    let required_applicability = unsafe_fixes.required_applicability();
+
     let mut with_fixes = diagnostics
         .iter()
-        .filter(|diag| diag.fix.is_some())
+        .filter(|diagnostic| {
+            diagnostic
+                .fix
+                .as_ref()
+                .map_or(false, |fix| fix.applies(required_applicability))
+        })
         .peekable();
 
     if with_fixes.peek().is_none() {
