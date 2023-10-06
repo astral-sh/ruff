@@ -230,7 +230,7 @@ pub(crate) fn unnecessary_map(
                 checker.locator(),
                 checker.stylist(),
             )
-            .map(Fix::sometimes_applies)
+            .map(Fix::unsafe_edit)
         });
     }
     checker.diagnostics.push(diagnostic);

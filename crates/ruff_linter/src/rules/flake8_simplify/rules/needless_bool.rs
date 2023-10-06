@@ -112,7 +112,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(Box::new(if_test.clone())),
                     range: TextRange::default(),
                 };
-                diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     checker.generator().stmt(&node.into()),
                     range,
                 )));
@@ -137,7 +137,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(Box::new(node1.into())),
                     range: TextRange::default(),
                 };
-                diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     checker.generator().stmt(&node2.into()),
                     range,
                 )));

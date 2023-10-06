@@ -51,7 +51,7 @@ pub(crate) fn numeric_literal_too_long(checker: &mut Checker, expr: &Expr) {
 
     let mut diagnostic = Diagnostic::new(NumericLiteralTooLong, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "...".to_string(),
             expr.range(),
         )));

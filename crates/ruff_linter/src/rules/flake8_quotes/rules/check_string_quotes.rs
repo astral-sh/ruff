@@ -240,7 +240,7 @@ fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> 
         fixed_contents.push_str(&quote);
         fixed_contents.push_str(string_contents);
         fixed_contents.push_str(&quote);
-        diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             fixed_contents,
             range,
         )));
@@ -317,7 +317,7 @@ fn strings(
                 fixed_contents.push_str(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push_str(quote);
-                diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     fixed_contents,
                     *range,
                 )));
@@ -342,7 +342,7 @@ fn strings(
                 fixed_contents.push(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push(quote);
-                diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     fixed_contents,
                     *range,
                 )));

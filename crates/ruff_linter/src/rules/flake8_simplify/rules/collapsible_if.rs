@@ -123,7 +123,7 @@ pub(crate) fn nested_if_statements(
                             checker.settings.tab_size,
                         )
                     }) {
-                        diagnostic.set_fix(Fix::sometimes_applies(edit));
+                        diagnostic.set_fix(Fix::unsafe_edit(edit));
                     }
                 }
                 Err(err) => error!("Failed to fix nested if: {err}"),

@@ -151,7 +151,7 @@ fn replace_with_bytes_literal(
         prev = range.end();
     }
 
-    Fix::always_applies(Edit::range_replacement(
+    Fix::safe_edit(Edit::range_replacement(
         pad(replacement, call.range(), locator),
         call.range(),
     ))
@@ -202,7 +202,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 Parentheses::Preserve,
                                 checker.locator().contents(),
                             )
-                            .map(Fix::always_applies)
+                            .map(Fix::safe_edit)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -222,7 +222,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 Parentheses::Preserve,
                                 checker.locator().contents(),
                             )
-                            .map(Fix::always_applies)
+                            .map(Fix::safe_edit)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -249,7 +249,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 Parentheses::Preserve,
                                 checker.locator().contents(),
                             )
-                            .map(Fix::always_applies)
+                            .map(Fix::safe_edit)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -269,7 +269,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 Parentheses::Preserve,
                                 checker.locator().contents(),
                             )
-                            .map(Fix::always_applies)
+                            .map(Fix::safe_edit)
                         });
                     }
                     checker.diagnostics.push(diagnostic);

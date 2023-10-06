@@ -74,7 +74,7 @@ pub(crate) fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr
         content.push('(');
         content.push_str(&existing[1..existing.len() - 1]);
         content.push(')');
-        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             content,
             value.range(),
         )));

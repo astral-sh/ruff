@@ -163,7 +163,7 @@ mod tests {
                 // The choice of rule here is arbitrary.
                 kind: MissingNewlineAtEndOfFile.into(),
                 range: edit.range(),
-                fix: Some(Fix::always_applies(edit)),
+                fix: Some(Fix::safe_edit(edit)),
                 parent: None,
             })
             .collect()

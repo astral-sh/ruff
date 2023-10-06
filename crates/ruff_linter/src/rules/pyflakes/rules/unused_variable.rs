@@ -237,11 +237,11 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     )?
                     .start();
                     let edit = Edit::deletion(start, end);
-                    Some(Fix::sometimes_applies(edit))
+                    Some(Fix::unsafe_edit(edit))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                     let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
-                    Some(Fix::sometimes_applies(edit).isolate(isolation))
+                    Some(Fix::unsafe_edit(edit).isolate(isolation))
                 };
             }
         }
@@ -265,11 +265,11 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     })?
                     .start();
                 let edit = Edit::deletion(start, end);
-                Some(Fix::sometimes_applies(edit))
+                Some(Fix::unsafe_edit(edit))
             } else {
                 // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                 let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
-                Some(Fix::sometimes_applies(edit).isolate(isolation))
+                Some(Fix::unsafe_edit(edit).isolate(isolation))
             };
         }
     }
@@ -300,7 +300,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     .start();
 
                     let edit = Edit::deletion(start, end);
-                    return Some(Fix::sometimes_applies(edit));
+                    return Some(Fix::unsafe_edit(edit));
                 }
             }
         }

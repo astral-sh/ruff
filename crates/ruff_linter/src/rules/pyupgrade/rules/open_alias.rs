@@ -56,7 +56,7 @@ pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
         let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             if checker.semantic().is_builtin("open") {
-                diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     "open".to_string(),
                     func.range(),
                 )));

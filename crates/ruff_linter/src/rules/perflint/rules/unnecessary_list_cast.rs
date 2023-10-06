@@ -135,7 +135,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
 
 /// Generate a [`Fix`] to remove a `list` cast from an expression.
 fn remove_cast(list_range: TextRange, iterable_range: TextRange) -> Fix {
-    Fix::always_applies_edits(
+    Fix::safe_edits(
         Edit::deletion(list_range.start(), iterable_range.start()),
         [Edit::deletion(iterable_range.end(), list_range.end())],
     )

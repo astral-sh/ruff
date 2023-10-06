@@ -83,7 +83,7 @@ pub(crate) fn manual_from_import(
                 level: Some(0),
                 range: TextRange::default(),
             };
-            diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 checker.generator().stmt(&node.into()),
                 stmt.range(),
             )));

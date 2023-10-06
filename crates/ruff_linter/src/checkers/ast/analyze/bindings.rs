@@ -38,7 +38,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
                             binding,
                             checker.locator,
                         )
-                        .map(Fix::always_applies)
+                        .map(Fix::safe_edit)
                     });
                 }
                 checker.diagnostics.push(diagnostic);

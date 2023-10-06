@@ -110,10 +110,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
                     ),
                     stmt_for.target.range(),
                 );
-                diagnostic.set_fix(Fix::sometimes_applies_edits(
-                    replace_attribute,
-                    [replace_target],
-                ));
+                diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -135,10 +132,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
                     ),
                     stmt_for.target.range(),
                 );
-                diagnostic.set_fix(Fix::sometimes_applies_edits(
-                    replace_attribute,
-                    [replace_target],
-                ));
+                diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
             }
             checker.diagnostics.push(diagnostic);
         }

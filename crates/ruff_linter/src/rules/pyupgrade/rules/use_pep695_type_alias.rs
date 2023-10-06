@@ -145,9 +145,9 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         // The fix is only safe in a type stub because new-style aliases have different runtime  behavior
         // See https://github.com/astral-sh/ruff/issues/6434
         let fix = if checker.source_type.is_stub() {
-            Fix::always_applies(edit)
+            Fix::safe_edit(edit)
         } else {
-            Fix::sometimes_applies(edit)
+            Fix::unsafe_edit(edit)
         };
 
         diagnostic.set_fix(fix);

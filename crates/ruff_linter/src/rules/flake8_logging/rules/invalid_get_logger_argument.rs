@@ -82,7 +82,7 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
     let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().is_builtin("__name__") {
-            diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 "__name__".to_string(),
                 expr.range(),
             )));

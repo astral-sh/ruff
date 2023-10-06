@@ -53,9 +53,9 @@ impl Display for Diff<'_> {
 
         let message = match self.fix.applicability() {
             // TODO(zanieb): Adjust this messaging once it's user-facing
-            Applicability::Always => "Fix",
-            Applicability::Sometimes => "Suggested fix",
-            Applicability::Never => "Possible fix",
+            Applicability::Safe => "Fix",
+            Applicability::Unsafe => "Suggested fix",
+            Applicability::Display => "Possible fix",
         };
         writeln!(f, "ℹ {}", message.blue())?;
 
