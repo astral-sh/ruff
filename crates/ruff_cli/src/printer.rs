@@ -169,17 +169,15 @@ impl Printer {
 
                 if unapplied > 0 {
                     let es = if unapplied == 1 { "" } else { "es" };
-                    let omitted =
-                        format!("({unapplied} additional fix{es} available with `--unsafe-fixes`)");
                     if fixed > 0 {
                         let s = if fixed == 1 { "" } else { "s" };
                         if self.fix_mode.is_apply() {
-                            writeln!(writer, "Fixed {fixed} error{s} {omitted}.")?;
+                            writeln!(writer, "Fixed {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`).")?;
                         } else {
-                            writeln!(writer, "Would fix {fixed} error{s} {omitted}.")?;
+                            writeln!(writer, "Would fix {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`).")?;
                         }
                     } else {
-                        writeln!(writer, "No errors fixed {omitted}.")?;
+                        writeln!(writer, "No errors fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
                     }
                 } else {
                     if fixed > 0 {
