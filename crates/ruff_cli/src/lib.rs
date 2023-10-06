@@ -304,7 +304,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     if cli.watch {
         if output_format != SerializationFormat::Text {
-            warn_user!("--format 'text' is used in watch mode.");
+            warn_user!("`--output-format text` is always used in watch mode.");
         }
 
         // Configure the file watcher.
