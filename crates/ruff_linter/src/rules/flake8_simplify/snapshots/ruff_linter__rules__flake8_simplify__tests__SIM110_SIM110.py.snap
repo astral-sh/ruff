@@ -304,6 +304,8 @@ SIM110.py:184:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
 186 | |             return True
 187 | |     return False
     | |________________^ SIM110
+188 |   
+189 |   async def f():
     |
     = help: Replace with `return any(check(x) for x in iterable)`
 
@@ -316,5 +318,36 @@ SIM110.py:184:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
 186     |-            return True
 187     |-    return False
     184 |+    return any(check(x) for x in iterable)
+188 185 | 
+189 186 | async def f():
+190 187 |     # SIM110
+
+SIM110.py:191:5: SIM110 [*] Use `return any(check(x) for x in await iterable)` instead of `for` loop
+    |
+189 |   async def f():
+190 |       # SIM110
+191 |       for x in await iterable:
+    |  _____^
+192 | |         if check(x):
+193 | |             return True
+194 | |     return False
+    | |________________^ SIM110
+195 |   
+196 |   def f():
+    |
+    = help: Replace with `return any(check(x) for x in await iterable)`
+
+ℹ Suggested fix
+188 188 | 
+189 189 | async def f():
+190 190 |     # SIM110
+191     |-    for x in await iterable:
+192     |-        if check(x):
+193     |-            return True
+194     |-    return False
+    191 |+    return any(check(x) for x in await iterable)
+195 192 | 
+196 193 | def f():
+197 194 |     # OK (can't turn this into any() because the yield would end up inside a genexp)
 
 

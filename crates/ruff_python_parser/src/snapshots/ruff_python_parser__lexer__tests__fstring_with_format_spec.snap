@@ -191,11 +191,76 @@ expression: lex_source(source)
         43..44,
     ),
     (
-        FStringEnd,
+        FStringMiddle {
+            value: " ",
+            is_raw: false,
+        },
         44..45,
     ),
     (
+        Lbrace,
+        45..46,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        46..47,
+    ),
+    (
+        Colon,
+        47..48,
+    ),
+    (
+        Lbrace,
+        48..49,
+    ),
+    (
+        Lbrace,
+        49..50,
+    ),
+    (
+        Int {
+            value: 1,
+        },
+        50..51,
+    ),
+    (
+        Rbrace,
+        51..52,
+    ),
+    (
+        Dot,
+        52..53,
+    ),
+    (
+        Name {
+            name: "pop",
+        },
+        53..56,
+    ),
+    (
+        Lpar,
+        56..57,
+    ),
+    (
+        Rpar,
+        57..58,
+    ),
+    (
+        Rbrace,
+        58..59,
+    ),
+    (
+        Rbrace,
+        59..60,
+    ),
+    (
+        FStringEnd,
+        60..61,
+    ),
+    (
         Newline,
-        45..45,
+        61..61,
     ),
 ]

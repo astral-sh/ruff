@@ -50,7 +50,7 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
 
     let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
             asname.to_string(),
             alias.range(),
         )));

@@ -26,6 +26,7 @@ use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
+use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
 use ruff_notebook::Notebook;
@@ -155,8 +156,11 @@ pub(crate) fn test_contents<'a>(
             code: fixed_contents,
             source_map,
             ..
-        }) = fix_file(&diagnostics, &Locator::new(transformed.source_code()))
-        {
+        }) = fix_file(
+            &diagnostics,
+            &Locator::new(transformed.source_code()),
+            UnsafeFixes::Enabled,
+        ) {
             if iterations < max_iterations() {
                 iterations += 1;
             } else {
@@ -294,6 +298,7 @@ pub(crate) fn print_jupyter_messages(
         .with_show_fix_status(true)
         .with_show_fix_diff(true)
         .with_show_source(true)
+        .with_unsafe_fixes(UnsafeFixes::Enabled)
         .emit(
             &mut output,
             messages,
@@ -314,6 +319,7 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
         .with_show_fix_status(true)
         .with_show_fix_diff(true)
         .with_show_source(true)
+        .with_unsafe_fixes(UnsafeFixes::Enabled)
         .emit(
             &mut output,
             messages,

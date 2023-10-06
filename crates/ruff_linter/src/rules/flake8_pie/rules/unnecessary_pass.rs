@@ -70,7 +70,7 @@ pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                     } else {
                         fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer())
                     };
-                diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(
+                diagnostic.set_fix(Fix::always_applies(edit).isolate(Checker::isolation(
                     checker.semantic().current_statement_id(),
                 )));
             }

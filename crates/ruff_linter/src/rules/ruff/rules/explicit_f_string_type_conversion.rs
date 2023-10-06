@@ -160,7 +160,7 @@ fn convert_call_to_conversion_flag(
         formatted_string_expression.expression = call.args[0].value.clone();
         Ok(expression)
     })
-    .map(|output| Fix::automatic(Edit::range_replacement(output, expr.range())))
+    .map(|output| Fix::always_applies(Edit::range_replacement(output, expr.range())))
 }
 
 /// Return the [`FormattedStringContent`] at the given index in an f-string or implicit

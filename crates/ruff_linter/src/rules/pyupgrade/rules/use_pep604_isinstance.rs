@@ -117,7 +117,7 @@ pub(crate) fn use_pep604_isinstance(
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
                         checker.generator().expr(&union(elts)),
                         types.range(),
                     )));

@@ -46,16 +46,16 @@ fn stdin_success() {
 fn stdin_error() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .pass_stdin("import os\n"), @r#"
+        .pass_stdin("import os\n"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
     -:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "#);
+    "###);
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn stdin_filename() {
     ----- stdout -----
     F401.py:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -87,7 +87,7 @@ fn stdin_source_type_py() {
     ----- stdout -----
     TCH.py:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -975,11 +975,247 @@ fn check_input_from_argfile() -> Result<()> {
         ----- stdout -----
         /path/to/a.py:1:8: F401 [*] `os` imported but unused
         Found 1 error.
-        [*] 1 potentially fixable with the --fix option.
+        [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
         "###);
     });
 
     Ok(())
+}
+
+#[test]
+fn check_hints_hidden_unsafe_fixes() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format=text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--no-cache",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["-", "--output-format", "text", "--no-cache", "--isolated", "--select", "F601"])
+        .pass_stdin("x = {'a': 1, 'a': 1}\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    Found 1 error.
+    1 hidden fix can be enabled with the `--unsafe-fixes` option.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn check_shows_unsafe_fixes_with_opt_in() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format=text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--no-cache",
+            "--unsafe-fixes",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 2 fixable with the --fix option.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn fix_applies_safe_fixes_by_default() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache", 
+                "--select",
+                "F601,UP034",
+                "--fix",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn fix_applies_unsafe_fixes_with_opt_in() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache", 
+                "--select",
+                "F601,UP034",
+                "--fix",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    x = {'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn fix_only_flag_applies_safe_fixes_by_default() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache", 
+                "--select",
+                "F601,UP034",
+                "--fix-only",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache", 
+                "--select",
+                "F601,UP034",
+                "--fix-only",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    x = {'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn diff_shows_safe_fixes_by_default() {
+    assert_cmd_snapshot!(
+    Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format",
+            "text",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+            "--diff",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+     x = {'a': 1, 'a': 1}
+    -print('foo')
+    +print(('foo'))
+
+
+    ----- stderr -----
+    "###
+    );
+}
+
+#[test]
+fn diff_shows_unsafe_fixes_with_opt_in() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "F601,UP034",
+                "--diff",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+    -x = {'a': 1}
+    -print('foo')
+    +x = {'a': 1, 'a': 1}
+    +print(('foo'))
+
+
+    ----- stderr -----
+    "###
+    );
 }

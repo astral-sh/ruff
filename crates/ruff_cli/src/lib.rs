@@ -10,7 +10,7 @@ use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
-use ruff_linter::settings::flags;
+use ruff_linter::settings::flags::{FixMode, Parser};
 use ruff_linter::settings::types::{ParserType, SerializationFormat};
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
@@ -228,6 +228,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let Settings {
         fix,
         fix_only,
+        unsafe_fixes,
         output_format,
         show_fixes,
         show_source,
@@ -236,17 +237,20 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
-    // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
+    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
-    // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   fixes).
+    // - If `--diff` or `--fix-only` are set, don't print any violations (only applicable fixes)
+    // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
+    //   `--unsafe-fixes` is set, then [`Applicablility::Suggested`] fixes are included.
+
     let fix_mode = if cli.diff {
-        flags::FixMode::Diff
+        FixMode::Diff
     } else if fix || fix_only {
-        flags::FixMode::Apply
+        FixMode::Apply
     } else {
-        flags::FixMode::Generate
+        FixMode::Generate
     };
+
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
     let mut printer_flags = PrinterFlags::empty();
@@ -260,9 +264,9 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
     let parser = match cli.parser {
-        Some(ParserType::Ipynb) => flags::Parser::Ipynb,
-        Some(ParserType::Py) => flags::Parser::Python,
-        None => flags::Parser::Auto,
+        Some(ParserType::Ipynb) => Parser::Ipynb,
+        Some(ParserType::Py) => Parser::Python,
+        None => Parser::Auto,
     };
 
     if cli.ecosystem_ci {
@@ -296,7 +300,13 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(output_format, log_level, fix_mode, printer_flags);
+    let printer = Printer::new(
+        output_format,
+        log_level,
+        fix_mode,
+        unsafe_fixes,
+        printer_flags,
+    );
 
     if cli.watch {
         if output_format != SerializationFormat::Text {
@@ -324,6 +334,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             cache.into(),
             noqa.into(),
             fix_mode,
+            unsafe_fixes,
             parser,
         )?;
         printer.write_continuously(&mut writer, &messages)?;
@@ -357,7 +368,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         cache.into(),
                         noqa.into(),
                         fix_mode,
-                        flags::Parser::Auto,
+                        unsafe_fixes,
+                        Parser::Auto,
                     )?;
                     printer.write_continuously(&mut writer, &messages)?;
                 }
@@ -385,6 +397,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 cache.into(),
                 noqa.into(),
                 fix_mode,
+                unsafe_fixes,
                 parser,
             )?
         };
@@ -392,7 +405,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff)) {
+        if !(is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff)) {
             if cli.statistics {
                 printer.write_statistics(&diagnostics, &mut writer)?;
             } else {
