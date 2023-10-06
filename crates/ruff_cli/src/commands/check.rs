@@ -30,6 +30,7 @@ use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
@@ -205,6 +206,7 @@ pub(crate) fn check(
 
 /// Wraps [`lint_path`](crate::diagnostics::lint_path) in a [`catch_unwind`](std::panic::catch_unwind) and emits
 /// a diagnostic if the linting the file panics.
+#[allow(clippy::too_many_arguments)]
 fn lint_path(
     path: &Path,
     package: Option<&Path>,

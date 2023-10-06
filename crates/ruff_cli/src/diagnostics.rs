@@ -175,6 +175,7 @@ fn parser_source_type(
     }
 }
 /// Lint the source code at the given `Path`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
