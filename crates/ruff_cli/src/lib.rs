@@ -328,6 +328,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             cache.into(),
             noqa.into(),
             fix_mode,
+            unsafe_fixes,
         )?;
         printer.write_continuously(&mut writer, &messages)?;
 
@@ -360,6 +361,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         cache.into(),
                         noqa.into(),
                         fix_mode,
+                        unsafe_fixes,
                     )?;
                     printer.write_continuously(&mut writer, &messages)?;
                 }
@@ -386,6 +388,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 cache.into(),
                 noqa.into(),
                 fix_mode,
+                unsafe_fixes,
             )?
         };
 

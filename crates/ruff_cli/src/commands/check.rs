@@ -37,6 +37,7 @@ pub(crate) fn check(
     cache: flags::Cache,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -127,7 +128,7 @@ pub(crate) fn check(
                         cache,
                         noqa,
                         fix_mode,
-                        settings.unsafe_fixes,
+                        unsafe_fixes,
                     )
                     .map_err(|e| {
                         (Some(path.to_owned()), {
@@ -245,6 +246,7 @@ mod test {
 
     use anyhow::Result;
 
+    use ruff_linter::settings::types::UnsafeFixes;
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
@@ -297,6 +299,7 @@ mod test {
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,
+            UnsafeFixes::Enabled,
         )
         .unwrap();
         let mut output = Vec::new();
