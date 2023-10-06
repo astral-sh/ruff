@@ -68,7 +68,7 @@ pub enum RuleSelectorKind {
 }
 
 impl RuleSelection {
-    pub fn selector_by_kind(&self) -> impl Iterator<Item = (RuleSelectorKind, &RuleSelector)> {
+    pub fn selectors_by_kind(&self) -> impl Iterator<Item = (RuleSelectorKind, &RuleSelector)> {
         self.select
             .iter()
             .flatten()
@@ -749,7 +749,7 @@ impl LintConfiguration {
             }
 
             // Check for selections that require a warning
-            for (kind, selector) in selection.selector_by_kind() {
+            for (kind, selector) in selection.selectors_by_kind() {
                 #[allow(deprecated)]
                 if matches!(selector, RuleSelector::Nursery) {
                     let suggestion = if preview.mode.is_disabled() {
