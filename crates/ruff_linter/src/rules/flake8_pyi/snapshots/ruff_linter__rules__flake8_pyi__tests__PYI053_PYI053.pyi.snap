@@ -12,7 +12,7 @@ PYI053.pyi:3:14: PYI053 [*] String and bytes literals longer than 50 characters 
   |
   = help: Replace with `...`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
 2 2 | def f2(
 3   |-    x: str = "51 character stringgggggggggggggggggggggggggggggggg",  # Error: PYI053
@@ -32,7 +32,7 @@ PYI053.pyi:9:14: PYI053 [*] String and bytes literals longer than 50 characters 
    |
    = help: Replace with `...`
 
-ℹ Suggested fix
+ℹ Fix
 6  6  |     x: str = "50 character stringgggggggggggggggggggggggggggggg\U0001f600",  # OK
 7  7  | ) -> None: ...
 8  8  | def f4(
@@ -52,7 +52,7 @@ PYI053.pyi:21:16: PYI053 [*] String and bytes literals longer than 50 characters
    |
    = help: Replace with `...`
 
-ℹ Suggested fix
+ℹ Fix
 18 18 |     x: bytes = b"50 character byte stringggggggggggggggggggggggggg\xff",  # OK
 19 19 | ) -> None: ...
 20 20 | def f8(
@@ -73,7 +73,7 @@ PYI053.pyi:26:12: PYI053 [*] String and bytes literals longer than 50 characters
    |
    = help: Replace with `...`
 
-ℹ Suggested fix
+ℹ Fix
 23 23 | 
 24 24 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
 25 25 | 
@@ -94,7 +94,7 @@ PYI053.pyi:30:14: PYI053 [*] String and bytes literals longer than 50 characters
    |
    = help: Replace with `...`
 
-ℹ Suggested fix
+ℹ Fix
 27 27 | 
 28 28 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
 29 29 | 

@@ -157,7 +157,7 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
                 target.try_make_suggestion(starmap_name, &comprehension.iter, func, checker)?,
                 target.range(),
             );
-            Ok(Fix::unsafe_edits(import_edit, [main_edit]))
+            Ok(Fix::safe_edits(import_edit, [main_edit]))
         });
     }
     checker.diagnostics.push(diagnostic);
