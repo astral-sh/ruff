@@ -102,12 +102,15 @@ impl Printer {
 
     fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
         if self.log_level >= LogLevel::Default {
+            let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
+
+            let fixed = diagnostics
+                .fixed
+                .values()
+                .flat_map(std::collections::HashMap::values)
+                .sum::<usize>();
+
             if self.flags.intersects(Flags::SHOW_VIOLATIONS) {
-                let fixed = diagnostics
-                    .fixed
-                    .values()
-                    .flat_map(std::collections::HashMap::values)
-                    .sum::<usize>();
                 let remaining = diagnostics.messages.len();
                 let total = fixed + remaining;
                 if fixed > 0 {
@@ -121,21 +124,71 @@ impl Printer {
                     writeln!(writer, "Found {remaining} error{s}.")?;
                 }
 
-                if let Some(fixables) = FixableSummary::try_from(diagnostics, self.unsafe_fixes) {
-                    writeln!(writer, "{fixables}")?;
+                if let Some(fixables) = fixables {
+                    let fix_prefix = format!("[{}]", "*".cyan());
+
+                    if self.unsafe_fixes.is_enabled() {
+                        writeln!(
+                            writer,
+                            "{fix_prefix} {} fixable with the --fix option.",
+                            fixables.applicable
+                        )?;
+                    } else {
+                        if fixables.applicable > 0 && fixables.unapplicable > 0 {
+                            let es = if fixables.unapplicable == 1 { "" } else { "es" };
+                            writeln!(writer,
+                                "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
+                                fixables.applicable, fixables.unapplicable
+                            )?;
+                        } else if fixables.applicable > 0 {
+                            // Only applicable fixes
+                            writeln!(
+                                writer,
+                                "{fix_prefix} {} fixable with the `--fix` option.",
+                                fixables.applicable,
+                            )?;
+                        } else {
+                            // Only unapplicable fixes
+                            let es = if fixables.unapplicable == 1 { "" } else { "es" };
+                            writeln!(writer,
+                                "{} hidden fix{es} can be enabled with the `--unsafe-fixes` option.",
+                                fixables.unapplicable
+                            )?;
+                        }
+                    }
                 }
             } else {
-                let fixed = diagnostics
-                    .fixed
-                    .values()
-                    .flat_map(std::collections::HashMap::values)
-                    .sum::<usize>();
-                if fixed > 0 {
-                    let s = if fixed == 1 { "" } else { "s" };
-                    if self.fix_mode.is_apply() {
-                        writeln!(writer, "Fixed {fixed} error{s}.")?;
+                // Check if there are unapplied fixes
+                let unapplied = {
+                    if let Some(fixables) = fixables {
+                        fixables.unapplicable
                     } else {
-                        writeln!(writer, "Would fix {fixed} error{s}.")?;
+                        0
+                    }
+                };
+
+                if unapplied > 0 {
+                    let es = if unapplied == 1 { "" } else { "es" };
+                    let omitted =
+                        format!("({unapplied} additional fix{es} available with `--unsafe-fixes`)");
+                    if fixed > 0 {
+                        let s = if fixed == 1 { "" } else { "s" };
+                        if self.fix_mode.is_apply() {
+                            writeln!(writer, "Fixed {fixed} error{s} {omitted}.")?;
+                        } else {
+                            writeln!(writer, "Would fix {fixed} error{s} {omitted}.")?;
+                        }
+                    } else {
+                        writeln!(writer, "No errors fixed {omitted}.")?;
+                    }
+                } else {
+                    if fixed > 0 {
+                        let s = if fixed == 1 { "" } else { "s" };
+                        if self.fix_mode.is_apply() {
+                            writeln!(writer, "Fixed {fixed} error{s}.")?;
+                        } else {
+                            writeln!(writer, "Would fix {fixed} error{s}.")?;
+                        }
                     }
                 }
             }
@@ -170,7 +223,7 @@ impl Printer {
         }
 
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
-        let fixables = FixableSummary::try_from(diagnostics, self.unsafe_fixes);
+        let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
         match self.format {
             SerializationFormat::Json => {
@@ -354,7 +407,7 @@ impl Printer {
             );
         }
 
-        let fixables = FixableSummary::try_from(diagnostics, self.unsafe_fixes);
+        let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
         if !diagnostics.messages.is_empty() {
             if self.log_level >= LogLevel::Default {
@@ -388,13 +441,13 @@ fn num_digits(n: usize) -> usize {
 }
 
 /// Return `true` if the [`Printer`] should indicate that a rule is fixable.
-fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableSummary>) -> bool {
+fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics>) -> bool {
     // If we're in application mode, avoid indicating that a rule is fixable.
     // If the specific violation were truly fixable, it would've been fixed in
     // this pass! (We're occasionally unable to determine whether a specific
     // violation is fixable without trying to fix it, so if fix is not
     // enabled, we may inadvertently indicate that a rule is fixable.)
-    (!fix_mode.is_apply()) && fixables.is_some_and(FixableSummary::any_applicable_fixes)
+    (!fix_mode.is_apply()) && fixables.is_some_and(FixableStatistics::any_applicable_fixes)
 }
 
 fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
@@ -438,15 +491,14 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>
     Ok(())
 }
 
-/// Summarizes [applicable][ruff_diagnostics::Applicability] fixes.
+/// Statistics for [applicable][ruff_diagnostics::Applicability] fixes.
 #[derive(Debug)]
-struct FixableSummary {
+struct FixableStatistics {
     applicable: u32,
     unapplicable: u32,
-    unsafe_fixes: UnsafeFixes,
 }
 
-impl FixableSummary {
+impl FixableStatistics {
     fn try_from(diagnostics: &Diagnostics, unsafe_fixes: UnsafeFixes) -> Option<Self> {
         let mut applicable = 0;
         let mut unapplicable = 0;
@@ -467,50 +519,11 @@ impl FixableSummary {
             Some(Self {
                 applicable,
                 unapplicable,
-                unsafe_fixes,
             })
         }
     }
 
     fn any_applicable_fixes(&self) -> bool {
         self.applicable > 0
-    }
-}
-
-impl Display for FixableSummary {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let fix_prefix = format!("[{}]", "*".cyan());
-
-        if self.unsafe_fixes.is_enabled() {
-            write!(
-                f,
-                "{fix_prefix} {} fixable with the --fix option.",
-                self.applicable
-            )
-        } else {
-            if self.applicable > 0 && self.unapplicable > 0 {
-                let es = if self.unapplicable == 1 { "" } else { "es" };
-                write!(
-                    f,
-                    "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
-                    self.applicable, self.unapplicable
-                )
-            } else if self.applicable > 0 {
-                // Only applicable fixes
-                write!(
-                    f,
-                    "{fix_prefix} {} fixable with the `--fix` option.",
-                    self.applicable,
-                )
-            } else {
-                // Only unapplicable fixes
-                let es = if self.unapplicable == 1 { "" } else { "es" };
-                write!(
-                    f,
-                    "{} hidden fix{es} can be enabled with the `--unsafe-fixes` option.",
-                    self.unapplicable
-                )
-            }
-        }
     }
 }
