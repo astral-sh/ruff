@@ -208,6 +208,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         }
         _ => Box::new(BufWriter::new(io::stdout())),
     };
+    let stderr_writer = Box::new(BufWriter::new(io::stderr()));
 
     if cli.show_settings {
         commands::show_settings::show_settings(
@@ -392,15 +393,18 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             )?
         };
 
-        // Always try to print violations (the printer itself may suppress output),
-        // unless we're writing fixes via stdin (in which case, the transformed
-        // source code goes to stdout).
-        if !(is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff)) {
-            if cli.statistics {
-                printer.write_statistics(&diagnostics, &mut writer)?;
-            } else {
-                printer.write_once(&diagnostics, &mut writer)?;
-            }
+        // Always try to print violations (though the printer itself may suppress output)
+        // If we're writing fixes via stdin, the transformed source code goes to the writer
+        // so send the summary to stderr instead
+        let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
+            stderr_writer
+        } else {
+            writer
+        };
+        if cli.statistics {
+            printer.write_statistics(&diagnostics, &mut summary_writer)?;
+        } else {
+            printer.write_once(&diagnostics, &mut summary_writer)?;
         }
 
         if !cli.exit_zero {
