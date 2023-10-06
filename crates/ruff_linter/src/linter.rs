@@ -8,7 +8,7 @@ use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Applicability, Diagnostic};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
@@ -257,6 +257,26 @@ pub fn check_path(
         // If the syntax error _diagnostic_ is disabled, discard the _diagnostic_.
         if !settings.rules.enabled(Rule::SyntaxError) {
             diagnostics.retain(|diagnostic| diagnostic.kind.rule() != Rule::SyntaxError);
+        }
+    }
+
+    // Update fix applicability to account for overrides
+    if !settings.extend_safe_fixes.is_empty() || !settings.extend_unsafe_fixes.is_empty() {
+        for diagnostic in &mut diagnostics {
+            if let Some(fix) = &diagnostic.fix {
+                // Check unsafe before safe so if someone puts a rule in both we are conservative
+                if settings
+                    .extend_unsafe_fixes
+                    .contains(diagnostic.kind.rule())
+                    && fix.applicability().is_always()
+                {
+                    diagnostic.set_fix(fix.clone().with_applicability(Applicability::Sometimes));
+                } else if settings.extend_safe_fixes.contains(diagnostic.kind.rule())
+                    && fix.applicability().is_sometimes()
+                {
+                    diagnostic.set_fix(fix.clone().with_applicability(Applicability::Always));
+                }
+            }
         }
     }
 

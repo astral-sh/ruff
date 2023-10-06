@@ -42,6 +42,8 @@ pub struct LinterSettings {
 
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
+    pub extend_unsafe_fixes: RuleSet,
+    pub extend_safe_fixes: RuleSet,
 
     pub target_version: PythonVersion,
     pub preview: PreviewMode,
@@ -139,6 +141,8 @@ impl LinterSettings {
             namespace_packages: vec![],
 
             per_file_ignores: vec![],
+            extend_safe_fixes: RuleSet::empty(),
+            extend_unsafe_fixes: RuleSet::empty(),
 
             src: vec![path_dedot::CWD.clone()],
             // Needs duplicating
