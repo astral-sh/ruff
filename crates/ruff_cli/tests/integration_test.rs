@@ -150,6 +150,7 @@ fn stdin_fix_py() {
     print(sys.version)
 
     ----- stderr -----
+    Found 1 error (1 fixed, 0 remaining).
     "###);
 }
 
@@ -317,6 +318,7 @@ fn stdin_fix_jupyter() {
      "nbformat_minor": 5
     }
     ----- stderr -----
+    Found 2 errors (2 fixed, 0 remaining).
     "###);
 }
 
@@ -336,6 +338,8 @@ fn stdin_fix_when_not_fixable_should_still_print_contents() {
          print(sys.version)
 
     ----- stderr -----
+    -:3:4: F634 If test is a tuple, which is always `True`
+    Found 2 errors (1 fixed, 1 remaining).
     "###);
 }
 
@@ -961,6 +965,9 @@ fn fix_applies_safe_fixes_by_default() {
     print('foo')
 
     ----- stderr -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    Found 2 errors (1 fixed, 1 remaining).
+    1 hidden fix can be enabled with the `--unsafe-fixes` option.
     "###);
 }
 
@@ -988,6 +995,7 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
     print('foo')
 
     ----- stderr -----
+    Found 2 errors (2 fixed, 0 remaining).
     "###);
 }
 
@@ -1014,6 +1022,7 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
     print('foo')
 
     ----- stderr -----
+    Fixed 1 error.
     "###);
 }
 
@@ -1041,6 +1050,7 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
     print('foo')
 
     ----- stderr -----
+    Fixed 2 errors.
     "###);
 }
 
@@ -1070,6 +1080,7 @@ fn diff_shows_safe_fixes_by_default() {
 
 
     ----- stderr -----
+    Would fix 1 error.
     "###
     );
 }
@@ -1102,6 +1113,7 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
 
 
     ----- stderr -----
+    Would fix 2 errors.
     "###
     );
 }
