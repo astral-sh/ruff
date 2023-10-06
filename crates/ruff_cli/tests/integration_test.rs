@@ -331,7 +331,7 @@ fn stdin_override_parser_py() {
     ----- stdout -----
     F401.ipynb:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -428,8 +428,8 @@ fn stdin_override_parser_ipynb() {
     Jupyter.py:cell 1:1:8: F401 [*] `os` imported but unused
     Jupyter.py:cell 3:1:8: F401 [*] `sys` imported but unused
     Found 2 errors.
-    [*] 2 potentially fixable with the --fix option.
-    
+    [*] 2 fixable with the `--fix` option.
+
     ----- stderr -----
     "###);
 }
