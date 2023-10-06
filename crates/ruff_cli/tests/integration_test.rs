@@ -10,13 +10,14 @@ use std::path::Path;
 use std::process::Command;
 use std::str;
 
-use anyhow::{Context, Result};
+#[cfg(unix)]
+use anyhow::Context;
+use anyhow::Result;
 #[cfg(unix)]
 use clap::Parser;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 #[cfg(unix)]
 use path_absolutize::path_dedot;
-#[cfg(unix)]
 use tempfile::TempDir;
 
 #[cfg(unix)]
