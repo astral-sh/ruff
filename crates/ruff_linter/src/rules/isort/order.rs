@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use itertools::Itertools;
 
 use super::settings::Settings;
-use super::sorting::{cmp_import_from, cmp_members, cmp_modules};
+use super::sorting::{cmp_import_from, cmp_members, module_key};
 use super::types::{AliasData, CommentSet, ImportBlock, ImportFromStatement, OrderedImportBlock};
 
 pub(crate) fn order_imports<'a>(
@@ -17,7 +17,7 @@ pub(crate) fn order_imports<'a>(
         block
             .import
             .into_iter()
-            .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2, settings)),
+            .sorted_by_cached_key(|(alias, _)| module_key(alias.name, alias.asname, settings)),
     );
 
     // Sort `Stmt::ImportFrom`.

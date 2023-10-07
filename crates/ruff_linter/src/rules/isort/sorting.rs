@@ -1,4 +1,5 @@
 /// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
+use natord;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
@@ -168,4 +169,45 @@ pub(crate) fn cmp_either_import(
             cmp_import_from(import_from1, import_from2, settings)
         }
     }
+}
+
+#[derive(Eq, PartialEq, Debug)]
+pub(crate) struct NatOrdString(String);
+
+impl std::fmt::Display for NatOrdString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Ord for NatOrdString {
+    fn cmp(&self, other: &Self) -> Ordering {
+        natord::compare(&self.0, &other.0)
+    }
+}
+
+impl PartialOrd for NatOrdString {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+pub(crate) fn module_key(
+    name: &str,
+    asname: Option<&str>,
+    settings: &Settings,
+) -> (
+    bool,
+    Option<NatOrdString>,
+    NatOrdString,
+    Option<NatOrdString>,
+) {
+    let force_to_top = !settings.force_to_top.contains(name);
+    let maybe_lower_case_name = (!settings.case_sensitive)
+        .then_some(name.to_lowercase())
+        .map(NatOrdString);
+    let module_name = NatOrdString(name.to_string());
+    let asname = asname.map(String::from).map(NatOrdString);
+
+    (force_to_top, maybe_lower_case_name, module_name, asname)
 }
