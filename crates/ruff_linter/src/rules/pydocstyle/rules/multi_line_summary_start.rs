@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_semantic::Definition;
@@ -52,13 +52,13 @@ use crate::registry::{AsRule, Rule};
 #[violation]
 pub struct MultiLineSummaryFirstLine;
 
-impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
+impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Multi-line docstring summary should start at the first line")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove whitespace after opening quotes".to_string()
     }
 }
@@ -106,13 +106,13 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
 #[violation]
 pub struct MultiLineSummarySecondLine;
 
-impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
+impl AlwaysFixableViolation for MultiLineSummarySecondLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Multi-line docstring summary should start at the second line")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Insert line break and indentation after opening quotes".to_string()
     }
 }
@@ -141,7 +141,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                 // Delete until first non-whitespace char.
                 for line in content_lines {
                     if let Some(end_column) = line.find(|c: char| !c.is_whitespace()) {
-                        diagnostic.set_fix(Fix::automatic(Edit::deletion(
+                        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                             first_line.end(),
                             line.start() + TextSize::try_from(end_column).unwrap(),
                         )));
@@ -197,7 +197,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                         first_line.strip_prefix(prefix).unwrap().trim_start()
                     );
 
-                    diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                         repl,
                         body.start(),
                         first_line.end(),

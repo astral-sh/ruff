@@ -15,7 +15,9 @@ license = { workspace = true }
 [dependencies]
 ruff_linter = { path = "../ruff_linter" }
 ruff_formatter = { path = "../ruff_formatter" }
-ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_python_formatter = { path = "../ruff_python_formatter", features = ["serde"] }
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_source_file = { path = "../ruff_source_file" }
 ruff_cache = { path = "../ruff_cache" }
 ruff_macros = { path = "../ruff_macros" }
 
@@ -29,7 +31,7 @@ glob = { workspace = true }
 globset = { workspace = true }
 once_cell = { workspace = true }
 path-absolutize = { workspace = true }
-pep440_rs = { version = "0.3.1", features = ["serde"] }
+pep440_rs = { version = "0.3.12", features = ["serde"] }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
@@ -43,4 +45,6 @@ tempfile = "3.6.0"
 
 
 [features]
-schemars = [ "dep:schemars" ]
+schemars = [ "dep:schemars", "ruff_formatter/schemars", "ruff_python_formatter/schemars" ]
+
+default = []

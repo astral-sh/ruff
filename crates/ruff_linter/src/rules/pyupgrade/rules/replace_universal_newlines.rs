@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_argument, Parentheses};
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -37,13 +37,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct ReplaceUniversalNewlines;
 
-impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
+impl AlwaysFixableViolation for ReplaceUniversalNewlines {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`universal_newlines` is deprecated, use `text`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `text` keyword argument".to_string()
     }
 }
@@ -74,10 +74,10 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::Expr
                         Parentheses::Preserve,
                         checker.locator().contents(),
                     )
-                    .map(Fix::suggested)
+                    .map(Fix::unsafe_edit)
                 });
             } else {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     "text".to_string(),
                     arg.range(),
                 )));

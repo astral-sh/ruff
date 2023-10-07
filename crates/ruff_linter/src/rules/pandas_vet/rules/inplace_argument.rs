@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -7,8 +7,8 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_argument, Parentheses};
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -39,14 +39,14 @@ use crate::registry::AsRule;
 pub struct PandasUseOfInplaceArgument;
 
 impl Violation for PandasUseOfInplaceArgument {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`inplace=True` should be avoided; it has inconsistent behavior")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Assign to variable; remove `inplace` arg".to_string())
     }
 }
@@ -135,5 +135,5 @@ fn convert_inplace_argument_to_assignment(
     )
     .ok()?;
 
-    Some(Fix::suggested_edits(insert_assignment, [remove_argument]))
+    Some(Fix::unsafe_edits(insert_assignment, [remove_argument]))
 }

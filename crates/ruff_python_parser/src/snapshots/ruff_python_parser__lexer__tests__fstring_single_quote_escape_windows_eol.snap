@@ -1,0 +1,25 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: fstring_single_quote_escape_eol(WINDOWS_EOL)
+---
+[
+    (
+        FStringStart,
+        0..2,
+    ),
+    (
+        FStringMiddle {
+            value: "text \\\r\n more text",
+            is_raw: false,
+        },
+        2..20,
+    ),
+    (
+        FStringEnd,
+        20..21,
+    ),
+    (
+        Newline,
+        21..21,
+    ),
+]

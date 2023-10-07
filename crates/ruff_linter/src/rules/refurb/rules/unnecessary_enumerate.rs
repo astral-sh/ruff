@@ -1,16 +1,16 @@
 use std::fmt;
 
-use num_traits::Zero;
-
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Constant, Expr};
+use ruff_python_ast::{Arguments, Constant, Expr, Int};
 use ruff_python_codegen::Generator;
+use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
+use ruff_python_semantic::Binding;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::pad;
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -24,6 +24,16 @@ use crate::registry::AsRule;
 /// If you only need the index or values of a sequence, you should iterate over
 /// `range(len(...))` or the sequence itself, respectively, instead. This is
 /// more efficient and communicates the intent of the code more clearly.
+///
+/// ## Known problems
+/// This rule is prone to false negatives due to type inference limitations;
+/// namely, it will only suggest a fix using the `len` builtin function if the
+/// sequence passed to `enumerate` is an instantiated as a list, set, dict, or
+/// tuple literal, or annotated as such with a type annotation.
+///
+/// The `len` builtin function is not defined for all object types (such as
+/// generators), and so refactoring to use `len` over `enumerate` is not always
+/// safe.
 ///
 /// ## Example
 /// ```python
@@ -53,7 +63,7 @@ pub struct UnnecessaryEnumerate {
 }
 
 impl Violation for UnnecessaryEnumerate {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -68,7 +78,7 @@ impl Violation for UnnecessaryEnumerate {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UnnecessaryEnumerate { subset } = self;
         match subset {
             EnumerateSubset::Indices => Some("Replace with `range(len(...))`".to_string()),
@@ -139,12 +149,32 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                     ),
                     stmt_for.target.range(),
                 );
-                diagnostic.set_fix(Fix::suggested_edits(replace_iter, [replace_target]));
+                diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
             }
 
             checker.diagnostics.push(diagnostic);
         }
         (false, true) => {
+            // Ensure the sequence object works with `len`. If it doesn't, the
+            // fix is unclear.
+            let scope = checker.semantic().current_scope();
+            let bindings: Vec<&Binding> = scope
+                .get_all(sequence)
+                .map(|binding_id| checker.semantic().binding(binding_id))
+                .collect();
+            let [binding] = bindings.as_slice() else {
+                return;
+            };
+            // This will lead to a lot of false negatives, but it is the best
+            // we can do with the current type inference.
+            if !is_list(binding, checker.semantic())
+                && !is_dict(binding, checker.semantic())
+                && !is_set(binding, checker.semantic())
+                && !is_tuple(binding, checker.semantic())
+            {
+                return;
+            }
+
             // The value is unused, so replace with `for index in range(len(sequence))`.
             let mut diagnostic = Diagnostic::new(
                 UnnecessaryEnumerate {
@@ -160,15 +190,13 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 // there's no clear fix.
                 let start = arguments.find_argument("start", 1);
                 if start.map_or(true, |start| {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Int(value),
-                        ..
-                    }) = start
-                    {
-                        value.is_zero()
-                    } else {
-                        false
-                    }
+                    matches!(
+                        start,
+                        Expr::Constant(ast::ExprConstant {
+                            value: Constant::Int(Int::ZERO),
+                            ..
+                        })
+                    )
                 }) {
                     let replace_iter = Edit::range_replacement(
                         generate_range_len_call(sequence, checker.generator()),
@@ -184,7 +212,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                         stmt_for.target.range(),
                     );
 
-                    diagnostic.set_fix(Fix::suggested_edits(replace_iter, [replace_target]));
+                    diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
                 }
             }
             checker.diagnostics.push(diagnostic);

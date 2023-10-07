@@ -1,15 +1,14 @@
 use log::error;
 
-use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::line_width::LineWidthBuilder;
+use crate::fix::edits::fits;
 use crate::registry::AsRule;
 
 use super::fix_with;
@@ -45,7 +44,7 @@ use super::fix_with;
 pub struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,7 +54,7 @@ impl Violation for MultipleWithStatements {
         )
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Combine `with` statements".to_string())
     }
 }
@@ -137,16 +136,16 @@ pub(crate) fn multiple_with_statements(
                     with_stmt,
                 ) {
                     Ok(edit) => {
-                        if edit
-                            .content()
-                            .unwrap_or_default()
-                            .universal_newlines()
-                            .all(|line| {
-                                LineWidthBuilder::new(checker.settings.tab_size).add_str(&line)
-                                    <= checker.settings.line_length
-                            })
-                        {
-                            diagnostic.set_fix(Fix::suggested(edit));
+                        if edit.content().map_or(true, |content| {
+                            fits(
+                                content,
+                                with_stmt.into(),
+                                checker.locator(),
+                                checker.settings.line_length,
+                                checker.settings.tab_size,
+                            )
+                        }) {
+                            diagnostic.set_fix(Fix::unsafe_edit(edit));
                         }
                     }
                     Err(err) => error!("Failed to fix nested with: {err}"),

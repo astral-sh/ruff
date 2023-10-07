@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
@@ -56,7 +56,7 @@ pub struct UnusedLoopControlVariable {
 }
 
 impl Violation for UnusedLoopControlVariable {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -70,7 +70,7 @@ impl Violation for UnusedLoopControlVariable {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UnusedLoopControlVariable { rename, name, .. } = self;
 
         rename
@@ -168,7 +168,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
                         .filter(|binding| binding.start() >= expr.start())
                         .all(|binding| !binding.is_used())
                     {
-                        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             rename,
                             expr.range(),
                         )));

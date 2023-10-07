@@ -1,8 +1,10 @@
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::node::AstNode;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -48,13 +50,13 @@ use crate::{checkers::ast::Checker, registry::Rule};
 #[violation]
 pub struct QuadraticListSummation;
 
-impl AlwaysAutofixableViolation for QuadraticListSummation {
+impl AlwaysFixableViolation for QuadraticListSummation {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Avoid quadratic list summation")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Replace with `functools.reduce`")
     }
 }
@@ -100,9 +102,17 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
         checker.semantic(),
     )?;
 
-    let iterable = checker.locator().slice(iterable);
+    let iterable = checker.locator().slice(
+        parenthesized_range(
+            iterable.into(),
+            call.arguments.as_any_node_ref(),
+            checker.indexer().comment_ranges(),
+            checker.locator().contents(),
+        )
+        .unwrap_or(iterable.range()),
+    );
 
-    Ok(Fix::suggested_edits(
+    Ok(Fix::unsafe_edits(
         Edit::range_replacement(
             format!("{reduce_binding}({iadd_binding}, {iterable}, [])"),
             call.range(),

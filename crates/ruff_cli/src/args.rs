@@ -9,6 +9,7 @@ use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
+    UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -76,19 +77,25 @@ pub enum Command {
 pub struct CheckCommand {
     /// List of files or directories to check.
     pub files: Vec<PathBuf>,
-    /// Attempt to automatically fix lint violations.
-    /// Use `--no-fix` to disable.
+    /// Apply fixes to resolve lint violations.
+    /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
     #[clap(long, overrides_with("fix"), hide = true)]
     no_fix: bool,
+    /// Include fixes that may not retain the original intent of the code.
+    /// Use `--no-unsafe-fixes` to disable.
+    #[arg(long, overrides_with("no_unsafe_fixes"))]
+    unsafe_fixes: bool,
+    #[arg(long, overrides_with("unsafe_fixes"), hide = true)]
+    no_unsafe_fixes: bool,
     /// Show violations with source code.
     /// Use `--no-show-source` to disable.
     #[arg(long, overrides_with("no_show_source"))]
     show_source: bool,
     #[clap(long, overrides_with("show_source"), hide = true)]
     no_show_source: bool,
-    /// Show an enumeration of all autofixed lint violations.
+    /// Show an enumeration of all fixed lint violations.
     /// Use `--no-show-fixes` to disable.
     #[arg(long, overrides_with("no_show_fixes"))]
     show_fixes: bool,
@@ -100,8 +107,8 @@ pub struct CheckCommand {
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
     pub watch: bool,
-    /// Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`.
-    /// Use `--no-fix-only` to disable.
+    /// Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`.
+    /// Use `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
@@ -202,7 +209,7 @@ pub struct CheckCommand {
         help_heading = "File selection"
     )]
     pub extend_exclude: Option<Vec<FilePattern>>,
-    /// List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`).
+    /// List of rule codes to treat as eligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
@@ -212,7 +219,7 @@ pub struct CheckCommand {
         hide_possible_values = true
     )]
     pub fixable: Option<Vec<RuleSelector>>,
-    /// List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`).
+    /// List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
@@ -288,7 +295,7 @@ pub struct CheckCommand {
         conflicts_with = "exit_non_zero_on_fix"
     )]
     pub exit_zero: bool,
-    /// Exit with a non-zero status code if any files were modified via autofix, even if no lint violations remain.
+    /// Exit with a non-zero status code if any files were modified via fix, even if no lint violations remain.
     #[arg(long, help_heading = "Miscellaneous", conflicts_with = "exit_zero")]
     pub exit_non_zero_on_fix: bool,
     /// Show counts for every rule with at least one violation.
@@ -497,6 +504,8 @@ impl CheckCommand {
                 cache_dir: self.cache_dir,
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
+                unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
+                    .map(UnsafeFixes::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 output_format: self.output_format.or(self.format),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
@@ -599,6 +608,7 @@ pub struct CliOverrides {
     pub cache_dir: Option<PathBuf>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
+    pub unsafe_fixes: Option<UnsafeFixes>,
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
@@ -610,7 +620,7 @@ impl ConfigurationTransformer for CliOverrides {
             config.cache_dir = Some(cache_dir.clone());
         }
         if let Some(dummy_variable_rgx) = &self.dummy_variable_rgx {
-            config.dummy_variable_rgx = Some(dummy_variable_rgx.clone());
+            config.lint.dummy_variable_rgx = Some(dummy_variable_rgx.clone());
         }
         if let Some(exclude) = &self.exclude {
             config.exclude = Some(exclude.clone());
@@ -624,7 +634,10 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(fix_only) = &self.fix_only {
             config.fix_only = Some(*fix_only);
         }
-        config.rule_selections.push(RuleSelection {
+        if self.unsafe_fixes.is_some() {
+            config.unsafe_fixes = self.unsafe_fixes;
+        }
+        config.lint.rule_selections.push(RuleSelection {
             select: self.select.clone(),
             ignore: self
                 .ignore
@@ -657,7 +670,7 @@ impl ConfigurationTransformer for CliOverrides {
             config.preview = Some(*preview);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
-            config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
+            config.lint.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
         }
         if let Some(respect_gitignore) = &self.respect_gitignore {
             config.respect_gitignore = Some(*respect_gitignore);

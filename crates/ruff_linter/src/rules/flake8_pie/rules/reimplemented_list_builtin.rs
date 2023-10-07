@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, ExprLambda};
 
-use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -40,14 +40,14 @@ use crate::registry::AsRule;
 pub struct ReimplementedListBuiltin;
 
 impl Violation for ReimplementedListBuiltin {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `list` over useless lambda")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Replace with `list`".to_string())
     }
 }
@@ -66,7 +66,7 @@ pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambd
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if checker.semantic().is_builtin("list") {
-                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             "list".to_string(),
                             expr.range(),
                         )));

@@ -6,8 +6,8 @@ use libcst_native::{
 use log::error;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use crate::autofix::codemods::CodegenStylist;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::codemods::CodegenStylist;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::whitespace::indentation;
@@ -52,13 +52,13 @@ pub struct DeprecatedMockImport {
     reference_type: MockReference,
 }
 
-impl AlwaysAutofixableViolation for DeprecatedMockImport {
+impl AlwaysFixableViolation for DeprecatedMockImport {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`mock` is deprecated, use `unittest.mock`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let DeprecatedMockImport { reference_type } = self;
         match reference_type {
             MockReference::Import => "Import from `unittest.mock` instead".to_string(),
@@ -262,7 +262,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 value.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     "mock".to_string(),
                     value.range(),
                 )));
@@ -308,7 +308,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             name.range(),
                         );
                         if let Some(content) = content.as_ref() {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 content.clone(),
                                 stmt.range(),
                             )));
@@ -339,7 +339,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                         diagnostic.try_set_fix(|| {
                             format_import_from(stmt, indent, checker.locator(), checker.stylist())
                                 .map(|content| Edit::range_replacement(content, stmt.range()))
-                                .map(Fix::suggested)
+                                .map(Fix::unsafe_edit)
                         });
                     }
                 }

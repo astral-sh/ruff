@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
@@ -47,7 +47,7 @@ pub struct BlankLineAfterSummary {
 }
 
 impl Violation for BlankLineAfterSummary {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -61,7 +61,7 @@ impl Violation for BlankLineAfterSummary {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Insert single blank line".to_string())
     }
 }
@@ -114,7 +114,7 @@ pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) 
                 }
 
                 // Insert one blank line after the summary (replacing any existing lines).
-                diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     checker.stylist().line_ending().to_string(),
                     summary_end,
                     blank_end,

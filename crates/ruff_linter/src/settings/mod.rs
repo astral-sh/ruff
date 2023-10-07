@@ -30,6 +30,7 @@ use super::line_width::{LineLength, TabSize};
 
 use self::rule_table::RuleTable;
 use self::types::PreviewMode;
+use crate::rule_selector::PreviewOptions;
 
 pub mod flags;
 pub mod rule_table;
@@ -44,6 +45,7 @@ pub struct LinterSettings {
 
     pub target_version: PythonVersion,
     pub preview: PreviewMode,
+    pub explicit_preview_rules: bool,
 
     // Rule-specific settings
     pub allowed_confusables: FxHashSet<char>,
@@ -58,6 +60,7 @@ pub struct LinterSettings {
     pub tab_size: TabSize,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
+
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bandit: flake8_bandit::settings::Settings,
@@ -121,7 +124,7 @@ impl LinterSettings {
             project_root: project_root.to_path_buf(),
             rules: PREFIXES
                 .iter()
-                .flat_map(|selector| selector.rules(PreviewMode::default()))
+                .flat_map(|selector| selector.rules(&PreviewOptions::default()))
                 .collect(),
             allowed_confusables: FxHashSet::from_iter([]),
 
@@ -168,6 +171,7 @@ impl LinterSettings {
             pylint: pylint::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
             preview: PreviewMode::default(),
+            explicit_preview_rules: false,
         }
     }
 

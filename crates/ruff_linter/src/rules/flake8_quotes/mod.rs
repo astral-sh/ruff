@@ -11,6 +11,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -42,6 +43,44 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn require_singles_over_doubles_escaped_py311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_quotes/doubles_escaped.py"),
+            &LinterSettings {
+                flake8_quotes: super::settings::Settings {
+                    inline_quotes: Quote::Single,
+                    multiline_quotes: Quote::Single,
+                    docstring_quotes: Quote::Single,
+                    avoid_escape: true,
+                },
+                ..LinterSettings::for_rule(Rule::AvoidableEscapedQuote)
+                    .with_target_version(PythonVersion::Py311)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn require_doubles_over_singles_escaped_py311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_quotes/singles_escaped.py"),
+            &LinterSettings {
+                flake8_quotes: super::settings::Settings {
+                    inline_quotes: Quote::Double,
+                    multiline_quotes: Quote::Double,
+                    docstring_quotes: Quote::Double,
+                    avoid_escape: true,
+                },
+                ..LinterSettings::for_rule(Rule::AvoidableEscapedQuote)
+                    .with_target_version(PythonVersion::Py311)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 

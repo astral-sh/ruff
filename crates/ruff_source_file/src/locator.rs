@@ -76,7 +76,15 @@ impl<'a> Locator<'a> {
         if let Some(index) = memrchr2(b'\n', b'\r', bytes) {
             // SAFETY: Safe because `index < offset`
             TextSize::try_from(index).unwrap().add(TextSize::from(1))
-        } else if self.contents.starts_with('\u{feff}') {
+        } else {
+            self.contents_start()
+        }
+    }
+
+    /// Computes the start position of the file contents: either the first byte, or the byte after
+    /// the BOM.
+    pub fn contents_start(&self) -> TextSize {
+        if self.contents.starts_with('\u{feff}') {
             // Skip the BOM.
             '\u{feff}'.text_len()
         } else {
@@ -85,9 +93,9 @@ impl<'a> Locator<'a> {
         }
     }
 
+    /// Returns `true` if `offset` is at the start of a line.
     pub fn is_at_start_of_line(&self, offset: TextSize) -> bool {
-        offset == TextSize::from(0)
-            || self.contents[TextRange::up_to(offset)].ends_with(['\n', '\r'])
+        self.line_start(offset) == offset
     }
 
     /// Computes the offset that is right after the newline character that ends `offset`'s line.

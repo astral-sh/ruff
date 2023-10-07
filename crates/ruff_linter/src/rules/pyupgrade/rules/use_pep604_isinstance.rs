@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::{Ranged, TextRange};
@@ -65,13 +65,13 @@ pub struct NonPEP604Isinstance {
     kind: CallKind,
 }
 
-impl AlwaysAutofixableViolation for NonPEP604Isinstance {
+impl AlwaysFixableViolation for NonPEP604Isinstance {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `X | Y` in `{}` call instead of `(X, Y)`", self.kind)
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Convert to `X | Y`".to_string()
     }
 }
@@ -117,7 +117,7 @@ pub(crate) fn use_pep604_isinstance(
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                         checker.generator().expr(&union(elts)),
                         types.range(),
                     )));

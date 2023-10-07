@@ -1,6 +1,6 @@
 use ruff_python_ast::{Expr, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -36,14 +36,14 @@ pub struct UnnecessaryLiteralSet {
     obj_type: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryLiteralSet {
+impl AlwaysFixableViolation for UnnecessaryLiteralSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryLiteralSet { obj_type } = self;
         format!("Unnecessary `{obj_type}` literal (rewrite as a `set` literal)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Rewrite as a `set` literal".to_string()
     }
 }
@@ -76,8 +76,9 @@ pub(crate) fn unnecessary_literal_set(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic
-            .try_set_fix(|| fixes::fix_unnecessary_literal_set(expr, checker).map(Fix::suggested));
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_literal_set(expr, checker).map(Fix::unsafe_edit)
+        });
     }
     checker.diagnostics.push(diagnostic);
 }

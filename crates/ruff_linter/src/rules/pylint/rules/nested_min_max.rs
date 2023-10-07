@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::SemanticModel;
 
@@ -43,7 +43,7 @@ pub struct NestedMinMax {
 }
 
 impl Violation for NestedMinMax {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
 
@@ -52,7 +52,7 @@ impl Violation for NestedMinMax {
         format!("Nested `{func}` calls can be flattened")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let NestedMinMax { func } = self;
         Some(format!("Flatten nested `{func}` calls"))
     }
@@ -171,7 +171,7 @@ pub(crate) fn nested_min_max(
                     },
                     range: TextRange::default(),
                 });
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     checker.generator().expr(&flattened_expr),
                     expr.range(),
                 )));

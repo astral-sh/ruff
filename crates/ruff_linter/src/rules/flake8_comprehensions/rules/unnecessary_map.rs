@@ -1,7 +1,7 @@
 use std::fmt;
 
-use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -47,7 +47,7 @@ pub struct UnnecessaryMap {
 }
 
 impl Violation for UnnecessaryMap {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,7 +55,7 @@ impl Violation for UnnecessaryMap {
         format!("Unnecessary `map` usage (rewrite using a {object_type})")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UnnecessaryMap { object_type } = self;
         Some(format!("Replace `map` with a {object_type}"))
     }
@@ -230,7 +230,7 @@ pub(crate) fn unnecessary_map(
                 checker.locator(),
                 checker.stylist(),
             )
-            .map(Fix::suggested)
+            .map(Fix::unsafe_edit)
         });
     }
     checker.diagnostics.push(diagnostic);

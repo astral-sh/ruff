@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -43,7 +43,7 @@ pub struct CollectionLiteralConcatenation {
 }
 
 impl Violation for CollectionLiteralConcatenation {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,7 +55,7 @@ impl Violation for CollectionLiteralConcatenation {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let CollectionLiteralConcatenation { expression } = self;
         if let Some(expression) = expression.full_display() {
             Some(format!("Replace with `{expression}`"))
@@ -202,7 +202,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
         if !checker.indexer().has_comments(expr, checker.locator()) {
             // This suggestion could be unsafe if the non-literal expression in the
             // expression has overridden the `__add__` (or `__radd__`) magic methods.
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 contents,
                 expr.range(),
             )));

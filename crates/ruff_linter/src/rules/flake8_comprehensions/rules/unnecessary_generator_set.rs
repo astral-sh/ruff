@@ -1,6 +1,6 @@
 use ruff_python_ast::{Expr, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -31,13 +31,13 @@ use super::helpers;
 #[violation]
 pub struct UnnecessaryGeneratorSet;
 
-impl AlwaysAutofixableViolation for UnnecessaryGeneratorSet {
+impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary generator (rewrite as a `set` comprehension)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Rewrite as a `set` comprehension".to_string()
     }
 }
@@ -62,7 +62,7 @@ pub(crate) fn unnecessary_generator_set(
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_generator_set(expr, checker).map(Fix::suggested)
+                fixes::fix_unnecessary_generator_set(expr, checker).map(Fix::unsafe_edit)
             });
         }
         checker.diagnostics.push(diagnostic);

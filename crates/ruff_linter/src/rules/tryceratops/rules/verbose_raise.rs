@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_text_size::Ranged;
@@ -35,13 +35,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct VerboseRaise;
 
-impl AlwaysAutofixableViolation for VerboseRaise {
+impl AlwaysFixableViolation for VerboseRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `raise` without specifying exception name")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove exception name")
     }
 }
@@ -97,7 +97,7 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                         if id == exception_name.as_str() {
                             let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                     "raise".to_string(),
                                     raise.range(),
                                 )));

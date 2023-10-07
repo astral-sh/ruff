@@ -111,7 +111,7 @@ pub(crate) fn check_noqa(
                             Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
                         if settings.rules.should_fix(diagnostic.kind.rule()) {
                             diagnostic
-                                .set_fix(Fix::suggested(delete_noqa(directive.range(), locator)));
+                                .set_fix(Fix::unsafe_edit(delete_noqa(directive.range(), locator)));
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -175,12 +175,12 @@ pub(crate) fn check_noqa(
                         );
                         if settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
-                                diagnostic.set_fix(Fix::suggested(delete_noqa(
+                                diagnostic.set_fix(Fix::unsafe_edit(delete_noqa(
                                     directive.range(),
                                     locator,
                                 )));
                             } else {
-                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
                                     directive.range(),
                                 )));
@@ -230,7 +230,13 @@ fn delete_noqa(range: TextRange, locator: &Locator) -> Edit {
         Edit::deletion(range.start() - leading_space_len, line_range.end())
     }
     // Ex) `x = 1  # noqa  # type: ignore`
-    else if locator.contents()[usize::from(range.end() + trailing_space_len)..].starts_with('#') {
+    else if locator
+        .slice(TextRange::new(
+            range.end() + trailing_space_len,
+            line_range.end(),
+        ))
+        .starts_with('#')
+    {
         Edit::deletion(range.start(), range.end() + trailing_space_len)
     }
     // Ex) `x = 1  # noqa here`

@@ -1,12 +1,12 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 use itertools::Itertools;
+
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use num_bigint::BigInt;
-
+use crate::int;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
@@ -2584,7 +2584,7 @@ pub enum Constant {
     Bool(bool),
     Str(StringConstant),
     Bytes(BytesConstant),
-    Int(BigInt),
+    Int(int::Int),
     Float(f64),
     Complex { real: f64, imag: f64 },
     Ellipsis,
@@ -2597,6 +2597,14 @@ impl Constant {
         match self {
             Constant::Str(value) => value.implicit_concatenated,
             Constant::Bytes(value) => value.implicit_concatenated,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the constant is a string constant that is a unicode string (i.e., `u"..."`).
+    pub fn is_unicode_string(&self) -> bool {
+        match self {
+            Constant::Str(value) => value.unicode,
             _ => false,
         }
     }
@@ -2620,6 +2628,16 @@ impl Deref for StringConstant {
     }
 }
 
+impl From<String> for StringConstant {
+    fn from(value: String) -> StringConstant {
+        Self {
+            value,
+            unicode: false,
+            implicit_concatenated: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BytesConstant {
     /// The bytes value as resolved by the parser (i.e., without quotes, or escape sequences, or
@@ -2633,6 +2651,15 @@ impl Deref for BytesConstant {
     type Target = [u8];
     fn deref(&self) -> &Self::Target {
         self.value.as_slice()
+    }
+}
+
+impl From<Vec<u8>> for BytesConstant {
+    fn from(value: Vec<u8>) -> BytesConstant {
+        Self {
+            value,
+            implicit_concatenated: false,
+        }
     }
 }
 
@@ -3206,6 +3233,12 @@ pub struct ParenthesizedExpr {
     pub range: TextRange,
     /// The underlying expression.
     pub expr: Expr,
+}
+impl ParenthesizedExpr {
+    /// Returns `true` if the expression is may be parenthesized.
+    pub fn is_parenthesized(&self) -> bool {
+        self.range != self.expr.range()
+    }
 }
 impl Ranged for ParenthesizedExpr {
     fn range(&self) -> TextRange {

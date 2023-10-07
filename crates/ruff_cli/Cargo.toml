@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.290"
+version = "0.0.292"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -70,7 +70,7 @@ insta = { workspace = true, features = ["filters"] }
 insta-cmd = { version = "0.4.0" }
 tempfile = "3.6.0"
 test-case = { workspace = true }
-ureq = { version = "2.6.2", features = [] }
+ureq = { version = "2.8.0", features = [] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = "0.1.39"

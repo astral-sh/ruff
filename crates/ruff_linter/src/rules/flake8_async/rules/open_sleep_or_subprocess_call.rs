@@ -1,5 +1,4 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::Expr;
+use ruff_python_ast::ExprCall;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -42,20 +41,18 @@ impl Violation for OpenSleepOrSubprocessInAsyncFunction {
 }
 
 /// ASYNC101
-pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, call: &ExprCall) {
     if checker.semantic().in_async_context() {
-        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if checker
-                .semantic()
-                .resolve_call_path(func)
-                .as_ref()
-                .is_some_and(is_open_sleep_or_subprocess_call)
-            {
-                checker.diagnostics.push(Diagnostic::new(
-                    OpenSleepOrSubprocessInAsyncFunction,
-                    func.range(),
-                ));
-            }
+        if checker
+            .semantic()
+            .resolve_call_path(call.func.as_ref())
+            .as_ref()
+            .is_some_and(is_open_sleep_or_subprocess_call)
+        {
+            checker.diagnostics.push(Diagnostic::new(
+                OpenSleepOrSubprocessInAsyncFunction,
+                call.func.range(),
+            ));
         }
     }
 }

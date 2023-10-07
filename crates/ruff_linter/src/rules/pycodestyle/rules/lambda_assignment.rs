@@ -3,7 +3,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -42,14 +42,14 @@ pub struct LambdaAssignment {
 }
 
 impl Violation for LambdaAssignment {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not assign a `lambda` expression, use a `def`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let LambdaAssignment { name } = self;
         Some(format!("Rewrite `{name}` as a `def`"))
     }
@@ -125,9 +125,12 @@ pub(crate) fn lambda_assignment(
                     .get_all(id)
                     .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
             {
-                diagnostic.set_fix(Fix::manual(Edit::range_replacement(indented, stmt.range())));
+                diagnostic.set_fix(Fix::display_edit(Edit::range_replacement(
+                    indented,
+                    stmt.range(),
+                )));
             } else {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     indented,
                     stmt.range(),
                 )));

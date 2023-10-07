@@ -1,6 +1,6 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -38,14 +38,14 @@ use crate::registry::AsRule;
 pub struct DatetimeTimezoneUTC;
 
 impl Violation for DatetimeTimezoneUTC {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `datetime.UTC` alias")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Convert to `datetime.UTC` alias".to_string())
     }
 }
@@ -66,7 +66,7 @@ pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
                     checker.semantic(),
                 )?;
                 let reference_edit = Edit::range_replacement(binding, expr.range());
-                Ok(Fix::suggested_edits(import_edit, [reference_edit]))
+                Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
             });
         }
         checker.diagnostics.push(diagnostic);

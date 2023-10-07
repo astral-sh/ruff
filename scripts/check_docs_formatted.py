@@ -55,6 +55,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "multiple-statements-on-one-line-semicolon",
     "no-blank-line-before-function",
     "no-indented-block-comment",
+    "no-return-argument-annotation-in-stub",
     "no-space-after-block-comment",
     "no-space-after-inline-comment",
     "non-empty-stub-body",

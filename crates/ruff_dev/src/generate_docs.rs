@@ -8,9 +8,10 @@ use anyhow::Result;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::AutofixKind;
+use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_workspace::options::Options;
+use ruff_workspace::options_base::OptionsMetadata;
 
 use crate::ROOT_DIR;
 
@@ -36,16 +37,19 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            let autofix = rule.autofixable();
-            if matches!(autofix, AutofixKind::Always | AutofixKind::Sometimes) {
-                output.push_str(&autofix.to_string());
+            let fix_availability = rule.fixable();
+            if matches!(
+                fix_availability,
+                FixAvailability::Always | FixAvailability::Sometimes
+            ) {
+                output.push_str(&fix_availability.to_string());
                 output.push('\n');
                 output.push('\n');
             }
 
-            if rule.is_preview() {
+            if rule.is_preview() || rule.is_nursery() {
                 output.push_str(
-                    r#"This rule is in preview and is not stable. The `--preview` flag is required for use."#,
+                    r#"This rule is unstable and in [preview](../preview.md). The `--preview` flag is required for use."#,
                 );
                 output.push('\n');
                 output.push('\n');
@@ -96,10 +100,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
             if let Some(rest) = line.strip_prefix("- `") {
                 let option = rest.trim_end().trim_end_matches('`');
 
-                assert!(
-                    Options::metadata().get(option).is_some(),
-                    "unknown option {option}"
-                );
+                assert!(Options::metadata().has(option), "unknown option {option}");
 
                 let anchor = option.replace('.', "-");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));

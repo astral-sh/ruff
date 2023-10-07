@@ -29,7 +29,7 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use log::error;
+use log::debug;
 use ruff_python_ast::{
     self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
     ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
@@ -183,7 +183,7 @@ impl<'a> Checker<'a> {
 
         // Find the quote character used to start the containing f-string.
         let expr = self.semantic.current_expression()?;
-        let string_range = self.indexer.f_string_range(expr.start())?;
+        let string_range = self.indexer.fstring_ranges().innermost(expr.start())?;
         let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
 
         // Invert the quote character, if it's a single quote.
@@ -1176,7 +1176,7 @@ where
                                     self.visit_expr_context(ctx);
                                 }
                             } else {
-                                error!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
                         }
                         None => {

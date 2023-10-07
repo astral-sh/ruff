@@ -33,10 +33,10 @@ message
     assert not (a or not (b or c))
     assert not (a or not (b and c))
 
-    # detected, but no autofix for messages
+    # detected, but no fix for messages
     assert something and something_else, "error message"
     assert not (something or something_else and something_third), "with message"
-    # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
+    # detected, but no fix for mixed conditions (e.g. `a or b and c`)
     assert not (something or something_else and something_third)
 
 

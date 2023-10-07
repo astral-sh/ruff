@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
@@ -28,13 +28,13 @@ use super::helpers;
 #[violation]
 pub struct UnnecessaryListComprehensionDict;
 
-impl AlwaysAutofixableViolation for UnnecessaryListComprehensionDict {
+impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary `list` comprehension (rewrite as a `dict` comprehension)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Rewrite as a `dict` comprehension".to_string()
     }
 }
@@ -67,7 +67,7 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_list_comprehension_dict(expr, checker).map(Fix::suggested)
+            fixes::fix_unnecessary_list_comprehension_dict(expr, checker).map(Fix::unsafe_edit)
         });
     }
     checker.diagnostics.push(diagnostic);

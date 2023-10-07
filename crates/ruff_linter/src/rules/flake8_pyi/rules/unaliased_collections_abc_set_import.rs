@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::Imported;
 use ruff_python_semantic::{Binding, BindingKind};
@@ -33,7 +33,7 @@ use crate::renamer::Renamer;
 pub struct UnaliasedCollectionsAbcSetImport;
 
 impl Violation for UnaliasedCollectionsAbcSetImport {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -42,7 +42,7 @@ impl Violation for UnaliasedCollectionsAbcSetImport {
         )
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Alias `Set` to `AbstractSet`"))
     }
 }
@@ -70,7 +70,7 @@ pub(crate) fn unaliased_collections_abc_set_import(
             diagnostic.try_set_fix(|| {
                 let scope = &checker.semantic().scopes[binding.scope];
                 let (edit, rest) = Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
-                Ok(Fix::suggested_edits(edit, rest))
+                Ok(Fix::unsafe_edits(edit, rest))
             });
         }
     }

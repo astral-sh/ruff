@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::is_const_none;
@@ -53,7 +53,7 @@ impl EqCmpOp {
 #[violation]
 pub struct NoneComparison(EqCmpOp);
 
-impl AlwaysAutofixableViolation for NoneComparison {
+impl AlwaysFixableViolation for NoneComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoneComparison(op) = self;
@@ -63,7 +63,7 @@ impl AlwaysAutofixableViolation for NoneComparison {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let NoneComparison(op) = self;
         match op {
             EqCmpOp::Eq => "Replace with `cond is None`".to_string(),
@@ -99,7 +99,7 @@ impl AlwaysAutofixableViolation for NoneComparison {
 #[violation]
 pub struct TrueFalseComparison(bool, EqCmpOp);
 
-impl AlwaysAutofixableViolation for TrueFalseComparison {
+impl AlwaysFixableViolation for TrueFalseComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TrueFalseComparison(value, op) = self;
@@ -119,7 +119,7 @@ impl AlwaysAutofixableViolation for TrueFalseComparison {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let TrueFalseComparison(value, op) = self;
         match (value, op) {
             (true, EqCmpOp::Eq) => "Replace with `cond is True`".to_string(),
@@ -287,7 +287,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             checker.locator(),
         );
         for diagnostic in &mut diagnostics {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 content.to_string(),
                 compare.range(),
             )));

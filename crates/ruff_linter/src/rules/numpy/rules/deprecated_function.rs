@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
@@ -37,7 +37,7 @@ pub struct NumpyDeprecatedFunction {
 }
 
 impl Violation for NumpyDeprecatedFunction {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -48,7 +48,7 @@ impl Violation for NumpyDeprecatedFunction {
         format!("`np.{existing}` is deprecated; use `np.{replacement}` instead")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let NumpyDeprecatedFunction { replacement, .. } = self;
         Some(format!("Replace with `np.{replacement}`"))
     }
@@ -84,7 +84,7 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
                     checker.semantic(),
                 )?;
                 let replacement_edit = Edit::range_replacement(binding, expr.range());
-                Ok(Fix::suggested_edits(import_edit, [replacement_edit]))
+                Ok(Fix::unsafe_edits(import_edit, [replacement_edit]))
             });
         }
         checker.diagnostics.push(diagnostic);

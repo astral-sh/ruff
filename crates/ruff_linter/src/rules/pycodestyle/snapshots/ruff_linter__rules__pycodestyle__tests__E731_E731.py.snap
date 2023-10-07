@@ -100,7 +100,7 @@ E731.py:24:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 26 27 | 
 27 28 | def scope():
 
-E731.py:57:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:57:5: E731 Do not assign a `lambda` expression, use a `def`
    |
 55 | class Scope:
 56 |     # E731
@@ -120,7 +120,7 @@ E731.py:57:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 59 60 | 
 60 61 | class Scope:
 
-E731.py:64:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:64:5: E731 Do not assign a `lambda` expression, use a `def`
    |
 63 |     # E731
 64 |     f: Callable[[int], int] = lambda x: 2 * x
@@ -139,7 +139,7 @@ E731.py:64:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 66 67 | 
 67 68 | def scope():
 
-E731.py:73:9: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:73:9: E731 Do not assign a `lambda` expression, use a `def`
    |
 71 |     x: Callable[[int], int]
 72 |     if True:
@@ -161,7 +161,7 @@ E731.py:73:9: E731 [*] Do not assign a `lambda` expression, use a `def`
 75 76 |         x = lambda: 2
 76 77 |     return x
 
-E731.py:75:9: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:75:9: E731 Do not assign a `lambda` expression, use a `def`
    |
 73 |         x = lambda: 1
 74 |     else:
@@ -322,7 +322,7 @@ E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 137 138 | 
 138 139 | class TemperatureScales(Enum):
 
-E731.py:139:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:139:5: E731 Do not assign a `lambda` expression, use a `def`
     |
 138 | class TemperatureScales(Enum):
 139 |     CELSIUS = (lambda deg_c: deg_c)
@@ -342,7 +342,7 @@ E731.py:139:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 141 142 | 
 142 143 | 
 
-E731.py:140:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:140:5: E731 Do not assign a `lambda` expression, use a `def`
     |
 138 | class TemperatureScales(Enum):
 139 |     CELSIUS = (lambda deg_c: deg_c)

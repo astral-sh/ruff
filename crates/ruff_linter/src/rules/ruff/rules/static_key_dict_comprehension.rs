@@ -1,6 +1,6 @@
 use ruff_python_ast::Expr;
 
-use crate::autofix::snippet::SourceCodeSnippet;
+use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_constant;

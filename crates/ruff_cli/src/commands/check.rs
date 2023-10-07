@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff_linter::settings::types::UnsafeFixes;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -35,7 +36,8 @@ pub(crate) fn check(
     overrides: &CliOverrides,
     cache: flags::Cache,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -119,7 +121,16 @@ pub(crate) fn check(
                         }
                     });
 
-                    lint_path(path, package, &settings.linter, cache, noqa, autofix).map_err(|e| {
+                    lint_path(
+                        path,
+                        package,
+                        &settings.linter,
+                        cache,
+                        noqa,
+                        fix_mode,
+                        unsafe_fixes,
+                    )
+                    .map_err(|e| {
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
@@ -198,10 +209,11 @@ fn lint_path(
     settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     let result = catch_unwind(|| {
-        crate::diagnostics::lint_path(path, package, settings, cache, noqa, autofix)
+        crate::diagnostics::lint_path(path, package, settings, cache, noqa, fix_mode, unsafe_fixes)
     });
 
     match result {
@@ -233,6 +245,8 @@ mod test {
     use std::os::unix::fs::OpenOptionsExt;
 
     use anyhow::Result;
+
+    use ruff_linter::settings::types::UnsafeFixes;
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
@@ -285,6 +299,7 @@ mod test {
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,
+            UnsafeFixes::Enabled,
         )
         .unwrap();
         let mut output = Vec::new();

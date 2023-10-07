@@ -98,23 +98,48 @@ pub(crate) fn blind_except(
                 func, arguments, ..
             }) = value.as_ref()
             {
-                if logging::is_logger_candidate(
-                    func,
-                    checker.semantic(),
-                    &checker.settings.logger_objects,
-                ) {
-                    if let Some(attribute) = func.as_attribute_expr() {
-                        let attr = attribute.attr.as_str();
-                        if attr == "exception" {
-                            return true;
-                        }
-                        if attr == "error" {
-                            if let Some(keyword) = arguments.find_keyword("exc_info") {
-                                if is_const_true(&keyword.value) {
-                                    return true;
+                match func.as_ref() {
+                    Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                        if logging::is_logger_candidate(
+                            func,
+                            checker.semantic(),
+                            &checker.settings.logger_objects,
+                        ) {
+                            match attr.as_str() {
+                                "exception" => return true,
+                                "error" => {
+                                    if let Some(keyword) = arguments.find_keyword("exc_info") {
+                                        if is_const_true(&keyword.value) {
+                                            return true;
+                                        }
+                                    }
                                 }
+                                _ => {}
                             }
                         }
+                    }
+                    Expr::Name(ast::ExprName { .. }) => {
+                        if checker
+                            .semantic()
+                            .resolve_call_path(func.as_ref())
+                            .is_some_and(|call_path| match call_path.as_slice() {
+                                ["logging", "exception"] => true,
+                                ["logging", "error"] => {
+                                    if let Some(keyword) = arguments.find_keyword("exc_info") {
+                                        if is_const_true(&keyword.value) {
+                                            return true;
+                                        }
+                                    }
+                                    false
+                                }
+                                _ => false,
+                            })
+                        {
+                            return true;
+                        }
+                    }
+                    _ => {
+                        return false;
                     }
                 }
             }

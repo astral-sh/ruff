@@ -152,3 +152,11 @@ x = [
 	multiline string with tab in it, different lines
 '''
 "	single line string with tab in it"
+
+f"test{
+	tab_indented_should_be_flagged
+}	<- this tab is fine"
+
+f"""test{
+	tab_indented_should_be_flagged
+}	<- this tab is fine"""

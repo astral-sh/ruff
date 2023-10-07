@@ -1,7 +1,9 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_semantic::analyze::logging;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -43,14 +45,36 @@ impl Violation for DeprecatedLogWarn {
 }
 
 /// PGH002
-pub(crate) fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
-    if checker
-        .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "warn"]))
-    {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(DeprecatedLogWarn, func.range()));
+pub(crate) fn deprecated_log_warn(checker: &mut Checker, call: &ExprCall) {
+    match call.func.as_ref() {
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+            if !logging::is_logger_candidate(
+                &call.func,
+                checker.semantic(),
+                &checker.settings.logger_objects,
+            ) {
+                return;
+            }
+            if !matches!(
+                LoggingLevel::from_attribute(attr.as_str()),
+                Some(LoggingLevel::Warn)
+            ) {
+                return;
+            }
+        }
+        Expr::Name(_) => {
+            if !checker
+                .semantic()
+                .resolve_call_path(call.func.as_ref())
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "warn"]))
+            {
+                return;
+            }
+        }
+        _ => return,
     }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(DeprecatedLogWarn, call.func.range()));
 }

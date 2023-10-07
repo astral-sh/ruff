@@ -2,7 +2,7 @@ use std::hash::BuildHasherDefault;
 
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::node::AstNode;
@@ -77,7 +77,7 @@ pub struct PytestParametrizeNamesWrongType {
 }
 
 impl Violation for PytestParametrizeNamesWrongType {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -85,7 +85,7 @@ impl Violation for PytestParametrizeNamesWrongType {
         format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let PytestParametrizeNamesWrongType { expected } = self;
         Some(format!("Use a `{expected}` for parameter names"))
     }
@@ -234,7 +234,7 @@ pub struct PytestDuplicateParametrizeTestCases {
 }
 
 impl Violation for PytestDuplicateParametrizeTestCases {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -242,7 +242,7 @@ impl Violation for PytestDuplicateParametrizeTestCases {
         format!("Duplicate of test case at index {index} in `@pytest_mark.parametrize`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Remove duplicate test case".to_string())
     }
 }
@@ -352,7 +352,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 format!("({})", checker.generator().expr(&node)),
                                 name_range,
                             )));
@@ -387,7 +387,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 checker.generator().expr(&node),
                                 name_range,
                             )));
@@ -419,7 +419,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 checker.generator().expr(&node),
                                 expr.range(),
                             )));
@@ -435,7 +435,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker.generator()) {
-                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                     content,
                                     expr.range(),
                                 )));
@@ -467,7 +467,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 format!("({})", checker.generator().expr(&node)),
                                 expr.range(),
                             )));
@@ -483,7 +483,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker.generator()) {
-                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                     content,
                                     expr.range(),
                                 )));
@@ -599,7 +599,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                             .intersects(deletion_range)
                         {
                             diagnostic
-                                .set_fix(Fix::suggested(Edit::range_deletion(deletion_range)));
+                                .set_fix(Fix::unsafe_edit(Edit::range_deletion(deletion_range)));
                         }
                     }
                 }
@@ -620,7 +620,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
 
     if checker.patch(diagnostic.kind.rule()) {
         let node = value.clone();
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.generator().expr(&node),
             expr.range(),
         )));

@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
 
-use ruff_diagnostics::AlwaysAutofixableViolation;
+use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
@@ -45,14 +45,14 @@ pub struct MultipleStartsEndsWith {
     attr: String,
 }
 
-impl AlwaysAutofixableViolation for MultipleStartsEndsWith {
+impl AlwaysFixableViolation for MultipleStartsEndsWith {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MultipleStartsEndsWith { attr } = self;
         format!("Call `{attr}` once with a `tuple`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let MultipleStartsEndsWith { attr } = self;
         format!("Merge into a single `{attr}` call")
     }
@@ -196,7 +196,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     range: TextRange::default(),
                 });
                 let bool_op = node;
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     checker.generator().expr(&bool_op),
                     expr.range(),
                 )));

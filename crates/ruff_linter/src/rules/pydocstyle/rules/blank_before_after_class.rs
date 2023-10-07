@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::{indentation_at_offset, PythonWhitespace};
 use ruff_source_file::{Line, UniversalNewlineIterator};
@@ -43,13 +43,13 @@ use crate::registry::{AsRule, Rule};
 #[violation]
 pub struct OneBlankLineBeforeClass;
 
-impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
+impl AlwaysFixableViolation for OneBlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("1 blank line required before class docstring")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Insert 1 blank line before class docstring".to_string()
     }
 }
@@ -95,13 +95,13 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
 #[violation]
 pub struct OneBlankLineAfterClass;
 
-impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
+impl AlwaysFixableViolation for OneBlankLineAfterClass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("1 blank line required after class docstring")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Insert 1 blank line after class docstring".to_string()
     }
 }
@@ -140,13 +140,13 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 #[violation]
 pub struct BlankLineBeforeClass;
 
-impl AlwaysAutofixableViolation for BlankLineBeforeClass {
+impl AlwaysFixableViolation for BlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No blank lines allowed before class docstring")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove blank line(s) before class docstring".to_string()
     }
 }
@@ -191,7 +191,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
                 let mut diagnostic = Diagnostic::new(BlankLineBeforeClass, docstring.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     // Delete the blank line before the class.
-                    diagnostic.set_fix(Fix::automatic(Edit::deletion(
+                    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                         blank_lines_start,
                         docstring.start() - docstring.indentation.text_len(),
                     )));
@@ -204,7 +204,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
                 let mut diagnostic = Diagnostic::new(OneBlankLineBeforeClass, docstring.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     // Insert one blank line before the class.
-                    diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                         checker.stylist().line_ending().to_string(),
                         blank_lines_start,
                         docstring.start() - docstring.indentation.text_len(),
@@ -252,7 +252,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
                     //     """Has priorities"""   ;   priorities=1
                     // ```
                     let next_statement = next_statement.trim_whitespace_start();
-                    diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                         line_ending.to_string() + line_ending + indentation + next_statement,
                         replacement_start,
                         first_line.end(),
@@ -282,7 +282,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
             let mut diagnostic = Diagnostic::new(OneBlankLineAfterClass, docstring.range());
             if checker.patch(diagnostic.kind.rule()) {
                 // Insert a blank line before the class (replacing any existing lines).
-                diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     checker.stylist().line_ending().to_string(),
                     replacement_start,
                     blank_lines_end,

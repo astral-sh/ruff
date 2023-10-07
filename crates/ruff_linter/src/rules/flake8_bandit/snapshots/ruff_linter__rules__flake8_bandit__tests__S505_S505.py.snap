@@ -1,0 +1,142 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S505.py:29:35: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+28 | # Errors
+29 | dsa.generate_private_key(key_size=2047, backend=backends.default_backend())
+   |                                   ^^^^ S505
+30 | ec.generate_private_key(curve=ec.SECT163R2, backend=backends.default_backend())
+31 | rsa.generate_private_key(
+   |
+
+S505.py:30:31: S505 EC key sizes below 224 bits are considered breakable
+   |
+28 | # Errors
+29 | dsa.generate_private_key(key_size=2047, backend=backends.default_backend())
+30 | ec.generate_private_key(curve=ec.SECT163R2, backend=backends.default_backend())
+   |                               ^^^^^^^^^^^^ S505
+31 | rsa.generate_private_key(
+32 |     public_exponent=65537, key_size=2047, backend=backends.default_backend()
+   |
+
+S505.py:32:37: S505 RSA key sizes below 2048 bits are considered breakable
+   |
+30 | ec.generate_private_key(curve=ec.SECT163R2, backend=backends.default_backend())
+31 | rsa.generate_private_key(
+32 |     public_exponent=65537, key_size=2047, backend=backends.default_backend()
+   |                                     ^^^^ S505
+33 | )
+34 | pycrypto_dsa.generate(bits=2047)
+   |
+
+S505.py:34:28: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+32 |     public_exponent=65537, key_size=2047, backend=backends.default_backend()
+33 | )
+34 | pycrypto_dsa.generate(bits=2047)
+   |                            ^^^^ S505
+35 | pycrypto_rsa.generate(bits=2047)
+36 | pycryptodomex_dsa.generate(bits=2047)
+   |
+
+S505.py:35:28: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+33 | )
+34 | pycrypto_dsa.generate(bits=2047)
+35 | pycrypto_rsa.generate(bits=2047)
+   |                            ^^^^ S505
+36 | pycryptodomex_dsa.generate(bits=2047)
+37 | pycryptodomex_rsa.generate(bits=2047)
+   |
+
+S505.py:36:33: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+34 | pycrypto_dsa.generate(bits=2047)
+35 | pycrypto_rsa.generate(bits=2047)
+36 | pycryptodomex_dsa.generate(bits=2047)
+   |                                 ^^^^ S505
+37 | pycryptodomex_rsa.generate(bits=2047)
+38 | dsa.generate_private_key(2047, backends.default_backend())
+   |
+
+S505.py:37:33: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+35 | pycrypto_rsa.generate(bits=2047)
+36 | pycryptodomex_dsa.generate(bits=2047)
+37 | pycryptodomex_rsa.generate(bits=2047)
+   |                                 ^^^^ S505
+38 | dsa.generate_private_key(2047, backends.default_backend())
+39 | ec.generate_private_key(ec.SECT163R2, backends.default_backend())
+   |
+
+S505.py:38:26: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+36 | pycryptodomex_dsa.generate(bits=2047)
+37 | pycryptodomex_rsa.generate(bits=2047)
+38 | dsa.generate_private_key(2047, backends.default_backend())
+   |                          ^^^^ S505
+39 | ec.generate_private_key(ec.SECT163R2, backends.default_backend())
+40 | rsa.generate_private_key(3, 2047, backends.default_backend())
+   |
+
+S505.py:39:25: S505 EC key sizes below 224 bits are considered breakable
+   |
+37 | pycryptodomex_rsa.generate(bits=2047)
+38 | dsa.generate_private_key(2047, backends.default_backend())
+39 | ec.generate_private_key(ec.SECT163R2, backends.default_backend())
+   |                         ^^^^^^^^^^^^ S505
+40 | rsa.generate_private_key(3, 2047, backends.default_backend())
+41 | pycrypto_dsa.generate(2047)
+   |
+
+S505.py:40:29: S505 RSA key sizes below 2048 bits are considered breakable
+   |
+38 | dsa.generate_private_key(2047, backends.default_backend())
+39 | ec.generate_private_key(ec.SECT163R2, backends.default_backend())
+40 | rsa.generate_private_key(3, 2047, backends.default_backend())
+   |                             ^^^^ S505
+41 | pycrypto_dsa.generate(2047)
+42 | pycrypto_rsa.generate(2047)
+   |
+
+S505.py:41:23: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+39 | ec.generate_private_key(ec.SECT163R2, backends.default_backend())
+40 | rsa.generate_private_key(3, 2047, backends.default_backend())
+41 | pycrypto_dsa.generate(2047)
+   |                       ^^^^ S505
+42 | pycrypto_rsa.generate(2047)
+43 | pycryptodomex_dsa.generate(2047)
+   |
+
+S505.py:42:23: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+40 | rsa.generate_private_key(3, 2047, backends.default_backend())
+41 | pycrypto_dsa.generate(2047)
+42 | pycrypto_rsa.generate(2047)
+   |                       ^^^^ S505
+43 | pycryptodomex_dsa.generate(2047)
+44 | pycryptodomex_rsa.generate(2047)
+   |
+
+S505.py:43:28: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+41 | pycrypto_dsa.generate(2047)
+42 | pycrypto_rsa.generate(2047)
+43 | pycryptodomex_dsa.generate(2047)
+   |                            ^^^^ S505
+44 | pycryptodomex_rsa.generate(2047)
+   |
+
+S505.py:44:28: S505 DSA key sizes below 2048 bits are considered breakable
+   |
+42 | pycrypto_rsa.generate(2047)
+43 | pycryptodomex_dsa.generate(2047)
+44 | pycryptodomex_rsa.generate(2047)
+   |                            ^^^^ S505
+45 | 
+46 | # Don't crash when the size is variable.
+   |
+
+

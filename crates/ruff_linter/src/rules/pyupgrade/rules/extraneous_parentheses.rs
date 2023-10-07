@@ -2,7 +2,7 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
 
@@ -28,13 +28,13 @@ use crate::settings::LinterSettings;
 #[violation]
 pub struct ExtraneousParentheses;
 
-impl AlwaysAutofixableViolation for ExtraneousParentheses {
+impl AlwaysFixableViolation for ExtraneousParentheses {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Avoid extraneous parentheses")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove extraneous parentheses".to_string()
     }
 }
@@ -157,7 +157,7 @@ pub(crate) fn extraneous_parentheses(
                 if settings.rules.should_fix(Rule::ExtraneousParentheses) {
                     let contents =
                         locator.slice(TextRange::new(start_range.start(), end_range.end()));
-                    diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                         contents[1..contents.len() - 1].to_string(),
                         start_range.start(),
                         end_range.end(),

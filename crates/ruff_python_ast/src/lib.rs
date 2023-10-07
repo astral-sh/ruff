@@ -1,6 +1,7 @@
 use std::path::Path;
 
 pub use expression::*;
+pub use int::*;
 pub use nodes::*;
 
 pub mod all;
@@ -12,6 +13,7 @@ pub mod hashable;
 pub mod helpers;
 pub mod identifier;
 pub mod imports;
+mod int;
 pub mod node;
 mod nodes;
 pub mod parenthesize;
@@ -39,13 +41,13 @@ impl Default for SourceType {
     }
 }
 
-impl From<&Path> for SourceType {
-    fn from(path: &Path) -> Self {
-        match path.file_name() {
+impl<P: AsRef<Path>> From<P> for SourceType {
+    fn from(path: P) -> Self {
+        match path.as_ref().file_name() {
             Some(filename) if filename == "pyproject.toml" => Self::Toml(TomlSourceType::Pyproject),
             Some(filename) if filename == "Pipfile" => Self::Toml(TomlSourceType::Pipfile),
             Some(filename) if filename == "poetry.lock" => Self::Toml(TomlSourceType::Poetry),
-            _ => match path.extension() {
+            _ => match path.as_ref().extension() {
                 Some(ext) if ext == "toml" => Self::Toml(TomlSourceType::Unrecognized),
                 _ => Self::Python(PySourceType::from(path)),
             },
@@ -77,9 +79,9 @@ pub enum PySourceType {
     Ipynb,
 }
 
-impl From<&Path> for PySourceType {
-    fn from(path: &Path) -> Self {
-        match path.extension() {
+impl<P: AsRef<Path>> From<P> for PySourceType {
+    fn from(path: P) -> Self {
+        match path.as_ref().extension() {
             Some(ext) if ext == "py" => PySourceType::Python,
             Some(ext) if ext == "pyi" => PySourceType::Stub,
             Some(ext) if ext == "ipynb" => PySourceType::Ipynb,

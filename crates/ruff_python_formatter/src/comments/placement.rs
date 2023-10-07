@@ -8,9 +8,10 @@ use ruff_python_trivia::{
     SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
+use crate::expression::expr_generator_exp::is_generator_parenthesized;
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
 use crate::expression::expr_tuple::is_tuple_parenthesized;
 use crate::other::parameters::{
@@ -290,10 +291,14 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::ExprFString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
-        | AnyNodeRef::ExprGeneratorExp(_)
         | AnyNodeRef::ExprListComp(_)
         | AnyNodeRef::ExprSetComp(_) => handle_bracketed_end_of_line_comment(comment, locator),
         AnyNodeRef::ExprTuple(tuple) if is_tuple_parenthesized(tuple, locator.contents()) => {
+            handle_bracketed_end_of_line_comment(comment, locator)
+        }
+        AnyNodeRef::ExprGeneratorExp(generator)
+            if is_generator_parenthesized(generator, locator.contents()) =>
+        {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
         _ => CommentPlacement::Default(comment),
@@ -587,11 +592,11 @@ fn handle_own_line_comment_between_branches<'a>(
 
     // It depends on the indentation level of the comment if it is a leading comment for the
     // following branch or if it a trailing comment of the previous body's last statement.
-    let comment_indentation = indentation_at_offset(comment.start(), locator)
-        .unwrap_or_default()
-        .len();
+    let comment_indentation = own_line_comment_indentation(preceding, &comment, locator);
 
-    let preceding_indentation = indentation(locator, &preceding).unwrap_or_default().len();
+    let preceding_indentation = indentation(locator, &preceding)
+        .unwrap_or_default()
+        .text_len();
 
     // Compare to the last statement in the body
     match comment_indentation.cmp(&preceding_indentation) {
@@ -662,18 +667,16 @@ fn handle_own_line_comment_between_branches<'a>(
 /// Determine where to attach an own line comment after a branch depending on its indentation
 fn handle_own_line_comment_after_branch<'a>(
     comment: DecoratedComment<'a>,
-    preceding_node: AnyNodeRef<'a>,
+    preceding: AnyNodeRef<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let Some(last_child) = last_child_in_body(preceding_node) else {
+    let Some(last_child) = last_child_in_body(preceding) else {
         return CommentPlacement::Default(comment);
     };
 
     // We only care about the length because indentations with mixed spaces and tabs are only valid if
     // the indent-level doesn't depend on the tab width (the indent level must be the same if the tab width is 1 or 8).
-    let comment_indentation = indentation_at_offset(comment.start(), locator)
-        .unwrap_or_default()
-        .len();
+    let comment_indentation = own_line_comment_indentation(preceding, &comment, locator);
 
     // Keep the comment on the entire statement in case it's a trailing comment
     // ```python
@@ -684,9 +687,9 @@ fn handle_own_line_comment_after_branch<'a>(
     // # Trailing if comment
     // ```
     // Here we keep the comment a trailing comment of the `if`
-    let preceding_indentation = indentation_at_offset(preceding_node.start(), locator)
+    let preceding_indentation = indentation_at_offset(preceding.start(), locator)
         .unwrap_or_default()
-        .len();
+        .text_len();
     if comment_indentation == preceding_indentation {
         return CommentPlacement::Default(comment);
     }
@@ -697,7 +700,7 @@ fn handle_own_line_comment_after_branch<'a>(
     loop {
         let child_indentation = indentation(locator, &last_child_in_parent)
             .unwrap_or_default()
-            .len();
+            .text_len();
 
         // There a three cases:
         // ```python
@@ -747,6 +750,80 @@ fn handle_own_line_comment_after_branch<'a>(
             }
         }
     }
+}
+
+/// Determine the indentation level of an own-line comment, defined as the minimum indentation of
+/// all comments between the preceding node and the comment, including the comment itself. In
+/// other words, we don't allow successive comments to ident _further_ than any preceding comments.
+///
+/// For example, given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+/// ```
+///
+/// The indentation would be 4, as the comment is indented by 4 spaces.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+/// # comment
+/// else:
+///     pass
+/// ```
+///
+/// The indentation would be 0, as the comment is not indented at all.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+///         # comment
+/// ```
+///
+/// Both comments would be marked as indented at 4 spaces, as the indentation of the first comment
+/// is used for the second comment.
+///
+/// This logic avoids pathological cases like:
+/// ```python
+/// try:
+///     if True:
+///         if True:
+///             pass
+///
+///         # a
+///             # b
+///         # c
+/// except Exception:
+///     pass
+/// ```
+///
+/// If we don't use the minimum indentation of any preceding comments, we would mark `# b` as
+/// indented to the same depth as `pass`, which could in turn lead to us treating it as a trailing
+/// comment of `pass`, despite there being a comment between them that "resets" the indentation.
+fn own_line_comment_indentation(
+    preceding: AnyNodeRef,
+    comment: &DecoratedComment,
+    locator: &Locator,
+) -> TextSize {
+    let tokenizer = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(locator.full_line_end(preceding.end()), comment.end()),
+    );
+
+    tokenizer
+        .filter_map(|token| {
+            if token.kind() == SimpleTokenKind::Comment {
+                indentation_at_offset(token.start(), locator).map(TextLen::text_len)
+            } else {
+                None
+            }
+        })
+        .min()
+        .unwrap_or_default()
 }
 
 /// Attaches comments for the positional-only parameters separator `/` or the keywords-only
@@ -2006,7 +2083,7 @@ fn handle_comprehension_comment<'a>(
             CommentPlacement::Default(comment)
         } else {
             // after the `for`
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
+            CommentPlacement::dangling(comprehension, comment)
         };
     }
 
@@ -2029,7 +2106,7 @@ fn handle_comprehension_comment<'a>(
         // attach as dangling comments on the target
         // (to be rendered as leading on the "in")
         return if is_own_line {
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
+            CommentPlacement::dangling(comprehension, comment)
         } else {
             // correctly trailing on the target
             CommentPlacement::Default(comment)
@@ -2049,7 +2126,7 @@ fn handle_comprehension_comment<'a>(
             CommentPlacement::Default(comment)
         } else {
             // after the `in` but same line, turn into trailing on the `in` token
-            CommentPlacement::dangling(&comprehension.iter, comment)
+            CommentPlacement::dangling(comprehension, comment)
         };
     }
 
@@ -2080,10 +2157,10 @@ fn handle_comprehension_comment<'a>(
         );
         if is_own_line {
             if last_end < comment.start() && comment.start() < if_token.start() {
-                return CommentPlacement::dangling(if_node, comment);
+                return CommentPlacement::dangling(comprehension, comment);
             }
         } else if if_token.start() < comment.start() && comment.start() < if_node.start() {
-            return CommentPlacement::dangling(if_node, comment);
+            return CommentPlacement::dangling(comprehension, comment);
         }
         last_end = if_node.end();
     }

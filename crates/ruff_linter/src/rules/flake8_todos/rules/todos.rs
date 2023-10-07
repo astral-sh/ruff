@@ -4,7 +4,7 @@ use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::settings::LinterSettings;
@@ -184,14 +184,14 @@ pub struct InvalidTodoCapitalization {
     tag: String,
 }
 
-impl AlwaysAutofixableViolation for InvalidTodoCapitalization {
+impl AlwaysFixableViolation for InvalidTodoCapitalization {
     #[derive_message_formats]
     fn message(&self) -> String {
         let InvalidTodoCapitalization { tag } = self;
         format!("Invalid TODO capitalization: `{tag}` should be `TODO`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let InvalidTodoCapitalization { tag } = self;
         format!("Replace `{tag}` with `TODO`")
     }
@@ -319,7 +319,7 @@ fn directive_errors(
         );
 
         if settings.rules.should_fix(Rule::InvalidTodoCapitalization) {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 "TODO".to_string(),
                 directive.range,
             )));

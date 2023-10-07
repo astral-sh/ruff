@@ -1,9 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use num_bigint::BigInt;
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_text_size::Ranged;
@@ -47,7 +45,7 @@ impl From<LiteralType> for Constant {
                 value: Vec::new(),
                 implicit_concatenated: false,
             }),
-            LiteralType::Int => Constant::Int(BigInt::from(0)),
+            LiteralType::Int => Constant::Int(0.into()),
             LiteralType::Float => Constant::Float(0.0),
             LiteralType::Bool => Constant::Bool(false),
         }
@@ -109,14 +107,14 @@ pub struct NativeLiterals {
     literal_type: LiteralType,
 }
 
-impl AlwaysAutofixableViolation for NativeLiterals {
+impl AlwaysFixableViolation for NativeLiterals {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NativeLiterals { literal_type } = self;
         format!("Unnecessary `{literal_type}` call (rewrite as a literal)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let NativeLiterals { literal_type } = self;
         match literal_type {
             LiteralType::Str => "Replace with empty string".to_string(),
@@ -187,7 +185,7 @@ pub(crate) fn native_literals(
             if checker.patch(diagnostic.kind.rule()) {
                 let constant = Constant::from(literal_type);
                 let content = checker.generator().constant(&constant);
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     content,
                     call.range(),
                 )));
@@ -225,7 +223,7 @@ pub(crate) fn native_literals(
 
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     content,
                     call.range(),
                 )));

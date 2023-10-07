@@ -1,6 +1,6 @@
 use log::debug;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{
@@ -50,7 +50,7 @@ pub struct ConvertNamedTupleFunctionalToClass {
 }
 
 impl Violation for ConvertNamedTupleFunctionalToClass {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -58,7 +58,7 @@ impl Violation for ConvertNamedTupleFunctionalToClass {
         format!("Convert `{name}` from `NamedTuple` functional to class syntax")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let ConvertNamedTupleFunctionalToClass { name } = self;
 
         Some(format!("Convert `{name}` to class syntax"))
@@ -241,7 +241,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    Fix::suggested(Edit::range_replacement(
+    Fix::unsafe_edit(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(typename, body, base_class)),
         stmt.range(),
     ))

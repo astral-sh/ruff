@@ -20,10 +20,28 @@ G004.py:5:27: G004 Logging statement uses f-string
   |
 
 G004.py:8:14: G004 Logging statement uses f-string
-  |
-7 | _LOGGER = logging.getLogger()
-8 | _LOGGER.info(f"{__name__}")
-  |              ^^^^^^^^^^^^^ G004
-  |
+   |
+ 7 | _LOGGER = logging.getLogger()
+ 8 | _LOGGER.info(f"{__name__}")
+   |              ^^^^^^^^^^^^^ G004
+ 9 | 
+10 | from logging import info
+   |
+
+G004.py:11:6: G004 Logging statement uses f-string
+   |
+10 | from logging import info
+11 | info(f"{name}")
+   |      ^^^^^^^^^ G004
+12 | info(f"{__name__}")
+   |
+
+G004.py:12:6: G004 Logging statement uses f-string
+   |
+10 | from logging import info
+11 | info(f"{name}")
+12 | info(f"{__name__}")
+   |      ^^^^^^^^^^^^^ G004
+   |
 
 

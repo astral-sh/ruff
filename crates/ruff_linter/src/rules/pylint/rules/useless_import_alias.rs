@@ -1,6 +1,6 @@
 use ruff_python_ast::Alias;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -25,13 +25,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UselessImportAlias;
 
-impl AlwaysAutofixableViolation for UselessImportAlias {
+impl AlwaysFixableViolation for UselessImportAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Import alias does not rename original package")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove import alias".to_string()
     }
 }
@@ -50,7 +50,7 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
 
     let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             asname.to_string(),
             alias.range(),
         )));

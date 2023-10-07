@@ -5,6 +5,17 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for the presence of the `from __future__ import annotations` import
+/// statement in stub files.
+///
+/// ## Why is this bad?
+/// Stub files are already evaluated under `annotations` semantics. As such,
+/// the `from __future__ import annotations` import statement has no effect
+/// and should be omitted.
+///
+/// ## Resources
+/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
 #[violation]
 pub struct FutureAnnotationsInStub;
 

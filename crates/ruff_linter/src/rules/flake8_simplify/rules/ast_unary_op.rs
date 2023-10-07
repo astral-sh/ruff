@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::ScopeKind;
 
@@ -33,14 +33,14 @@ pub struct NegateEqualOp {
     right: String,
 }
 
-impl AlwaysAutofixableViolation for NegateEqualOp {
+impl AlwaysFixableViolation for NegateEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NegateEqualOp { left, right } = self;
         format!("Use `{left} != {right}` instead of `not {left} == {right}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `!=` operator".to_string()
     }
 }
@@ -70,14 +70,14 @@ pub struct NegateNotEqualOp {
     right: String,
 }
 
-impl AlwaysAutofixableViolation for NegateNotEqualOp {
+impl AlwaysFixableViolation for NegateNotEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NegateNotEqualOp { left, right } = self;
         format!("Use `{left} == {right}` instead of `not {left} != {right}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `==` operator".to_string()
     }
 }
@@ -106,14 +106,14 @@ pub struct DoubleNegation {
     expr: String,
 }
 
-impl AlwaysAutofixableViolation for DoubleNegation {
+impl AlwaysFixableViolation for DoubleNegation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DoubleNegation { expr } = self;
         format!("Use `{expr}` instead of `not (not {expr})`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let DoubleNegation { expr } = self;
         format!("Replace with `{expr}`")
     }
@@ -182,7 +182,7 @@ pub(crate) fn negation_with_equal_op(
             comparators: comparators.clone(),
             range: TextRange::default(),
         };
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.generator().expr(&node.into()),
             expr.range(),
         )));
@@ -239,7 +239,7 @@ pub(crate) fn negation_with_not_equal_op(
             comparators: comparators.clone(),
             range: TextRange::default(),
         };
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             checker.generator().expr(&node.into()),
             expr.range(),
         )));
@@ -272,7 +272,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
     );
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().in_boolean_test() {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.locator().slice(operand.as_ref()).to_string(),
                 expr.range(),
             )));
@@ -291,7 +291,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
                 },
                 range: TextRange::default(),
             };
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().expr(&node1.into()),
                 expr.range(),
             )));

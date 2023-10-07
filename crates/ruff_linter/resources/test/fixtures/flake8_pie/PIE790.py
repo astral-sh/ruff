@@ -123,3 +123,28 @@ except NetworkError:
 
 def foo() -> None:
     pass
+
+
+def foo():
+    print("foo")
+    pass
+
+
+def foo():
+    """A docstring."""
+    print("foo")
+    pass
+
+
+for i in range(10):
+    pass
+    pass
+
+for i in range(10):
+    pass
+
+    pass
+
+for i in range(10):
+    pass  # comment
+    pass

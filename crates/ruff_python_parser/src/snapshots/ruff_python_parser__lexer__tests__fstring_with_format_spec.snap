@@ -1,0 +1,266 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        FStringStart,
+        0..2,
+    ),
+    (
+        Lbrace,
+        2..3,
+    ),
+    (
+        Name {
+            name: "foo",
+        },
+        3..6,
+    ),
+    (
+        Colon,
+        6..7,
+    ),
+    (
+        Rbrace,
+        7..8,
+    ),
+    (
+        FStringMiddle {
+            value: " ",
+            is_raw: false,
+        },
+        8..9,
+    ),
+    (
+        Lbrace,
+        9..10,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        10..11,
+    ),
+    (
+        Equal,
+        11..12,
+    ),
+    (
+        Exclamation,
+        12..13,
+    ),
+    (
+        Name {
+            name: "s",
+        },
+        13..14,
+    ),
+    (
+        Colon,
+        14..15,
+    ),
+    (
+        FStringMiddle {
+            value: ".3f",
+            is_raw: false,
+        },
+        15..18,
+    ),
+    (
+        Rbrace,
+        18..19,
+    ),
+    (
+        FStringMiddle {
+            value: " ",
+            is_raw: false,
+        },
+        19..20,
+    ),
+    (
+        Lbrace,
+        20..21,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        21..22,
+    ),
+    (
+        Colon,
+        22..23,
+    ),
+    (
+        FStringMiddle {
+            value: ".",
+            is_raw: false,
+        },
+        23..24,
+    ),
+    (
+        Lbrace,
+        24..25,
+    ),
+    (
+        Name {
+            name: "y",
+        },
+        25..26,
+    ),
+    (
+        Rbrace,
+        26..27,
+    ),
+    (
+        FStringMiddle {
+            value: "f",
+            is_raw: false,
+        },
+        27..28,
+    ),
+    (
+        Rbrace,
+        28..29,
+    ),
+    (
+        FStringMiddle {
+            value: " ",
+            is_raw: false,
+        },
+        29..30,
+    ),
+    (
+        Lbrace,
+        30..31,
+    ),
+    (
+        String {
+            value: "",
+            kind: String,
+            triple_quoted: false,
+        },
+        31..33,
+    ),
+    (
+        Colon,
+        33..34,
+    ),
+    (
+        FStringMiddle {
+            value: "*^",
+            is_raw: false,
+        },
+        34..36,
+    ),
+    (
+        Lbrace,
+        36..37,
+    ),
+    (
+        Int {
+            value: 1,
+        },
+        37..38,
+    ),
+    (
+        Colon,
+        38..39,
+    ),
+    (
+        Lbrace,
+        39..40,
+    ),
+    (
+        Int {
+            value: 1,
+        },
+        40..41,
+    ),
+    (
+        Rbrace,
+        41..42,
+    ),
+    (
+        Rbrace,
+        42..43,
+    ),
+    (
+        Rbrace,
+        43..44,
+    ),
+    (
+        FStringMiddle {
+            value: " ",
+            is_raw: false,
+        },
+        44..45,
+    ),
+    (
+        Lbrace,
+        45..46,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        46..47,
+    ),
+    (
+        Colon,
+        47..48,
+    ),
+    (
+        Lbrace,
+        48..49,
+    ),
+    (
+        Lbrace,
+        49..50,
+    ),
+    (
+        Int {
+            value: 1,
+        },
+        50..51,
+    ),
+    (
+        Rbrace,
+        51..52,
+    ),
+    (
+        Dot,
+        52..53,
+    ),
+    (
+        Name {
+            name: "pop",
+        },
+        53..56,
+    ),
+    (
+        Lpar,
+        56..57,
+    ),
+    (
+        Rpar,
+        57..58,
+    ),
+    (
+        Rbrace,
+        58..59,
+    ),
+    (
+        Rbrace,
+        59..60,
+    ),
+    (
+        FStringEnd,
+        60..61,
+    ),
+    (
+        Newline,
+        61..61,
+    ),
+]

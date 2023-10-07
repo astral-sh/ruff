@@ -2,7 +2,7 @@ use std::fmt;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::{self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters};
@@ -80,14 +80,14 @@ pub struct ImplicitOptional {
 }
 
 impl Violation for ImplicitOptional {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("PEP 484 prohibits implicit `Optional`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let ImplicitOptional { conversion_type } = self;
         Some(format!("Convert to `{conversion_type}`"))
     }
@@ -134,7 +134,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 range: TextRange::default(),
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::suggested(Edit::range_replacement(
+            Ok(Fix::unsafe_edit(Edit::range_replacement(
                 content,
                 expr.range(),
             )))
@@ -156,7 +156,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 ctx: ast::ExprContext::Load,
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::suggested_edits(
+            Ok(Fix::unsafe_edits(
                 Edit::range_replacement(content, expr.range()),
                 [import_edit],
             ))

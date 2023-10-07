@@ -1,7 +1,7 @@
 //! Check for calls to suspicious functions, or calls into suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::ExprCall;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -825,12 +825,8 @@ impl Violation for SuspiciousFTPLibUsage {
 }
 
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
-pub(crate) fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return;
-    };
-
-    let Some(diagnostic_kind) = checker.semantic().resolve_call_path(func).and_then(|call_path| {
+pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
+    let Some(diagnostic_kind) = checker.semantic().resolve_call_path(call.func.as_ref()).and_then(|call_path| {
         match call_path.as_slice() {
             // Pickle
             ["pickle" | "dill", "load" | "loads" | "Unpickler"] |
@@ -888,7 +884,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, expr.range());
+    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.range());
     if checker.enabled(diagnostic.kind.rule()) {
         checker.diagnostics.push(diagnostic);
     }

@@ -8,11 +8,6 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion::Py311;
 
-#[violation]
-pub struct NoReturnArgumentAnnotationInStub {
-    module: TypingModule,
-}
-
 /// ## What it does
 /// Checks for uses of `typing.NoReturn` (and `typing_extensions.NoReturn`) in
 /// stubs.
@@ -37,6 +32,15 @@ pub struct NoReturnArgumentAnnotationInStub {
 ///
 /// def foo(x: Never): ...
 /// ```
+///
+/// ## References
+/// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
+/// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
+#[violation]
+pub struct NoReturnArgumentAnnotationInStub {
+    module: TypingModule,
+}
+
 impl Violation for NoReturnArgumentAnnotationInStub {
     #[derive_message_formats]
     fn message(&self) -> String {

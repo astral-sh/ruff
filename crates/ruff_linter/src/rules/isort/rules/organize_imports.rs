@@ -2,7 +2,7 @@ use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{PySourceType, Stmt};
@@ -41,14 +41,14 @@ use super::super::{comments, format_imports};
 pub struct UnsortedImports;
 
 impl Violation for UnsortedImports {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Import block is un-sorted or un-formatted")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Organize imports".to_string())
     }
 }
@@ -126,27 +126,8 @@ pub(crate) fn organize_imports(
         &settings.src,
         package,
         source_type,
-        settings.isort.combine_as_imports,
-        settings.isort.force_single_line,
-        settings.isort.force_sort_within_sections,
-        settings.isort.case_sensitive,
-        settings.isort.force_wrap_aliases,
-        &settings.isort.force_to_top,
-        &settings.isort.known_modules,
-        settings.isort.order_by_type,
-        settings.isort.detect_same_package,
-        settings.isort.relative_imports_order,
-        &settings.isort.single_line_exclusions,
-        settings.isort.split_on_trailing_comma,
-        &settings.isort.classes,
-        &settings.isort.constants,
-        &settings.isort.variables,
-        &settings.isort.no_lines_before,
-        settings.isort.lines_after_imports,
-        settings.isort.lines_between_types,
-        &settings.isort.forced_separate,
         settings.target_version,
-        &settings.isort.section_order,
+        &settings.isort,
     );
 
     // Expand the span the entire range, including leading and trailing space.
@@ -158,7 +139,7 @@ pub(crate) fn organize_imports(
 
     let mut diagnostic = Diagnostic::new(UnsortedImports, range);
     if settings.rules.should_fix(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             indent(&expected, indentation).to_string(),
             range,
         )));

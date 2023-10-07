@@ -1,15 +1,13 @@
 use std::borrow::Cow;
 
-use num_traits::Zero;
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr};
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -50,7 +48,7 @@ pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     iterable: SourceCodeSnippet,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement {
+impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
@@ -58,7 +56,7 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
         format!("Prefer `next({iterable})` over single element slice")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
         let iterable = iterable.truncated_display();
         format!("Replace with `next({iterable})`")
@@ -99,7 +97,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             format!("next({iterable})"),
             *range,
         )));
@@ -110,15 +108,13 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
 
 /// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).
 fn is_head_slice(expr: &Expr) -> bool {
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
-        ..
-    }) = expr
-    {
-        value.is_zero()
-    } else {
-        false
-    }
+    matches!(
+        expr,
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(Int::ZERO),
+            ..
+        })
+    )
 }
 
 #[derive(Debug)]

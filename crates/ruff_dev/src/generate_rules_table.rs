@@ -5,10 +5,11 @@
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::AutofixKind;
+use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_workspace::options::Options;
+use ruff_workspace::options_base::OptionsMetadata;
 
 const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
@@ -19,11 +20,11 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push_str("| ---- | ---- | ------- | ------: |");
     table_out.push('\n');
     for rule in rules {
-        let fix_token = match rule.autofixable() {
-            AutofixKind::Always | AutofixKind::Sometimes => {
+        let fix_token = match rule.fixable() {
+            FixAvailability::Always | FixAvailability::Sometimes => {
                 format!("<span style='opacity: 1'>{FIX_SYMBOL}</span>")
             }
-            AutofixKind::None => format!("<span style='opacity: 0.1'>{FIX_SYMBOL}</span>"),
+            FixAvailability::None => format!("<span style='opacity: 0.1'>{FIX_SYMBOL}</span>"),
         };
         let preview_token = if rule.is_preview() || rule.is_nursery() {
             format!("<span style='opacity: 1'>{PREVIEW_SYMBOL}</span>")
@@ -104,10 +105,7 @@ pub(crate) fn generate() -> String {
             table_out.push('\n');
         }
 
-        if Options::metadata()
-            .iter()
-            .any(|(name, _)| name == &linter.name())
-        {
+        if Options::metadata().has(linter.name()) {
             table_out.push_str(&format!(
                 "For related settings, see [{}](settings.md#{}).",
                 linter.name(),

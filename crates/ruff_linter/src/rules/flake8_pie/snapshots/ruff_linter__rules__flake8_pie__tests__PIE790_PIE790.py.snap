@@ -317,4 +317,149 @@ PIE790.py:101:5: PIE790 [*] Unnecessary `pass` statement
 103 103 | 
 104 104 | class Foo:
 
+PIE790.py:130:5: PIE790 [*] Unnecessary `pass` statement
+    |
+128 | def foo():
+129 |     print("foo")
+130 |     pass
+    |     ^^^^ PIE790
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+127 127 | 
+128 128 | def foo():
+129 129 |     print("foo")
+130     |-    pass
+131 130 | 
+132 131 | 
+133 132 | def foo():
+
+PIE790.py:136:5: PIE790 [*] Unnecessary `pass` statement
+    |
+134 |     """A docstring."""
+135 |     print("foo")
+136 |     pass
+    |     ^^^^ PIE790
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+133 133 | def foo():
+134 134 |     """A docstring."""
+135 135 |     print("foo")
+136     |-    pass
+137 136 | 
+138 137 | 
+139 138 | for i in range(10):
+
+PIE790.py:140:5: PIE790 [*] Unnecessary `pass` statement
+    |
+139 | for i in range(10):
+140 |     pass
+    |     ^^^^ PIE790
+141 |     pass
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+138 138 | 
+139 139 | for i in range(10):
+140 140 |     pass
+141     |-    pass
+142 141 | 
+143 142 | for i in range(10):
+144 143 |     pass
+
+PIE790.py:141:5: PIE790 [*] Unnecessary `pass` statement
+    |
+139 | for i in range(10):
+140 |     pass
+141 |     pass
+    |     ^^^^ PIE790
+142 | 
+143 | for i in range(10):
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+138 138 | 
+139 139 | for i in range(10):
+140 140 |     pass
+141     |-    pass
+142 141 | 
+143 142 | for i in range(10):
+144 143 |     pass
+
+PIE790.py:144:5: PIE790 [*] Unnecessary `pass` statement
+    |
+143 | for i in range(10):
+144 |     pass
+    |     ^^^^ PIE790
+145 | 
+146 |     pass
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+141 141 |     pass
+142 142 | 
+143 143 | for i in range(10):
+144     |-    pass
+145 144 | 
+146 145 |     pass
+147 146 | 
+
+PIE790.py:146:5: PIE790 [*] Unnecessary `pass` statement
+    |
+144 |     pass
+145 | 
+146 |     pass
+    |     ^^^^ PIE790
+147 | 
+148 | for i in range(10):
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+143 143 | for i in range(10):
+144 144 |     pass
+145 145 | 
+146     |-    pass
+147 146 | 
+148 147 | for i in range(10):
+149 148 |     pass  # comment
+
+PIE790.py:149:5: PIE790 [*] Unnecessary `pass` statement
+    |
+148 | for i in range(10):
+149 |     pass  # comment
+    |     ^^^^ PIE790
+150 |     pass
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+146 146 |     pass
+147 147 | 
+148 148 | for i in range(10):
+149     |-    pass  # comment
+    149 |+    # comment
+150 150 |     pass
+
+PIE790.py:150:5: PIE790 [*] Unnecessary `pass` statement
+    |
+148 | for i in range(10):
+149 |     pass  # comment
+150 |     pass
+    |     ^^^^ PIE790
+    |
+    = help: Remove unnecessary `pass`
+
+ℹ Fix
+147 147 | 
+148 148 | for i in range(10):
+149 149 |     pass  # comment
+150     |-    pass
+
 

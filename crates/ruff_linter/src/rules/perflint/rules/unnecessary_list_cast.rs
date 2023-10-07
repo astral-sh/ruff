@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Stmt;
 use ruff_python_ast::{self as ast, Arguments, Expr};
@@ -38,13 +38,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnnecessaryListCast;
 
-impl AlwaysAutofixableViolation for UnnecessaryListCast {
+impl AlwaysFixableViolation for UnnecessaryListCast {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not cast an iterable to `list` before iterating over it")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove `list()` cast")
     }
 }
@@ -135,7 +135,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
 
 /// Generate a [`Fix`] to remove a `list` cast from an expression.
 fn remove_cast(list_range: TextRange, iterable_range: TextRange) -> Fix {
-    Fix::automatic_edits(
+    Fix::safe_edits(
         Edit::deletion(list_range.start(), iterable_range.start()),
         [Edit::deletion(iterable_range.end(), list_range.end())],
     )

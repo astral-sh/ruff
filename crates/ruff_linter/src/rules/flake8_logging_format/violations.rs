@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 /// ## What it does
@@ -376,13 +376,13 @@ impl Violation for LoggingFString {
 #[violation]
 pub struct LoggingWarn;
 
-impl AlwaysAutofixableViolation for LoggingWarn {
+impl AlwaysFixableViolation for LoggingWarn {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Logging statement uses `warn` instead of `warning`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Convert to `warn`".to_string()
     }
 }

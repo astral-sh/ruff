@@ -16,22 +16,24 @@ use crate::line_width::{LineWidthBuilder, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
+use crate::settings::types::UnsafeFixes;
 
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
         /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS = 0b0000_0001;
+        const SHOW_FIX_STATUS    = 0b0000_0001;
         /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF   = 0b0000_0010;
+        const SHOW_FIX_DIFF      = 0b0000_0010;
         /// Whether to show the source code of a diagnostic.
-        const SHOW_SOURCE     = 0b0000_0100;
+        const SHOW_SOURCE        = 0b0000_0100;
     }
 }
 
 #[derive(Default)]
 pub struct TextEmitter {
     flags: EmitterFlags,
+    unsafe_fixes: UnsafeFixes,
 }
 
 impl TextEmitter {
@@ -51,6 +53,12 @@ impl TextEmitter {
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
         self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
+        self
+    }
+
+    #[must_use]
+    pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
+        self.unsafe_fixes = unsafe_fixes;
         self
     }
 }
@@ -105,7 +113,8 @@ impl Emitter for TextEmitter {
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
                     message,
-                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS)
+                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS),
+                    unsafe_fixes: self.unsafe_fixes,
                 }
             )?;
 
@@ -134,28 +143,33 @@ impl Emitter for TextEmitter {
 pub(super) struct RuleCodeAndBody<'a> {
     pub(crate) message: &'a Message,
     pub(crate) show_fix_status: bool,
+    pub(crate) unsafe_fixes: UnsafeFixes,
 }
 
 impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let kind = &self.message.kind;
+        if self.show_fix_status {
+            if let Some(fix) = self.message.fix.as_ref() {
+                // Do not display an indicator for unapplicable fixes
+                if fix.applies(self.unsafe_fixes.required_applicability()) {
+                    return write!(
+                        f,
+                        "{code} {fix}{body}",
+                        code = kind.rule().noqa_code().to_string().red().bold(),
+                        fix = format_args!("[{}] ", "*".cyan()),
+                        body = kind.body,
+                    );
+                }
+            }
+        };
 
-        if self.show_fix_status && self.message.fix.is_some() {
-            write!(
-                f,
-                "{code} {autofix}{body}",
-                code = kind.rule().noqa_code().to_string().red().bold(),
-                autofix = format_args!("[{}] ", "*".cyan()),
-                body = kind.body,
-            )
-        } else {
-            write!(
-                f,
-                "{code} {body}",
-                code = kind.rule().noqa_code().to_string().red().bold(),
-                body = kind.body,
-            )
-        }
+        write!(
+            f,
+            "{code} {body}",
+            code = kind.rule().noqa_code().to_string().red().bold(),
+            body = kind.body,
+        )
     }
 }
 
@@ -341,6 +355,7 @@ mod tests {
 
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::TextEmitter;
+    use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
@@ -355,6 +370,17 @@ mod tests {
         let mut emitter = TextEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true);
+        let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn fix_status_unsafe() {
+        let mut emitter = TextEmitter::default()
+            .with_show_fix_status(true)
+            .with_show_source(true)
+            .with_unsafe_fixes(UnsafeFixes::Enabled);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

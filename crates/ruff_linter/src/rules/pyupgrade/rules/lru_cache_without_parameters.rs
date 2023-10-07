@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_text_size::{Ranged, TextRange};
@@ -42,13 +42,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct LRUCacheWithoutParameters;
 
-impl AlwaysAutofixableViolation for LRUCacheWithoutParameters {
+impl AlwaysFixableViolation for LRUCacheWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary parentheses to `functools.lru_cache`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove unnecessary parentheses".to_string()
     }
 }
@@ -78,7 +78,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
                 TextRange::new(func.end(), decorator.end()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(arguments.range())));
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
             }
             checker.diagnostics.push(diagnostic);
         }

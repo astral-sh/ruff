@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Constant, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
@@ -34,7 +34,7 @@ use crate::registry::AsRule;
 #[violation]
 pub struct SetAttrWithConstant;
 
-impl AlwaysAutofixableViolation for SetAttrWithConstant {
+impl AlwaysFixableViolation for SetAttrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -43,7 +43,7 @@ impl AlwaysAutofixableViolation for SetAttrWithConstant {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace `setattr` with assignment".to_string()
     }
 }
@@ -78,6 +78,9 @@ pub(crate) fn setattr_with_constant(
     let [obj, name, value] = args else {
         return;
     };
+    if obj.is_starred_expr() {
+        return;
+    }
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(name),
         ..
@@ -91,6 +94,10 @@ pub(crate) fn setattr_with_constant(
     if is_mangled_private(name) {
         return;
     }
+    if !checker.semantic().is_builtin("setattr") {
+        return;
+    }
+
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `Stmt::Expr`).
@@ -102,7 +109,7 @@ pub(crate) fn setattr_with_constant(
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     assignment(obj, name, value, checker.generator()),
                     expr.range(),
                 )));

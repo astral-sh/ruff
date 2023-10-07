@@ -191,7 +191,7 @@ If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel fr
 
 ## What versions of Python does Ruff support?
 
-Ruff can lint code for any Python version from 3.7 onwards, including Python 3.10 and 3.11.
+Ruff can lint code for any Python version from 3.7 onwards, including Python 3.12.
 
 Ruff does not support Python 2. Ruff _may_ run on pre-Python 3.7 code, although such versions
 are not officially supported (e.g., Ruff does _not_ respect type comments).
@@ -436,14 +436,14 @@ For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) c
 
 ## Ruff tried to fix something — but it broke my code?
 
-Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
+Ruff's fixes are a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
 have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.
 
-In the future, Ruff will support enabling autofix behavior based on the safety of the patch.
+In the future, Ruff will support enabling fix behavior based on the safety of the patch.
 
-In the meantime, if you find that the autofix is too aggressive, you can disable it on a per-rule or
+In the meantime, if you find that the fixes are too aggressive, you can disable it on a per-rule or
 per-category basis using the [`unfixable`](settings.md#unfixable) mechanic.
-For example, to disable autofix for some possibly-unsafe rules, you could add the following to your
+For example, to disable the fix for some possibly-unsafe rules, you could add the following to your
 `pyproject.toml`:
 
 ```toml
@@ -451,7 +451,7 @@ For example, to disable autofix for some possibly-unsafe rules, you could add th
 unfixable = ["B", "SIM", "TRY", "RUF"]
 ```
 
-If you find a case where Ruff's autofix breaks your code, please file an Issue!
+If you find a case where Ruff's fix breaks your code, please file an Issue!
 
 ## How can I disable Ruff's color output?
 

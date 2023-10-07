@@ -1,8 +1,8 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::SemanticModel;
@@ -40,13 +40,13 @@ pub struct OSErrorAlias {
     name: Option<String>,
 }
 
-impl AlwaysAutofixableViolation for OSErrorAlias {
+impl AlwaysFixableViolation for OSErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Replace aliased errors with `OSError`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let OSErrorAlias { name } = self;
         match name {
             None => "Replace with builtin `OSError`".to_string(),
@@ -83,7 +83,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().is_builtin("OSError") {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 "OSError".to_string(),
                 target.range(),
             )));
@@ -135,7 +135,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
                 format!("({})", checker.generator().expr(&node.into()))
             };
 
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 pad(content, tuple.range(), checker.locator()),
                 tuple.range(),
             )));

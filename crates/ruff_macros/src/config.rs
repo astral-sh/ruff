@@ -1,16 +1,22 @@
-use ruff_python_trivia::textwrap::dedent;
-
+use proc_macro2::TokenTree;
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{
     AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput, ExprLit, Field,
-    Fields, Lit, LitStr, Path, PathArguments, PathSegment, Token, Type, TypePath,
+    Fields, Lit, LitStr, Meta, Path, PathArguments, PathSegment, Token, Type, TypePath,
 };
 
+use ruff_python_trivia::textwrap::dedent;
+
 pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let DeriveInput { ident, data, .. } = input;
+    let DeriveInput {
+        ident,
+        data,
+        attrs: struct_attributes,
+        ..
+    } = input;
 
     match data {
         Data::Struct(DataStruct {
@@ -20,45 +26,74 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
             let mut output = vec![];
 
             for field in &fields.named {
-                let docs: Vec<&Attribute> = field
-                    .attrs
-                    .iter()
-                    .filter(|attr| attr.path().is_ident("doc"))
-                    .collect();
-
-                if docs.is_empty() {
-                    return Err(syn::Error::new(
-                        field.span(),
-                        "Missing documentation for field",
-                    ));
-                }
-
                 if let Some(attr) = field
                     .attrs
                     .iter()
                     .find(|attr| attr.path().is_ident("option"))
                 {
-                    output.push(handle_option(field, attr, docs)?);
-                };
-
-                if field
+                    output.push(handle_option(field, attr)?);
+                } else if field
                     .attrs
                     .iter()
                     .any(|attr| attr.path().is_ident("option_group"))
                 {
                     output.push(handle_option_group(field)?);
-                };
+                } else if let Some(serde) = field
+                    .attrs
+                    .iter()
+                    .find(|attr| attr.path().is_ident("serde"))
+                {
+                    // If a field has the `serde(flatten)` attribute, flatten the options into the parent
+                    // by calling `Type::record` instead of `visitor.visit_set`
+                    if let (Type::Path(ty), Meta::List(list)) = (&field.ty, &serde.meta) {
+                        for token in list.tokens.clone() {
+                            if let TokenTree::Ident(ident) = token {
+                                if ident == "flatten" {
+                                    let ty_name = ty.path.require_ident()?;
+                                    output.push(quote_spanned!(
+                                        ident.span() => (#ty_name::record(visit))
+                                    ));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
-            let options_len = output.len();
+            let docs: Vec<&Attribute> = struct_attributes
+                .iter()
+                .filter(|attr| attr.path().is_ident("doc"))
+                .collect();
+
+            // Convert the list of `doc` attributes into a single string.
+            let doc = dedent(
+                &docs
+                    .into_iter()
+                    .map(parse_doc)
+                    .collect::<syn::Result<Vec<_>>>()?
+                    .join("\n"),
+            )
+            .trim_matches('\n')
+            .to_string();
+
+            let documentation = if doc.is_empty() {
+                None
+            } else {
+                Some(quote!(
+                    fn documentation() -> Option<&'static str> {
+                        Some(&#doc)
+                    }
+                ))
+            };
 
             Ok(quote! {
-
-                impl #ident {
-                    pub const fn metadata() -> crate::options_base::OptionGroup {
-                        const OPTIONS: [(&'static str, crate::options_base::OptionEntry); #options_len] = [#(#output),*];
-                        crate::options_base::OptionGroup::new(&OPTIONS)
+                impl crate::options_base::OptionsMetadata for #ident {
+                    fn record(visit: &mut dyn crate::options_base::Visit) {
+                        #(#output);*
                     }
+
+                    #documentation
                 }
             })
         }
@@ -92,7 +127,7 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
                 let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
                 Ok(quote_spanned!(
-                    ident.span() => (#kebab_name, crate::options_base::OptionEntry::Group(#path::metadata()))
+                    ident.span() => (visit.record_set(#kebab_name, crate::options_base::OptionSet::of::<#path>()))
                 ))
             }
             _ => Err(syn::Error::new(
@@ -121,11 +156,20 @@ fn parse_doc(doc: &Attribute) -> syn::Result<String> {
 
 /// Parse an `#[option(doc="...", default="...", value_type="...",
 /// example="...")]` attribute and return data in the form of an `OptionField`.
-fn handle_option(
-    field: &Field,
-    attr: &Attribute,
-    docs: Vec<&Attribute>,
-) -> syn::Result<proc_macro2::TokenStream> {
+fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::TokenStream> {
+    let docs: Vec<&Attribute> = field
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .collect();
+
+    if docs.is_empty() {
+        return Err(syn::Error::new(
+            field.span(),
+            "Missing documentation for field",
+        ));
+    }
+
     // Convert the list of `doc` attributes into a single string.
     let doc = dedent(
         &docs
@@ -150,12 +194,14 @@ fn handle_option(
     let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
     Ok(quote_spanned!(
-        ident.span() => (#kebab_name, crate::options_base::OptionEntry::Field(crate::options_base::OptionField {
-            doc: &#doc,
-            default: &#default,
-            value_type: &#value_type,
-            example: &#example,
-        }))
+        ident.span() => {
+            visit.record_field(#kebab_name, crate::options_base::OptionField{
+                doc: &#doc,
+                default: &#default,
+                value_type: &#value_type,
+                example: &#example,
+            })
+        }
     ))
 }
 

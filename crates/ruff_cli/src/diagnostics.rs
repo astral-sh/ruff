@@ -1,20 +1,18 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
-use std::fs::{write, File};
+use std::fs::File;
 use std::io;
-use std::io::{BufWriter, Write};
 use std::ops::AddAssign;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
+use ruff_linter::settings::types::UnsafeFixes;
 use rustc_hash::FxHashMap;
-use similar::TextDiff;
-use thiserror::Error;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
@@ -23,12 +21,12 @@ use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::{flags, LinterSettings};
-use ruff_linter::source_kind::SourceKind;
+use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_macros::CacheKey;
-use ruff_notebook::{Cell, Notebook, NotebookError, NotebookIndex};
+use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
+use ruff_python_ast::{SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
@@ -82,15 +80,38 @@ impl Diagnostics {
         }
     }
 
-    /// Generate [`Diagnostics`] based on a [`SourceExtractionError`].
+    /// Generate [`Diagnostics`] based on a [`SourceError`].
     pub(crate) fn from_source_error(
-        err: &SourceExtractionError,
+        err: &SourceError,
         path: Option<&Path>,
         settings: &LinterSettings,
     ) -> Self {
-        let diagnostic = Diagnostic::from(err);
+        let diagnostic = match err {
+            // IO errors.
+            SourceError::Io(_)
+            | SourceError::Notebook(NotebookError::Io(_) | NotebookError::Json(_)) => {
+                Diagnostic::new(
+                    IOError {
+                        message: err.to_string(),
+                    },
+                    TextRange::default(),
+                )
+            }
+            // Syntax errors.
+            SourceError::Notebook(
+                NotebookError::InvalidJson(_)
+                | NotebookError::InvalidSchema(_)
+                | NotebookError::InvalidFormat(_),
+            ) => Diagnostic::new(
+                SyntaxError {
+                    message: err.to_string(),
+                },
+                TextRange::default(),
+            ),
+        };
+
         if settings.rules.enabled(diagnostic.kind.rule()) {
-            let name = path.map_or_else(|| "-".into(), std::path::Path::to_string_lossy);
+            let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
             let dummy = SourceFileBuilder::new(name, "").finish();
             Self::new(
                 vec![Message::from_diagnostic(
@@ -147,7 +168,8 @@ pub(crate) fn lint_path(
     settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     // Check the cache.
     // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
@@ -156,7 +178,7 @@ pub(crate) fn lint_path(
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
     let caching = match cache {
-        Some(cache) if noqa.into() && autofix.is_generate() => {
+        Some(cache) if noqa.into() && fix_mode.is_generate() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
@@ -183,13 +205,12 @@ pub(crate) fn lint_path(
                 .iter_enabled()
                 .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
             {
-                let contents =
-                    match std::fs::read_to_string(path).map_err(SourceExtractionError::Io) {
-                        Ok(contents) => contents,
-                        Err(err) => {
-                            return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
-                        }
-                    };
+                let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
+                    Ok(contents) => contents,
+                    Err(err) => {
+                        return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
+                    }
+                };
                 let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
                 lint_pyproject_toml(source_file, settings)
             } else {
@@ -205,8 +226,8 @@ pub(crate) fn lint_path(
     };
 
     // Extract the sources from the file.
-    let LintSource(source_kind) = match LintSource::try_from_path(path, source_type) {
-        Ok(Some(sources)) => sources,
+    let source_kind = match SourceKind::from_path(path, source_type) {
+        Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
             return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
@@ -220,89 +241,36 @@ pub(crate) fn lint_path(
             error: parse_error,
         },
         fixed,
-    ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
+    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok(FixerResult {
             result,
             transformed,
             fixed,
-        }) = lint_fix(path, package, noqa, settings, &source_kind, source_type)
-        {
+        }) = lint_fix(
+            path,
+            package,
+            noqa,
+            unsafe_fixes,
+            settings,
+            &source_kind,
+            source_type,
+        ) {
             if !fixed.is_empty() {
-                match autofix {
-                    flags::FixMode::Apply => match transformed.as_ref() {
-                        SourceKind::Python(transformed) => {
-                            write(path, transformed.as_bytes())?;
-                        }
-                        SourceKind::IpyNotebook(notebook) => {
-                            let mut writer = BufWriter::new(File::create(path)?);
-                            notebook.write(&mut writer)?;
-                        }
-                    },
+                match fix_mode {
+                    flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
                     flags::FixMode::Diff => {
-                        match transformed.as_ref() {
-                            SourceKind::Python(transformed) => {
-                                let mut stdout = io::stdout().lock();
-                                TextDiff::from_lines(source_kind.source_code(), transformed)
-                                    .unified_diff()
-                                    .header(&fs::relativize_path(path), &fs::relativize_path(path))
-                                    .to_writer(&mut stdout)?;
-                                stdout.write_all(b"\n")?;
-                                stdout.flush()?;
-                            }
-                            SourceKind::IpyNotebook(dest_notebook) => {
-                                // We need to load the notebook again, since we might've
-                                // mutated it.
-                                let src_notebook = source_kind.as_ipy_notebook().unwrap();
-                                let mut stdout = io::stdout().lock();
-                                for ((idx, src_cell), dest_cell) in src_notebook
-                                    .cells()
-                                    .iter()
-                                    .enumerate()
-                                    .zip(dest_notebook.cells().iter())
-                                {
-                                    let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) =
-                                        (src_cell, dest_cell)
-                                    else {
-                                        continue;
-                                    };
-                                    TextDiff::from_lines(
-                                        &src_code_cell.source.to_string(),
-                                        &dest_code_cell.source.to_string(),
-                                    )
-                                    .unified_diff()
-                                    // Jupyter notebook cells don't necessarily have a newline
-                                    // at the end. For example,
-                                    //
-                                    // ```python
-                                    // print("hello")
-                                    // ```
-                                    //
-                                    // For a cell containing the above code, there'll only be one line,
-                                    // and it won't have a newline at the end. If it did, there'd be
-                                    // two lines, and the second line would be empty:
-                                    //
-                                    // ```python
-                                    // print("hello")
-                                    //
-                                    // ```
-                                    .missing_newline_hint(false)
-                                    .header(
-                                        &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                        &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                    )
-                                    .to_writer(&mut stdout)?;
-                                }
-                                stdout.write_all(b"\n")?;
-                                stdout.flush()?;
-                            }
-                        }
+                        source_kind.diff(
+                            transformed.as_ref(),
+                            Some(path),
+                            &mut io::stdout().lock(),
+                        )?;
                     }
                     flags::FixMode::Generate => {}
                 }
             }
             (result, fixed)
         } else {
-            // If we fail to autofix, lint the original source code.
+            // If we fail to fix, lint the original source code.
             let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
             let fixed = FxHashMap::default();
             (result, fixed)
@@ -343,13 +311,7 @@ pub(crate) fn lint_path(
     }
 
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
-        FxHashMap::from_iter([(
-            path.to_str()
-                .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
-                .to_string(),
-            // Index needs to be computed always to store in cache.
-            notebook.index().clone(),
-        )])
+        FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
     } else {
         FxHashMap::default()
     };
@@ -370,7 +332,7 @@ pub(crate) fn lint_stdin(
     contents: String,
     settings: &Settings,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
     let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
@@ -378,8 +340,8 @@ pub(crate) fn lint_stdin(
     };
 
     // Extract the sources from the file.
-    let LintSource(source_kind) = match LintSource::try_from_source_code(contents, source_type) {
-        Ok(Some(sources)) => sources,
+    let source_kind = match SourceKind::from_source_code(contents, source_type) {
+        Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
             return Ok(Diagnostics::from_source_error(&err, path, &settings.linter));
@@ -393,7 +355,7 @@ pub(crate) fn lint_stdin(
             error: parse_error,
         },
         fixed,
-    ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
+    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok(FixerResult {
             result,
             transformed,
@@ -402,32 +364,20 @@ pub(crate) fn lint_stdin(
             path.unwrap_or_else(|| Path::new("-")),
             package,
             noqa,
+            settings.unsafe_fixes,
             &settings.linter,
             &source_kind,
             source_type,
         ) {
-            match autofix {
+            match fix_mode {
                 flags::FixMode::Apply => {
                     // Write the contents to stdout, regardless of whether any errors were fixed.
-                    io::stdout().write_all(transformed.source_code().as_bytes())?;
+                    transformed.write(&mut io::stdout().lock())?;
                 }
                 flags::FixMode::Diff => {
                     // But only write a diff if it's non-empty.
                     if !fixed.is_empty() {
-                        let text_diff = TextDiff::from_lines(
-                            source_kind.source_code(),
-                            transformed.source_code(),
-                        );
-                        let mut unified_diff = text_diff.unified_diff();
-                        if let Some(path) = path {
-                            unified_diff
-                                .header(&fs::relativize_path(path), &fs::relativize_path(path));
-                        }
-
-                        let mut stdout = io::stdout().lock();
-                        unified_diff.to_writer(&mut stdout)?;
-                        stdout.write_all(b"\n")?;
-                        stdout.flush()?;
+                        source_kind.diff(transformed.as_ref(), path, &mut io::stdout().lock())?;
                     }
                 }
                 flags::FixMode::Generate => {}
@@ -435,7 +385,7 @@ pub(crate) fn lint_stdin(
 
             (result, fixed)
         } else {
-            // If we fail to autofix, lint the original source code.
+            // If we fail to fix, lint the original source code.
             let result = lint_only(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
@@ -447,8 +397,8 @@ pub(crate) fn lint_stdin(
             let fixed = FxHashMap::default();
 
             // Write the contents to stdout anyway.
-            if autofix.is_apply() {
-                io::stdout().write_all(source_kind.source_code().as_bytes())?;
+            if fix_mode.is_apply() {
+                source_kind.write(&mut io::stdout().lock())?;
             }
 
             (result, fixed)
@@ -475,6 +425,15 @@ pub(crate) fn lint_stdin(
         );
     }
 
+    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
+        FxHashMap::from_iter([(
+            path.map_or_else(|| "-".into(), |path| path.to_string_lossy().to_string()),
+            notebook.into_index(),
+        )])
+    } else {
+        FxHashMap::default()
+    };
+
     Ok(Diagnostics {
         messages,
         fixed: FxHashMap::from_iter([(
@@ -482,83 +441,6 @@ pub(crate) fn lint_stdin(
             fixed,
         )]),
         imports,
-        notebook_indexes: FxHashMap::default(),
+        notebook_indexes,
     })
-}
-
-#[derive(Debug)]
-pub(crate) struct LintSource(pub(crate) SourceKind);
-
-impl LintSource {
-    /// Extract the lint [`LintSource`] from the given file path.
-    pub(crate) fn try_from_path(
-        path: &Path,
-        source_type: PySourceType,
-    ) -> Result<Option<LintSource>, SourceExtractionError> {
-        if source_type.is_ipynb() {
-            let notebook = Notebook::from_path(path)?;
-            Ok(notebook
-                .is_python_notebook()
-                .then_some(LintSource(SourceKind::IpyNotebook(notebook))))
-        } else {
-            // This is tested by ruff_cli integration test `unreadable_file`
-            let contents = std::fs::read_to_string(path)?;
-            Ok(Some(LintSource(SourceKind::Python(contents))))
-        }
-    }
-
-    /// Extract the lint [`LintSource`] from the raw string contents, optionally accompanied by a
-    /// file path indicating the path to the file from which the contents were read. If provided,
-    /// the file path should be used for diagnostics, but not for reading the file from disk.
-    pub(crate) fn try_from_source_code(
-        source_code: String,
-        source_type: PySourceType,
-    ) -> Result<Option<LintSource>, SourceExtractionError> {
-        if source_type.is_ipynb() {
-            let notebook = Notebook::from_source_code(&source_code)?;
-            Ok(notebook
-                .is_python_notebook()
-                .then_some(LintSource(SourceKind::IpyNotebook(notebook))))
-        } else {
-            Ok(Some(LintSource(SourceKind::Python(source_code))))
-        }
-    }
-}
-
-#[derive(Error, Debug)]
-pub(crate) enum SourceExtractionError {
-    /// The extraction failed due to an [`io::Error`].
-    #[error(transparent)]
-    Io(#[from] io::Error),
-    /// The extraction failed due to a [`NotebookError`].
-    #[error(transparent)]
-    Notebook(#[from] NotebookError),
-}
-
-impl From<&SourceExtractionError> for Diagnostic {
-    fn from(err: &SourceExtractionError) -> Self {
-        match err {
-            // IO errors.
-            SourceExtractionError::Io(_)
-            | SourceExtractionError::Notebook(NotebookError::Io(_) | NotebookError::Json(_)) => {
-                Diagnostic::new(
-                    IOError {
-                        message: err.to_string(),
-                    },
-                    TextRange::default(),
-                )
-            }
-            // Syntax errors.
-            SourceExtractionError::Notebook(
-                NotebookError::InvalidJson(_)
-                | NotebookError::InvalidSchema(_)
-                | NotebookError::InvalidFormat(_),
-            ) => Diagnostic::new(
-                SyntaxError {
-                    message: err.to_string(),
-                },
-                TextRange::default(),
-            ),
-        }
-    }
 }

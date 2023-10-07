@@ -1,6 +1,6 @@
 use ruff_text_size::{TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
@@ -35,13 +35,13 @@ use crate::settings::LinterSettings;
 #[violation]
 pub struct ShebangLeadingWhitespace;
 
-impl AlwaysAutofixableViolation for ShebangLeadingWhitespace {
+impl AlwaysFixableViolation for ShebangLeadingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Avoid whitespace before shebang")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove whitespace before shebang")
     }
 }
@@ -69,7 +69,7 @@ pub(crate) fn shebang_leading_whitespace(
     let prefix = TextRange::up_to(range.start());
     let mut diagnostic = Diagnostic::new(ShebangLeadingWhitespace, prefix);
     if settings.rules.should_fix(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(prefix)));
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
     }
     Some(diagnostic)
 }

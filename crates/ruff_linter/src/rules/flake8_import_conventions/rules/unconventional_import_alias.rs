@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{Binding, Imported};
 use ruff_text_size::Ranged;
@@ -37,7 +37,7 @@ pub struct UnconventionalImportAlias {
 }
 
 impl Violation for UnconventionalImportAlias {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -45,7 +45,7 @@ impl Violation for UnconventionalImportAlias {
         format!("`{name}` should be imported as `{asname}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UnconventionalImportAlias { name, asname } = self;
         Some(format!("Alias `{name}` to `{asname}`"))
     }
@@ -86,7 +86,7 @@ pub(crate) fn unconventional_import_alias(
                     let scope = &checker.semantic().scopes[binding.scope];
                     let (edit, rest) =
                         Renamer::rename(name, expected_alias, scope, checker.semantic())?;
-                    Ok(Fix::suggested_edits(edit, rest))
+                    Ok(Fix::unsafe_edits(edit, rest))
                 });
             }
         }

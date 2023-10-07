@@ -72,7 +72,19 @@ expression: lex_source(source)
         55..59,
     ),
     (
+        Int {
+            value: 0,
+        },
+        60..63,
+    ),
+    (
+        Int {
+            value: 0x995DC9BBDF1939FA,
+        },
+        64..82,
+    ),
+    (
         Newline,
-        59..59,
+        82..82,
     ),
 ]

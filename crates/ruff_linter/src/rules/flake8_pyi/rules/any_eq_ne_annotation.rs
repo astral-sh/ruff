@@ -1,6 +1,6 @@
 use ruff_python_ast::Parameters;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -35,20 +35,20 @@ use crate::registry::AsRule;
 /// ```
 /// ## References
 /// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)
-/// - [Mypy documentation](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
+/// - [Mypy documentation: Any vs. object](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
 #[violation]
 pub struct AnyEqNeAnnotation {
     method_name: String,
 }
 
-impl AlwaysAutofixableViolation for AnyEqNeAnnotation {
+impl AlwaysFixableViolation for AnyEqNeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AnyEqNeAnnotation { method_name } = self;
         format!("Prefer `object` to `Any` for the second parameter to `{method_name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Replace with `object`")
     }
 }
@@ -81,7 +81,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters
         if checker.patch(diagnostic.kind.rule()) {
             // Ex) `def __eq__(self, obj: Any): ...`
             if checker.semantic().is_builtin("object") {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "object".to_string(),
                     annotation.range(),
                 )));
