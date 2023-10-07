@@ -51,7 +51,7 @@ pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &a
 
     let mut diagnostic = Diagnostic::new(UnnecessaryClassParentheses, arguments.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::always_applies(Edit::deletion(
+        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
             arguments.start(),
             arguments.end(),
         )));

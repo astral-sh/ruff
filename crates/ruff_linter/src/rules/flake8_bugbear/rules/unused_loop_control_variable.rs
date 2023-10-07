@@ -168,7 +168,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
                         .filter(|binding| binding.start() >= expr.start())
                         .all(|binding| !binding.is_used())
                     {
-                        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             rename,
                             expr.range(),
                         )));

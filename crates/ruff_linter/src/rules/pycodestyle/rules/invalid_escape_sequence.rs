@@ -162,7 +162,7 @@ pub(crate) fn invalid_escape_sequence(
         if contains_valid_escape_sequence {
             // Escape with backslash.
             for diagnostic in &mut invalid_escape_sequence {
-                diagnostic.set_fix(Fix::always_applies(Edit::insertion(
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     r"\".to_string(),
                     diagnostic.start() + TextSize::from(1),
                 )));
@@ -184,7 +184,7 @@ pub(crate) fn invalid_escape_sequence(
                 // If necessary, add a space between any leading keyword (`return`, `yield`,
                 // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
                 // `returnr"foo"` is not.
-                diagnostic.set_fix(Fix::always_applies(Edit::insertion(
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     pad_start("r".to_string(), tok_start, locator),
                     tok_start,
                 )));

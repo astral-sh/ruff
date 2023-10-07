@@ -275,7 +275,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    Fix::sometimes_applies(Edit::range_replacement(
+    Fix::unsafe_edit(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(
             class_name,
             body,

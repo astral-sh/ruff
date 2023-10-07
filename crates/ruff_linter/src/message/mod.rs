@@ -178,9 +178,10 @@ def fibonacci(n):
             },
             TextRange::new(TextSize::from(7), TextSize::from(9)),
         )
-        .with_fix(Fix::sometimes_applies(Edit::range_deletion(
-            TextRange::new(TextSize::from(0), TextSize::from(10)),
-        )));
+        .with_fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
+            TextSize::from(0),
+            TextSize::from(10),
+        ))));
 
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
@@ -192,7 +193,7 @@ def fibonacci(n):
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
         )
-        .with_fix(Fix::sometimes_applies(Edit::deletion(
+        .with_fix(Fix::unsafe_edit(Edit::deletion(
             TextSize::from(94),
             TextSize::from(99),
         )));

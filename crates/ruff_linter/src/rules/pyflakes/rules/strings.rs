@@ -618,7 +618,7 @@ pub(crate) fn percent_format_extra_named_arguments(
                 checker.locator(),
                 checker.stylist(),
             )?;
-            Ok(Fix::always_applies(edit))
+            Ok(Fix::safe_edit(edit))
         });
     }
     checker.diagnostics.push(diagnostic);
@@ -785,7 +785,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
                 checker.locator(),
                 checker.stylist(),
             )?;
-            Ok(Fix::always_applies(edit))
+            Ok(Fix::safe_edit(edit))
         });
     }
     checker.diagnostics.push(diagnostic);
@@ -854,7 +854,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
                     checker.locator(),
                     checker.stylist(),
                 )?;
-                Ok(Fix::always_applies(edit))
+                Ok(Fix::safe_edit(edit))
             });
         }
     }

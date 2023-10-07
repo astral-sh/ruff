@@ -10,17 +10,17 @@ use crate::edit::Edit;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Applicability {
-    /// The fix is unsafe and should only be manually applied by the user.
+    /// The fix is unsafe and should only be displayed for manual application by the user.
     /// The fix is likely to be incorrect or the resulting code may have invalid syntax.
-    Never,
+    Display,
 
     /// The fix is unsafe and should only be applied with user opt-in.
     /// The fix may be what the user intended, but it is uncertain; the resulting code will have valid syntax.
-    Sometimes,
+    Unsafe,
 
     /// The fix is safe and can always be applied.
     /// The fix is definitely what the user intended, or it maintains the exact meaning of the code.
-    Always,
+    Safe,
 }
 
 /// Indicates the level of isolation required to apply a fix.
@@ -47,62 +47,62 @@ pub struct Fix {
 }
 
 impl Fix {
-    /// Create a new [`Fix`] that can [always](Applicability::Always) be applied from an [`Edit`] element.
-    pub fn always_applies(edit: Edit) -> Self {
+    /// Create a new [`Fix`] that is [safe](Applicability::Safe) to apply from an [`Edit`] element.
+    pub fn safe_edit(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Always,
+            applicability: Applicability::Safe,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] that can [always](Applicability::Always) be applied from multiple [`Edit`] elements.
-    pub fn always_applies_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] that is [safe](Applicability::Safe) to apply from multiple [`Edit`] elements.
+    pub fn safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Always,
+            applicability: Applicability::Safe,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] that can [sometimes](Applicability::Sometimes) be applied from an [`Edit`] element.
-    pub fn sometimes_applies(edit: Edit) -> Self {
+    /// Create a new [`Fix`] that is [unsafe](Applicability::Unsafe) to apply from an [`Edit`] element.
+    pub fn unsafe_edit(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Sometimes,
+            applicability: Applicability::Unsafe,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] that can [sometimes](Applicability::Sometimes) be applied from multiple [`Edit`] elements.
-    pub fn sometimes_applies_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] that is [unsafe](Applicability::Unsafe) to apply from multiple [`Edit`] elements.
+    pub fn unsafe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Sometimes,
+            applicability: Applicability::Unsafe,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] that should [never](Applicability::Never) be applied from an [`Edit`] element .
-    pub fn never_applies(edit: Edit) -> Self {
+    /// Create a new [`Fix`] that should only [display](Applicability::Display) and not apply from an [`Edit`] element .
+    pub fn display_edit(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Never,
+            applicability: Applicability::Display,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] that should [never](Applicability::Never) be applied from multiple [`Edit`] elements.
-    pub fn never_applies_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] that should only [display](Applicability::Display) and not apply from multiple [`Edit`] elements.
+    pub fn display_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Never,
+            applicability: Applicability::Display,
             isolation_level: IsolationLevel::default(),
         }
     }

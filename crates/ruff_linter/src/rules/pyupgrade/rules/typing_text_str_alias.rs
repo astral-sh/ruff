@@ -55,7 +55,7 @@ pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             if checker.semantic().is_builtin("str") {
-                diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "str".to_string(),
                     expr.range(),
                 )));

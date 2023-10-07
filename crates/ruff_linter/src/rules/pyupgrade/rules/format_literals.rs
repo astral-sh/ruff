@@ -116,7 +116,7 @@ pub(crate) fn format_literals(
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             generate_call(call, arguments, checker.locator(), checker.stylist()).map(|suggestion| {
-                Fix::sometimes_applies(Edit::range_replacement(suggestion, call.range()))
+                Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range()))
             })
         });
     }

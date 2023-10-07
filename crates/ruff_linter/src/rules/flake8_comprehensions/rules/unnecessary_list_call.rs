@@ -59,7 +59,7 @@ pub(crate) fn unnecessary_list_call(
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_list_call(expr, checker.locator(), checker.stylist())
-                .map(Fix::sometimes_applies)
+                .map(Fix::unsafe_edit)
         });
     }
     checker.diagnostics.push(diagnostic);

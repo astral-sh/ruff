@@ -128,12 +128,12 @@ fn key_in_dict(
                 .next()
                 .is_some_and(|char| char.is_ascii_alphabetic())
             {
-                diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     " ".to_string(),
                     range,
                 )));
             } else {
-                diagnostic.set_fix(Fix::sometimes_applies(Edit::range_deletion(range)));
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(range)));
             }
         }
     }

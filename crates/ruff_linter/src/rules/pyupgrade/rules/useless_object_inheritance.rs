@@ -76,7 +76,7 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
                     Parentheses::Remove,
                     checker.locator().contents(),
                 )
-                .map(Fix::always_applies)
+                .map(Fix::safe_edit)
             });
         }
         checker.diagnostics.push(diagnostic);

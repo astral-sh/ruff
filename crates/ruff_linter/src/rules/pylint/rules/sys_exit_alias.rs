@@ -85,7 +85,7 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
                 checker.semantic(),
             )?;
             let reference_edit = Edit::range_replacement(binding, func.range());
-            Ok(Fix::sometimes_applies_edits(import_edit, [reference_edit]))
+            Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
         });
     }
     checker.diagnostics.push(diagnostic);

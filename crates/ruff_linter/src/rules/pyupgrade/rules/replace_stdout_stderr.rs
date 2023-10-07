@@ -105,7 +105,7 @@ fn generate_fix(
         (stderr, stdout)
     };
     // Replace one argument with `capture_output=True`, and remove the other.
-    Ok(Fix::sometimes_applies_edits(
+    Ok(Fix::unsafe_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
         [remove_argument(
             second,

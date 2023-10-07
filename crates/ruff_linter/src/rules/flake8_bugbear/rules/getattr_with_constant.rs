@@ -86,7 +86,7 @@ pub(crate) fn getattr_with_constant(
 
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             pad(
                 if matches!(
                     obj,

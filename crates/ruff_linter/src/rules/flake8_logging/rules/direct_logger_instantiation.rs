@@ -69,7 +69,7 @@ pub(crate) fn direct_logger_instantiation(checker: &mut Checker, call: &ast::Exp
                     checker.semantic(),
                 )?;
                 let reference_edit = Edit::range_replacement(binding, call.func.range());
-                Ok(Fix::sometimes_applies_edits(import_edit, [reference_edit]))
+                Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
             });
         }
         checker.diagnostics.push(diagnostic);
