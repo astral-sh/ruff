@@ -10,11 +10,12 @@ use crate::fix::edits::pad;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for membership tests against single-item objects.
+/// Checks for membership tests against single-item containers.
 ///
 /// ## Why is this bad?
-/// Performing a membership test against an object with a single item is less
-/// readable and less efficient than comparing against the item directly.
+/// Performing a membership test against a container (like a `list` or `set`)
+/// with a single item is less readable and less efficient than comparing
+/// against the item directly.
 ///
 /// ## Example
 /// ```python
@@ -39,7 +40,7 @@ impl Violation for SingleItemMembershipTest {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Membership test against single-item object")
+        format!("Membership test against single-item container")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -78,7 +79,7 @@ pub(crate) fn single_item_membership_test(
     let mut diagnostic =
         Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             pad(
                 generate_comparison(
                     left,
@@ -107,7 +108,7 @@ fn single_item(expr: &Expr) -> Option<&Expr> {
         string_expr @ Expr::Constant(ExprConstant {
             value: Constant::Str(string),
             ..
-        }) if string.len() == 1 => Some(string_expr),
+        }) if string.chars().count() == 1 => Some(string_expr),
         _ => None,
     }
 }
