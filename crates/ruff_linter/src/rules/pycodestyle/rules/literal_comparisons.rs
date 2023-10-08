@@ -3,14 +3,13 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
-use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::helpers::{generate_comparison, is_const_none};
 use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::registry::AsRule;
-use crate::rules::pycodestyle::helpers::generate_comparison;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum EqCmpOp {
