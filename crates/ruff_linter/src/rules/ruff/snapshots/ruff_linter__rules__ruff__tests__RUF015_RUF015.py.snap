@@ -267,7 +267,7 @@ RUF015.py:42:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
    42 |+next(iter(x["y"]))
 43 43 | [*x.y][0]
 44 44 | [* x.y][0]
-45 45 | 
+45 45 | [
 
 RUF015.py:43:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
@@ -276,6 +276,7 @@ RUF015.py:43:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 43 | [*x.y][0]
    | ^^^^^^^^^ RUF015
 44 | [* x.y][0]
+45 | [
    |
    = help: Replace with `next(iter(x.y))`
 
@@ -286,8 +287,8 @@ RUF015.py:43:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 43    |-[*x.y][0]
    43 |+next(iter(x.y))
 44 44 | [* x.y][0]
-45 45 | 
-46 46 | # RUF015 (multi-line)
+45 45 | [
+46 46 |     *x.y
 
 RUF015.py:44:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
@@ -295,8 +296,8 @@ RUF015.py:44:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 43 | [*x.y][0]
 44 | [* x.y][0]
    | ^^^^^^^^^^ RUF015
-45 | 
-46 | # RUF015 (multi-line)
+45 | [
+46 |     *x.y
    |
    = help: Replace with `next(iter(x.y))`
 
@@ -306,92 +307,117 @@ RUF015.py:44:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 43 43 | [*x.y][0]
 44    |-[* x.y][0]
    44 |+next(iter(x.y))
-45 45 | 
-46 46 | # RUF015 (multi-line)
-47 47 | revision_heads_map_ast = [
+45 45 | [
+46 46 |     *x.y
+47 47 | ][0]
 
-RUF015.py:47:26: RUF015 [*] Prefer `next(...)` over single element slice
+RUF015.py:45:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
-46 |   # RUF015 (multi-line)
-47 |   revision_heads_map_ast = [
-   |  __________________________^
-48 | |     a
-49 | |     for a in revision_heads_map_ast_obj.body
-50 | |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
-51 | | ][0]
+43 |   [*x.y][0]
+44 |   [* x.y][0]
+45 | / [
+46 | |     *x.y
+47 | | ][0]
    | |____^ RUF015
-52 |   
-53 |   # RUF015 (zip)
+48 |   
+49 |   # RUF015 (multi-line)
+   |
+   = help: Replace with `next(iter(x.y))`
+
+ℹ Suggested fix
+42 42 | [*x["y"]][0]
+43 43 | [*x.y][0]
+44 44 | [* x.y][0]
+45    |-[
+46    |-    *x.y
+47    |-][0]
+   45 |+next(iter(x.y))
+48 46 | 
+49 47 | # RUF015 (multi-line)
+50 48 | revision_heads_map_ast = [
+
+RUF015.py:50:26: RUF015 [*] Prefer `next(...)` over single element slice
+   |
+49 |   # RUF015 (multi-line)
+50 |   revision_heads_map_ast = [
+   |  __________________________^
+51 | |     a
+52 | |     for a in revision_heads_map_ast_obj.body
+53 | |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
+54 | | ][0]
+   | |____^ RUF015
+55 |   
+56 |   # RUF015 (zip)
    |
    = help: Replace with `next(...)`
 
 ℹ Suggested fix
-44 44 | [* x.y][0]
-45 45 | 
-46 46 | # RUF015 (multi-line)
-47    |-revision_heads_map_ast = [
-   47 |+revision_heads_map_ast = next(
-48 48 |     a
-49 49 |     for a in revision_heads_map_ast_obj.body
-50 50 |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
-51    |-][0]
-   51 |+)
-52 52 | 
-53 53 | # RUF015 (zip)
-54 54 | list(zip(x, y))[0]
+47 47 | ][0]
+48 48 | 
+49 49 | # RUF015 (multi-line)
+50    |-revision_heads_map_ast = [
+   50 |+revision_heads_map_ast = next(
+51 51 |     a
+52 52 |     for a in revision_heads_map_ast_obj.body
+53 53 |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
+54    |-][0]
+   54 |+)
+55 55 | 
+56 56 | # RUF015 (zip)
+57 57 | list(zip(x, y))[0]
 
-RUF015.py:54:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
+RUF015.py:57:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
    |
-53 | # RUF015 (zip)
-54 | list(zip(x, y))[0]
+56 | # RUF015 (zip)
+57 | list(zip(x, y))[0]
    | ^^^^^^^^^^^^^^^^^^ RUF015
-55 | [*zip(x, y)][0]
+58 | [*zip(x, y)][0]
    |
    = help: Replace with `next(zip(x, y))`
 
 ℹ Suggested fix
-51 51 | ][0]
-52 52 | 
-53 53 | # RUF015 (zip)
-54    |-list(zip(x, y))[0]
-   54 |+next(zip(x, y))
-55 55 | [*zip(x, y)][0]
-56 56 | 
-57 57 | 
+54 54 | ][0]
+55 55 | 
+56 56 | # RUF015 (zip)
+57    |-list(zip(x, y))[0]
+   57 |+next(zip(x, y))
+58 58 | [*zip(x, y)][0]
+59 59 | 
+60 60 | 
 
-RUF015.py:55:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
+RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
    |
-53 | # RUF015 (zip)
-54 | list(zip(x, y))[0]
-55 | [*zip(x, y)][0]
+56 | # RUF015 (zip)
+57 | list(zip(x, y))[0]
+58 | [*zip(x, y)][0]
    | ^^^^^^^^^^^^^^^ RUF015
    |
    = help: Replace with `next(zip(x, y))`
 
 ℹ Suggested fix
-52 52 | 
-53 53 | # RUF015 (zip)
-54 54 | list(zip(x, y))[0]
-55    |-[*zip(x, y)][0]
-   55 |+next(zip(x, y))
-56 56 | 
-57 57 | 
-58 58 | def test():
+55 55 | 
+56 56 | # RUF015 (zip)
+57 57 | list(zip(x, y))[0]
+58    |-[*zip(x, y)][0]
+   58 |+next(zip(x, y))
+59 59 | 
+60 60 | 
+61 61 | def test():
 
-RUF015.py:60:5: RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element slice
+RUF015.py:63:5: RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element slice
    |
-58 | def test():
-59 |     zip = list  # Overwrite the builtin zip
-60 |     list(zip(x, y))[0]
+61 | def test():
+62 |     zip = list  # Overwrite the builtin zip
+63 |     list(zip(x, y))[0]
    |     ^^^^^^^^^^^^^^^^^^ RUF015
    |
    = help: Replace with `next(iter(zip(x, y)))`
 
 ℹ Suggested fix
-57 57 | 
-58 58 | def test():
-59 59 |     zip = list  # Overwrite the builtin zip
-60    |-    list(zip(x, y))[0]
-   60 |+    next(iter(zip(x, y)))
+60 60 | 
+61 61 | def test():
+62 62 |     zip = list  # Overwrite the builtin zip
+63    |-    list(zip(x, y))[0]
+   63 |+    next(iter(zip(x, y)))
 
 

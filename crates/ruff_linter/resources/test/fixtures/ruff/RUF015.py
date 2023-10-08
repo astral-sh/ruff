@@ -42,6 +42,9 @@ list(x["y"])[0]
 [*x["y"]][0]
 [*x.y][0]
 [* x.y][0]
+[
+    *x.y
+][0]
 
 # RUF015 (multi-line)
 revision_heads_map_ast = [
