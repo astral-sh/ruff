@@ -1111,8 +1111,8 @@ fn diff_shows_safe_fixes_by_default() {
     ----- stdout -----
     @@ -1,2 +1,2 @@
      x = {'a': 1, 'a': 1}
-    -print('foo')
-    +print(('foo'))
+    -print(('foo'))
+    +print('foo')
 
 
     ----- stderr -----
@@ -1142,10 +1142,10 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
     exit_code: 1
     ----- stdout -----
     @@ -1,2 +1,2 @@
-    -x = {'a': 1}
-    -print('foo')
-    +x = {'a': 1, 'a': 1}
-    +print(('foo'))
+    -x = {'a': 1, 'a': 1}
+    -print(('foo'))
+    +x = {'a': 1}
+    +print('foo')
 
 
     ----- stderr -----
