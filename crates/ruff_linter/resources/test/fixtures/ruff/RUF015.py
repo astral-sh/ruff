@@ -39,8 +39,9 @@ list(range(10))[0]
 list(x.y)[0]
 list(x["y"])[0]
 [*range(10)][0]
-[*x.y][0]
 [*x["y"]][0]
+[*x.y][0]
+[* x.y][0]
 
 # RUF015 (multi-line)
 revision_heads_map_ast = [

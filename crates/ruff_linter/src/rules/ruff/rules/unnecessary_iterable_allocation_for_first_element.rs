@@ -4,6 +4,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Int};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_stdlib::builtins::is_iterator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -217,22 +218,18 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
             let [elt] = elts.as_slice() else {
                 return None;
             };
-            match elt {
-                Expr::Starred(ast::ExprStarred { value, .. }) => {
-                    let range: TextRange = expr
-                        .range()
-                        // Remove the `[*`
-                        .add_start(TextSize::from(2))
-                        // Remove the `]`
-                        .sub_end(TextSize::from(1));
-                    let iterable = if value.is_call_expr() {
-                        is_func_builtin_iterator(&value.as_call_expr()?.func, semantic)
-                    } else {
-                        false
-                    };
-                    return Some(IterationTarget { range, iterable });
-                }
-                _ => return None,
+            let Expr::Starred(ast::ExprStarred { value, .. }) = elt else {
+                return None;
+            };
+
+            let iterable = if value.is_call_expr() {
+                is_func_builtin_iterator(&value.as_call_expr()?.func, semantic)
+            } else {
+                false
+            };
+            IterationTarget {
+                range: value.range(),
+                iterable,
             }
         }
         _ => return None,
@@ -266,11 +263,9 @@ fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Optio
     Some(generator.iter.range())
 }
 
-// Returns true if the function is a builtin iterator
-// The list of iterators is: enumerate, filter, map, reversed, zip, and iter
+/// Returns `true` if the function is a builtin iterator.
 fn is_func_builtin_iterator(func: &Expr, semantic: &SemanticModel) -> bool {
-    let builtins = ["enumerate", "filter", "map", "reversed", "zip", "iter"];
     func.as_name_expr().map_or(false, |func_name| {
-        semantic.is_builtin(func_name.id.as_str()) && builtins.contains(&func_name.id.as_str())
+        is_iterator(func_name.id.as_str()) && semantic.is_builtin(func_name.id.as_str())
     })
 }
