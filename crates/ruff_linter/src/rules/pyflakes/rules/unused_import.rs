@@ -251,7 +251,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         checker.stylist(),
         checker.indexer(),
     )?;
-    Ok(Fix::automatic(edit).isolate(Checker::isolation(
+    Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
     )))
 }

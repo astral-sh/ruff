@@ -100,7 +100,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                         )?;
                         let reference_edit =
                             Edit::range_replacement(binding, decorator.expression.range());
-                        Ok(Fix::automatic_edits(import_edit, [reference_edit]))
+                        Ok(Fix::safe_edits(import_edit, [reference_edit]))
                     });
                 }
                 checker.diagnostics.push(diagnostic);

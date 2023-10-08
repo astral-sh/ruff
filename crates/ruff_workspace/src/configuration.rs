@@ -24,7 +24,7 @@ use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
-    Version,
+    UnsafeFixes, Version,
 };
 use ruff_linter::settings::{
     resolve_per_file_ignores, LinterSettings, DUMMY_VARIABLE_RGX, PREFIXES, TASK_TAGS,
@@ -64,6 +64,7 @@ pub struct Configuration {
     pub extend: Option<PathBuf>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
+    pub unsafe_fixes: Option<UnsafeFixes>,
     pub output_format: Option<SerializationFormat>,
     pub preview: Option<PreviewMode>,
     pub required_version: Option<Version>,
@@ -137,6 +138,7 @@ impl Configuration {
                 .unwrap_or_else(|| cache_dir(project_root)),
             fix: self.fix.unwrap_or(false),
             fix_only: self.fix_only.unwrap_or(false),
+            unsafe_fixes: self.unsafe_fixes.unwrap_or_default(),
             output_format: self.output_format.unwrap_or_default(),
             show_fixes: self.show_fixes.unwrap_or(false),
             show_source: self.show_source.unwrap_or(false),
@@ -365,6 +367,7 @@ impl Configuration {
             }),
             fix: options.fix,
             fix_only: options.fix_only,
+            unsafe_fixes: options.unsafe_fixes.map(UnsafeFixes::from),
             output_format: options.output_format.or_else(|| {
                 options
                     .format
@@ -418,6 +421,7 @@ impl Configuration {
             include: self.include.or(config.include),
             fix: self.fix.or(config.fix),
             fix_only: self.fix_only.or(config.fix_only),
+            unsafe_fixes: self.unsafe_fixes.or(config.unsafe_fixes),
             output_format: self.output_format.or(config.output_format),
             force_exclude: self.force_exclude.or(config.force_exclude),
             line_length: self.line_length.or(config.line_length),

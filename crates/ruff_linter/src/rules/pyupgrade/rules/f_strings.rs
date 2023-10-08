@@ -11,12 +11,12 @@ use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use ruff_python_parser::{lexer, Mode, Tok};
-
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::line_width::LineLength;
+use crate::fix::edits::fits_or_shrinks;
+
 use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
@@ -306,7 +306,6 @@ pub(crate) fn f_strings(
     call: &ast::ExprCall,
     summary: &FormatSummary,
     template: &Expr,
-    line_length: LineLength,
 ) {
     if summary.has_nested_parts {
         return;
@@ -384,22 +383,6 @@ pub(crate) fn f_strings(
     }
     contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
 
-    // Avoid refactors that exceed the line length limit.
-    let col_offset = template.start() - checker.locator().line_start(template.start());
-    if contents.lines().enumerate().any(|(idx, line)| {
-        // If `template` is a multiline string, `col_offset` should only be applied to the first
-        // line:
-        // ```
-        // a = """{}        -> offset = col_offset (= 4)
-        // {}               -> offset = 0
-        // """.format(0, 1) -> offset = 0
-        // ```
-        let offset = if idx == 0 { col_offset.to_usize() } else { 0 };
-        offset + line.chars().count() > line_length.value() as usize
-    }) {
-        return;
-    }
-
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
     let existing = checker.locator().slice(TextRange::up_to(call.start()));
@@ -409,6 +392,17 @@ pub(crate) fn f_strings(
         .is_some_and(|char| char.is_ascii_alphabetic())
     {
         contents.insert(0, ' ');
+    }
+
+    // Avoid refactors that exceed the line length limit.
+    if !fits_or_shrinks(
+        &contents,
+        template.into(),
+        checker.locator(),
+        checker.settings.line_length,
+        checker.settings.tab_size,
+    ) {
+        return;
     }
 
     let mut diagnostic = Diagnostic::new(FString, call.range());
@@ -425,7 +419,7 @@ pub(crate) fn f_strings(
             .comment_ranges()
             .intersects(call.arguments.range())
     {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
             call.range(),
         )));

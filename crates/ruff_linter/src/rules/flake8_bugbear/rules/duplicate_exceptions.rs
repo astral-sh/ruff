@@ -147,7 +147,7 @@ fn duplicate_handler_exceptions<'a>(
                 expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     // Single exceptions don't require parentheses, but since we're _removing_
                     // parentheses, insert whitespace as needed.
                     if let [elt] = unique_elts.as_slice() {

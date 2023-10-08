@@ -32,6 +32,7 @@ use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
+use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs};
@@ -415,10 +416,12 @@ fn diagnostics_to_messages(
 
 /// Generate `Diagnostic`s from source code content, iteratively fixing
 /// until stable.
+#[allow(clippy::too_many_arguments)]
 pub fn lint_fix<'a>(
     path: &Path,
     package: Option<&Path>,
     noqa: flags::Noqa,
+    unsafe_fixes: UnsafeFixes,
     settings: &LinterSettings,
     source_kind: &'a SourceKind,
     source_type: PySourceType,
@@ -494,7 +497,7 @@ pub fn lint_fix<'a>(
             code: fixed_contents,
             fixes: applied,
             source_map,
-        }) = fix_file(&result.data.0, &locator)
+        }) = fix_file(&result.data.0, &locator, unsafe_fixes)
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.

@@ -86,7 +86,7 @@ pub(crate) fn unconventional_import_alias(
                     let scope = &checker.semantic().scopes[binding.scope];
                     let (edit, rest) =
                         Renamer::rename(name, expected_alias, scope, checker.semantic())?;
-                    Ok(Fix::suggested_edits(edit, rest))
+                    Ok(Fix::unsafe_edits(edit, rest))
                 });
             }
         }

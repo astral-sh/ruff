@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-"""See Docs.md"""
+"""See CONTRIBUTING.md"""
 
 # %%
 

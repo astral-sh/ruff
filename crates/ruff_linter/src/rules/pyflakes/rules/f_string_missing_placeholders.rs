@@ -151,7 +151,7 @@ fn convert_f_string_to_regular_string(
         content.insert(0, ' ');
     }
 
-    Fix::automatic(Edit::replacement(
+    Fix::safe_edit(Edit::replacement(
         content,
         prefix_range.start(),
         tok_range.end(),

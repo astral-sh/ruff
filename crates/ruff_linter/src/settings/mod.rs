@@ -60,6 +60,7 @@ pub struct LinterSettings {
     pub tab_size: TabSize,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
+
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bandit: flake8_bandit::settings::Settings,

@@ -414,13 +414,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.enabled(Rule::FString) {
-                                        pyupgrade::rules::f_strings(
-                                            checker,
-                                            call,
-                                            &summary,
-                                            value,
-                                            checker.settings.line_length,
-                                        );
+                                        pyupgrade::rules::f_strings(checker, call, &summary, value);
                                     }
                                 }
                             }
