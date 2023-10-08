@@ -738,6 +738,42 @@ fn preview_disabled_prefix_empty() {
 }
 
 #[test]
+fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
+    // Does not warn that the selection is empty since the user is not trying to enable the rule
+    let args = ["--ignore", "CPY"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
+    // Does not warn that the selection is empty since the user is not trying to enable the rule
+    let args = ["--fixable", "CPY"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 fn preview_group_selector() {
     // `--select PREVIEW` should error (selector was removed)
     let args = ["--select", "PREVIEW", "--preview"];

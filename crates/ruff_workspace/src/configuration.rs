@@ -57,6 +57,51 @@ pub struct RuleSelection {
     pub extend_fixable: Vec<RuleSelector>,
 }
 
+#[derive(Debug, Eq, PartialEq, is_macro::Is)]
+pub enum RuleSelectorKind {
+    /// Enables the selected rules
+    Enable,
+    /// Disables the selected rules
+    Disable,
+    /// Modifies the behavior of selected rules
+    Modify,
+}
+
+impl RuleSelection {
+    pub fn selectors_by_kind(&self) -> impl Iterator<Item = (RuleSelectorKind, &RuleSelector)> {
+        self.select
+            .iter()
+            .flatten()
+            .map(|selector| (RuleSelectorKind::Enable, selector))
+            .chain(
+                self.fixable
+                    .iter()
+                    .flatten()
+                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+            )
+            .chain(
+                self.ignore
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Disable, selector)),
+            )
+            .chain(
+                self.extend_select
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Enable, selector)),
+            )
+            .chain(
+                self.unfixable
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+            )
+            .chain(
+                self.extend_fixable
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+            )
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Configuration {
     // Global options
@@ -704,16 +749,7 @@ impl LintConfiguration {
             }
 
             // Check for selections that require a warning
-            for selector in selection
-                .select
-                .iter()
-                .chain(selection.fixable.iter())
-                .flatten()
-                .chain(selection.ignore.iter())
-                .chain(selection.extend_select.iter())
-                .chain(selection.unfixable.iter())
-                .chain(selection.extend_fixable.iter())
-            {
+            for (kind, selector) in selection.selectors_by_kind() {
                 #[allow(deprecated)]
                 if matches!(selector, RuleSelector::Nursery) {
                     let suggestion = if preview.mode.is_disabled() {
@@ -725,7 +761,9 @@ impl LintConfiguration {
                     warn_user_once!("The `NURSERY` selector has been deprecated.{suggestion}");
                 };
 
-                if preview.mode.is_disabled() {
+                // Only warn for the following selectors if used to enable rules
+                // e.g. use with `--ignore` or `--fixable` is okay
+                if preview.mode.is_disabled() && kind.is_enable() {
                     if let RuleSelector::Rule { prefix, .. } = selector {
                         if prefix.rules().any(|rule| rule.is_nursery()) {
                             deprecated_nursery_selectors.insert(selector);
