@@ -41,7 +41,7 @@ smallvec = { version = "1.11.1" }
 static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
 strum_macros = { version = "0.25.2" }
-syn = { version = "2.0.37" }
+syn = { version = "2.0.38" }
 test-case = { version = "3.2.1" }
 thiserror = { version = "1.0.49" }
 toml = { version = "0.7.8" }
