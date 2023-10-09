@@ -1414,8 +1414,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
         }
         Expr::NamedExpr(..) => {
-            if checker.enabled(Rule::AssignInAssert) {
-                ruff::rules::assign_in_assert(checker, expr);
+            if checker.enabled(Rule::AssignmentInAssert) {
+                ruff::rules::assignment_in_assert(checker, expr);
             }
         }
         _ => {}

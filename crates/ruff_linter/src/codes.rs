@@ -865,7 +865,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "016") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidIndexType),
         #[allow(deprecated)]
         (Ruff, "017") => (RuleGroup::Nursery, rules::ruff::rules::QuadraticListSummation),
-        (Ruff, "018") => (RuleGroup::Preview, rules::ruff::rules::AssignInAssert),
+        (Ruff, "018") => (RuleGroup::Preview, rules::ruff::rules::AssignmentInAssert),
         (Ruff, "100") => (RuleGroup::Unspecified, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidPyprojectToml),
 

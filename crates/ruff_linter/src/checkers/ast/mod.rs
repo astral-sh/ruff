@@ -690,13 +690,10 @@ where
                 msg,
                 range: _,
             }) => {
-                let snapshot = self.semantic.flags;
-                self.semantic.flags |= SemanticModelFlags::ASSERT;
                 self.visit_boolean_test(test);
                 if let Some(expr) = msg {
                     self.visit_expr(expr);
                 }
-                self.semantic.flags = snapshot;
             }
             Stmt::While(ast::StmtWhile {
                 test,
