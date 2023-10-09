@@ -7,11 +7,11 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for assert statements containing assignment expressions.
+/// Checks for assignment expressions in assert statements.
 ///
 /// ## Why is this bad?
-/// Assignment expression in assert statements get optimized away when running
-/// Python with the `-O` option.
+/// Assignment expressions in assert statements will not be executed when the
+/// Python interpreter is run with the `-O` option.
 ///
 /// ## Examples
 /// ```python
