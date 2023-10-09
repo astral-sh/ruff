@@ -1878,8 +1878,7 @@ fn handle_lambda_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Attach trailing end-of-line comments on the operator as dangling comments on the enclosing
-/// node.
+/// Move comment between a unary op and its operand before the unary op by marking them as trailing.
 ///
 /// For example, given:
 /// ```python
@@ -1896,26 +1895,27 @@ fn handle_unary_op_comment<'a>(
     unary_op: &'a ast::ExprUnaryOp,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if comment.line_position().is_own_line() {
-        return CommentPlacement::Default(comment);
-    }
-
-    if comment.start() > unary_op.operand.start() {
-        return CommentPlacement::Default(comment);
-    }
-
-    let tokenizer = SimpleTokenizer::new(
+    let mut tokenizer = SimpleTokenizer::new(
         locator.contents(),
-        TextRange::new(comment.start(), unary_op.operand.start()),
-    );
-    if tokenizer
-        .skip_trivia()
-        .any(|token| token.kind == SimpleTokenKind::LParen)
-    {
-        return CommentPlacement::Default(comment);
+        TextRange::new(unary_op.start(), unary_op.operand.start()),
+    )
+    .skip_trivia();
+    let op_token = tokenizer.next();
+    debug_assert!(op_token.is_some_and(|token| matches!(
+        token.kind,
+        SimpleTokenKind::Tilde
+            | SimpleTokenKind::Not
+            | SimpleTokenKind::Plus
+            | SimpleTokenKind::Minus
+    )));
+    let up_to = tokenizer
+        .find(|token| token.kind == SimpleTokenKind::LParen)
+        .map_or(unary_op.operand.start(), |lparen| lparen.start());
+    if comment.end() < up_to {
+        CommentPlacement::leading(unary_op, comment)
+    } else {
+        CommentPlacement::Default(comment)
     }
-
-    CommentPlacement::dangling(comment.enclosing_node(), comment)
 }
 
 /// Attach an end-of-line comment immediately following an open bracket as a dangling comment on

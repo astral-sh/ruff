@@ -167,7 +167,17 @@ if True:
                 + "WARNING: Removing listed files. Do you really want to continue. yes/n)? "
             ):
                 pass
-```
+
+# https://github.com/astral-sh/ruff/issues/7448
+x = (
+    # a
+    not # b
+    # c
+    ( # d
+        # e
+        True
+    )
+)```
 
 ## Output
 ```py
@@ -217,35 +227,31 @@ if +(
     pass
 
 if (
-    not
     # comment
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    ~
     # comment
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
-    -
     # comment
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    +
     # comment
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
@@ -254,8 +260,8 @@ if (
 
 if (
     # unary comment
+    # operand comment
     not (
-        # operand comment
         # comment
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
@@ -286,28 +292,31 @@ if not (
 
 ## Trailing operator comments
 
-if (
-    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
+if (  # comment
+    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
+    # comment
+    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
-    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
+    # comment
+    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
+    # comment
+    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
@@ -327,13 +336,14 @@ if (
     pass
 
 if (
-    not
     # comment
-    a
+    not a
 ):
     pass
 
-if not a:  # comment
+if (  # comment
+    not a
+):
     pass
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7423
@@ -345,6 +355,17 @@ if True:
                 + "WARNING: Removing listed files. Do you really want to continue. yes/n)? "
             ):
                 pass
+
+# https://github.com/astral-sh/ruff/issues/7448
+x = (
+    # a
+    # b
+    # c
+    not (  # d
+        # e
+        True
+    )
+)
 ```
 
 

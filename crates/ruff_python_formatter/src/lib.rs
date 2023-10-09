@@ -60,7 +60,6 @@ where
             }
 
             self.fmt_fields(node, f)?;
-            self.fmt_dangling_comments(node_comments.dangling, f)?;
 
             if is_source_map_enabled {
                 source_position(node.end()).fmt(f)?;
