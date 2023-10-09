@@ -12,7 +12,7 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
             | "assertNotEquals"
             | "bool"
             | "bytes"
-            // | "coalesce"
+            | "coalesce"
             | "count"
             | "failIfEqual"
             | "failUnlessEqual"
