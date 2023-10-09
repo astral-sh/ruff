@@ -1,15 +1,15 @@
-use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Comprehension, Constant, Expr, ExprContext, Stmt, UnaryOp,
-};
-use ruff_text_size::{Ranged, TextRange};
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::traversal;
+use ruff_python_ast::{
+    self as ast, Arguments, CmpOp, Comprehension, Constant, Expr, ExprContext, Stmt, UnaryOp,
+};
 use ruff_python_codegen::Generator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::fits;
 use crate::line_width::LineWidthBuilder;
 use crate::registry::AsRule;
 
@@ -80,8 +80,9 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
         return;
     };
 
-    // Check if any of the expressions contain an `await` expression.
-    if contains_await(loop_.target) || contains_await(loop_.iter) || contains_await(loop_.test) {
+    // Check if any of the expressions contain an `await`, `yield`, or `yield from` expression.
+    // If so, turning the code into an any() or all() call would produce a SyntaxError.
+    if contains_yield_like(loop_.target) || contains_yield_like(loop_.test) {
         return;
     }
 
@@ -97,16 +98,13 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
             );
 
             // Don't flag if the resulting expression would exceed the maximum line length.
-            let line_start = checker.locator().line_start(stmt.start());
-            if LineWidthBuilder::new(checker.settings.tab_size)
-                .add_str(
-                    checker
-                        .locator()
-                        .slice(TextRange::new(line_start, stmt.start())),
-                )
-                .add_str(&contents)
-                > checker.settings.line_length
-            {
+            if !fits(
+                &contents,
+                stmt.into(),
+                checker.locator(),
+                checker.settings.line_length,
+                checker.settings.tab_size,
+            ) {
                 return;
             }
 
@@ -117,7 +115,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
             if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("any") {
-                diagnostic.set_fix(Fix::suggested(Edit::replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),
                     terminal.stmt.end(),
@@ -203,7 +201,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
             if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("all") {
-                diagnostic.set_fix(Fix::suggested(Edit::replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),
                     terminal.stmt.end(),
@@ -413,7 +411,9 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     generator.stmt(&node3.into())
 }
 
-/// Return `true` if the [`Expr`] contains an `await` expression.
-fn contains_await(expr: &Expr) -> bool {
+/// Return `true` if the [`Expr`] contains an `await`, `yield`, or `yield from` expression.
+fn contains_yield_like(expr: &Expr) -> bool {
     any_over_expr(expr, &Expr::is_await_expr)
+        || any_over_expr(expr, &Expr::is_yield_expr)
+        || any_over_expr(expr, &Expr::is_yield_from_expr)
 }

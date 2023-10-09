@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 1a0e7fb63b805f132cd3ab1d4c27182a01180a7196bacc2b93eae088dd07c79a
+// sha3: 02b10a353d68a76918de8edbf7f2eaf4710077920b96ce46f0e4855e2ee189bb
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -36287,6 +36287,7 @@ fn __action221<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
+    (_, name_location, _): (TextSize, TextSize, TextSize),
     (_, s, _): (TextSize, String, TextSize),
 ) -> Result<(TextSize, ast::ConversionFlag),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -36297,7 +36298,7 @@ fn __action221<
             "a" => ast::ConversionFlag::Ascii,
             _ => Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
-                location,
+                location: name_location,
             })?
         };
         Ok((location, conversion))
@@ -48263,6 +48264,8 @@ fn __action800<
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
+    let __start1 = __0.2;
+    let __end1 = __1.0;
     let __temp0 = __action412(
         source_code,
         mode,
@@ -48270,11 +48273,19 @@ fn __action800<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
+    let __temp1 = __action412(
+        source_code,
+        mode,
+        &__start1,
+        &__end1,
+    );
+    let __temp1 = (__start1, __temp1, __end1);
     __action221(
         source_code,
         mode,
         __temp0,
         __0,
+        __temp1,
         __1,
     )
 }

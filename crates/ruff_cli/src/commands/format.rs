@@ -66,23 +66,21 @@ pub(crate) fn format(
         .filter_map(|entry| {
             match entry {
                 Ok(entry) => {
-                    let path = entry.path();
+                    let path = entry.into_path();
 
-                    let SourceType::Python(source_type) = SourceType::from(path) else {
+                    let SourceType::Python(source_type) = SourceType::from(&path) else {
                         // Ignore any non-Python files.
                         return None;
                     };
 
-                    let resolved_settings = resolver.resolve(path, &pyproject_config);
+                    let resolved_settings = resolver.resolve(&path, &pyproject_config);
 
                     Some(
                         match catch_unwind(|| {
-                            format_path(path, &resolved_settings.formatter, source_type, mode)
+                            format_path(&path, &resolved_settings.formatter, source_type, mode)
                         }) {
-                            Ok(inner) => inner,
-                            Err(error) => {
-                                Err(FormatCommandError::Panic(Some(path.to_path_buf()), error))
-                            }
+                            Ok(inner) => inner.map(|result| FormatPathResult { path, result }),
+                            Err(error) => Err(FormatCommandError::Panic(Some(path), error)),
                         },
                     )
                 }
@@ -106,7 +104,7 @@ pub(crate) fn format(
         error!("{error}");
     }
 
-    let summary = FormatResultSummary::new(results, mode);
+    let summary = FormatSummary::new(results.as_slice(), mode);
 
     // Report on the formatting changes.
     if log_level >= LogLevel::Default {
@@ -126,7 +124,7 @@ pub(crate) fn format(
         }
         FormatMode::Check => {
             if errors.is_empty() {
-                if summary.formatted > 0 {
+                if summary.any_formatted() {
                     Ok(ExitStatus::Failure)
                 } else {
                     Ok(ExitStatus::Success)
@@ -145,11 +143,11 @@ fn format_path(
     settings: &FormatterSettings,
     source_type: PySourceType,
     mode: FormatMode,
-) -> Result<FormatCommandResult, FormatCommandError> {
+) -> Result<FormatResult, FormatCommandError> {
     // Extract the sources from the file.
     let source_kind = match SourceKind::from_path(path, source_type) {
         Ok(Some(source_kind)) => source_kind,
-        Ok(None) => return Ok(FormatCommandResult::Unchanged),
+        Ok(None) => return Ok(FormatResult::Unchanged),
         Err(err) => {
             return Err(FormatCommandError::Read(Some(path.to_path_buf()), err));
         }
@@ -166,9 +164,9 @@ fn format_path(
                     .write(&mut writer)
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
             }
-            Ok(FormatCommandResult::Formatted)
+            Ok(FormatResult::Formatted)
         }
-        FormattedSource::Unchanged(_) => Ok(FormatCommandResult::Unchanged),
+        FormattedSource::Unchanged(_) => Ok(FormatResult::Unchanged),
     }
 }
 
@@ -180,11 +178,11 @@ pub(crate) enum FormattedSource {
     Unchanged(SourceKind),
 }
 
-impl From<FormattedSource> for FormatCommandResult {
+impl From<FormattedSource> for FormatResult {
     fn from(value: FormattedSource) -> Self {
         match value {
-            FormattedSource::Formatted(_) => FormatCommandResult::Formatted,
-            FormattedSource::Unchanged(_) => FormatCommandResult::Unchanged,
+            FormattedSource::Formatted(_) => FormatResult::Formatted,
+            FormattedSource::Unchanged(_) => FormatResult::Unchanged,
         }
     }
 }
@@ -292,73 +290,97 @@ pub(crate) fn format_source(
     }
 }
 
+/// The result of an individual formatting operation.
 #[derive(Debug, Clone, Copy, is_macro::Is)]
-pub(crate) enum FormatCommandResult {
+pub(crate) enum FormatResult {
     /// The file was formatted.
     Formatted,
     /// The file was unchanged, as the formatted contents matched the existing contents.
     Unchanged,
 }
 
+/// The coupling of a [`FormatResult`] with the path of the file that was analyzed.
 #[derive(Debug)]
-struct FormatResultSummary {
-    /// The format mode that was used.
-    mode: FormatMode,
-    /// The number of files that were formatted.
-    formatted: usize,
-    /// The number of files that were unchanged.
-    unchanged: usize,
+struct FormatPathResult {
+    path: PathBuf,
+    result: FormatResult,
 }
 
-impl FormatResultSummary {
-    fn new(diagnostics: Vec<FormatCommandResult>, mode: FormatMode) -> Self {
-        let mut summary = Self {
-            mode,
-            formatted: 0,
-            unchanged: 0,
-        };
-        for diagnostic in diagnostics {
-            match diagnostic {
-                FormatCommandResult::Formatted => summary.formatted += 1,
-                FormatCommandResult::Unchanged => summary.unchanged += 1,
-            }
-        }
-        summary
+/// A summary of the formatting results.
+#[derive(Debug)]
+struct FormatSummary<'a> {
+    /// The individual formatting results.
+    results: &'a [FormatPathResult],
+    /// The format mode that was used.
+    mode: FormatMode,
+}
+
+impl<'a> FormatSummary<'a> {
+    fn new(results: &'a [FormatPathResult], mode: FormatMode) -> Self {
+        Self { results, mode }
+    }
+
+    /// Returns `true` if any of the files require formatting.
+    fn any_formatted(&self) -> bool {
+        self.results
+            .iter()
+            .any(|result| result.result.is_formatted())
     }
 }
 
-impl Display for FormatResultSummary {
+impl Display for FormatSummary<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.formatted > 0 && self.unchanged > 0 {
+        // Compute the number of changed and unchanged files.
+        let mut formatted = 0u32;
+        let mut unchanged = 0u32;
+        for result in self.results {
+            match result.result {
+                FormatResult::Formatted => {
+                    // If we're running in check mode, report on any files that would be formatted.
+                    if self.mode.is_check() {
+                        writeln!(
+                            f,
+                            "Would reformat: {}",
+                            fs::relativize_path(&result.path).bold()
+                        )?;
+                    }
+                    formatted += 1;
+                }
+                FormatResult::Unchanged => unchanged += 1,
+            }
+        }
+
+        // Write out a summary of the formatting results.
+        if formatted > 0 && unchanged > 0 {
             write!(
                 f,
                 "{} file{} {}, {} file{} left unchanged",
-                self.formatted,
-                if self.formatted == 1 { "" } else { "s" },
+                formatted,
+                if formatted == 1 { "" } else { "s" },
                 match self.mode {
                     FormatMode::Write => "reformatted",
                     FormatMode::Check => "would be reformatted",
                 },
-                self.unchanged,
-                if self.unchanged == 1 { "" } else { "s" },
+                unchanged,
+                if unchanged == 1 { "" } else { "s" },
             )
-        } else if self.formatted > 0 {
+        } else if formatted > 0 {
             write!(
                 f,
                 "{} file{} {}",
-                self.formatted,
-                if self.formatted == 1 { "" } else { "s" },
+                formatted,
+                if formatted == 1 { "" } else { "s" },
                 match self.mode {
                     FormatMode::Write => "reformatted",
                     FormatMode::Check => "would be reformatted",
                 }
             )
-        } else if self.unchanged > 0 {
+        } else if unchanged > 0 {
             write!(
                 f,
                 "{} file{} left unchanged",
-                self.unchanged,
-                if self.unchanged == 1 { "" } else { "s" },
+                unchanged,
+                if unchanged == 1 { "" } else { "s" },
             )
         } else {
             Ok(())

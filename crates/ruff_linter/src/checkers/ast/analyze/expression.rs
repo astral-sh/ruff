@@ -414,13 +414,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.enabled(Rule::FString) {
-                                        pyupgrade::rules::f_strings(
-                                            checker,
-                                            call,
-                                            &summary,
-                                            value,
-                                            checker.settings.line_length,
-                                        );
+                                        pyupgrade::rules::f_strings(checker, call, &summary, value);
                                     }
                                 }
                             }
@@ -1223,6 +1217,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     ops,
                     comparators,
                 );
+            }
+            if checker.enabled(Rule::SingleItemMembershipTest) {
+                refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
             }
         }
         Expr::Constant(ast::ExprConstant {

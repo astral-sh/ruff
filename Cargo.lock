@@ -2494,6 +2494,7 @@ dependencies = [
  "glob",
  "globset",
  "ignore",
+ "is-macro",
  "itertools 0.11.0",
  "log",
  "once_cell",

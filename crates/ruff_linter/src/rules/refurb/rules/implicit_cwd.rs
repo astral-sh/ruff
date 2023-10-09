@@ -14,7 +14,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest, registry::AsRule};
 ///
 /// ## Example
 /// ```python
-/// cwd = Path.resolve()
+/// cwd = Path().resolve()
 /// ```
 ///
 /// Use instead:
@@ -95,7 +95,7 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
                 call.start(),
                 checker.semantic(),
             )?;
-            Ok(Fix::suggested_edits(
+            Ok(Fix::unsafe_edits(
                 Edit::range_replacement(format!("{binding}.cwd()"), call.range()),
                 [import_edit],
             ))

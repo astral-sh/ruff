@@ -35,7 +35,7 @@ impl<'a> Explanation<'a> {
             message_formats: rule.message_formats(),
             fix,
             explanation: rule.explanation(),
-            preview: rule.is_preview(),
+            preview: rule.is_preview() || rule.is_nursery(),
         }
     }
 }
@@ -61,7 +61,7 @@ fn format_rule_text(rule: Rule) -> String {
         output.push('\n');
     }
 
-    if rule.is_preview() {
+    if rule.is_preview() || rule.is_nursery() {
         output.push_str(
             r#"This rule is in preview and is not stable. The `--preview` flag is required for use."#,
         );

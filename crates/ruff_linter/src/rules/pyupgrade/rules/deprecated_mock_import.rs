@@ -262,7 +262,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 value.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     "mock".to_string(),
                     value.range(),
                 )));
@@ -308,7 +308,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             name.range(),
                         );
                         if let Some(content) = content.as_ref() {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 content.clone(),
                                 stmt.range(),
                             )));
@@ -339,7 +339,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                         diagnostic.try_set_fix(|| {
                             format_import_from(stmt, indent, checker.locator(), checker.stylist())
                                 .map(|content| Edit::range_replacement(content, stmt.range()))
-                                .map(Fix::suggested)
+                                .map(Fix::unsafe_edit)
                         });
                     }
                 }

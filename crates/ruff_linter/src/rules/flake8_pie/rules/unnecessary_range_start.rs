@@ -86,7 +86,7 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
                 Parentheses::Preserve,
                 checker.locator().contents(),
             )
-            .map(Fix::automatic)
+            .map(Fix::safe_edit)
         });
     }
     checker.diagnostics.push(diagnostic);

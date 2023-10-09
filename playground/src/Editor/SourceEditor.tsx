@@ -51,7 +51,6 @@ export default function SourceEditor({
     const codeActionProvider = monaco?.languages.registerCodeActionProvider(
       "python",
       {
-        // @ts-expect-error: The type definition is wrong.
         provideCodeActions: function (model, position) {
           const actions = diagnostics
             .filter((check) => position.startLineNumber === check.location.row)
@@ -69,7 +68,7 @@ export default function SourceEditor({
                     edits: check.fix.edits.map((edit) => ({
                       resource: model.uri,
                       versionId: model.getVersionId(),
-                      edit: {
+                      textEdit: {
                         range: {
                           startLineNumber: edit.location.row,
                           startColumn: edit.location.column,

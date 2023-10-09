@@ -132,7 +132,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
             })
         };
 
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        let edit = Edit::range_replacement(
             checker.generator().stmt(&Stmt::from(StmtTypeAlias {
                 range: TextRange::default(),
                 name: target.clone(),
@@ -140,7 +140,17 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
                 value: value.clone(),
             })),
             stmt.range(),
-        )));
+        );
+
+        // The fix is only safe in a type stub because new-style aliases have different runtime  behavior
+        // See https://github.com/astral-sh/ruff/issues/6434
+        let fix = if checker.source_type.is_stub() {
+            Fix::safe_edit(edit)
+        } else {
+            Fix::unsafe_edit(edit)
+        };
+
+        diagnostic.set_fix(fix);
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -115,8 +115,9 @@ pub(crate) fn format_literals(
     let mut diagnostic = Diagnostic::new(FormatLiterals, call.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            generate_call(call, arguments, checker.locator(), checker.stylist())
-                .map(|suggestion| Fix::suggested(Edit::range_replacement(suggestion, call.range())))
+            generate_call(call, arguments, checker.locator(), checker.stylist()).map(|suggestion| {
+                Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range()))
+            })
         });
     }
     checker.diagnostics.push(diagnostic);
