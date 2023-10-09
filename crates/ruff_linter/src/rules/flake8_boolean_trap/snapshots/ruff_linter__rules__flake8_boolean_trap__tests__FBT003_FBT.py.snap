@@ -38,4 +38,12 @@ FBT.py:69:38: FBT003 Boolean positional value in function call
 71 | bar.is_not(False)
    |
 
+FBT.py:73:31: FBT003 Boolean positional value in function call
+   |
+71 | bar.is_not(False)
+72 | next(iter([]), False)
+73 | sa.func.coalesce(tbl.c.valid, False)
+   |                               ^^^^^ FBT003
+   |
+
 
