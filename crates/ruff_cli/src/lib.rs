@@ -6,6 +6,7 @@ use std::sync::mpsc::channel;
 
 use anyhow::Result;
 use clap::CommandFactory;
+use colored::Colorize;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
@@ -104,8 +105,6 @@ pub fn run(
     }: Args,
 ) -> Result<ExitStatus> {
     {
-        use colored::Colorize;
-
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             #[allow(clippy::print_stderr)]
@@ -166,9 +165,11 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    warn_user_once!(
-        "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
-        experimentation."
+    eprintln!(
+        "{}{} The formatter is not stable yet. Code style, configuration and CLI are still subject \
+        to change.",
+        "note".yellow().bold(),
+        ":".bold()
     );
 
     let (cli, overrides) = args.partition();
