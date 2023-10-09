@@ -1047,6 +1047,7 @@ mod tests {
         Rule::TooManyPublicMethods,
         Rule::UndocumentedWarn,
         Rule::UnnecessaryEnumerate,
+        Rule::AssignInAssert,
     ];
 
     #[allow(clippy::needless_pass_by_value)]

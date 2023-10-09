@@ -1413,6 +1413,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::repeated_equality_comparison(checker, bool_op);
             }
         }
+        Expr::NamedExpr(..) => {
+            if checker.enabled(Rule::AssignInAssert) {
+                ruff::rules::assign_in_assert(checker, expr);
+            }
+        }
         _ => {}
     };
 }

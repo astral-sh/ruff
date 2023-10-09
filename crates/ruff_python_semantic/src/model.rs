@@ -1330,6 +1330,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::SUBSCRIPT)
     }
 
+    /// Return `true` if the model is in an assert statement.
+    pub const fn in_assert(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ASSERT)
+    }
+
     /// Return `true` if the model is in a type-checking block.
     pub const fn in_type_checking_block(&self) -> bool {
         self.flags
@@ -1599,6 +1604,14 @@ bitflags! {
         ///   ...
         /// ```
         const FUTURE_ANNOTATIONS = 1 << 14;
+
+        /// The model is in an assert statement.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// assert x
+        /// ```
+        const ASSERT = 1 << 15;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_ANNOTATION.bits();
