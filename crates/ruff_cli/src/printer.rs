@@ -177,7 +177,11 @@ impl Printer {
                             writeln!(writer, "Would fix {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`).")?;
                         }
                     } else {
-                        writeln!(writer, "No errors fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
+                        if self.fix_mode.is_apply() {
+                            writeln!(writer, "No errors fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
+                        } else {
+                            writeln!(writer, "No errors would be fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
+                        }
                     }
                 } else {
                     if fixed > 0 {
