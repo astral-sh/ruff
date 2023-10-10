@@ -256,11 +256,11 @@ fn compare_version(
             Ok(if or_equal {
                 // Ex) `sys.version_info <= 3.8`. If Python 3.8 is the minimum supported version,
                 // the condition won't always evaluate to `false`, so we want to return `false`.
-                if_minor < py_minor
+                if_minor <= py_minor
             } else {
                 // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
                 // the condition _will_ always evaluate to `false`, so we want to return `true`.
-                if_minor <= py_minor
+                if_minor < py_minor
             })
         }
     }
@@ -464,9 +464,10 @@ mod tests {
     #[test_case(PythonVersion::Py37, & [3, 0], true, true; "compare-3.0-whole")]
     #[test_case(PythonVersion::Py37, & [3, 1], true, true; "compare-3.1")]
     #[test_case(PythonVersion::Py37, & [3, 5], true, true; "compare-3.5")]
-    #[test_case(PythonVersion::Py37, & [3, 7], true, false; "compare-3.7")]
-    #[test_case(PythonVersion::Py37, & [3, 7], false, true; "compare-3.7-not-equal")]
-    #[test_case(PythonVersion::Py37, & [3, 8], false, false; "compare-3.8")]
+    #[test_case(PythonVersion::Py37, & [3, 7], true, true; "compare-3.7")]
+    #[test_case(PythonVersion::Py37, & [3, 7], false, false; "compare-3.7-not-equal")]
+    #[test_case(PythonVersion::Py37, & [3, 8], true, false; "compare-3.8")]
+    #[test_case(PythonVersion::Py37, & [3, 8], false, false; "compare-3.8-not-equal")]
     #[test_case(PythonVersion::Py310, & [3, 9], true, true; "compare-3.9")]
     #[test_case(PythonVersion::Py310, & [3, 11], true, false; "compare-3.11")]
     fn test_compare_version(

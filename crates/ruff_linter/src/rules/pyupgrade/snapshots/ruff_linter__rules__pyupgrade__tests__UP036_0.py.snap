@@ -665,25 +665,45 @@ UP036_0.py:179:8: UP036 [*] Version block is outdated for minimum Python version
 181 180 | 
 182 181 | if sys.version_info < (3,12):
 
-UP036_0.py:182:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:185:4: UP036 [*] Version block is outdated for minimum Python version
     |
-180 |     expected_error = []
-181 | 
-182 | if sys.version_info < (3,12):
-    |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
 183 |     print("py3")
+184 | 
+185 | if sys.version_info <= (3,12):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+186 |     print("py3")
     |
     = help: Remove outdated version block
 
 ℹ Suggested fix
-179 179 |     if sys.version_info > (3, 0): \
-180 180 |     expected_error = []
-181 181 | 
-182     |-if sys.version_info < (3,12):
-183     |-    print("py3")
-184 182 | 
-185 183 | if sys.version_info <= (3,12):
-186 184 |     print("py3")
+182 182 | if sys.version_info < (3,12):
+183 183 |     print("py3")
+184 184 | 
+185     |-if sys.version_info <= (3,12):
+186     |-    print("py3")
+187 185 | 
+188 186 | if sys.version_info <= (3,12):
+189 187 |     print("py3")
+
+UP036_0.py:188:4: UP036 [*] Version block is outdated for minimum Python version
+    |
+186 |     print("py3")
+187 | 
+188 | if sys.version_info <= (3,12):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+189 |     print("py3")
+    |
+    = help: Remove outdated version block
+
+ℹ Suggested fix
+185 185 | if sys.version_info <= (3,12):
+186 186 |     print("py3")
+187 187 | 
+188     |-if sys.version_info <= (3,12):
+189     |-    print("py3")
+190 188 | 
+191 189 | if sys.version_info == 10000000:
+192 190 |     print("py3")
 
 UP036_0.py:191:24: UP036 Version specifier is invalid
     |
@@ -711,5 +731,23 @@ UP036_0.py:197:24: UP036 Version specifier is invalid
     |                        ^^^^^^^^^^^^ UP036
 198 |     print("py3")
     |
+
+UP036_0.py:203:4: UP036 [*] Version block is outdated for minimum Python version
+    |
+201 |     print('py3')
+202 |     
+203 | if sys.version_info >= (3, 12):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+204 |     print('py3')
+    |
+    = help: Remove outdated version block
+
+ℹ Suggested fix
+200 200 | if sys.version_info > (3, 12):
+201 201 |     print('py3')
+202 202 |     
+203     |-if sys.version_info >= (3, 12):
+204     |-    print('py3')
+    203 |+print('py3')
 
 
