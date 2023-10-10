@@ -1285,3 +1285,44 @@ extend-safe-fixes = ["F601"]
 
     Ok(())
 }
+
+#[test]
+fn check_extend_unsafe_fixes_conflict_with_extend_safe_fixes() -> Result<()> {
+    // Adding a rule to both options should result in it being treated as unsafe
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-unsafe-fixes = ["UP034"]
+extend-safe-fixes = ["UP034"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 Avoid extraneous parentheses
+    Found 2 errors.
+    2 hidden fixes can be enabled with the `--unsafe-fixes` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
