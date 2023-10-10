@@ -56,6 +56,7 @@ pub(crate) use useless_import_alias::*;
 pub(crate) use useless_return::*;
 pub(crate) use yield_from_in_async_function::*;
 pub(crate) use yield_in_init::*;
+pub(crate) use redefined_argument_from_local::*;
 
 mod assert_on_string_literal;
 mod await_outside_async;
@@ -115,3 +116,4 @@ mod useless_import_alias;
 mod useless_return;
 mod yield_from_in_async_function;
 mod yield_in_init;
+mod redefined_argument_from_local;

@@ -1237,6 +1237,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     perflint::rules::try_except_in_loop(checker, body);
                 }
             }
+            if checker.enabled(Rule::RedefinedArgumentFromLocal) {
+                pylint::rules::redefined_argument_from_local(checker, )
+            }
         }
         Stmt::Try(ast::StmtTry {
             body,
