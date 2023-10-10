@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
+use crate::{checkers::ast::Checker, registry::AsRule, rules::flake8_pyi::helpers::traverse_union};
 
 /// ## What it does
 /// Checks for the presence of multiple `type`s in a union.
@@ -27,7 +27,7 @@ pub struct UnnecessaryTypeUnion {
     is_pep604_union: bool,
 }
 
-impl Violation for UnnecessaryTypeUnion {
+impl AlwaysFixableViolation for UnnecessaryTypeUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
         let union_str = if self.is_pep604_union {
@@ -39,6 +39,10 @@ impl Violation for UnnecessaryTypeUnion {
         format!(
             "Multiple `type` members in a union. Combine them into one, e.g., `type[{union_str}]`."
         )
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Combine multiple `type` members into one union")
     }
 }
 
@@ -74,15 +78,32 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     traverse_union(&mut collect_type_exprs, checker.semantic(), union, None);
 
     if type_exprs.len() > 1 {
-        checker.diagnostics.push(Diagnostic::new(
+        let type_members: Vec<String> = type_exprs
+            .into_iter()
+            .map(|type_expr| checker.locator().slice(type_expr.as_ref()).to_string())
+            .collect();
+
+        let mut diagnostic = Diagnostic::new(
             UnnecessaryTypeUnion {
-                members: type_exprs
-                    .into_iter()
-                    .map(|type_expr| checker.locator().slice(type_expr.as_ref()).to_string())
-                    .collect(),
+                members: type_members.clone(),
                 is_pep604_union,
             },
             union.range(),
-        ));
+        );
+
+        if checker.patch(diagnostic.kind.rule()) {
+            let union_str = if is_pep604_union {
+                format!("type[{}]", type_members.join(" | "))
+            } else {
+                format!("type[Union[{}]]", type_members.join(", "))
+            };
+
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                union_str,
+                union.range(),
+            )));
+        }
+
+        checker.diagnostics.push(diagnostic);
     }
 }
