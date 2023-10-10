@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -31,13 +31,17 @@ pub struct UnnecessaryLiteralUnion {
     members: Vec<String>,
 }
 
-impl Violation for UnnecessaryLiteralUnion {
+impl AlwaysFixableViolation for UnnecessaryLiteralUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
             "Multiple literal members in a union. Use a single literal, e.g. `Literal[{}]`",
             self.members.join(", ")
         )
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Replace Literal unions with a single Literal.")
     }
 }
 
@@ -59,15 +63,22 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
 
     // Raise a violation if more than one
     if literal_exprs.len() > 1 {
-        let diagnostic = Diagnostic::new(
+        let literal_members: Vec<String> = literal_exprs
+            .into_iter()
+            .map(|expr| checker.locator().slice(expr.as_ref()).to_string())
+            .collect();
+
+        let mut diagnostic = Diagnostic::new(
             UnnecessaryLiteralUnion {
-                members: literal_exprs
-                    .into_iter()
-                    .map(|expr| checker.locator().slice(expr.as_ref()).to_string())
-                    .collect(),
+                members: literal_members.clone(),
             },
             expr.range(),
         );
+
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            format!("Literal[{}]", literal_members.clone().join(", ")),
+            expr.range(),
+        )));
 
         checker.diagnostics.push(diagnostic);
     }
