@@ -86,6 +86,9 @@ impl fmt::Display for CmpOpExt {
 /// Returns `Some([condition, true_value, false_value])`
 /// if `bool_op` is `condition and true_value or false_value` form.
 pub(super) fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<[Expr; 3]> {
+    if bool_op.op != BoolOp::Or {
+        return None;
+    }
     let [expr, false_value] = bool_op.values.as_slice() else {
         return None;
     };
@@ -94,17 +97,11 @@ pub(super) fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<[Expr; 3]> {
             let [condition, true_value] = and_op.values.as_slice() else {
                 return None;
             };
-            if bool_op.op == BoolOp::Or
-                && !false_value.is_bool_op_expr()
-                && !true_value.is_bool_op_expr()
-            {
-                Some([condition.clone(), true_value.clone(), false_value.clone()])
-            } else {
-                return None;
+            if !false_value.is_bool_op_expr() && !true_value.is_bool_op_expr() {
+                return Some([condition.clone(), true_value.clone(), false_value.clone()]);
             }
         }
-        _ => {
-            return None;
-        }
+        _ => {}
     }
+    None
 }
