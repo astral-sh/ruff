@@ -1036,6 +1036,35 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
 }
 
 #[test]
+fn fix_only_unsafe_fixes_available() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache", 
+                "--select",
+                "F601",
+                "--fix",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}
+    print(('foo'))
+
+    ----- stderr -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    Found 1 error.
+    1 hidden fix can be enabled with the `--unsafe-fixes` option.
+    "###);
+}
+
+#[test]
 fn fix_only_flag_applies_safe_fixes_by_default() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
@@ -1058,7 +1087,7 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
     print('foo')
 
     ----- stderr -----
-    Fixed 1 error.
+    Fixed 1 error (1 additional fix available with `--unsafe-fixes`).
     "###);
 }
 
@@ -1116,7 +1145,7 @@ fn diff_shows_safe_fixes_by_default() {
 
 
     ----- stderr -----
-    Would fix 1 error.
+    Would fix 1 error (1 additional fix available with `--unsafe-fixes`).
     "###
     );
 }
@@ -1150,6 +1179,32 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
 
     ----- stderr -----
     Would fix 2 errors.
+    "###
+    );
+}
+
+#[test]
+fn diff_only_unsafe_fixes_available() {
+    assert_cmd_snapshot!(
+    Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format",
+            "text",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "F601",
+            "--diff",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    No errors would be fixed (1 fix available with `--unsafe-fixes`).
     "###
     );
 }
