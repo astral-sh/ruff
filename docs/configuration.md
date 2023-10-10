@@ -391,7 +391,7 @@ whether a rule supports fixing, see [_Rules_](rules.md).
 
 ### Fix safety
 
-Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code should be retained by safe fixes, but may be changed by unsafe fixes.
+Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when applying safe fixes, but the meaning could be changed when applying unsafe fixes.
 
 Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing the `--unsafe-fixes` flag to `ruff check`:
 
