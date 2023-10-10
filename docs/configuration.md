@@ -386,14 +386,14 @@ To enable fixes, pass the `--fix` flag to `ruff check`:
 ruff check . --fix
 ```
 
-By default, Ruff will fix all violations for which safe fixes are available To determine
+By default, Ruff will fix all violations for which safe fixes are available; to determine
 whether a rule supports fixing, see [_Rules_](rules.md).
 
 ### Fix safety
 
-Ruff labels fixes as "safe" and "unsafe". Safe fixes are very unlikely to change the intent of your code; in contrast, unsafe fixes may change the meaning of your code.
+Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code should be retained by safe fixes, but may be changed by unsafe fixes.
 
-Ruff only uses safe fixes by default. Unsafe fixes can be enabled by passing the `--unsafe-fixes` flag to `ruff check` or by enabling [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file.
+Ruff only enables safe fixes by default. Unsafe fixes can be enabled by passing the `--unsafe-fixes` flag to `ruff check` or by enabling [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file.
 
 ```shell
 # Show unsafe fixes
