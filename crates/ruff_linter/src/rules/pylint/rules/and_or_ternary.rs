@@ -63,7 +63,7 @@ pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
         bool_op.range,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             ternary,
             bool_op.range,
         )));
