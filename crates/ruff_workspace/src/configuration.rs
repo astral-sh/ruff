@@ -226,6 +226,28 @@ impl Configuration {
                         .chain(lint.extend_per_file_ignores)
                         .collect(),
                 )?,
+
+                extend_safe_fixes: lint
+                    .extend_safe_fixes
+                    .iter()
+                    .flat_map(|selector| {
+                        selector.rules(&PreviewOptions {
+                            mode: preview,
+                            require_explicit: false,
+                        })
+                    })
+                    .collect(),
+                extend_unsafe_fixes: lint
+                    .extend_unsafe_fixes
+                    .iter()
+                    .flat_map(|selector| {
+                        selector.rules(&PreviewOptions {
+                            mode: preview,
+                            require_explicit: false,
+                        })
+                    })
+                    .collect(),
+
                 src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
                 explicit_preview_rules: lint.explicit_preview_rules.unwrap_or_default(),
 
@@ -494,6 +516,10 @@ pub struct LintConfiguration {
     pub rule_selections: Vec<RuleSelection>,
     pub explicit_preview_rules: Option<bool>,
 
+    // Fix configuration
+    pub extend_unsafe_fixes: Vec<RuleSelector>,
+    pub extend_safe_fixes: Vec<RuleSelector>,
+
     // Global lint settings
     pub allowed_confusables: Option<Vec<char>>,
     pub dummy_variable_rgx: Option<Regex>,
@@ -551,6 +577,8 @@ impl LintConfiguration {
                     .collect(),
                 extend_fixable: options.extend_fixable.unwrap_or_default(),
             }],
+            extend_safe_fixes: options.extend_safe_fixes.unwrap_or_default(),
+            extend_unsafe_fixes: options.extend_unsafe_fixes.unwrap_or_default(),
             allowed_confusables: options.allowed_confusables,
             dummy_variable_rgx: options
                 .dummy_variable_rgx
@@ -846,6 +874,16 @@ impl LintConfiguration {
                 .rule_selections
                 .into_iter()
                 .chain(self.rule_selections)
+                .collect(),
+            extend_safe_fixes: config
+                .extend_safe_fixes
+                .into_iter()
+                .chain(self.extend_safe_fixes)
+                .collect(),
+            extend_unsafe_fixes: config
+                .extend_unsafe_fixes
+                .into_iter()
+                .chain(self.extend_unsafe_fixes)
                 .collect(),
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),

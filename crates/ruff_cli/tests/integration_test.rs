@@ -1,6 +1,5 @@
 #![cfg(not(target_family = "wasm"))]
 
-#[cfg(unix)]
 use std::fs;
 #[cfg(unix)]
 use std::fs::Permissions;
@@ -12,13 +11,13 @@ use std::process::Command;
 use std::str;
 
 #[cfg(unix)]
-use anyhow::{Context, Result};
+use anyhow::Context;
+use anyhow::Result;
 #[cfg(unix)]
 use clap::Parser;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 #[cfg(unix)]
 use path_absolutize::path_dedot;
-#[cfg(unix)]
 use tempfile::TempDir;
 
 #[cfg(unix)]
@@ -1207,4 +1206,123 @@ fn diff_only_unsafe_fixes_available() {
     No errors would be fixed (1 fix available with `--unsafe-fixes`).
     "###
     );
+}
+
+#[test]
+fn check_extend_unsafe_fixes() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-unsafe-fixes = ["UP034"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache", 
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 Avoid extraneous parentheses
+    Found 2 errors.
+    2 hidden fixes can be enabled with the `--unsafe-fixes` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn check_extend_safe_fixes() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-safe-fixes = ["F601"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache", 
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn check_extend_unsafe_fixes_conflict_with_extend_safe_fixes() -> Result<()> {
+    // Adding a rule to both options should result in it being treated as unsafe
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-unsafe-fixes = ["UP034"]
+extend-safe-fixes = ["UP034"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 Avoid extraneous parentheses
+    Found 2 errors.
+    2 hidden fixes can be enabled with the `--unsafe-fixes` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
 }

@@ -107,8 +107,28 @@
         }
       }
     },
+    "extend-safe-fixes": {
+      "description": "A list of rule codes or prefixes for which unsafe fixes should be considered safe.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
+    "extend-unsafe-fixes": {
+      "description": "A list of rule codes or prefixes for which safe fixes should be considered unsafe.",
       "type": [
         "array",
         "null"
@@ -1612,8 +1632,28 @@
             }
           }
         },
+        "extend-safe-fixes": {
+          "description": "A list of rule codes or prefixes for which unsafe fixes should be considered safe.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
         "extend-select": {
           "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "extend-unsafe-fixes": {
+          "description": "A list of rule codes or prefixes for which safe fixes should be considered unsafe.",
           "type": [
             "array",
             "null"
