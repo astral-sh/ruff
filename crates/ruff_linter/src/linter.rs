@@ -264,15 +264,15 @@ pub fn check_path(
     if !settings.extend_safe_fixes.is_empty() || !settings.extend_unsafe_fixes.is_empty() {
         for diagnostic in &mut diagnostics {
             if let Some(fix) = diagnostic.fix.take() {
-                // Check unsafe before safe so if someone puts a rule in both we are conservative
-                if settings
-                    .extend_unsafe_fixes
-                    .contains(diagnostic.kind.rule())
-                    && fix.applicability().is_safe()
+                // Enforce demotions over promotions so if someone puts a rule in both we are conservative
+                if fix.applicability().is_safe()
+                    && settings
+                        .extend_unsafe_fixes
+                        .contains(diagnostic.kind.rule())
                 {
                     diagnostic.set_fix(fix.with_applicability(Applicability::Unsafe));
-                } else if settings.extend_safe_fixes.contains(diagnostic.kind.rule())
-                    && fix.applicability().is_unsafe()
+                } else if fix.applicability().is_unsafe()
+                    && settings.extend_safe_fixes.contains(diagnostic.kind.rule())
                 {
                     diagnostic.set_fix(fix.with_applicability(Applicability::Safe));
                 } else {
