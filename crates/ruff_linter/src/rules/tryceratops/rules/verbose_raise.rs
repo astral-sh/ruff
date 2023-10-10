@@ -97,7 +97,7 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                         if id == exception_name.as_str() {
                             let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                     "raise".to_string(),
                                     raise.range(),
                                 )));

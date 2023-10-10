@@ -52,10 +52,10 @@ impl Display for Diff<'_> {
         let diff = TextDiff::from_lines(self.source_code.source_text(), &output);
 
         let message = match self.fix.applicability() {
-            Applicability::Automatic => "Fix",
-            Applicability::Suggested => "Suggested fix",
-            Applicability::Manual => "Possible fix",
-            Applicability::Unspecified => "Suggested fix", /* For backwards compatibility, unspecified fixes are 'suggested' */
+            // TODO(zanieb): Adjust this messaging once it's user-facing
+            Applicability::Safe => "Fix",
+            Applicability::Unsafe => "Suggested fix",
+            Applicability::Display => "Possible fix",
         };
         writeln!(f, "ℹ {}", message.blue())?;
 

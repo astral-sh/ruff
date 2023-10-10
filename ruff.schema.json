@@ -128,7 +128,7 @@
       }
     },
     "fix": {
-      "description": "Enable fix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags).",
+      "description": "Enable fix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags). Only includes automatic fixes unless `--unsafe-fixes` is provided.",
       "type": [
         "boolean",
         "null"
@@ -392,9 +392,7 @@
         {
           "type": "null"
         }
-      ],
-      "maximum": 320.0,
-      "minimum": 1.0
+      ]
     },
     "lint": {
       "anyOf": [
@@ -637,6 +635,13 @@
       "items": {
         "$ref": "#/definitions/RuleSelector"
       }
+    },
+    "unsafe-fixes": {
+      "description": "Enable application of unsafe fixes.",
+      "type": [
+        "boolean",
+        "null"
+      ]
     }
   },
   "additionalProperties": false,
@@ -1551,6 +1556,7 @@
       "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=320",
       "type": "integer",
       "format": "uint16",
+      "maximum": 320.0,
       "minimum": 1.0
     },
     "LintOptions": {
@@ -2677,6 +2683,7 @@
         "FURB145",
         "FURB148",
         "FURB17",
+        "FURB171",
         "FURB177",
         "G",
         "G0",
@@ -3138,6 +3145,7 @@
         "RUF015",
         "RUF016",
         "RUF017",
+        "RUF018",
         "RUF1",
         "RUF10",
         "RUF100",

@@ -24,7 +24,7 @@ exit_code: 1
     },
     "filename": "/path/to/F401.py",
     "fix": {
-      "applicability": "Automatic",
+      "applicability": "safe",
       "edits": [
         {
           "content": "",

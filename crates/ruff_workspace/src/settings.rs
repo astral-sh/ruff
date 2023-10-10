@@ -1,7 +1,7 @@
 use path_absolutize::path_dedot;
 use ruff_cache::cache_dir;
 use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
-use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFormat};
+use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFormat, UnsafeFixes};
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
@@ -18,6 +18,8 @@ pub struct Settings {
     pub fix: bool,
     #[cache_key(ignore)]
     pub fix_only: bool,
+    #[cache_key(ignore)]
+    pub unsafe_fixes: UnsafeFixes,
     #[cache_key(ignore)]
     pub output_format: SerializationFormat,
     #[cache_key(ignore)]
@@ -40,6 +42,7 @@ impl Default for Settings {
             output_format: SerializationFormat::default(),
             show_fixes: false,
             show_source: false,
+            unsafe_fixes: UnsafeFixes::default(),
             linter: LinterSettings::new(project_root),
             file_resolver: FileResolverSettings::new(project_root),
             formatter: FormatterSettings::default(),

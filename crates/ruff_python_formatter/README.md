@@ -629,3 +629,44 @@ df.drop(columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]).drop_duplicates(a).rename
     }
 ).to_csv(path / "aaaaaa.csv", index=False).other(a)
 ```
+
+### Expressions with (non-pragma) trailing comments are split more often  ([#7823](https://github.com/astral-sh/ruff/issues/7823))
+
+Both Ruff and Black will break the following expression over multiple lines, since it then allows
+the expression to fit within the configured line width:
+
+```python
+# Input
+some_long_variable_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+# Black
+some_long_variable_name = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+)
+
+# Ruff
+some_long_variable_name = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+)
+```
+
+However, if the expression ends in a trailing comment, Black will avoid wrapping the expression
+in some cases, while Ruff will wrap as long as it allows the expanded lines to fit within the line
+length limit:
+
+```python
+# Input
+some_long_variable_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  # a trailing comment
+
+# Black
+some_long_variable_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  # a trailing comment
+
+# Ruff
+some_long_variable_name = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+)  # a trailing comment
+```
+
+Doing so leads to fewer overlong lines while retaining the comment's intent. As pragma comments
+(like `# noqa` and `# type: ignore`) are ignored when computing line width, this behavior only
+applies to non-pragma comments.

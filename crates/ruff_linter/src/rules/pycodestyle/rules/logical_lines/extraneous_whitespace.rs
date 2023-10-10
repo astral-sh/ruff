@@ -163,7 +163,7 @@ pub(crate) fn extraneous_whitespace(
                         );
                         if fix_after_open_bracket {
                             diagnostic
-                                .set_fix(Fix::automatic(Edit::range_deletion(diagnostic.range())));
+                                .set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
                         }
                         context.push_diagnostic(diagnostic);
                     }
@@ -178,7 +178,7 @@ pub(crate) fn extraneous_whitespace(
                                 TextRange::at(token.start() - offset, offset),
                             );
                             if fix_before_close_bracket {
-                                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
+                                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                     diagnostic.range(),
                                 )));
                             }
@@ -196,7 +196,7 @@ pub(crate) fn extraneous_whitespace(
                                 TextRange::at(token.start() - offset, offset),
                             );
                             if fix_before_punctuation {
-                                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
+                                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                     diagnostic.range(),
                                 )));
                             }

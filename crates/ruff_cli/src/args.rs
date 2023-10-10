@@ -9,6 +9,7 @@ use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
+    UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -76,12 +77,18 @@ pub enum Command {
 pub struct CheckCommand {
     /// List of files or directories to check.
     pub files: Vec<PathBuf>,
-    /// Attempt to automatically fix lint violations.
-    /// Use `--no-fix` to disable.
+    /// Apply fixes to resolve lint violations.
+    /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
     #[clap(long, overrides_with("fix"), hide = true)]
     no_fix: bool,
+    /// Include fixes that may not retain the original intent of the code.
+    /// Use `--no-unsafe-fixes` to disable.
+    #[arg(long, overrides_with("no_unsafe_fixes"))]
+    unsafe_fixes: bool,
+    #[arg(long, overrides_with("unsafe_fixes"), hide = true)]
+    no_unsafe_fixes: bool,
     /// Show violations with source code.
     /// Use `--no-show-source` to disable.
     #[arg(long, overrides_with("no_show_source"))]
@@ -100,8 +107,8 @@ pub struct CheckCommand {
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
     pub watch: bool,
-    /// Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`.
-    /// Use `--no-fix-only` to disable.
+    /// Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`.
+    /// Use `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
@@ -497,6 +504,8 @@ impl CheckCommand {
                 cache_dir: self.cache_dir,
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
+                unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
+                    .map(UnsafeFixes::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 output_format: self.output_format.or(self.format),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
@@ -599,6 +608,7 @@ pub struct CliOverrides {
     pub cache_dir: Option<PathBuf>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
+    pub unsafe_fixes: Option<UnsafeFixes>,
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
@@ -623,6 +633,9 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(fix_only) = &self.fix_only {
             config.fix_only = Some(*fix_only);
+        }
+        if self.unsafe_fixes.is_some() {
+            config.unsafe_fixes = self.unsafe_fixes;
         }
         config.lint.rule_selections.push(RuleSelection {
             select: self.select.clone(),

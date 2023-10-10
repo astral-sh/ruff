@@ -644,7 +644,7 @@ expression: parse_ast
     ),
     Match(
         StmtMatch {
-            range: 207..269,
+            range: 207..298,
             subject: Name(
                 ExprName {
                     range: 213..216,
@@ -654,68 +654,20 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: 222..269,
+                    range: 222..246,
                     pattern: MatchValue(
                         PatternMatchValue {
-                            range: 227..255,
-                            value: FString(
-                                ExprFString {
-                                    range: 227..255,
-                                    values: [
-                                        Constant(
-                                            ExprConstant {
-                                                range: 228..240,
-                                                value: Str(
-                                                    StringConstant {
-                                                        value: "foo bar ",
-                                                        unicode: false,
-                                                        implicit_concatenated: true,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        FormattedValue(
-                                            ExprFormattedValue {
-                                                range: 240..247,
-                                                value: BinOp(
-                                                    ExprBinOp {
-                                                        range: 241..246,
-                                                        left: Name(
-                                                            ExprName {
-                                                                range: 241..242,
-                                                                id: "x",
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        op: Add,
-                                                        right: Name(
-                                                            ExprName {
-                                                                range: 245..246,
-                                                                id: "y",
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                                debug_text: None,
-                                                conversion: None,
-                                                format_spec: None,
-                                            },
-                                        ),
-                                        Constant(
-                                            ExprConstant {
-                                                range: 247..254,
-                                                value: Str(
-                                                    StringConstant {
-                                                        value: " baz",
-                                                        unicode: false,
-                                                        implicit_concatenated: true,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    implicit_concatenated: true,
+                            range: 227..232,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 227..232,
+                                    value: Str(
+                                        StringConstant {
+                                            value: "one",
+                                            unicode: false,
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
                                 },
                             ),
                         },
@@ -724,7 +676,35 @@ expression: parse_ast
                     body: [
                         Pass(
                             StmtPass {
-                                range: 265..269,
+                                range: 242..246,
+                            },
+                        ),
+                    ],
+                },
+                MatchCase {
+                    range: 251..298,
+                    pattern: MatchValue(
+                        PatternMatchValue {
+                            range: 256..284,
+                            value: Constant(
+                                ExprConstant {
+                                    range: 256..284,
+                                    value: Str(
+                                        StringConstant {
+                                            value: "implicitly concatenated",
+                                            unicode: false,
+                                            implicit_concatenated: true,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 294..298,
                             },
                         ),
                     ],
@@ -734,14 +714,14 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 271..288,
+            range: 300..317,
             value: FString(
                 ExprFString {
-                    range: 271..288,
+                    range: 300..317,
                     values: [
                         Constant(
                             ExprConstant {
-                                range: 273..274,
+                                range: 302..303,
                                 value: Str(
                                     StringConstant {
                                         value: "\\",
@@ -753,10 +733,10 @@ expression: parse_ast
                         ),
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 274..279,
+                                range: 303..308,
                                 value: Name(
                                     ExprName {
-                                        range: 275..278,
+                                        range: 304..307,
                                         id: "foo",
                                         ctx: Load,
                                     },
@@ -768,7 +748,7 @@ expression: parse_ast
                         ),
                         Constant(
                             ExprConstant {
-                                range: 279..280,
+                                range: 308..309,
                                 value: Str(
                                     StringConstant {
                                         value: "\\",
@@ -780,10 +760,10 @@ expression: parse_ast
                         ),
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 280..287,
+                                range: 309..316,
                                 value: Name(
                                     ExprName {
-                                        range: 281..284,
+                                        range: 310..313,
                                         id: "bar",
                                         ctx: Load,
                                     },
@@ -793,11 +773,11 @@ expression: parse_ast
                                 format_spec: Some(
                                     FString(
                                         ExprFString {
-                                            range: 285..286,
+                                            range: 314..315,
                                             values: [
                                                 Constant(
                                                     ExprConstant {
-                                                        range: 285..286,
+                                                        range: 314..315,
                                                         value: Str(
                                                             StringConstant {
                                                                 value: "\\",
@@ -822,20 +802,69 @@ expression: parse_ast
     ),
     Expr(
         StmtExpr {
-            range: 289..303,
+            range: 318..332,
             value: FString(
                 ExprFString {
-                    range: 289..303,
+                    range: 318..332,
                     values: [
                         Constant(
                             ExprConstant {
-                                range: 291..302,
+                                range: 320..331,
                                 value: Str(
                                     StringConstant {
                                         value: "\\{foo\\}",
                                         unicode: false,
                                         implicit_concatenated: false,
                                     },
+                                ),
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 333..373,
+            value: FString(
+                ExprFString {
+                    range: 333..373,
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 337..370,
+                                value: Name(
+                                    ExprName {
+                                        range: 343..346,
+                                        id: "foo",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: Some(
+                                    FString(
+                                        ExprFString {
+                                            range: 347..369,
+                                            values: [
+                                                Constant(
+                                                    ExprConstant {
+                                                        range: 347..369,
+                                                        value: Str(
+                                                            StringConstant {
+                                                                value: "x\n        y\n        z\n",
+                                                                unicode: false,
+                                                                implicit_concatenated: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            implicit_concatenated: false,
+                                        },
+                                    ),
                                 ),
                             },
                         ),

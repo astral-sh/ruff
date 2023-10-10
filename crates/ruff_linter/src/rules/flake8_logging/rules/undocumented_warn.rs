@@ -63,7 +63,7 @@ pub(crate) fn undocumented_warn(checker: &mut Checker, expr: &Expr) {
                     checker.semantic(),
                 )?;
                 let reference_edit = Edit::range_replacement(binding, expr.range());
-                Ok(Fix::suggested_edits(import_edit, [reference_edit]))
+                Ok(Fix::safe_edits(import_edit, [reference_edit]))
             });
         }
         checker.diagnostics.push(diagnostic);

@@ -10,7 +10,7 @@ use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
-use ruff_linter::settings::flags;
+use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
@@ -208,6 +208,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         }
         _ => Box::new(BufWriter::new(io::stdout())),
     };
+    let stderr_writer = Box::new(BufWriter::new(io::stderr()));
 
     if cli.show_settings {
         commands::show_settings::show_settings(
@@ -228,6 +229,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let Settings {
         fix,
         fix_only,
+        unsafe_fixes,
         output_format,
         show_fixes,
         show_source,
@@ -236,17 +238,20 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
-    // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
+    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
-    // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   fixes).
+    // - If `--diff` or `--fix-only` are set, don't print any violations (only applicable fixes)
+    // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
+    //   `--unsafe-fixes` is set, then [`Applicablility::Suggested`] fixes are included.
+
     let fix_mode = if cli.diff {
-        flags::FixMode::Diff
+        FixMode::Diff
     } else if fix || fix_only {
-        flags::FixMode::Apply
+        FixMode::Apply
     } else {
-        flags::FixMode::Generate
+        FixMode::Generate
     };
+
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
     let mut printer_flags = PrinterFlags::empty();
@@ -290,11 +295,17 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(output_format, log_level, fix_mode, printer_flags);
+    let printer = Printer::new(
+        output_format,
+        log_level,
+        fix_mode,
+        unsafe_fixes,
+        printer_flags,
+    );
 
     if cli.watch {
         if output_format != SerializationFormat::Text {
-            warn_user!("--format 'text' is used in watch mode.");
+            warn_user!("`--output-format text` is always used in watch mode.");
         }
 
         // Configure the file watcher.
@@ -318,6 +329,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             cache.into(),
             noqa.into(),
             fix_mode,
+            unsafe_fixes,
         )?;
         printer.write_continuously(&mut writer, &messages)?;
 
@@ -350,6 +362,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         cache.into(),
                         noqa.into(),
                         fix_mode,
+                        unsafe_fixes,
                     )?;
                     printer.write_continuously(&mut writer, &messages)?;
                 }
@@ -376,18 +389,22 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 cache.into(),
                 noqa.into(),
                 fix_mode,
+                unsafe_fixes,
             )?
         };
 
-        // Always try to print violations (the printer itself may suppress output),
-        // unless we're writing fixes via stdin (in which case, the transformed
-        // source code goes to stdout).
-        if !(is_stdin && matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff)) {
-            if cli.statistics {
-                printer.write_statistics(&diagnostics, &mut writer)?;
-            } else {
-                printer.write_once(&diagnostics, &mut writer)?;
-            }
+        // Always try to print violations (though the printer itself may suppress output)
+        // If we're writing fixes via stdin, the transformed source code goes to the writer
+        // so send the summary to stderr instead
+        let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
+            stderr_writer
+        } else {
+            writer
+        };
+        if cli.statistics {
+            printer.write_statistics(&diagnostics, &mut summary_writer)?;
+        } else {
+            printer.write_once(&diagnostics, &mut summary_writer)?;
         }
 
         if !cli.exit_zero {

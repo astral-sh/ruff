@@ -1144,6 +1144,24 @@ match x:
     }
 
     #[test]
+    fn test_match_pattern_fstring_literal() {
+        // F-string literal is not allowed in match pattern.
+        let parse_error = parse_suite(
+            r#"
+match x:
+    case f"{y}":
+        pass
+"#,
+            "<test>",
+        )
+        .err();
+        assert!(
+            parse_error.is_some(),
+            "expected parse error when f-string literal is used in match pattern"
+        );
+    }
+
+    #[test]
     fn test_variadic_generics() {
         let parse_ast = parse_suite(
             r#"
@@ -1285,11 +1303,18 @@ f'{f"{3.1415=:.1f}":*^20}'
 
 {"foo " f"bar {x + y} " "baz": 10}
 match foo:
-    case "foo " f"bar {x + y} " "baz":
+    case "one":
+        pass
+    case "implicitly " "concatenated":
         pass
 
 f"\{foo}\{bar:\}"
 f"\\{{foo\\}}"
+f"""{
+    foo:x
+        y
+        z
+}"""
 "#
             .trim(),
             "<test>",

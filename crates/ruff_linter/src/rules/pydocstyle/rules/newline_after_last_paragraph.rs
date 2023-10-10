@@ -96,7 +96,7 @@ pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Do
                             checker.stylist().line_ending().as_str(),
                             clean_space(docstring.indentation)
                         );
-                        diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                        diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                             content,
                             docstring.expr.end() - num_trailing_quotes - num_trailing_spaces,
                             docstring.expr.end() - num_trailing_quotes,

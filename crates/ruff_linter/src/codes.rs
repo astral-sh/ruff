@@ -866,6 +866,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "016") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidIndexType),
         #[allow(deprecated)]
         (Ruff, "017") => (RuleGroup::Nursery, rules::ruff::rules::QuadraticListSummation),
+        (Ruff, "018") => (RuleGroup::Preview, rules::ruff::rules::AssignmentInAssert),
         (Ruff, "100") => (RuleGroup::Unspecified, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidPyprojectToml),
 
@@ -924,6 +925,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "140") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedStarmap),
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
         (Refurb, "148") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryEnumerate),
+        (Refurb, "171") => (RuleGroup::Preview, rules::refurb::rules::SingleItemMembershipTest),
         (Refurb, "177") => (RuleGroup::Preview, rules::refurb::rules::ImplicitCwd),
 
         // flake8-logging

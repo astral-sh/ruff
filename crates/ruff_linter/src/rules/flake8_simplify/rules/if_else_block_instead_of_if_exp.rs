@@ -145,7 +145,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !checker.indexer().has_comments(stmt, checker.locator()) {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 contents,
                 stmt.range(),
             )));

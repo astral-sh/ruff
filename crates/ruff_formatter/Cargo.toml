@@ -20,7 +20,7 @@ rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 static_assertions = { workspace = true }
-tracing = { version = "0.1.37", default-features = false, features = ["std"] }
+tracing = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]

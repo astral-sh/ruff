@@ -668,7 +668,7 @@ LiteralPattern: ast::Pattern = {
         value: Box::new(value.into()),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
+    <location:@L> <strings:StringLiteral+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
         value: Box::new(concatenate_strings(strings, (location..end_location).into())?),
         range: (location..end_location).into()
     }.into()),
@@ -1662,14 +1662,14 @@ FStringFormatSpec: ast::Expr = {
 };
 
 FStringConversion: (TextSize, ast::ConversionFlag) = {
-    <location:@L> "!" <s:name> =>? {
+    <location:@L> "!" <name_location:@L> <s:name> =>? {
         let conversion = match s.as_str() {
             "s" => ast::ConversionFlag::Str,
             "r" => ast::ConversionFlag::Repr,
             "a" => ast::ConversionFlag::Ascii,
             _ => Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
-                location,
+                location: name_location,
             })?
         };
         Ok((location, conversion))

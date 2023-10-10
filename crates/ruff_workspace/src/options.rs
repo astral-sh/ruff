@@ -2,12 +2,11 @@ use std::collections::BTreeSet;
 use std::hash::BuildHasherDefault;
 
 use regex::Regex;
-use ruff_formatter::IndentStyle;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::options_base::{OptionsMetadata, Visit};
+use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
@@ -30,6 +29,7 @@ use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::QuoteStyle;
 
+use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -89,8 +89,17 @@ pub struct Options {
 
     /// Enable fix behavior by-default when running `ruff` (overridden
     /// by the `--fix` and `--no-fix` command-line flags).
+    /// Only includes automatic fixes unless `--unsafe-fixes` is provided.
     #[option(default = "false", value_type = "bool", example = "fix = true")]
     pub fix: Option<bool>,
+
+    /// Enable application of unsafe fixes.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = "unsafe-fixes = true"
+    )]
+    pub unsafe_fixes: Option<bool>,
 
     /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
     #[option(default = "false", value_type = "bool", example = "fix-only = true")]
@@ -353,7 +362,6 @@ pub struct Options {
         line-length = 120
         "#
     )]
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))]
     pub line_length: Option<LineLength>,
 
     /// The tabulation size to calculate line length.

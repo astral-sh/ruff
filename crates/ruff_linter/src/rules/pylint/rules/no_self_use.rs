@@ -29,7 +29,7 @@ use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
 /// class Person:
 ///     @staticmethod
 ///     def greeting():
-///         print(f"Greetings friend!")
+///         print("Greetings friend!")
 /// ```
 #[violation]
 pub struct NoSelfUse {

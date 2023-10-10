@@ -703,7 +703,7 @@ pub(crate) fn definition(
                         function.identifier(),
                     );
                     if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.set_fix(Fix::suggested(Edit::insertion(
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                             " -> None".to_string(),
                             function.parameters.range().end(),
                         )));
@@ -721,7 +721,7 @@ pub(crate) fn definition(
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(return_type) = simple_magic_return_type(name) {
-                        diagnostic.set_fix(Fix::suggested(Edit::insertion(
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                             format!(" -> {return_type}"),
                             function.parameters.range().end(),
                         )));
