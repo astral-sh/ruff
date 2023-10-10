@@ -1,3 +1,4 @@
+use ast::ExprContext;
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
@@ -54,22 +55,14 @@ pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
     let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
 
     if checker.patch(diagnostic.kind.rule()) {
-        let first = elts.first().unwrap();
-        let last = elts.last().unwrap();
-
-        let inner_slice = checker
-            .locator()
-            .slice(TextRange::new(first.range().start(), last.range().end()));
-
-        let content = if elts.len() == 1 {
-            // handle the case of a single element in a tuple, needs a trailing comma
-            format!("({inner_slice},)")
-        } else {
-            format!("({inner_slice})")
-        };
+        let tuple_replacement = checker.generator().expr(&Expr::Tuple(ast::ExprTuple {
+            elts: elts.clone(),
+            ctx: ExprContext::Store,
+            range: TextRange::default(),
+        }));
 
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            content,
+            format!("({tuple_replacement})"),
             expr.range(),
         )));
     }
