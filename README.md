@@ -239,7 +239,7 @@ Rust as a first-party feature.
 
 By default, Ruff enables Flake8's `E` and `F` rules. Ruff supports all rules from the `F` category,
 and a [subset](https://docs.astral.sh/ruff/rules/#error-e) of the `E` category, omitting those
-stylistic rules made obsolete by the use of an autoformatter, like
+stylistic rules made obsolete by the use of a formatter, like
 [Black](https://github.com/psf/black).
 
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
