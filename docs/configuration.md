@@ -393,7 +393,7 @@ whether a rule supports fixing, see [_Rules_](rules.md).
 
 Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code should be retained by safe fixes, but may be changed by unsafe fixes.
 
-Ruff only enables safe fixes by default. Unsafe fixes can be enabled by passing the `--unsafe-fixes` flag to `ruff check` or by enabling [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file.
+Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing the `--unsafe-fixes` flag to `ruff check`:
 
 ```shell
 # Show unsafe fixes
@@ -405,7 +405,7 @@ ruff check . --fix --unsafe-fixes
 
 The safety of fixes can be adjusted per rule using the [`extend-safe-fixes`](settings.md#extend-safe-fixes) and [`extend-unsafe-fixes`](settings.md#extend-unsafe-fixes) settings.
 
-For example, the following configuration would promote unsafe fixes for `F601` to safe fixes and demote safe fixes for `UP034` to unsafe fixes.
+For example, the following configuration would promote unsafe fixes for `F601` to safe fixes and demote safe fixes for `UP034` to unsafe fixes:
 
 ```toml
 [tool.ruff.lint]
@@ -419,7 +419,7 @@ You may use prefixes to select rules as well, e.g. `F` can be used to promote fi
 
     All fixes will always be displayed by Ruff when using the `json` output format. The safety of each fix is available under the `applicability` field.
 
-### Toggling fixes per rule
+### Disabling fixes
 
 To limit the set of rules that Ruff should fix, use the [`fixable`](settings.md#fixable) and [`unfixable`](settings.md#unfixable) settings, along with their [`extend-fixable`](settings.md#extend-fixable) and [`extend-unfixable`](settings.md#extend-unfixable)
 variants.
