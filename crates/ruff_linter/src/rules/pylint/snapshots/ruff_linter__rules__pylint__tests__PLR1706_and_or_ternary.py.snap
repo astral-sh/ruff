@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-and_or_ternary.py:35:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b'`
+and_or_ternary.py:35:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
 33 | # Ternary (Error)
 34 | 
@@ -22,7 +22,7 @@ and_or_ternary.py:35:1: PLR1706 [*] Consider using ternary `'a' if 1 < 2 else 'b
 37 37 | (lambda x: x+1) and 'a' or 'b'
 38 38 | 
 
-and_or_ternary.py:37:1: PLR1706 [*] Consider using ternary `'a' if (lambda x: x + 1) else 'b'`
+and_or_ternary.py:37:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
 35 | 1<2 and 'a' or 'b'
 36 | 
@@ -43,7 +43,7 @@ and_or_ternary.py:37:1: PLR1706 [*] Consider using ternary `'a' if (lambda x: x 
 39 39 | 'a' and (lambda x: x+1) or 'orange'
 40 40 | 
 
-and_or_ternary.py:39:1: PLR1706 [*] Consider using ternary `(lambda x: x + 1) if 'a' else 'orange'`
+and_or_ternary.py:39:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
 37 | (lambda x: x+1) and 'a' or 'b'
 38 | 
@@ -64,7 +64,7 @@ and_or_ternary.py:39:1: PLR1706 [*] Consider using ternary `(lambda x: x + 1) if
 41 41 | val = '#0000FF'
 42 42 | (len(val) == 7 and val[0] == "#") or val in {'green'}
 
-and_or_ternary.py:42:1: PLR1706 [*] Consider using ternary `val[0] == '#' if len(val) == 7 else val in {'green'}`
+and_or_ternary.py:42:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
 41 | val = '#0000FF'
 42 | (len(val) == 7 and val[0] == "#") or val in {'green'}
@@ -84,7 +84,7 @@ and_or_ternary.py:42:1: PLR1706 [*] Consider using ternary `val[0] == '#' if len
 44 44 | marker = 'marker'
 45 45 | isinstance(marker, dict) and 'field' in marker or marker in {}
 
-and_or_ternary.py:45:1: PLR1706 [*] Consider using ternary `'field' in marker if isinstance(marker, dict) else marker in {}`
+and_or_ternary.py:45:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
 44 | marker = 'marker'
 45 | isinstance(marker, dict) and 'field' in marker or marker in {}
@@ -104,7 +104,7 @@ and_or_ternary.py:45:1: PLR1706 [*] Consider using ternary `'field' in marker if
 47 47 | def has_oranges(oranges, apples=None) -> bool:
 48 48 |     return apples and False or oranges
 
-and_or_ternary.py:48:12: PLR1706 [*] Consider using ternary `False if apples else oranges`
+and_or_ternary.py:48:12: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
 47 | def has_oranges(oranges, apples=None) -> bool:
 48 |     return apples and False or oranges

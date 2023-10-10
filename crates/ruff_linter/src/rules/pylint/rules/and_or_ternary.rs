@@ -5,18 +5,18 @@ use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::pylint::helpers::is_and_or_ternary;
+use crate::rules::pylint::helpers::parse_and_or_ternary;
 
 /// ## What it does
 /// Checks if pre-python 2.5 ternary syntax is used.
 ///
 /// ## Why is this bad?
-/// If-expression is more readable than logical ternary idiom.
+/// If-expressions are more readable than logical ternary expressions.
 ///
 /// ## Example
 /// ```python
 /// x, y = 1, 2
-/// maximum = x >= y and x or y  # [consider-using-ternary]
+/// maximum = x >= y and x or y
 /// ```
 ///
 /// Use instead:
@@ -34,8 +34,7 @@ impl Violation for AndOrTernary {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AndOrTernary { ternary } = self;
-        format!("Consider using ternary `{ternary}`")
+        format!("Pre-python 2.5 ternary syntax used")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -45,14 +44,14 @@ impl Violation for AndOrTernary {
 }
 
 pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
-    if !is_and_or_ternary(bool_op) {
+    let Some([condition, true_value, false_value]) = parse_and_or_ternary(bool_op) else {
         return;
-    }
+    };
 
     let if_expr = Expr::IfExp(ExprIfExp {
-        test: Box::new(bool_op.values[0].as_bool_op_expr().unwrap().values[0].clone()),
-        body: Box::new(bool_op.values[0].as_bool_op_expr().unwrap().values[1].clone()),
-        orelse: Box::new(bool_op.values[1].clone()),
+        test: Box::new(condition),
+        body: Box::new(true_value),
+        orelse: Box::new(false_value),
         range: TextRange::default(),
     });
     let ternary = checker.generator().expr(&if_expr);
@@ -63,13 +62,11 @@ pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
         },
         bool_op.range,
     );
-
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             ternary,
             bool_op.range,
         )));
     }
-
     checker.diagnostics.push(diagnostic);
 }
