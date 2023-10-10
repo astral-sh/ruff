@@ -13,6 +13,7 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::Strictness;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::settings::DEFAULT_SELECTORS;
 use ruff_linter::warn_user;
 use ruff_workspace::options::{
     Flake8AnnotationsOptions, Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ErrMsgOptions,
@@ -24,11 +25,6 @@ use ruff_workspace::pyproject::Pyproject;
 use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
 use super::{parser, plugin};
-
-const DEFAULT_SELECTORS: &[RuleSelector] = &[
-    RuleSelector::Linter(Linter::Pyflakes),
-    RuleSelector::Linter(Linter::Pycodestyle),
-];
 
 pub(crate) fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,

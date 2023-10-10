@@ -27,7 +27,7 @@ use ruff_linter::settings::types::{
     UnsafeFixes, Version,
 };
 use ruff_linter::settings::{
-    resolve_per_file_ignores, LinterSettings, DUMMY_VARIABLE_RGX, PREFIXES, TASK_TAGS,
+    resolve_per_file_ignores, LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS,
 };
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
@@ -617,7 +617,7 @@ impl LintConfiguration {
         };
 
         // The select_set keeps track of which rules have been selected.
-        let mut select_set: RuleSet = PREFIXES
+        let mut select_set: RuleSet = DEFAULT_SELECTORS
             .iter()
             .flat_map(|selector| selector.rules(&preview))
             .collect();

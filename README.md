@@ -172,8 +172,8 @@ If left unspecified, the default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
-# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
-select = ["E", "F"]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+select = ["E4", "E7", "E9", "F"]
 ignore = []
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
