@@ -263,18 +263,18 @@ pub fn check_path(
     // Update fix applicability to account for overrides
     if !settings.extend_safe_fixes.is_empty() || !settings.extend_unsafe_fixes.is_empty() {
         for diagnostic in &mut diagnostics {
-            if let Some(fix) = &diagnostic.fix {
+            if let Some(fix) = diagnostic.fix.take() {
                 // Check unsafe before safe so if someone puts a rule in both we are conservative
                 if settings
                     .extend_unsafe_fixes
                     .contains(diagnostic.kind.rule())
                     && fix.applicability().is_always()
                 {
-                    diagnostic.set_fix(fix.clone().with_applicability(Applicability::Sometimes));
+                    diagnostic.set_fix(fix.with_applicability(Applicability::Sometimes));
                 } else if settings.extend_safe_fixes.contains(diagnostic.kind.rule())
                     && fix.applicability().is_sometimes()
                 {
-                    diagnostic.set_fix(fix.clone().with_applicability(Applicability::Always));
+                    diagnostic.set_fix(fix.with_applicability(Applicability::Always));
                 }
             }
         }
