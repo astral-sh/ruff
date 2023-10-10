@@ -375,6 +375,69 @@ Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no
 Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
 with the exception of `F401`.
 
+## Fixes
+
+Ruff supports automatic fixes for a variety of lint errors. For example, Ruff can remove unused
+imports, reformat docstrings, rewrite type annotations to use the latest PEP syntax, and more.
+
+To enable fixes, pass the `--fix` flag to `ruff check`:
+
+```shell
+ruff check . --fix
+```
+
+By default, Ruff will fix all violations for which safe fixes are available To determine
+whether a rule supports fixing, see [_Rules_](rules.md).
+
+### Fix safety
+
+Ruff labels fixes as "safe" and "unsafe". Safe fixes are very unlikely to change the intent of your code; in contrast, unsafe fixes may change the meaning of your code.
+
+Ruff only uses safe fixes by default. Unsafe fixes can be enabled by passing the `--unsafe-fixes` flag to `ruff check` or by enabling [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file.
+
+```shell
+# Show unsafe fixes
+ruff check . --unsafe-fixes
+
+# Apply unsafe fixes
+ruff check . --fix --unsafe-fixes 
+```
+
+The safety of fixes can be adjusted per rule using the [`extend-safe-fixes`](settings.md#extend-safe-fixes) and [`extend-unsafe-fixes`](settings.md#extend-unsafe-fixes) settings.
+
+For example, the following configuration would promote unsafe fixes for `F601` to safe fixes and demote safe fixes for `UP034` to unsafe fixes.
+
+```toml
+[tool.ruff.lint]
+extend-safe-fixes = ["F601"]
+extend-unsafe-fixes = ["UP034"]
+```
+
+You may use prefixes to select rules as well, e.g. `F` can be used to promote fixes for all rules in pyflakes to safe.
+
+Note that all fixes will always be displayed by Ruff when using the `json` output format. The safety of the fix is available under the `applicability` field.
+
+### Toggling fixes per rule
+
+To limit the set of rules that Ruff should fix, use the [`fixable`](settings.md#fixable) and [`unfixable`](settings.md#unfixable) settings, along with their [`extend-fixable`](settings.md#extend-fixable) and [`extend-unfixable`](settings.md#extend-unfixable)
+variants.
+
+For example, the following configuration would enable fixes for all rules except
+[`unused-imports`](rules/unused-import.md) (`F401`):
+
+```toml
+[tool.ruff.lint]
+fixable = ["ALL"]
+unfixable = ["F401"]
+```
+
+Conversely, the following configuration would only enable fixes for `F401`:
+
+```toml
+[tool.ruff.lint]
+fixable = ["F401"]
+```
+
 ## Error suppression
 
 To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](settings.md#ignore)
