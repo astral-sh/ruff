@@ -9,7 +9,7 @@ PYI030.pyi:9:9: PYI030 [*] Multiple literal members in a union. Use a single lit
 10 | 
 11 | # Should emit for union types in arguments.
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 6  6  | field1: Literal[1]  # OK
@@ -28,7 +28,7 @@ PYI030.pyi:12:17: PYI030 [*] Multiple literal members in a union. Use a single l
    |                 ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 13 |     print(arg1)
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 9  9  | field2: Literal[1] | Literal[2]  # Error
@@ -47,7 +47,7 @@ PYI030.pyi:17:16: PYI030 [*] Multiple literal members in a union. Use a single l
    |                ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 18 |     return "my Literal[1]ing"
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 14 14 | 
@@ -67,7 +67,7 @@ PYI030.pyi:22:9: PYI030 [*] Multiple literal members in a union. Use a single li
 23 | field4: str | Literal[1] | Literal[2]  # Error
 24 | field5: Literal[1] | str | Literal[2]  # Error
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 19 19 | 
@@ -88,7 +88,7 @@ PYI030.pyi:23:9: PYI030 [*] Multiple literal members in a union. Use a single li
 24 | field5: Literal[1] | str | Literal[2]  # Error
 25 | field6: Literal[1] | bool | Literal[2] | str  # Error
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 20 20 | 
@@ -108,7 +108,7 @@ PYI030.pyi:24:9: PYI030 [*] Multiple literal members in a union. Use a single li
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 25 | field6: Literal[1] | bool | Literal[2] | str  # Error
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 21 21 | # Should emit in longer unions, even if not directly adjacent.
@@ -129,7 +129,7 @@ PYI030.pyi:25:9: PYI030 [*] Multiple literal members in a union. Use a single li
 26 | 
 27 | # Should emit for non-type unions.
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 22 22 | field3: Literal[1] | Literal[2] | str  # Error
@@ -149,7 +149,7 @@ PYI030.pyi:28:10: PYI030 [*] Multiple literal members in a union. Use a single l
 29 | 
 30 | # Should emit for parenthesized unions.
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 25 25 | field6: Literal[1] | bool | Literal[2] | str  # Error
@@ -169,7 +169,7 @@ PYI030.pyi:31:9: PYI030 [*] Multiple literal members in a union. Use a single li
 32 | 
 33 | # Should handle user parentheses when fixing.
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 28 28 | field7 = Literal[1] | Literal[2]  # Error
@@ -188,7 +188,7 @@ PYI030.pyi:34:9: PYI030 [*] Multiple literal members in a union. Use a single li
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 35 | field10: (Literal[1] | str) | Literal[2]  # Error
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 31 31 | field8: Literal[1] | (Literal[2] | str)  # Error
@@ -209,7 +209,7 @@ PYI030.pyi:35:10: PYI030 [*] Multiple literal members in a union. Use a single l
 36 | 
 37 | # Should emit for union in generic parent type.
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 32 32 | 
@@ -229,7 +229,7 @@ PYI030.pyi:38:15: PYI030 [*] Multiple literal members in a union. Use a single l
 39 | 
 40 | # Should emit for unions with more than two cases
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 35 35 | field10: (Literal[1] | str) | Literal[2]  # Error
@@ -248,7 +248,7 @@ PYI030.pyi:41:10: PYI030 [*] Multiple literal members in a union. Use a single l
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 38 38 | field11: dict[Literal[1] | Literal[2], str]  # Error
@@ -269,7 +269,7 @@ PYI030.pyi:42:10: PYI030 [*] Multiple literal members in a union. Use a single l
 43 | 
 44 | # Should emit for unions with more than two cases, even if not directly adjacent
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 39 39 | 
@@ -289,7 +289,7 @@ PYI030.pyi:45:10: PYI030 [*] Multiple literal members in a union. Use a single l
 46 | 
 47 | # Should emit for unions with mixed literal internal types
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 42 42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
@@ -309,7 +309,7 @@ PYI030.pyi:48:10: PYI030 [*] Multiple literal members in a union. Use a single l
 49 | 
 50 | # Shouldn't emit for duplicate field types with same value; covered by Y016
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 45 45 | field14: Literal[1] | Literal[2] | str | Literal[3]  # Error
@@ -329,7 +329,7 @@ PYI030.pyi:51:10: PYI030 [*] Multiple literal members in a union. Use a single l
 52 | 
 53 | # Shouldn't emit if in new parent type
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 48 48 | field15: Literal[1] | Literal["foo"] | Literal[True]  # Error
@@ -349,7 +349,7 @@ PYI030.pyi:60:10: PYI030 [*] Multiple literal members in a union. Use a single l
 61 | 
 62 | # Should emit in cases with newlines
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 57 57 | field18: dict[Literal[1], Literal[2]]  # OK
@@ -375,7 +375,7 @@ PYI030.pyi:63:10: PYI030 [*] Multiple literal members in a union. Use a single l
 69 |   
 70 |   # Should handle multiple unions with multiple members
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 60 60 | field19: typing.Literal[1] | typing.Literal[2]  # Error
@@ -400,7 +400,7 @@ PYI030.pyi:71:10: PYI030 [*] Multiple literal members in a union. Use a single l
 72 | 
 73 | # Should emit in cases with `typing.Union` instead of `|`
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 68 68 | ]  # Error, newline and comment will not be emitted in message
@@ -420,7 +420,7 @@ PYI030.pyi:74:10: PYI030 [*] Multiple literal members in a union. Use a single l
 75 | 
 76 | # Should emit in cases with `typing_extensions.Literal`
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 71 71 | field21: Literal[1, 2] | Literal[3, 4]  # Error
@@ -440,7 +440,7 @@ PYI030.pyi:77:10: PYI030 [*] Multiple literal members in a union. Use a single l
 78 | 
 79 | # Should emit in cases with nested `typing.Union`
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 74 74 | field22: typing.Union[Literal[1], Literal[2]]  # Error
@@ -460,7 +460,7 @@ PYI030.pyi:80:10: PYI030 [*] Multiple literal members in a union. Use a single l
 81 | 
 82 | # Should emit in cases with mixed `typing.Union` and `|`
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 77 77 | field23: typing_extensions.Literal[1] | typing_extensions.Literal[2]  # Error
@@ -480,7 +480,7 @@ PYI030.pyi:83:10: PYI030 [*] Multiple literal members in a union. Use a single l
 84 | 
 85 | # Should emit only once in cases with multiple nested `typing.Union`
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 80 80 | field24: typing.Union[Literal[1], typing.Union[Literal[2], str]]  # Error
@@ -498,7 +498,7 @@ PYI030.pyi:86:10: PYI030 [*] Multiple literal members in a union. Use a single l
 86 | field24: typing.Union[Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]]]  # Error
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
    |
-   = help: Replace Literal unions with a single Literal.
+   = help: Replace with a single `Literal`.
 
 ℹ Fix
 83 83 | field25: typing.Union[Literal[1], Literal[2] | str]  # Error
