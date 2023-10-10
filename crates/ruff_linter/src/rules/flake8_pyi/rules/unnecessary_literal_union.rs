@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralUnion {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with a single `Literal`.")
+        format!("Replace with a single `Literal`")
     }
 }
 
@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralUnion {
 pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Expr) {
     let mut literal_exprs = Vec::new();
 
-    // Adds a member to `literal_exprs` if it is a `Literal` annotation
+    // Adds a member to `literal_exprs` if it is a `Literal` annotation.
     let mut collect_literal_expr = |expr: &'a Expr, _| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if checker.semantic().match_typing_expr(value, "Literal") {
@@ -59,10 +59,10 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
         }
     };
 
-    // Traverse the union, collect all literal members
+    // Traverse the union, collect all literal members.
     traverse_union(&mut collect_literal_expr, checker.semantic(), expr, None);
 
-    // Raise a violation if more than one
+    // Raise a violation if more than one.
     if literal_exprs.len() > 1 {
         let literal_members: Vec<String> = literal_exprs
             .into_iter()
