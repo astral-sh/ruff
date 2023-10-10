@@ -1556,6 +1556,7 @@
       "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=320",
       "type": "integer",
       "format": "uint16",
+      "maximum": 320.0,
       "minimum": 1.0
     },
     "LintOptions": {
