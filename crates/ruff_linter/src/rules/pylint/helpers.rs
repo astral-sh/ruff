@@ -91,18 +91,14 @@ pub(super) fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<[Expr; 3]> {
     };
     match expr.as_bool_op_expr() {
         Some(and_op) if and_op.op == BoolOp::And => {
-            let and_values = &and_op.values;
-            let true_value = &and_values[1];
+            let [condition, true_value] = and_op.values.as_slice() else {
+                return None;
+            };
             if bool_op.op == BoolOp::Or
                 && !false_value.is_bool_op_expr()
                 && !true_value.is_bool_op_expr()
-                && and_values.len() == 2
             {
-                Some([
-                    and_values[0].clone(),
-                    true_value.clone(),
-                    false_value.clone(),
-                ])
+                Some([condition.clone(), true_value.clone(), false_value.clone()])
             } else {
                 return None;
             }
