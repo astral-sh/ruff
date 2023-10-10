@@ -241,7 +241,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    Fix::unsafe_edit(Edit::range_replacement(
+    Fix::safe_edit(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(typename, body, base_class)),
         stmt.range(),
     ))
