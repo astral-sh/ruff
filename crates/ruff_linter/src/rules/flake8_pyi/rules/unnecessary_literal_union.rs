@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 use crate::rules::flake8_pyi::helpers::traverse_union;
 
 /// ## What it does
@@ -41,7 +42,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralUnion {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace Literal unions with a single Literal.")
+        format!("Replace with a single `Literal`.")
     }
 }
 
@@ -75,10 +76,12 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
             expr.range(),
         );
 
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            format!("Literal[{}]", literal_members.clone().join(", ")),
-            expr.range(),
-        )));
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                format!("Literal[{}]", literal_members.join(", ")),
+                expr.range(),
+            )));
+        }
 
         checker.diagnostics.push(diagnostic);
     }
