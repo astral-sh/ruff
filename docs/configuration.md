@@ -416,7 +416,6 @@ extend-unsafe-fixes = ["UP034"]
 You may use prefixes to select rules as well, e.g. `F` can be used to promote fixes for all rules in pyflakes to safe.
 
 !!! note
-
     All fixes will always be displayed by Ruff when using the `json` output format. The safety of each fix is available under the `applicability` field.
 
 ### Disabling fixes
