@@ -63,9 +63,9 @@ pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
 
         let content = if elts.len() == 1 {
             // handle the case of a single element in a tuple, needs a trailing comma
-            format!("({},)", inner_slice)
+            format!("({inner_slice},)")
         } else {
-            format!("({})", inner_slice)
+            format!("({inner_slice})")
         };
 
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
