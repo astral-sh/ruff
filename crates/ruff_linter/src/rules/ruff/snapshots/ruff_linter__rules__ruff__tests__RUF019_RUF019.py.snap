@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF019.py:3:4: RUF019 Unnecessary key check. Use `d.get("k")` instead
+RUF019.py:3:4: RUF019 [*] Unnecessary key check
   |
 1 | d = {}
 2 | # RUF019
@@ -9,13 +9,34 @@ RUF019.py:3:4: RUF019 Unnecessary key check. Use `d.get("k")` instead
   |    ^^^^^^^^^^^^^^^^^^^ RUF019
 4 |     pass
   |
+  = help: Replace `"k" in d` with `d.get("k")`
 
-RUF019.py:7:4: RUF019 Unnecessary key check. Use `d.get(k)` instead
+ℹ Fix
+1 1 | d = {}
+2 2 | # RUF019
+3   |-if "k" in d and d["k"]:
+  3 |+if d.get("k"):
+4 4 |     pass
+5 5 | 
+6 6 | k = "k"
+
+RUF019.py:7:4: RUF019 [*] Unnecessary key check
   |
 6 | k = "k"
 7 | if k in d and d[k]:
   |    ^^^^^^^^^^^^^^^ RUF019
 8 |     pass
   |
+  = help: Replace `k in d` with `d.get(k)`
+
+ℹ Fix
+4 4 |     pass
+5 5 | 
+6 6 | k = "k"
+7   |-if k in d and d[k]:
+  7 |+if d.get(k):
+8 8 |     pass
+9 9 | 
+10 10 | # OK
 
 

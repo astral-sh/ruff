@@ -1,11 +1,12 @@
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 /// ## What it does
 /// TODO
@@ -30,11 +31,15 @@ pub struct UnnecessaryKeyCheck {
     dict: String,
 }
 
-impl Violation for UnnecessaryKeyCheck {
+impl AlwaysFixableViolation for UnnecessaryKeyCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
+        format!("Unnecessary key check")
+    }
+
+    fn fix_title(&self) -> String {
         let UnnecessaryKeyCheck { key, dict } = self;
-        format!("Unnecessary key check. Use `{dict}.get({key})` instead")
+        format!("Replace `{key} in {dict}` with `{dict}.get({key})`")
     }
 }
 
@@ -82,12 +87,23 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
     if ComparableExpr::from(comparator) == ComparableExpr::from(value)
         && ComparableExpr::from(left) == ComparableExpr::from(slice)
     {
-        checker.diagnostics.push(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             UnnecessaryKeyCheck {
                 key: checker.generator().expr(left),
                 dict: checker.generator().expr(value),
             },
             expr.range(),
-        ));
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                format!(
+                    "{}.get({})",
+                    checker.generator().expr(value),
+                    checker.generator().expr(left)
+                ),
+                expr.range(),
+            )));
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }
