@@ -104,36 +104,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
 
         match comparison {
             Expr::Tuple(ast::ExprTuple { elts, .. }) => match op {
-                CmpOp::Lt | CmpOp::LtE => {
-                    let Some(version) = extract_version(elts) else {
-                        return;
-                    };
-                    let target = checker.settings.target_version;
-                    match version_always_less_than(&version, target, op == &CmpOp::LtE) {
-                        Ok(false) => {}
-                        Ok(true) => {
-                            let mut diagnostic = Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Outdated,
-                                },
-                                branch.test.range(),
-                            );
-                            if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
-                                diagnostic.set_fix(fix);
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
-                        Err(_) => {
-                            checker.diagnostics.push(Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Invalid,
-                                },
-                                comparison.range(),
-                            ));
-                        }
-                    }
-                }
-                CmpOp::Gt | CmpOp::GtE => {
+                CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE => {
                     let Some(version) = extract_version(elts) else {
                         return;
                     };
@@ -141,8 +112,9 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                     match version_always_less_than(
                         &version,
                         target,
-                        // When making comparisons with >= we must reverse the behavior when equal
-                        op != &CmpOp::GtE,
+                        // `x <= y` and `x > y` are cases where `x == y` will not stop the comparison
+                        // from always evaluating to true or false respectively
+                        op.is_lt_e() || op.is_gt(),
                     ) {
                         Ok(false) => {}
                         Ok(true) => {
@@ -152,7 +124,11 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                                 },
                                 branch.test.range(),
                             );
-                            if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
+                            if let Some(fix) = if op.is_lt() || op.is_lt_e() {
+                                fix_always_false_branch(checker, stmt_if, &branch)
+                            } else {
+                                fix_always_true_branch(checker, stmt_if, &branch)
+                            } {
                                 diagnostic.set_fix(fix);
                             }
                             checker.diagnostics.push(diagnostic);
