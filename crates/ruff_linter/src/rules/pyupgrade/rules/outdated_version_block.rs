@@ -138,7 +138,12 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                         return;
                     };
                     let target = checker.settings.target_version;
-                    match compare_version(&version, target, op == &CmpOp::GtE) {
+                    match compare_version(
+                        &version,
+                        target,
+                        // When making comparisons with >= we must reverse the behavior when equal
+                        op != &CmpOp::GtE,
+                    ) {
                         Ok(false) => {}
                         Ok(true) => {
                             let mut diagnostic = Diagnostic::new(

@@ -712,4 +712,22 @@ UP036_0.py:197:24: UP036 Version specifier is invalid
 198 |     print("py3")
     |
 
+UP036_0.py:203:4: UP036 [*] Version block is outdated for minimum Python version
+    |
+201 |     print("py3")
+202 | 
+203 | if sys.version_info >= (3,12):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+204 |     print("py3")
+    |
+    = help: Remove outdated version block
+
+ℹ Suggested fix
+200 200 | if sys.version_info > (3,12):
+201 201 |     print("py3")
+202 202 | 
+203     |-if sys.version_info >= (3,12):
+204     |-    print("py3")
+    203 |+print("py3")
+
 
