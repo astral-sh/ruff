@@ -141,10 +141,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                         BoolOp::And => vec![CmpOp::NotIn],
                     },
                     comparators: vec![Expr::Tuple(ast::ExprTuple {
-                        elts: comparators
-                            .iter()
-                            .map(|comparator| comparator.to_owned().clone())
-                            .collect(),
+                        elts: comparators.iter().copied().cloned().collect(),
                         range: TextRange::default(),
                         ctx: ExprContext::Load,
                     })],
