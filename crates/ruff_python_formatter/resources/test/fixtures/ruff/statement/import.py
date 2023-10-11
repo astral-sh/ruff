@@ -9,6 +9,8 @@ import foo\
 from foo\
     .bar import baz
 
+import tqdm  . tqdm
+
 # At the top-level, force one empty line after an import, but allow up to two empty
 # lines.
 import os
