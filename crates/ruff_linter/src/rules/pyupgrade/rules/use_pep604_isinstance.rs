@@ -6,7 +6,6 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum CallKind {

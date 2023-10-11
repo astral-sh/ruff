@@ -5,7 +5,6 @@ use ruff_python_codegen::Generator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `print` calls with an empty string as the only positional

@@ -8,7 +8,6 @@ use ruff_python_ast::{helpers, visitor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, result_like::BoolLike)]
 enum Certainty {

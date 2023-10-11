@@ -7,7 +7,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Check for `if`-`else`-blocks that can be replaced with a ternary operator.

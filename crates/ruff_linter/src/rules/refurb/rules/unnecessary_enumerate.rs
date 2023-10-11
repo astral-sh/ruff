@@ -11,7 +11,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `enumerate` that discard either the index or the value
@@ -180,10 +179,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 },
                 func.range(),
             );
-            if checker.patch(diagnostic.kind.rule())
-                && checker.semantic().is_builtin("range")
-                && checker.semantic().is_builtin("len")
-            {
+            if checker.semantic().is_builtin("range") && checker.semantic().is_builtin("len") {
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
                 let start = arguments.find_argument("start", 1);

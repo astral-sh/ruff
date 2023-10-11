@@ -13,7 +13,7 @@ use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::line_width::LineWidthBuilder;
-use crate::registry::AsRule;
+
 use crate::settings::LinterSettings;
 
 use super::super::block::Block;

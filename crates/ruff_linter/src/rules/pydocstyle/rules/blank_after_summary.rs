@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for docstring summary lines that are not separated from the docstring

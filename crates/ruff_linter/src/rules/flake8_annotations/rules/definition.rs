@@ -11,7 +11,7 @@ use ruff_python_stdlib::typing::simple_magic_return_type;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::ruff::typing::type_hint_resolves_to_any;
 
 /// ## What it does

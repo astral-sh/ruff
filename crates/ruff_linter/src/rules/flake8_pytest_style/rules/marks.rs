@@ -6,7 +6,7 @@ use ruff_python_ast::call_path::CallPath;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 use super::helpers::get_mark_decorators;
 

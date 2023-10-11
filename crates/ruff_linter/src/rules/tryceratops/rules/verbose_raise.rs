@@ -6,7 +6,6 @@ use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for needless exception names in `raise` statements.

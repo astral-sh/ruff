@@ -8,7 +8,6 @@ use ruff_python_semantic::analyze::visibility::is_abstract;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for redundant definitions of `__str__` or `__repr__` in stubs.

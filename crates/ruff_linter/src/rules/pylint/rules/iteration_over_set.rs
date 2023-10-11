@@ -5,7 +5,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{checkers::ast::Checker, registry::AsRule};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for iterations over `set` literals.

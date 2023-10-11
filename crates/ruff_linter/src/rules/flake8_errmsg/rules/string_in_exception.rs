@@ -7,7 +7,7 @@ use ruff_python_ast::whitespace;
 use ruff_python_codegen::{Generator, Stylist};
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for the use of string literals in exception constructors.

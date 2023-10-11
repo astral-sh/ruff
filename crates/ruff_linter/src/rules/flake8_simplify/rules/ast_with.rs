@@ -9,7 +9,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-use crate::registry::AsRule;
 
 use super::fix_with;
 

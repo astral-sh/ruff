@@ -5,7 +5,6 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for docstrings that do not start with a capital letter.

@@ -5,7 +5,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::SemanticModel;
 
-use crate::{checkers::ast::Checker, registry::AsRule};
+use crate::checkers::ast::Checker;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum MinMax {

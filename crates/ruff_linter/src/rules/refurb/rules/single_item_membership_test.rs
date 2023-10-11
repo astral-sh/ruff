@@ -7,7 +7,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for membership tests against single-item containers.

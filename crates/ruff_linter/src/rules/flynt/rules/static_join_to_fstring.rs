@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
+
 use crate::rules::flynt::helpers;
 
 /// ## What it does

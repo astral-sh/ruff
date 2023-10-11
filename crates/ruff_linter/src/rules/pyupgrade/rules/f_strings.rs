@@ -17,7 +17,6 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits_or_shrinks;
 
-use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
@@ -433,11 +432,10 @@ pub(crate) fn f_strings(
     //     0,  # 0
     // )
     // ```
-    if checker.patch(diagnostic.kind.rule())
-        && !checker
-            .indexer()
-            .comment_ranges()
-            .intersects(call.arguments.range())
+    if !checker
+        .indexer()
+        .comment_ranges()
+        .intersects(call.arguments.range())
     {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             contents,

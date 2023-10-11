@@ -26,7 +26,6 @@ use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 use super::unittest_assert::UnittestAssert;
 
@@ -388,9 +387,7 @@ pub(crate) fn unittest_raises_assertion(
         },
         call.func.range(),
     );
-    if checker.patch(diagnostic.kind.rule())
-        && !checker.indexer().has_comments(call, checker.locator())
-    {
+    if !checker.indexer().has_comments(call, checker.locator()) {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(

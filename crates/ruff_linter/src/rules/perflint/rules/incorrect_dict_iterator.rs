@@ -8,7 +8,6 @@ use ruff_python_ast::{Arguments, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `dict.items()` that discard either the key or the value

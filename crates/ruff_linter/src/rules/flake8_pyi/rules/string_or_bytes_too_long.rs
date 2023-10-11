@@ -6,7 +6,6 @@ use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for the use of string and bytes literals longer than 50 characters

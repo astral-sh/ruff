@@ -6,7 +6,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_false;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `assert False`.

@@ -3,7 +3,7 @@ use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_pyi::helpers::traverse_union;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};

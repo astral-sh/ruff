@@ -1,7 +1,7 @@
 import os
 
 def refactor_rust_code(code):
-    pattern_start = 'if checker.patch(diagnostic.kind.rule()) {'
+    pattern_start = 'if settings.rules.should_fix(diagnostic.kind.rule()) {'
     i = 0
     output = []
     while i < len(code):

@@ -6,7 +6,7 @@ use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::refurb::helpers::generate_method_call;
 
 /// ## What it does

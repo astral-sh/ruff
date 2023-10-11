@@ -5,7 +5,6 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for non-empty function stub bodies.
@@ -69,11 +68,9 @@ pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
     }
 
     let mut diagnostic = Diagnostic::new(NonEmptyStubBody, stmt.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            format!("..."),
-            stmt.range(),
-        )));
-    };
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        format!("..."),
+        stmt.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

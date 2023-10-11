@@ -6,7 +6,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for single-line docstrings that are broken across multiple lines.

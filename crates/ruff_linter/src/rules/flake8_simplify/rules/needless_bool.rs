@@ -4,7 +4,6 @@ use ruff_python_ast::{self as ast, Arguments, Constant, ElifElseClause, Expr, Ex
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `bool`.

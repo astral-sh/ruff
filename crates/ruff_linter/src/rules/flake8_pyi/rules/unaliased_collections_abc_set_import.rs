@@ -5,7 +5,7 @@ use ruff_python_semantic::{Binding, BindingKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::renamer::Renamer;
 
 /// ## What it does

@@ -7,7 +7,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Check for environment variables that are not capitalized.

@@ -17,7 +17,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
-use crate::registry::{AsRule, Rule};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MockReference {
@@ -280,17 +279,13 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| &name.name == "mock" || &name.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator(), stmt) {
-                        match format_import(stmt, indent, checker.locator(), checker.stylist()) {
-                            Ok(content) => Some(content),
-                            Err(e) => {
-                                error!("Failed to rewrite `mock` import: {e}");
-                                None
-                            }
+                let content = if let Some(indent) = indentation(checker.locator(), stmt) {
+                    match format_import(stmt, indent, checker.locator(), checker.stylist()) {
+                        Ok(content) => Some(content),
+                        Err(e) => {
+                            error!("Failed to rewrite `mock` import: {e}");
+                            None
                         }
-                    } else {
-                        None
                     }
                 } else {
                     None

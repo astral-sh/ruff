@@ -7,7 +7,6 @@ use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::parenthesize::parenthesized_range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `if` expressions that can be replaced with `bool()` calls.

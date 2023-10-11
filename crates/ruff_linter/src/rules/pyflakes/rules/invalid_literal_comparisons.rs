@@ -8,7 +8,6 @@ use ruff_python_parser::locate_cmp_ops;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `is` and `is not` comparisons against constant literals, like

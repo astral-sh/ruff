@@ -15,7 +15,6 @@ use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for multiple `isinstance` calls on the same target.

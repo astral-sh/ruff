@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Removes ellipses (`...`) in otherwise non-empty class bodies.

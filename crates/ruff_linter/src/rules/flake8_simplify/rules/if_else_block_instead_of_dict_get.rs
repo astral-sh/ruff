@@ -9,7 +9,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `dict.get` calls.

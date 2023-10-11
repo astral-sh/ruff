@@ -6,7 +6,6 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `getattr` that take a constant attribute value as an

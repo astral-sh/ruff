@@ -5,7 +5,6 @@ use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for explicit casts to `list` on for-loop iterables.

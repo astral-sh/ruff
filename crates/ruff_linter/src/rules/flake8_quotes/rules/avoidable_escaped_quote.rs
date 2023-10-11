@@ -7,7 +7,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::TextRange;
 
 use crate::lex::docstring_detection::StateMachine;
-use crate::registry::AsRule;
+
 use crate::settings::LinterSettings;
 
 /// ## What it does

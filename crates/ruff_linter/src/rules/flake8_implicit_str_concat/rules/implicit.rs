@@ -9,7 +9,6 @@ use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::registry::AsRule;
 use crate::settings::LinterSettings;
 
 /// ## What it does

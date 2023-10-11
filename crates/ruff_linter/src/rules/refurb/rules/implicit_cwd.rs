@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, importer::ImportRequest, registry::AsRule};
+use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 /// ## What it does
 /// Checks for current-directory lookups using `Path().resolve()`.

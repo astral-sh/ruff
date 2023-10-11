@@ -7,7 +7,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{pad, remove_argument, Parentheses};
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for unnecessary calls to `encode` as UTF-8.
@@ -177,13 +176,11 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.set_fix(replace_with_bytes_literal(
-                            checker.locator(),
-                            call,
-                            checker.source_type,
-                        ));
-                    }
+                    diagnostic.set_fix(replace_with_bytes_literal(
+                        checker.locator(),
+                        call,
+                        checker.source_type,
+                    ));
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode(encoding="utf-8")` to
@@ -194,17 +191,15 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.try_set_fix(|| {
-                            remove_argument(
-                                kwarg,
-                                &call.arguments,
-                                Parentheses::Preserve,
-                                checker.locator().contents(),
-                            )
-                            .map(Fix::safe_edit)
-                        });
-                    }
+                    diagnostic.try_set_fix(|| {
+                        remove_argument(
+                            kwarg,
+                            &call.arguments,
+                            Parentheses::Preserve,
+                            checker.locator().contents(),
+                        )
+                        .map(Fix::safe_edit)
+                    });
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode("utf-8")` to `"unicode text©".encode()`.
@@ -214,17 +209,15 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.try_set_fix(|| {
-                            remove_argument(
-                                arg,
-                                &call.arguments,
-                                Parentheses::Preserve,
-                                checker.locator().contents(),
-                            )
-                            .map(Fix::safe_edit)
-                        });
-                    }
+                    diagnostic.try_set_fix(|| {
+                        remove_argument(
+                            arg,
+                            &call.arguments,
+                            Parentheses::Preserve,
+                            checker.locator().contents(),
+                        )
+                        .map(Fix::safe_edit)
+                    });
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -241,17 +234,15 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.try_set_fix(|| {
-                            remove_argument(
-                                kwarg,
-                                &call.arguments,
-                                Parentheses::Preserve,
-                                checker.locator().contents(),
-                            )
-                            .map(Fix::safe_edit)
-                        });
-                    }
+                    diagnostic.try_set_fix(|| {
+                        remove_argument(
+                            kwarg,
+                            &call.arguments,
+                            Parentheses::Preserve,
+                            checker.locator().contents(),
+                        )
+                        .map(Fix::safe_edit)
+                    });
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode("utf-8")` to `f"unicode text©".encode()`.
@@ -261,17 +252,15 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.try_set_fix(|| {
-                            remove_argument(
-                                arg,
-                                &call.arguments,
-                                Parentheses::Preserve,
-                                checker.locator().contents(),
-                            )
-                            .map(Fix::safe_edit)
-                        });
-                    }
+                    diagnostic.try_set_fix(|| {
+                        remove_argument(
+                            arg,
+                            &call.arguments,
+                            Parentheses::Preserve,
+                            checker.locator().contents(),
+                        )
+                        .map(Fix::safe_edit)
+                    });
                     checker.diagnostics.push(diagnostic);
                 }
             }

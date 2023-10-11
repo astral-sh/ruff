@@ -11,7 +11,6 @@ use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_inde
 use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for lambda expressions which are assigned to a variable.

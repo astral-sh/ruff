@@ -6,7 +6,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::AsRule;
+
 use crate::rules::pydocstyle::helpers::ends_with_backslash;
 
 /// ## What it does

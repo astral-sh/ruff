@@ -8,7 +8,6 @@ use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of exceptions that alias `OSError`.

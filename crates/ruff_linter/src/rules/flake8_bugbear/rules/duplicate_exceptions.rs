@@ -11,7 +11,7 @@ use ruff_python_ast::call_path::CallPath;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for `try-except` blocks with duplicate exception handlers.

@@ -8,7 +8,7 @@ use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_tidy_imports::settings::Strictness;
 
 /// ## What it does

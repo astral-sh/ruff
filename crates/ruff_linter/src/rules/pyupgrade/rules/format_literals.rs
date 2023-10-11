@@ -15,7 +15,7 @@ use crate::cst::matchers::{
     match_attribute, match_call_mut, match_expression, transform_expression_text,
 };
 use crate::fix::codemods::CodegenStylist;
-use crate::registry::AsRule;
+
 use crate::rules::pyflakes::format::FormatSummary;
 
 /// ## What it does

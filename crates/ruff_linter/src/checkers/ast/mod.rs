@@ -143,11 +143,6 @@ impl<'a> Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
-    /// Return `true` if a patch should be generated for a given [`Rule`].
-    pub(crate) fn patch(&self, code: Rule) -> bool {
-        self.settings.rules.should_fix(code)
-    }
-
     /// Return `true` if a [`Rule`] is disabled by a `noqa` directive.
     pub(crate) fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.

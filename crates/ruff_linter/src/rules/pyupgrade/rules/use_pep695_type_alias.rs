@@ -11,7 +11,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::{registry::AsRule, settings::types::PythonVersion};
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for use of `TypeAlias` annotation for declaring type aliases.

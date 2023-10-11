@@ -7,7 +7,6 @@ use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `functools.lru_cache` that set `maxsize=None`.

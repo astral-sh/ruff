@@ -8,7 +8,6 @@ use ruff_text_size::Ranged;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for unnecessary `dict` kwargs.

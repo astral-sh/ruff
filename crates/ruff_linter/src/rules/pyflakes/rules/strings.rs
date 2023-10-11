@@ -8,7 +8,6 @@ use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 use super::super::cformat::CFormatSummary;
 use super::super::fixes::{
@@ -794,28 +793,6 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     summary: &FormatSummary,
     args: &[Expr],
 ) {
-    let missing: Vec<usize> = args
-        .iter()
-        .enumerate()
-        .filter(|(i, arg)| {
-            !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
-        })
-        .map(|(i, _)| i)
-        .collect();
-
-    if missing.is_empty() {
-        return;
-    }
-
-    let mut diagnostic = Diagnostic::new(
-        StringDotFormatExtraPositionalArguments {
-            missing: missing
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<String>>(),
-        },
-        call.range(),
-    );
     // We can only fix if the positional arguments we're removing don't require re-indexing
     // the format string itself. For example, we can't fix `"{1}{2}".format(0, 1, 2)"`, since
     // this requires changing the format string to `"{0}{1}"`. But we can fix
@@ -841,6 +818,29 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         true
     }
 
+    let missing: Vec<usize> = args
+        .iter()
+        .enumerate()
+        .filter(|(i, arg)| {
+            !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
+        })
+        .map(|(i, _)| i)
+        .collect();
+
+    if missing.is_empty() {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        StringDotFormatExtraPositionalArguments {
+            missing: missing
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>(),
+        },
+        call.range(),
+    );
+
     if is_contiguous_from_end(&missing, args) {
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_positional_arguments_from_format_call(
@@ -852,6 +852,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
             Ok(Fix::safe_edit(edit))
         });
     }
+
     checker.diagnostics.push(diagnostic);
 }
 

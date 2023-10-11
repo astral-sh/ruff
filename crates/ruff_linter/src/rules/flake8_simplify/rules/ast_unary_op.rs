@@ -6,7 +6,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for negated `==` operators.

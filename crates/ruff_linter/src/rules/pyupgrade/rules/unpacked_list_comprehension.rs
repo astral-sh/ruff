@@ -6,7 +6,6 @@ use ruff_python_ast::helpers::any_over_expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for list comprehensions that are immediately unpacked.
