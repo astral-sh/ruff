@@ -85,26 +85,24 @@ pub(crate) fn getattr_with_constant(
     }
 
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            pad(
-                if matches!(
-                    obj,
-                    Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
-                ) && !checker.locator().contains_line_break(obj.range())
-                {
-                    format!("{}.{}", checker.locator().slice(obj), value)
-                } else {
-                    // Defensively parenthesize any other expressions. For example, attribute accesses
-                    // on `int` literals must be parenthesized, e.g., `getattr(1, "real")` becomes
-                    // `(1).real`. The same is true for named expressions and others.
-                    format!("({}).{}", checker.locator().slice(obj), value)
-                },
-                expr.range(),
-                checker.locator(),
-            ),
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        pad(
+            if matches!(
+                obj,
+                Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
+            ) && !checker.locator().contains_line_break(obj.range())
+            {
+                format!("{}.{}", checker.locator().slice(obj), value)
+            } else {
+                // Defensively parenthesize any other expressions. For example, attribute accesses
+                // on `int` literals must be parenthesized, e.g., `getattr(1, "real")` becomes
+                // `(1).real`. The same is true for named expressions and others.
+                format!("({}).{}", checker.locator().slice(obj), value)
+            },
             expr.range(),
-        )));
-    }
+            checker.locator(),
+        ),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

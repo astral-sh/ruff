@@ -124,13 +124,11 @@ pub(crate) fn banned_relative_import(
     };
     if level? > strictness_level {
         let mut diagnostic = Diagnostic::new(RelativeImports { strictness }, stmt.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if let Some(fix) =
-                fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
-            {
-                diagnostic.set_fix(fix);
-            };
-        }
+        if let Some(fix) =
+            fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
+        {
+            diagnostic.set_fix(fix);
+        };
         Some(diagnostic)
     } else {
         None

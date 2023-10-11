@@ -91,18 +91,16 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                            &ImportRequest::import("functools", "cache"),
-                            decorator.start(),
-                            checker.semantic(),
-                        )?;
-                        let reference_edit =
-                            Edit::range_replacement(binding, decorator.expression.range());
-                        Ok(Fix::safe_edits(import_edit, [reference_edit]))
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                        &ImportRequest::import("functools", "cache"),
+                        decorator.start(),
+                        checker.semantic(),
+                    )?;
+                    let reference_edit =
+                        Edit::range_replacement(binding, decorator.expression.range());
+                    Ok(Fix::safe_edits(import_edit, [reference_edit]))
+                });
                 checker.diagnostics.push(diagnostic);
             }
         }

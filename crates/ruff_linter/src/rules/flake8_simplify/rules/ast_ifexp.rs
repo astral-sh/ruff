@@ -157,48 +157,46 @@ pub(crate) fn if_expr_with_true_false(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if test.is_compare_expr() {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker
-                    .locator()
-                    .slice(
-                        parenthesized_range(
-                            test.into(),
-                            expr.into(),
-                            checker.indexer().comment_ranges(),
-                            checker.locator().contents(),
-                        )
-                        .unwrap_or(test.range()),
+    if test.is_compare_expr() {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker
+                .locator()
+                .slice(
+                    parenthesized_range(
+                        test.into(),
+                        expr.into(),
+                        checker.indexer().comment_ranges(),
+                        checker.locator().contents(),
                     )
-                    .to_string(),
-                expr.range(),
-            )));
-        } else if checker.semantic().is_builtin("bool") {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().expr(
-                    &ast::ExprCall {
-                        func: Box::new(
-                            ast::ExprName {
-                                id: "bool".into(),
-                                ctx: ExprContext::Load,
-                                range: TextRange::default(),
-                            }
-                            .into(),
-                        ),
-                        arguments: Arguments {
-                            args: vec![test.clone()],
-                            keywords: vec![],
+                    .unwrap_or(test.range()),
+                )
+                .to_string(),
+            expr.range(),
+        )));
+    } else if checker.semantic().is_builtin("bool") {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker.generator().expr(
+                &ast::ExprCall {
+                    func: Box::new(
+                        ast::ExprName {
+                            id: "bool".into(),
+                            ctx: ExprContext::Load,
                             range: TextRange::default(),
-                        },
+                        }
+                        .into(),
+                    ),
+                    arguments: Arguments {
+                        args: vec![test.clone()],
+                        keywords: vec![],
                         range: TextRange::default(),
-                    }
-                    .into(),
-                ),
-                expr.range(),
-            )));
-        };
-    }
+                    },
+                    range: TextRange::default(),
+                }
+                .into(),
+            ),
+            expr.range(),
+        )));
+    };
     checker.diagnostics.push(diagnostic);
 }
 
@@ -215,19 +213,17 @@ pub(crate) fn if_expr_with_false_true(
     }
 
     let mut diagnostic = Diagnostic::new(IfExprWithFalseTrue, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(
-                &ast::ExprUnaryOp {
-                    op: UnaryOp::Not,
-                    operand: Box::new(test.clone()),
-                    range: TextRange::default(),
-                }
-                .into(),
-            ),
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().expr(
+            &ast::ExprUnaryOp {
+                op: UnaryOp::Not,
+                operand: Box::new(test.clone()),
+                range: TextRange::default(),
+            }
+            .into(),
+        ),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -269,20 +265,18 @@ pub(crate) fn twisted_arms_in_ifexpr(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let node = body.clone();
-        let node1 = orelse.clone();
-        let node2 = orelse.clone();
-        let node3 = ast::ExprIfExp {
-            test: Box::new(node2),
-            body: Box::new(node1),
-            orelse: Box::new(node),
-            range: TextRange::default(),
-        };
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(&node3.into()),
-            expr.range(),
-        )));
-    }
+    let node = body.clone();
+    let node1 = orelse.clone();
+    let node2 = orelse.clone();
+    let node3 = ast::ExprIfExp {
+        test: Box::new(node2),
+        body: Box::new(node1),
+        orelse: Box::new(node),
+        range: TextRange::default(),
+    };
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().expr(&node3.into()),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

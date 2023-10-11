@@ -128,12 +128,10 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
     drop(parents);
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-            call.arguments.start() + TextSize::new(1),
-            call.arguments.end() - TextSize::new(1),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+        call.arguments.start() + TextSize::new(1),
+        call.arguments.end() - TextSize::new(1),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

@@ -344,10 +344,8 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
             },
             binding.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            if let Some(fix) = remove_unused_variable(binding, checker) {
-                diagnostic.set_fix(fix);
-            }
+        if let Some(fix) = remove_unused_variable(binding, checker) {
+            diagnostic.set_fix(fix);
         }
         diagnostics.push(diagnostic);
     }

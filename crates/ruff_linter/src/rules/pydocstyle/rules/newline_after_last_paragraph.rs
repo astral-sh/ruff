@@ -81,27 +81,25 @@ pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Do
                 if last_line != "\"\"\"" && last_line != "'''" {
                     let mut diagnostic =
                         Diagnostic::new(NewLineAfterLastParagraph, docstring.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        // Insert a newline just before the end-quote(s).
-                        let num_trailing_quotes = "'''".text_len();
-                        let num_trailing_spaces: TextSize = last_line
-                            .chars()
-                            .rev()
-                            .skip(usize::from(num_trailing_quotes))
-                            .take_while(|c| c.is_whitespace())
-                            .map(TextLen::text_len)
-                            .sum();
-                        let content = format!(
-                            "{}{}",
-                            checker.stylist().line_ending().as_str(),
-                            clean_space(docstring.indentation)
-                        );
-                        diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                            content,
-                            docstring.expr.end() - num_trailing_quotes - num_trailing_spaces,
-                            docstring.expr.end() - num_trailing_quotes,
-                        )));
-                    }
+                    // Insert a newline just before the end-quote(s).
+                    let num_trailing_quotes = "'''".text_len();
+                    let num_trailing_spaces: TextSize = last_line
+                        .chars()
+                        .rev()
+                        .skip(usize::from(num_trailing_quotes))
+                        .take_while(|c| c.is_whitespace())
+                        .map(TextLen::text_len)
+                        .sum();
+                    let content = format!(
+                        "{}{}",
+                        checker.stylist().line_ending().as_str(),
+                        clean_space(docstring.indentation)
+                    );
+                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                        content,
+                        docstring.expr.end() - num_trailing_quotes - num_trailing_spaces,
+                        docstring.expr.end() - num_trailing_quotes,
+                    )));
                     checker.diagnostics.push(diagnostic);
                 }
             }

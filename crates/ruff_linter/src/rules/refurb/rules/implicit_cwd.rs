@@ -88,19 +88,17 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
 
     let mut diagnostic = Diagnostic::new(ImplicitCwd, call.range());
 
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("pathlib", "Path"),
-                call.start(),
-                checker.semantic(),
-            )?;
-            Ok(Fix::unsafe_edits(
-                Edit::range_replacement(format!("{binding}.cwd()"), call.range()),
-                [import_edit],
-            ))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::unsafe_edits(
+            Edit::range_replacement(format!("{binding}.cwd()"), call.range()),
+            [import_edit],
+        ))
+    });
 
     checker
         .diagnostics

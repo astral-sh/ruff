@@ -79,13 +79,11 @@ pub(crate) fn duplicate_class_field_definition(checker: &mut Checker, body: &[St
                 },
                 stmt.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                let edit =
-                    fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
-                diagnostic.set_fix(Fix::unsafe_edit(edit).isolate(Checker::isolation(
-                    checker.semantic().current_statement_id(),
-                )));
-            }
+            let edit =
+                fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
+            diagnostic.set_fix(Fix::unsafe_edit(edit).isolate(Checker::isolation(
+                checker.semantic().current_statement_id(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

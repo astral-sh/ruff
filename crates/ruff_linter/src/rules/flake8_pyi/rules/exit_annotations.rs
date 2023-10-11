@@ -175,13 +175,11 @@ fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_ki
                 annotation.range(),
             );
 
-            if checker.patch(diagnostic.kind.rule()) {
-                if checker.semantic().is_builtin("object") {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        "object".to_string(),
-                        annotation.range(),
-                    )));
-                }
+            if checker.semantic().is_builtin("object") {
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "object".to_string(),
+                    annotation.range(),
+                )));
             }
 
             checker.diagnostics.push(diagnostic);

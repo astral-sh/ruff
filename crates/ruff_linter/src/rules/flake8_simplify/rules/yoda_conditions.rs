@@ -193,12 +193,10 @@ pub(crate) fn yoda_conditions(
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                pad(suggestion, expr.range(), checker.locator()),
-                expr.range(),
-            )));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(suggestion, expr.range(), checker.locator()),
+            expr.range(),
+        )));
         checker.diagnostics.push(diagnostic);
     } else {
         checker.diagnostics.push(Diagnostic::new(

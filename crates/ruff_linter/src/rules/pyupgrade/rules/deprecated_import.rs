@@ -630,7 +630,7 @@ pub(crate) fn deprecated_import(
             },
             stmt.range(),
         );
-        if checker.patch(Rule::DeprecatedImport) {
+        if checker.patch(diagnostic.kind.rule()) {
             if let Some(content) = fix {
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     content,

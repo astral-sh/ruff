@@ -82,7 +82,7 @@ pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCa
     };
 
     let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
-    if checker.patch(Rule::QuadraticListSummation) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
     }
     checker.diagnostics.push(diagnostic);

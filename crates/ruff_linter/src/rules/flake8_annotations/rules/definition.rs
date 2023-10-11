@@ -702,12 +702,10 @@ pub(crate) fn definition(
                         },
                         function.identifier(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                            " -> None".to_string(),
-                            function.parameters.range().end(),
-                        )));
-                    }
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                        " -> None".to_string(),
+                        function.parameters.range().end(),
+                    )));
                     diagnostics.push(diagnostic);
                 }
             }
@@ -719,13 +717,11 @@ pub(crate) fn definition(
                     },
                     function.identifier(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(return_type) = simple_magic_return_type(name) {
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                            format!(" -> {return_type}"),
-                            function.parameters.range().end(),
-                        )));
-                    }
+                if let Some(return_type) = simple_magic_return_type(name) {
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                        format!(" -> {return_type}"),
+                        function.parameters.range().end(),
+                    )));
                 }
                 diagnostics.push(diagnostic);
             }

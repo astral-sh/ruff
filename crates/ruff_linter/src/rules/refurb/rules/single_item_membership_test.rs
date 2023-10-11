@@ -78,23 +78,21 @@ pub(crate) fn single_item_membership_test(
 
     let mut diagnostic =
         Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            pad(
-                generate_comparison(
-                    left,
-                    &[membership_test.replacement_op()],
-                    &[item.clone()],
-                    expr.into(),
-                    checker.indexer().comment_ranges(),
-                    checker.locator(),
-                ),
-                expr.range(),
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        pad(
+            generate_comparison(
+                left,
+                &[membership_test.replacement_op()],
+                &[item.clone()],
+                expr.into(),
+                checker.indexer().comment_ranges(),
                 checker.locator(),
             ),
             expr.range(),
-        )));
-    }
+            checker.locator(),
+        ),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

@@ -77,16 +77,14 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         },
         func.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("sys", "exit"),
-                func.start(),
-                checker.semantic(),
-            )?;
-            let reference_edit = Edit::range_replacement(binding, func.range());
-            Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("sys", "exit"),
+            func.start(),
+            checker.semantic(),
+        )?;
+        let reference_edit = Edit::range_replacement(binding, func.range());
+        Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+    });
     checker.diagnostics.push(diagnostic);
 }

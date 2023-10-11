@@ -137,10 +137,8 @@ pub(crate) fn implicit(
                 TextRange::new(a_range.start(), b_range.end()),
             );
 
-            if settings.rules.should_fix(diagnostic.kind.rule()) {
-                if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
-                    diagnostic.set_fix(fix);
-                }
+            if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
+                diagnostic.set_fix(fix);
             }
 
             diagnostics.push(diagnostic);

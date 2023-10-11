@@ -196,12 +196,10 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
             LoggingCallType::LevelCall(LoggingLevel::Warn)
         ) {
             let mut diagnostic = Diagnostic::new(LoggingWarn, range);
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    "warning".to_string(),
-                    range,
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "warning".to_string(),
+                range,
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

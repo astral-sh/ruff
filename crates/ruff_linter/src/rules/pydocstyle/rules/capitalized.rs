@@ -90,12 +90,10 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
         docstring.expr.range(),
     );
 
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            capitalized_word,
-            TextRange::at(body.start(), first_word.text_len()),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        capitalized_word,
+        TextRange::at(body.start(), first_word.text_len()),
+    )));
 
     checker.diagnostics.push(diagnostic);
 }

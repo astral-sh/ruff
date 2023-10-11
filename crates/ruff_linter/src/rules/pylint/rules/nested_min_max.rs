@@ -160,22 +160,20 @@ pub(crate) fn nested_min_max(
         MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)
     }) {
         let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if !checker.indexer().has_comments(expr, checker.locator()) {
-                let flattened_expr = Expr::Call(ast::ExprCall {
-                    func: Box::new(func.clone()),
-                    arguments: Arguments {
-                        args: collect_nested_args(min_max, args, checker.semantic()),
-                        keywords: keywords.to_owned(),
-                        range: TextRange::default(),
-                    },
+        if !checker.indexer().has_comments(expr, checker.locator()) {
+            let flattened_expr = Expr::Call(ast::ExprCall {
+                func: Box::new(func.clone()),
+                arguments: Arguments {
+                    args: collect_nested_args(min_max, args, checker.semantic()),
+                    keywords: keywords.to_owned(),
                     range: TextRange::default(),
-                });
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    checker.generator().expr(&flattened_expr),
-                    expr.range(),
-                )));
-            }
+                },
+                range: TextRange::default(),
+            });
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().expr(&flattened_expr),
+                expr.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

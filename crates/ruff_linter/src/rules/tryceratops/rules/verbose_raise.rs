@@ -96,12 +96,10 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                     if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
                         if id == exception_name.as_str() {
                             let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
-                            if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                    "raise".to_string(),
-                                    raise.range(),
-                                )));
-                            }
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                                "raise".to_string(),
+                                raise.range(),
+                            )));
                             checker.diagnostics.push(diagnostic);
                         }
                     }

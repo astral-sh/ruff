@@ -47,7 +47,7 @@ pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
     };
 
     let mut diagnostic = Diagnostic::new(PassStatementStubBody, pass.range());
-    if checker.patch(Rule::PassStatementStubBody) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             format!("..."),
             pass.range(),

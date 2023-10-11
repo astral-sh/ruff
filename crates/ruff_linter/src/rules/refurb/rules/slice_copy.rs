@@ -61,14 +61,12 @@ pub(crate) fn slice_copy(checker: &mut Checker, subscript: &ast::ExprSubscript) 
         return;
     };
     let mut diagnostic = Diagnostic::new(SliceCopy, subscript.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let replacement = generate_method_call(name, "copy", checker.generator());
-        diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-            replacement,
-            subscript.start(),
-            subscript.end(),
-        )));
-    }
+    let replacement = generate_method_call(name, "copy", checker.generator());
+    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+        replacement,
+        subscript.start(),
+        subscript.end(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

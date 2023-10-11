@@ -54,13 +54,11 @@ pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["io", "open"]))
     {
         let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if checker.semantic().is_builtin("open") {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    "open".to_string(),
-                    func.range(),
-                )));
-            }
+        if checker.semantic().is_builtin("open") {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "open".to_string(),
+                func.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

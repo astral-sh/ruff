@@ -135,18 +135,16 @@ pub(crate) fn avoidable_escaped_quote(
                     && !string_contents.contains(quotes_settings.inline_quotes.opposite().as_char())
                 {
                     let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, tok_range);
-                    if settings.rules.should_fix(diagnostic.kind.rule()) {
-                        let fixed_contents = format!(
-                            "{prefix}{quote}{value}{quote}",
-                            prefix = kind.as_str(),
-                            quote = quotes_settings.inline_quotes.opposite().as_char(),
-                            value = unescape_string(string_contents)
-                        );
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            fixed_contents,
-                            tok_range,
-                        )));
-                    }
+                    let fixed_contents = format!(
+                        "{prefix}{quote}{value}{quote}",
+                        prefix = kind.as_str(),
+                        quote = quotes_settings.inline_quotes.opposite().as_char(),
+                        value = unescape_string(string_contents)
+                    );
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        fixed_contents,
+                        tok_range,
+                    )));
                     diagnostics.push(diagnostic);
                 }
             }
@@ -192,35 +190,33 @@ pub(crate) fn avoidable_escaped_quote(
                     AvoidableEscapedQuote,
                     TextRange::new(context.start_range.start(), tok_range.end()),
                 );
-                if settings.rules.should_fix(diagnostic.kind.rule()) {
-                    let fstring_start_edit = Edit::range_replacement(
-                        // No need for `r`/`R` as we don't perform the checks
-                        // for raw strings.
-                        format!("f{}", quotes_settings.inline_quotes.opposite().as_char()),
-                        context.start_range,
-                    );
-                    let fstring_middle_and_end_edits = context
-                        .middle_ranges_with_escapes
-                        .iter()
-                        .map(|&range| {
-                            Edit::range_replacement(unescape_string(locator.slice(range)), range)
-                        })
-                        .chain(std::iter::once(
-                            // `FStringEnd` edit
-                            Edit::range_replacement(
-                                quotes_settings
-                                    .inline_quotes
-                                    .opposite()
-                                    .as_char()
-                                    .to_string(),
-                                tok_range,
-                            ),
-                        ));
-                    diagnostic.set_fix(Fix::safe_edits(
-                        fstring_start_edit,
-                        fstring_middle_and_end_edits,
+                let fstring_start_edit = Edit::range_replacement(
+                    // No need for `r`/`R` as we don't perform the checks
+                    // for raw strings.
+                    format!("f{}", quotes_settings.inline_quotes.opposite().as_char()),
+                    context.start_range,
+                );
+                let fstring_middle_and_end_edits = context
+                    .middle_ranges_with_escapes
+                    .iter()
+                    .map(|&range| {
+                        Edit::range_replacement(unescape_string(locator.slice(range)), range)
+                    })
+                    .chain(std::iter::once(
+                        // `FStringEnd` edit
+                        Edit::range_replacement(
+                            quotes_settings
+                                .inline_quotes
+                                .opposite()
+                                .as_char()
+                                .to_string(),
+                            tok_range,
+                        ),
                     ));
-                }
+                diagnostic.set_fix(Fix::safe_edits(
+                    fstring_start_edit,
+                    fstring_middle_and_end_edits,
+                ));
                 diagnostics.push(diagnostic);
             }
             _ => {}

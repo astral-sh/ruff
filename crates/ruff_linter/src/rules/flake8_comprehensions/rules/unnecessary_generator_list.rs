@@ -60,12 +60,10 @@ pub(crate) fn unnecessary_generator_list(
     }
     if let Expr::GeneratorExp(_) = argument {
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorList, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_generator_list(expr, checker.locator(), checker.stylist())
-                    .map(Fix::unsafe_edit)
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_generator_list(expr, checker.locator(), checker.stylist())
+                .map(Fix::unsafe_edit)
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

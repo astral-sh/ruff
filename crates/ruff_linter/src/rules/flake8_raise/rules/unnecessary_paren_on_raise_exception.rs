@@ -74,26 +74,24 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
         }
 
         let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, arguments.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            // If the arguments are immediately followed by a `from`, insert whitespace to avoid
-            // a syntax error, as in:
-            // ```python
-            // raise IndexError()from ZeroDivisionError
-            // ```
-            if checker
-                .locator()
-                .after(arguments.end())
-                .chars()
-                .next()
-                .is_some_and(char::is_alphanumeric)
-            {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    " ".to_string(),
-                    arguments.range(),
-                )));
-            } else {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
-            }
+        // If the arguments are immediately followed by a `from`, insert whitespace to avoid
+        // a syntax error, as in:
+        // ```python
+        // raise IndexError()from ZeroDivisionError
+        // ```
+        if checker
+            .locator()
+            .after(arguments.end())
+            .chars()
+            .next()
+            .is_some_and(char::is_alphanumeric)
+        {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                " ".to_string(),
+                arguments.range(),
+            )));
+        } else {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
         }
         checker.diagnostics.push(diagnostic);
     }

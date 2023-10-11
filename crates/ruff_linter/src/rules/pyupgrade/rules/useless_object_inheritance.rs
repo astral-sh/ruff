@@ -68,17 +68,15 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
             },
             base.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                remove_argument(
-                    base,
-                    arguments,
-                    Parentheses::Remove,
-                    checker.locator().contents(),
-                )
-                .map(Fix::safe_edit)
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            remove_argument(
+                base,
+                arguments,
+                Parentheses::Remove,
+                checker.locator().contents(),
+            )
+            .map(Fix::safe_edit)
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

@@ -221,18 +221,16 @@ pub(crate) fn unnecessary_map(
     };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_map(
-                expr,
-                parent,
-                object_type,
-                checker.locator(),
-                checker.stylist(),
-            )
-            .map(Fix::unsafe_edit)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_map(
+            expr,
+            parent,
+            object_type,
+            checker.locator(),
+            checker.stylist(),
+        )
+        .map(Fix::unsafe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }
 

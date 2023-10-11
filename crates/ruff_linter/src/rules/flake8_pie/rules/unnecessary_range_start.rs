@@ -78,16 +78,14 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart, start.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            remove_argument(
-                &start,
-                &call.arguments,
-                Parentheses::Preserve,
-                checker.locator().contents(),
-            )
-            .map(Fix::safe_edit)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        remove_argument(
+            &start,
+            &call.arguments,
+            Parentheses::Preserve,
+            checker.locator().contents(),
+        )
+        .map(Fix::safe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }

@@ -76,12 +76,10 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
             expr.range(),
         );
 
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                format!("Literal[{}]", literal_members.join(", ")),
-                expr.range(),
-            )));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            format!("Literal[{}]", literal_members.join(", ")),
+            expr.range(),
+        )));
 
         checker.diagnostics.push(diagnostic);
     }

@@ -108,12 +108,10 @@ pub(crate) fn setattr_with_constant(
     {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    assignment(obj, name, value, checker.generator()),
-                    expr.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                assignment(obj, name, value, checker.generator()),
+                expr.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

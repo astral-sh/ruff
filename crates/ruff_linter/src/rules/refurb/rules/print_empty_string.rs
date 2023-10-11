@@ -87,13 +87,11 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
 
             let mut diagnostic = Diagnostic::new(PrintEmptyString { reason }, call.range());
 
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                    generate_suggestion(call, Separator::Remove, checker.generator()),
-                    call.start(),
-                    call.end(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                generate_suggestion(call, Separator::Remove, checker.generator()),
+                call.start(),
+                call.end(),
+            )));
 
             checker.diagnostics.push(diagnostic);
         }
@@ -109,13 +107,11 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                     call.range(),
                 );
 
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                        generate_suggestion(call, Separator::Remove, checker.generator()),
-                        call.start(),
-                        call.end(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                    generate_suggestion(call, Separator::Remove, checker.generator()),
+                    call.start(),
+                    call.end(),
+                )));
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -174,13 +170,11 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                 call.range(),
             );
 
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                    generate_suggestion(call, separator, checker.generator()),
-                    call.start(),
-                    call.end(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                generate_suggestion(call, separator, checker.generator()),
+                call.start(),
+                call.end(),
+            )));
 
             checker.diagnostics.push(diagnostic);
         }

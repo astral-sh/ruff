@@ -73,18 +73,16 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            let type_name = match type_name {
-                "unicode" => "str",
-                "long" => "int",
-                _ => type_name,
-            };
-            if checker.semantic().is_builtin(type_name) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    type_name.to_string(),
-                    expr.range(),
-                )));
-            }
+        let type_name = match type_name {
+            "unicode" => "str",
+            "long" => "int",
+            _ => type_name,
+        };
+        if checker.semantic().is_builtin(type_name) {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                type_name.to_string(),
+                expr.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

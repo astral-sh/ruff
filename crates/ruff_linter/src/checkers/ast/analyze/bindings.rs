@@ -32,7 +32,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
                     },
                     binding.range(),
                 );
-                if checker.patch(Rule::UnusedVariable) {
+                if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.try_set_fix(|| {
                         pyflakes::fixes::remove_exception_handler_assignment(
                             binding,

@@ -84,18 +84,16 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         },
         stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-        if checker.locator().is_at_start_of_line(stmt.start()) {
-            diagnostic.set_fix(convert_to_class(
-                stmt,
-                class_name,
-                body,
-                total_keyword,
-                base_class,
-                checker.generator(),
-            ));
-        }
+    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+    if checker.locator().is_at_start_of_line(stmt.start()) {
+        diagnostic.set_fix(convert_to_class(
+            stmt,
+            class_name,
+            body,
+            total_keyword,
+            base_class,
+            checker.generator(),
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }

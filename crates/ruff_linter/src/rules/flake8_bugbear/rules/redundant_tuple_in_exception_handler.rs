@@ -77,23 +77,21 @@ pub(crate) fn redundant_tuple_in_exception_handler(
             },
             type_.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            // If there's no space between the `except` and the tuple, we need to insert a space,
-            // as in:
-            // ```python
-            // except(ValueError,):
-            // ```
-            // Otherwise, the output will be invalid syntax, since we're removing a set of
-            // parentheses.
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                pad(
-                    checker.generator().expr(elt),
-                    type_.range(),
-                    checker.locator(),
-                ),
+        // If there's no space between the `except` and the tuple, we need to insert a space,
+        // as in:
+        // ```python
+        // except(ValueError,):
+        // ```
+        // Otherwise, the output will be invalid syntax, since we're removing a set of
+        // parentheses.
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(
+                checker.generator().expr(elt),
                 type_.range(),
-            )));
-        }
+                checker.locator(),
+            ),
+            type_.range(),
+        )));
         checker.diagnostics.push(diagnostic);
     }
 }

@@ -124,32 +124,30 @@ pub(crate) fn multiple_with_statements(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            if !checker
-                .indexer()
-                .comment_ranges()
-                .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
-            {
-                match fix_with::fix_multiple_with_statements(
-                    checker.locator(),
-                    checker.stylist(),
-                    with_stmt,
-                ) {
-                    Ok(edit) => {
-                        if edit.content().map_or(true, |content| {
-                            fits(
-                                content,
-                                with_stmt.into(),
-                                checker.locator(),
-                                checker.settings.line_length,
-                                checker.settings.tab_size,
-                            )
-                        }) {
-                            diagnostic.set_fix(Fix::unsafe_edit(edit));
-                        }
+        if !checker
+            .indexer()
+            .comment_ranges()
+            .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
+        {
+            match fix_with::fix_multiple_with_statements(
+                checker.locator(),
+                checker.stylist(),
+                with_stmt,
+            ) {
+                Ok(edit) => {
+                    if edit.content().map_or(true, |content| {
+                        fits(
+                            content,
+                            with_stmt.into(),
+                            checker.locator(),
+                            checker.settings.line_length,
+                            checker.settings.tab_size,
+                        )
+                    }) {
+                        diagnostic.set_fix(Fix::unsafe_edit(edit));
                     }
-                    Err(err) => error!("Failed to fix nested with: {err}"),
                 }
+                Err(err) => error!("Failed to fix nested with: {err}"),
             }
         }
         checker.diagnostics.push(diagnostic);

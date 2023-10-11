@@ -284,25 +284,23 @@ pub(crate) fn unittest_assertion(
                     },
                     func.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // We're converting an expression to a statement, so avoid applying the fix if
-                    // the assertion is part of a larger expression.
-                    if checker.semantic().current_statement().is_expr_stmt()
-                        && checker.semantic().current_expression_parent().is_none()
-                        && !checker.indexer().comment_ranges().intersects(expr.range())
-                    {
-                        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                checker.generator().stmt(&stmt),
-                                parenthesized_range(
-                                    expr.into(),
-                                    checker.semantic().current_statement().into(),
-                                    checker.indexer().comment_ranges(),
-                                    checker.locator().contents(),
-                                )
-                                .unwrap_or(expr.range()),
-                            )));
-                        }
+                // We're converting an expression to a statement, so avoid applying the fix if
+                // the assertion is part of a larger expression.
+                if checker.semantic().current_statement().is_expr_stmt()
+                    && checker.semantic().current_expression_parent().is_none()
+                    && !checker.indexer().comment_ranges().intersects(expr.range())
+                {
+                    if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            checker.generator().stmt(&stmt),
+                            parenthesized_range(
+                                expr.into(),
+                                checker.semantic().current_statement().into(),
+                                checker.indexer().comment_ranges(),
+                                checker.locator().contents(),
+                            )
+                            .unwrap_or(expr.range()),
+                        )));
                     }
                 }
                 Some(diagnostic)
@@ -746,19 +744,17 @@ pub(crate) fn composite_condition(
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if matches!(composite, CompositionKind::Simple)
-                && msg.is_none()
-                && !checker.indexer().comment_ranges().intersects(stmt.range())
-                && !checker
-                    .indexer()
-                    .in_multi_statement_line(stmt, checker.locator())
-            {
-                diagnostic.try_set_fix(|| {
-                    fix_composite_condition(stmt, checker.locator(), checker.stylist())
-                        .map(Fix::unsafe_edit)
-                });
-            }
+        if matches!(composite, CompositionKind::Simple)
+            && msg.is_none()
+            && !checker.indexer().comment_ranges().intersects(stmt.range())
+            && !checker
+                .indexer()
+                .in_multi_statement_line(stmt, checker.locator())
+        {
+            diagnostic.try_set_fix(|| {
+                fix_composite_condition(stmt, checker.locator(), checker.stylist())
+                    .map(Fix::unsafe_edit)
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -130,16 +130,14 @@ pub(crate) fn unnecessary_double_cast_or_process(
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_double_cast_or_process(
-                    expr,
-                    checker.locator(),
-                    checker.stylist(),
-                )
-                .map(Fix::unsafe_edit)
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_double_cast_or_process(
+                expr,
+                checker.locator(),
+                checker.stylist(),
+            )
+            .map(Fix::unsafe_edit)
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

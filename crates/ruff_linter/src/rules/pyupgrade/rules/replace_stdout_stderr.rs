@@ -81,12 +81,9 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
         }
 
         let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, call.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if call.arguments.find_keyword("capture_output").is_none() {
-                diagnostic.try_set_fix(|| {
-                    generate_fix(stdout, stderr, call, checker.locator().contents())
-                });
-            }
+        if call.arguments.find_keyword("capture_output").is_none() {
+            diagnostic
+                .try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator().contents()));
         }
         checker.diagnostics.push(diagnostic);
     }

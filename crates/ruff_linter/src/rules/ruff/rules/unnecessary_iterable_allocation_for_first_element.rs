@@ -97,12 +97,10 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         *range,
     );
 
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            format!("next({iterable})"),
-            *range,
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        format!("next({iterable})"),
+        *range,
+    )));
 
     checker.diagnostics.push(diagnostic);
 }

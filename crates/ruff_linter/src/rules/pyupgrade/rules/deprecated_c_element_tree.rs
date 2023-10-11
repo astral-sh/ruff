@@ -44,13 +44,11 @@ where
     T: Ranged,
 {
     let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, node.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let contents = checker.locator().slice(node);
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            contents.replacen("cElementTree", "ElementTree", 1),
-            node.range(),
-        )));
-    }
+    let contents = checker.locator().slice(node);
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        contents.replacen("cElementTree", "ElementTree", 1),
+        node.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

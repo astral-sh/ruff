@@ -207,21 +207,19 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         },
         slice.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let node = ast::ExprConstant {
-            value: ast::Constant::Str(ast::StringConstant {
-                value: capital_env_var,
-                unicode: *unicode,
-                implicit_concatenated: false,
-            }),
-            range: TextRange::default(),
-        };
-        let new_env_var = node.into();
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(&new_env_var),
-            slice.range(),
-        )));
-    }
+    let node = ast::ExprConstant {
+        value: ast::Constant::Str(ast::StringConstant {
+            value: capital_env_var,
+            unicode: *unicode,
+            implicit_concatenated: false,
+        }),
+        range: TextRange::default(),
+    };
+    let new_env_var = node.into();
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().expr(&new_env_var),
+        slice.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -275,11 +273,9 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
         expr.range(),
     );
 
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            expected,
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        expected,
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

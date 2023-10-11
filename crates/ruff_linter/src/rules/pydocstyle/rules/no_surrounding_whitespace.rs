@@ -63,17 +63,14 @@ pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docst
         return;
     }
     let mut diagnostic = Diagnostic::new(SurroundingWhitespace, docstring.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let quote = docstring.contents.chars().last().unwrap();
-        // If removing whitespace would lead to an invalid string of quote
-        // characters, avoid applying the fix.
-        if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed)
-        {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                trimmed.to_string(),
-                TextRange::at(body.start(), line.text_len()),
-            )));
-        }
+    let quote = docstring.contents.chars().last().unwrap();
+    // If removing whitespace would lead to an invalid string of quote
+    // characters, avoid applying the fix.
+    if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed) {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            trimmed.to_string(),
+            TextRange::at(body.start(), line.text_len()),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -143,13 +143,11 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         },
         stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if !checker.indexer().has_comments(stmt, checker.locator()) {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                contents,
-                stmt.range(),
-            )));
-        }
+    if !checker.indexer().has_comments(stmt, checker.locator()) {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            contents,
+            stmt.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -58,11 +58,9 @@ pub(crate) fn unnecessary_list_comprehension_set(
     }
     if argument.is_list_comp_expr() {
         let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_list_comprehension_set(expr, checker).map(Fix::unsafe_edit)
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_list_comprehension_set(expr, checker).map(Fix::unsafe_edit)
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

@@ -64,12 +64,10 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
-                .map(Fix::unsafe_edit)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
+            .map(Fix::unsafe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }
 

@@ -175,18 +175,16 @@ pub(crate) fn negation_with_equal_op(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let node = ast::ExprCompare {
-            left: left.clone(),
-            ops: vec![CmpOp::NotEq],
-            comparators: comparators.clone(),
-            range: TextRange::default(),
-        };
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            checker.generator().expr(&node.into()),
-            expr.range(),
-        )));
-    }
+    let node = ast::ExprCompare {
+        left: left.clone(),
+        ops: vec![CmpOp::NotEq],
+        comparators: comparators.clone(),
+        range: TextRange::default(),
+    };
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        checker.generator().expr(&node.into()),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -232,18 +230,16 @@ pub(crate) fn negation_with_not_equal_op(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let node = ast::ExprCompare {
-            left: left.clone(),
-            ops: vec![CmpOp::Eq],
-            comparators: comparators.clone(),
-            range: TextRange::default(),
-        };
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            checker.generator().expr(&node.into()),
-            expr.range(),
-        )));
-    }
+    let node = ast::ExprCompare {
+        left: left.clone(),
+        ops: vec![CmpOp::Eq],
+        comparators: comparators.clone(),
+        range: TextRange::default(),
+    };
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        checker.generator().expr(&node.into()),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -270,32 +266,30 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if checker.semantic().in_boolean_test() {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                checker.locator().slice(operand.as_ref()).to_string(),
-                expr.range(),
-            )));
-        } else if checker.semantic().is_builtin("bool") {
-            let node = ast::ExprName {
-                id: "bool".into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-            };
-            let node1 = ast::ExprCall {
-                func: Box::new(node.into()),
-                arguments: Arguments {
-                    args: vec![*operand.clone()],
-                    keywords: vec![],
-                    range: TextRange::default(),
-                },
-                range: TextRange::default(),
-            };
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                checker.generator().expr(&node1.into()),
-                expr.range(),
-            )));
+    if checker.semantic().in_boolean_test() {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            checker.locator().slice(operand.as_ref()).to_string(),
+            expr.range(),
+        )));
+    } else if checker.semantic().is_builtin("bool") {
+        let node = ast::ExprName {
+            id: "bool".into(),
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
         };
-    }
+        let node1 = ast::ExprCall {
+            func: Box::new(node.into()),
+            arguments: Arguments {
+                args: vec![*operand.clone()],
+                keywords: vec![],
+                range: TextRange::default(),
+            },
+            range: TextRange::default(),
+        };
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            checker.generator().expr(&node1.into()),
+            expr.range(),
+        )));
+    };
     checker.diagnostics.push(diagnostic);
 }

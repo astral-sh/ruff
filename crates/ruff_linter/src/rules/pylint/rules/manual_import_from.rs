@@ -71,23 +71,21 @@ pub(crate) fn manual_from_import(
         },
         alias.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if names.len() == 1 {
-            let node = ast::StmtImportFrom {
-                module: Some(Identifier::new(module.to_string(), TextRange::default())),
-                names: vec![Alias {
-                    name: asname.clone(),
-                    asname: None,
-                    range: TextRange::default(),
-                }],
-                level: Some(0),
+    if names.len() == 1 {
+        let node = ast::StmtImportFrom {
+            module: Some(Identifier::new(module.to_string(), TextRange::default())),
+            names: vec![Alias {
+                name: asname.clone(),
+                asname: None,
                 range: TextRange::default(),
-            };
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                checker.generator().stmt(&node.into()),
-                stmt.range(),
-            )));
-        }
+            }],
+            level: Some(0),
+            range: TextRange::default(),
+        };
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            checker.generator().stmt(&node.into()),
+            stmt.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

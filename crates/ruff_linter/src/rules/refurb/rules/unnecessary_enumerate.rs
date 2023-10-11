@@ -139,18 +139,16 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             );
 
             // The index is unused, so replace with `for value in sequence`.
-            if checker.patch(diagnostic.kind.rule()) {
-                let replace_iter = Edit::range_replacement(sequence.into(), stmt_for.iter.range());
-                let replace_target = Edit::range_replacement(
-                    pad(
-                        checker.locator().slice(value).to_string(),
-                        stmt_for.target.range(),
-                        checker.locator(),
-                    ),
+            let replace_iter = Edit::range_replacement(sequence.into(), stmt_for.iter.range());
+            let replace_target = Edit::range_replacement(
+                pad(
+                    checker.locator().slice(value).to_string(),
                     stmt_for.target.range(),
-                );
-                diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
-            }
+                    checker.locator(),
+                ),
+                stmt_for.target.range(),
+            );
+            diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
 
             checker.diagnostics.push(diagnostic);
         }

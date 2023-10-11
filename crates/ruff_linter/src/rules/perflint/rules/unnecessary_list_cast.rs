@@ -91,9 +91,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
             ..
         }) => {
             let mut diagnostic = Diagnostic::new(UnnecessaryListCast, *list_range);
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
-            }
+            diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
             checker.diagnostics.push(diagnostic);
         }
         Expr::Name(ast::ExprName {
@@ -119,9 +117,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
                             ) {
                                 let mut diagnostic =
                                     Diagnostic::new(UnnecessaryListCast, *list_range);
-                                if checker.patch(diagnostic.kind.rule()) {
-                                    diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
-                                }
+                                diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
                                 checker.diagnostics.push(diagnostic);
                             }
                         }

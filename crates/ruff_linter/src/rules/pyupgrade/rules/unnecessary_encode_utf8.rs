@@ -177,7 +177,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.set_fix(replace_with_bytes_literal(
                             checker.locator(),
                             call,
@@ -194,7 +194,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 kwarg,
@@ -214,7 +214,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 arg,
@@ -241,7 +241,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 kwarg,
@@ -261,7 +261,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 arg,

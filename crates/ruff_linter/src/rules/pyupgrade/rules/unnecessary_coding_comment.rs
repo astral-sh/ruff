@@ -91,12 +91,10 @@ pub(crate) fn unnecessary_coding_comment(
             }
 
             let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, *comment_range);
-            if settings.rules.should_fix(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                    line_range.start(),
-                    line_range.end(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                line_range.start(),
+                line_range.end(),
+            )));
             diagnostics.push(diagnostic);
         }
     }

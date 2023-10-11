@@ -58,17 +58,15 @@ pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "timezone", "utc"]))
     {
         let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import_from("datetime", "UTC"),
-                    expr.start(),
-                    checker.semantic(),
-                )?;
-                let reference_edit = Edit::range_replacement(binding, expr.range());
-                Ok(Fix::safe_edits(import_edit, [reference_edit]))
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from("datetime", "UTC"),
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let reference_edit = Edit::range_replacement(binding, expr.range());
+            Ok(Fix::safe_edits(import_edit, [reference_edit]))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

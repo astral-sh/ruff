@@ -65,14 +65,12 @@ pub(crate) fn unaliased_collections_abc_set_import(
     }
 
     let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        if checker.semantic().is_available("AbstractSet") {
-            diagnostic.try_set_fix(|| {
-                let scope = &checker.semantic().scopes[binding.scope];
-                let (edit, rest) = Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
-                Ok(Fix::unsafe_edits(edit, rest))
-            });
-        }
+    if checker.semantic().is_available("AbstractSet") {
+        diagnostic.try_set_fix(|| {
+            let scope = &checker.semantic().scopes[binding.scope];
+            let (edit, rest) = Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
+            Ok(Fix::unsafe_edits(edit, rest))
+        });
     }
     Some(diagnostic)
 }

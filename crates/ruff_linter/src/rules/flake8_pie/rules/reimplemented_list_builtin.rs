@@ -64,13 +64,11 @@ pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambd
         if let Expr::List(ast::ExprList { elts, .. }) = body.as_ref() {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    if checker.semantic().is_builtin("list") {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            "list".to_string(),
-                            expr.range(),
-                        )));
-                    }
+                if checker.semantic().is_builtin("list") {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        "list".to_string(),
+                        expr.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }

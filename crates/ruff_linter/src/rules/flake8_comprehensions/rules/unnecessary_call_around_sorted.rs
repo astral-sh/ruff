@@ -82,19 +82,14 @@ pub(crate) fn unnecessary_call_around_sorted(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let edit = fixes::fix_unnecessary_call_around_sorted(
-                expr,
-                checker.locator(),
-                checker.stylist(),
-            )?;
-            if outer.id == "reversed" {
-                Ok(Fix::unsafe_edit(edit))
-            } else {
-                Ok(Fix::safe_edit(edit))
-            }
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let edit =
+            fixes::fix_unnecessary_call_around_sorted(expr, checker.locator(), checker.stylist())?;
+        if outer.id == "reversed" {
+            Ok(Fix::unsafe_edit(edit))
+        } else {
+            Ok(Fix::safe_edit(edit))
+        }
+    });
     checker.diagnostics.push(diagnostic);
 }

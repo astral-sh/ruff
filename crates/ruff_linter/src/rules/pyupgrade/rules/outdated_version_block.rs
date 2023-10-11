@@ -118,12 +118,8 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                                 },
                                 branch.test.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                if let Some(fix) =
-                                    fix_always_false_branch(checker, stmt_if, &branch)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
+                            if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
                             }
                             checker.diagnostics.push(diagnostic);
                         }
@@ -151,11 +147,8 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                                 },
                                 branch.test.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
+                            if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
                             }
                             checker.diagnostics.push(diagnostic);
                         }
@@ -184,12 +177,8 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                                 },
                                 branch.test.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                if let Some(fix) =
-                                    fix_always_false_branch(checker, stmt_if, &branch)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
+                            if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
                             }
                             checker.diagnostics.push(diagnostic);
                         }
@@ -200,11 +189,8 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                                 },
                                 branch.test.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
+                            if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
                             }
                             checker.diagnostics.push(diagnostic);
                         }

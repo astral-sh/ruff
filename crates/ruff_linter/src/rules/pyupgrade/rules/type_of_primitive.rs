@@ -73,14 +73,12 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
         return;
     };
     let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let builtin = primitive.builtin();
-        if checker.semantic().is_builtin(&builtin) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                pad(primitive.builtin(), expr.range(), checker.locator()),
-                expr.range(),
-            )));
-        }
+    let builtin = primitive.builtin();
+    if checker.semantic().is_builtin(&builtin) {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(primitive.builtin(), expr.range(), checker.locator()),
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -110,18 +110,16 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
-            if checker.patch(diagnostic.kind.rule()) {
-                if let Some(fix) = move_initialization(
-                    function_def,
-                    parameter,
-                    default,
-                    checker.locator(),
-                    checker.stylist(),
-                    checker.indexer(),
-                    checker.generator(),
-                ) {
-                    diagnostic.set_fix(fix);
-                }
+            if let Some(fix) = move_initialization(
+                function_def,
+                parameter,
+                default,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
+                checker.generator(),
+            ) {
+                diagnostic.set_fix(fix);
             }
             checker.diagnostics.push(diagnostic);
         }

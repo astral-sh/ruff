@@ -75,11 +75,9 @@ pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
     }
 
     let mut diagnostic = Diagnostic::new(AssertFalse, test.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().stmt(&assertion_error(msg)),
-            stmt.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().stmt(&assertion_error(msg)),
+        stmt.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

@@ -261,12 +261,10 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 },
                 value.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    "mock".to_string(),
-                    value.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "mock".to_string(),
+                value.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -282,7 +280,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| &name.name == "mock" || &name.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(Rule::DeprecatedMockImport) {
+                let content = if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator(), stmt) {
                         match format_import(stmt, indent, checker.locator(), checker.stylist()) {
                             Ok(content) => Some(content),
@@ -334,14 +332,12 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     },
                     stmt.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator(), stmt) {
-                        diagnostic.try_set_fix(|| {
-                            format_import_from(stmt, indent, checker.locator(), checker.stylist())
-                                .map(|content| Edit::range_replacement(content, stmt.range()))
-                                .map(Fix::safe_edit)
-                        });
-                    }
+                if let Some(indent) = indentation(checker.locator(), stmt) {
+                    diagnostic.try_set_fix(|| {
+                        format_import_from(stmt, indent, checker.locator(), checker.stylist())
+                            .map(|content| Edit::range_replacement(content, stmt.range()))
+                            .map(Fix::safe_edit)
+                    });
                 }
                 checker.diagnostics.push(diagnostic);
             }
