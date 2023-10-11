@@ -393,7 +393,7 @@ whether a rule supports fixing, see [_Rules_](rules.md).
 
 Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when applying safe fixes, but the meaning could be changed when applying unsafe fixes.
 
-For example, `unnecessary-iterable-allocation-for-first-element` (`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
+For example, [`unnecessary-iterable-allocation-for-first-element`](../rules/unnecessary-iterable-allocation-for-first-element) (`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
 
 ```shell
 $ python -m timeit "head = list(range(99999999))[0]"
