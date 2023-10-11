@@ -43,6 +43,6 @@ with contextlib.ExitStack() as exit_stack:
     exit_stack_ = exit_stack
     f = exit_stack_.enter_context(open("filename"))
 
-# OK
-open("filename").close()
-pathlib.Path("foo.txt").open().close()
+# OK (quick one-liner clear file contents)
+open("filename", "w").close()
+pathlib.Path("filename").open("w").close()
