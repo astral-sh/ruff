@@ -6,7 +6,7 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::edit::Edit;
 
 /// Indicates if a fix can be applied.
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, is_macro::Is)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Applicability {
@@ -137,5 +137,12 @@ impl Fix {
     /// Return [`true`] if this [`Fix`] should be applied with at a given [`Applicability`].
     pub fn applies(&self, applicability: Applicability) -> bool {
         self.applicability >= applicability
+    }
+
+    /// Create a new [`Fix`] with the given [`Applicability`].
+    #[must_use]
+    pub fn with_applicability(mut self, applicability: Applicability) -> Self {
+        self.applicability = applicability;
+        self
     }
 }
