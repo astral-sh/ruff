@@ -145,13 +145,13 @@ PYI055.pyi:20:7: PYI055 [*] Multiple `type` members in a union. Combine them int
 22 22 | def func():
 23 23 |     # PYI055
 
-PYI055.pyi:24:11: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty]`.
+PYI055.pyi:24:11: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
    |
 22 | def func():
 23 |     # PYI055
-24 |     item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
-   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-25 |     item2: Union[type[requests_mock.Mocker], type[httpretty]] = requests_mock.Mocker
+24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
    |
    = help: Combine multiple `type` members into one union
 
@@ -159,24 +159,24 @@ PYI055.pyi:24:11: PYI055 [*] Multiple `type` members in a union. Combine them in
 21 21 | 
 22 22 | def func():
 23 23 |     # PYI055
-24    |-    item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
-   24 |+    item: type[requests_mock.Mocker | httpretty] = requests_mock.Mocker
-25 25 |     item2: Union[type[requests_mock.Mocker], type[httpretty]] = requests_mock.Mocker
+24    |-    item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+   24 |+    item: type[requests_mock.Mocker | httpretty | str] = requests_mock.Mocker
+25 25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
 
-PYI055.pyi:25:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty]]`.
+PYI055.pyi:25:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
 23 |     # PYI055
-24 |     item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
-25 |     item2: Union[type[requests_mock.Mocker], type[httpretty]] = requests_mock.Mocker
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
    |
    = help: Combine multiple `type` members into one union
 
 ℹ Fix
 22 22 | def func():
 23 23 |     # PYI055
-24 24 |     item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
-25    |-    item2: Union[type[requests_mock.Mocker], type[httpretty]] = requests_mock.Mocker
-   25 |+    item2: type[Union[requests_mock.Mocker, httpretty]] = requests_mock.Mocker
+24 24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+25    |-    item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+   25 |+    item2: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
 
 

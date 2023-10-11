@@ -1,7 +1,8 @@
+use ast::{ExprContext, Operator};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::{checkers::ast::Checker, registry::AsRule, rules::flake8_pyi::helpers::traverse_union};
 
@@ -46,6 +47,19 @@ impl AlwaysFixableViolation for UnnecessaryTypeUnion {
     }
 }
 
+fn concatenate_bin_ors(exprs: Vec<&Expr>) -> Expr {
+    let mut exprs = exprs.into_iter();
+    let first = exprs.next().unwrap();
+    exprs.fold((*first).clone(), |acc, expr| {
+        Expr::BinOp(ast::ExprBinOp {
+            left: Box::new(acc),
+            op: Operator::BitOr,
+            right: Box::new((*expr).clone()),
+            range: TextRange::default(),
+        })
+    })
+}
+
 /// PYI055
 pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr) {
     // The `|` operator isn't always safe to allow to runtime-evaluated annotations.
@@ -79,6 +93,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
 
     if type_exprs.len() > 1 {
         let type_members: Vec<String> = type_exprs
+            .clone()
             .into_iter()
             .map(|type_expr| checker.locator().slice(type_expr.as_ref()).to_string())
             .collect();
@@ -93,9 +108,59 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
 
         if checker.patch(diagnostic.kind.rule()) {
             let union_str = if is_pep604_union {
-                format!("type[{}]", type_members.join(" | "))
+                checker
+                    .generator()
+                    .expr(&Expr::Subscript(ast::ExprSubscript {
+                        value: Box::new(Expr::Name(ast::ExprName {
+                            id: "type".into(),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        })),
+                        slice: Box::new(concatenate_bin_ors(
+                            type_exprs
+                                .clone()
+                                .into_iter()
+                                .map(std::convert::AsRef::as_ref)
+                                .collect(),
+                        )),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    }))
             } else {
-                format!("type[Union[{}]]", type_members.join(", "))
+                checker
+                    .generator()
+                    .expr(&Expr::Subscript(ast::ExprSubscript {
+                        value: Box::new(Expr::Name(ast::ExprName {
+                            id: "type".into(),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        })),
+                        slice: Box::new(Expr::Subscript(ast::ExprSubscript {
+                            value: Box::new(Expr::Name(ast::ExprName {
+                                id: "Union".into(),
+                                ctx: ExprContext::Load,
+                                range: TextRange::default(),
+                            })),
+                            slice: Box::new(Expr::Tuple(ast::ExprTuple {
+                                elts: type_members
+                                    .into_iter()
+                                    .map(|type_member| {
+                                        Expr::Name(ast::ExprName {
+                                            id: type_member,
+                                            ctx: ExprContext::Load,
+                                            range: TextRange::default(),
+                                        })
+                                    })
+                                    .collect(),
+                                ctx: ExprContext::Load,
+                                range: TextRange::default(),
+                            })),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        })),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    }))
             };
 
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
