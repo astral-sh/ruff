@@ -102,39 +102,6 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Slice(expr) => expr.format().fmt(f),
             Expr::IpyEscapeCommand(expr) => expr.format().fmt(f),
         });
-        let format_expr_bare = format_with(|f| match expression {
-            Expr::BoolOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::NamedExpr(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::BinOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::UnaryOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Lambda(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::IfExp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Dict(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Set(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::ListComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::SetComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::DictComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::GeneratorExp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Await(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Yield(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::YieldFrom(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::FormattedValue(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Constant(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Attribute(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Subscript(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Starred(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Name(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::List(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Tuple(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::Slice(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-            Expr::IpyEscapeCommand(expr) => {
-                FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
-            }
-        });
-
         let parenthesize = match parentheses {
             Parentheses::Preserve => is_expression_parenthesized(
                 expression.into(),
@@ -150,7 +117,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             if !comments.has_leading(expression) && !comments.has_trailing(expression) {
                 parenthesized("(", &format_expr, ")").fmt(f)
             } else {
-                format_with_parentheses_comments(expression, f, &format_expr_bare, &comments)
+                format_with_parentheses_comments(expression, &comments, f)
             }
         } else {
             let level = match f.context().node_level() {
@@ -212,17 +179,12 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 ///
 /// Style decision: When there are multiple nested parentheses around an expression, we consider the
 /// outermost parentheses the relevant ones and discard the others.
-fn format_with_parentheses_comments<
-    'ast,
-    S: Fn(&mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()>,
->(
+fn format_with_parentheses_comments(
     expression: &Expr,
-    f: &mut PyFormatter<'ast, '_>,
-    format_expr_bare: &FormatWith<PyFormatContext<'ast>, S>,
     comments: &Comments,
+    f: &mut PyFormatter,
 ) -> FormatResult<()> {
-    let trailing = comments.trailing(expression);
-    let leading = comments.leading(expression);
+    // First part: Split the comments
     // TODO: deduplicate
     let right_tokenizer = SimpleTokenizer::new(
         f.context().source(),
@@ -247,6 +209,9 @@ fn format_with_parentheses_comments<
         .last()
         .map(|(right, left)| TextRange::new(left.start(), right.end()));
 
+    let leading = comments.leading(expression);
+    let trailing = comments.trailing(expression);
+
     let (leading_split, trailing_split) = if let Some(range_with_parens) = range_with_parens {
         let leading_split =
             leading.partition_point(|comment| comment.start() < range_with_parens.start());
@@ -262,7 +227,13 @@ fn format_with_parentheses_comments<
     let trailing_inner = &trailing[..trailing_split];
     let trailing_outer = &trailing[trailing_split..];
 
-    //
+    // Preserve an opening parentheses comment
+    // ```python
+    // a = ( # opening parentheses comment
+    //     # leading inner
+    //     1
+    // )
+    // ```
     let (parentheses_comment, leading_inner) = match leading_inner.split_first() {
         Some((first, rest)) if first.line_position().is_end_of_line() => {
             (slice::from_ref(first), rest)
@@ -270,10 +241,53 @@ fn format_with_parentheses_comments<
         _ => (Default::default(), leading),
     };
 
+    // Second Part: Format
+
+    // The code order is a bit strange here, we format:
+    // * outer leading comment
+    // * opening parenthesis
+    // * opening parenthesis comment
+    // * inner leading comments
+    // * the expression itself
+    // * inner trailing comments
+    // * the closing parenthesis
+    // * outer trailing comments
+
+    let fmt_fields = format_with(|f| match expression {
+        Expr::BoolOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::NamedExpr(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::BinOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::UnaryOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Lambda(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::IfExp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Dict(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Set(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::ListComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::SetComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::DictComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::GeneratorExp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Await(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Yield(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::YieldFrom(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::FormattedValue(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Constant(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Attribute(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Subscript(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Starred(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Name(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::List(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Tuple(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Slice(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::IpyEscapeCommand(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+    });
+
     leading_comments(leading_outer).fmt(f)?;
 
-    // Custom FormatNodeRule::fmt patch
-    let custom_format_node_rule_fmt = format_with(|f| {
+    // Custom FormatNodeRule::fmt variant that only formats the inner comments
+    let format_node_rule_fmt = format_with(|f| {
         // No need to handle suppression comments, those are statement only
         leading_comments(leading_inner).fmt(f)?;
 
@@ -283,7 +297,7 @@ fn format_with_parentheses_comments<
             source_position(expression.start()).fmt(f)?;
         }
 
-        format_expr_bare.fmt(f)?;
+        fmt_fields.fmt(f)?;
 
         if is_source_map_enabled {
             source_position(expression.end()).fmt(f)?;
@@ -293,7 +307,7 @@ fn format_with_parentheses_comments<
     });
 
     // The actual parenthesized formatting
-    parenthesized("(", &custom_format_node_rule_fmt, ")")
+    parenthesized("(", &format_node_rule_fmt, ")")
         .with_dangling_comments(parentheses_comment)
         .fmt(f)?;
     trailing_comments(trailing_outer).fmt(f)?;
