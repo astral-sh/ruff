@@ -43,6 +43,30 @@ impl Violation for AndOrTernary {
     }
 }
 
+/// Returns `Some((condition, true_value, false_value))`
+/// if `bool_op` is `condition and true_value or false_value` form.
+fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<(Expr, Expr, Expr)> {
+    if bool_op.op != BoolOp::Or {
+        return None;
+    }
+    let [expr, false_value] = bool_op.values.as_slice() else {
+        return None;
+    };
+    let Some(and_op) = expr.as_bool_op_expr() else {
+        return None;
+    };
+    if and_op.op != BoolOp::And {
+        return None;
+    }
+    let [condition, true_value] = and_op.values.as_slice() else {
+        return None;
+    };
+    if !false_value.is_bool_op_expr() && !true_value.is_bool_op_expr() {
+        return Some((condition.clone(), true_value.clone(), false_value.clone()));
+    }
+    None
+}
+
 pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
     let Some([condition, true_value, false_value]) = parse_and_or_ternary(bool_op) else {
         return;

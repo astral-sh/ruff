@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, BoolOp, CmpOp, Constant, Expr, ExprBoolOp};
+use ruff_python_ast::{Arguments, CmpOp, Constant, Expr};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
@@ -81,27 +81,4 @@ impl fmt::Display for CmpOpExt {
         };
         write!(f, "{representation}")
     }
-}
-
-/// Returns `Some([condition, true_value, false_value])`
-/// if `bool_op` is `condition and true_value or false_value` form.
-pub(super) fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<[Expr; 3]> {
-    if bool_op.op != BoolOp::Or {
-        return None;
-    }
-    let [expr, false_value] = bool_op.values.as_slice() else {
-        return None;
-    };
-    match expr.as_bool_op_expr() {
-        Some(and_op) if and_op.op == BoolOp::And => {
-            let [condition, true_value] = and_op.values.as_slice() else {
-                return None;
-            };
-            if !false_value.is_bool_op_expr() && !true_value.is_bool_op_expr() {
-                return Some([condition.clone(), true_value.clone(), false_value.clone()]);
-            }
-        }
-        _ => {}
-    }
-    None
 }
