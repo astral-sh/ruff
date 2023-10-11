@@ -117,11 +117,11 @@ impl AlwaysFixableViolation for NativeLiterals {
     fn fix_title(&self) -> String {
         let NativeLiterals { literal_type } = self;
         match literal_type {
-            LiteralType::Str => "Replace with empty string".to_string(),
-            LiteralType::Bytes => "Replace with empty bytes".to_string(),
-            LiteralType::Int => "Replace with 0".to_string(),
-            LiteralType::Float => "Replace with 0.0".to_string(),
-            LiteralType::Bool => "Replace with `False`".to_string(),
+            LiteralType::Str => "Replace with string literal".to_string(),
+            LiteralType::Bytes => "Replace with bytes literal".to_string(),
+            LiteralType::Int => "Replace with integer literal".to_string(),
+            LiteralType::Float => "Replace with float literal".to_string(),
+            LiteralType::Bool => "Replace with boolean literal".to_string(),
         }
     }
 }
