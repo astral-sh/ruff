@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::SectionKind;
 use crate::docstrings::Docstring;
-use crate::registry::AsRule;
+
 use crate::rules::pydocstyle::helpers::logical_line;
 
 /// ## What it does
@@ -103,7 +103,7 @@ pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring
         if !trimmed.ends_with(['.', '!', '?']) {
             let mut diagnostic = Diagnostic::new(EndsInPunctuation, docstring.range());
             // Best-effort fix: avoid adding a period after other punctuation marks.
-            if checker.patch(diagnostic.kind.rule()) && !trimmed.ends_with([':', ';']) {
+            if !trimmed.ends_with([':', ';']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                     ".".to_string(),
                     line.start() + trimmed.text_len(),

@@ -7,7 +7,6 @@ use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum LiteralType {
@@ -182,14 +181,12 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            if checker.patch(diagnostic.kind.rule()) {
-                let constant = Constant::from(literal_type);
-                let content = checker.generator().constant(&constant);
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    content,
-                    call.range(),
-                )));
-            }
+            let constant = Constant::from(literal_type);
+            let content = checker.generator().constant(&constant);
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                content,
+                call.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
         Some(arg) => {
@@ -222,12 +219,10 @@ pub(crate) fn native_literals(
             };
 
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    content,
-                    call.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                content,
+                call.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

@@ -4,7 +4,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for quoted type annotations in stub (`.pyi`) files, which should be avoided.
@@ -43,11 +42,9 @@ impl AlwaysFixableViolation for QuotedAnnotationInStub {
 /// PYI020
 pub(crate) fn quoted_annotation_in_stub(checker: &mut Checker, annotation: &str, range: TextRange) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotationInStub, range);
-    if checker.patch(Rule::QuotedAnnotationInStub) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            annotation.to_string(),
-            range,
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        annotation.to_string(),
+        range,
+    )));
     checker.diagnostics.push(diagnostic);
 }

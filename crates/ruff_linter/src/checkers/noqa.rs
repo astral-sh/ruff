@@ -109,10 +109,8 @@ pub(crate) fn check_noqa(
                     if line.matches.is_empty() {
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
-                        if settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic
-                                .set_fix(Fix::safe_edit(delete_noqa(directive.range(), locator)));
-                        }
+                        diagnostic.set_fix(Fix::safe_edit(delete_noqa(directive.range(), locator)));
+
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -173,18 +171,14 @@ pub(crate) fn check_noqa(
                             },
                             directive.range(),
                         );
-                        if settings.rules.should_fix(diagnostic.kind.rule()) {
-                            if valid_codes.is_empty() {
-                                diagnostic.set_fix(Fix::safe_edit(delete_noqa(
-                                    directive.range(),
-                                    locator,
-                                )));
-                            } else {
-                                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                                    format!("# noqa: {}", valid_codes.join(", ")),
-                                    directive.range(),
-                                )));
-                            }
+                        if valid_codes.is_empty() {
+                            diagnostic
+                                .set_fix(Fix::safe_edit(delete_noqa(directive.range(), locator)));
+                        } else {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                format!("# noqa: {}", valid_codes.join(", ")),
+                                directive.range(),
+                            )));
                         }
                         diagnostics.push(diagnostic);
                     }

@@ -9,7 +9,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
+
 use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
 
@@ -630,13 +630,11 @@ pub(crate) fn deprecated_import(
             },
             stmt.range(),
         );
-        if checker.patch(Rule::DeprecatedImport) {
-            if let Some(content) = fix {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    content,
-                    stmt.range(),
-                )));
-            }
+        if let Some(content) = fix {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                content,
+                stmt.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

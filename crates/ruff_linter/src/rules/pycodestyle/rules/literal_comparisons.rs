@@ -9,7 +9,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum EqCmpOp {
@@ -153,16 +152,12 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                 match op {
                     EqCmpOp::Eq => {
                         let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(0, CmpOp::Is);
-                        }
+                        bad_ops.insert(0, CmpOp::Is);
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
                         let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(0, CmpOp::IsNot);
-                        }
+                        bad_ops.insert(0, CmpOp::IsNot);
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -180,9 +175,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                                 TrueFalseComparison(*value, op),
                                 comparator.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                bad_ops.insert(0, CmpOp::Is);
-                            }
+                            bad_ops.insert(0, CmpOp::Is);
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
@@ -190,9 +183,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                                 TrueFalseComparison(*value, op),
                                 comparator.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                bad_ops.insert(0, CmpOp::IsNot);
-                            }
+                            bad_ops.insert(0, CmpOp::IsNot);
                             diagnostics.push(diagnostic);
                         }
                     }
@@ -221,16 +212,12 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             match op {
                 EqCmpOp::Eq => {
                     let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        bad_ops.insert(index, CmpOp::Is);
-                    }
+                    bad_ops.insert(index, CmpOp::Is);
                     diagnostics.push(diagnostic);
                 }
                 EqCmpOp::NotEq => {
                     let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        bad_ops.insert(index, CmpOp::IsNot);
-                    }
+                    bad_ops.insert(index, CmpOp::IsNot);
                     diagnostics.push(diagnostic);
                 }
             }
@@ -246,17 +233,13 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                     EqCmpOp::Eq => {
                         let diagnostic =
                             Diagnostic::new(TrueFalseComparison(*value, op), next.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(index, CmpOp::Is);
-                        }
+                        bad_ops.insert(index, CmpOp::Is);
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
                         let diagnostic =
                             Diagnostic::new(TrueFalseComparison(*value, op), next.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(index, CmpOp::IsNot);
-                        }
+                        bad_ops.insert(index, CmpOp::IsNot);
                         diagnostics.push(diagnostic);
                     }
                 }

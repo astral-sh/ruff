@@ -260,6 +260,13 @@ pub fn check_path(
         }
     }
 
+    // Remove fixes for any rules marked as unfixable.
+    for diagnostic in &mut diagnostics {
+        if !settings.rules.should_fix(diagnostic.kind.rule()) {
+            diagnostic.fix = None;
+        }
+    }
+
     // Update fix applicability to account for overrides
     if !settings.extend_safe_fixes.is_empty() || !settings.extend_unsafe_fixes.is_empty() {
         for diagnostic in &mut diagnostics {

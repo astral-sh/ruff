@@ -5,9 +5,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
 
-use crate::registry::AsRule;
-use crate::settings::LinterSettings;
-
 /// ## What it does
 /// Checks for whitespace before a shebang directive.
 ///
@@ -50,7 +47,6 @@ impl AlwaysFixableViolation for ShebangLeadingWhitespace {
 pub(crate) fn shebang_leading_whitespace(
     range: TextRange,
     locator: &Locator,
-    settings: &LinterSettings,
 ) -> Option<Diagnostic> {
     // If the shebang is at the beginning of the file, abort.
     if range.start() == TextSize::from(0) {
@@ -68,8 +64,6 @@ pub(crate) fn shebang_leading_whitespace(
 
     let prefix = TextRange::up_to(range.start());
     let mut diagnostic = Diagnostic::new(ShebangLeadingWhitespace, prefix);
-    if settings.rules.should_fix(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
     Some(diagnostic)
 }

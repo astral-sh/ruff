@@ -1,10 +1,10 @@
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
-use ast::ExprContext;
 use itertools::{any, Itertools};
 use rustc_hash::FxHashMap;
 
+use ast::ExprContext;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
@@ -15,7 +15,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for repeated equality comparisons that can rewritten as a membership
@@ -133,8 +132,8 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                 bool_op.range(),
             );
 
-            if checker.patch(diagnostic.kind.rule()) {
-                let content = checker.generator().expr(&Expr::Compare(ast::ExprCompare {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().expr(&Expr::Compare(ast::ExprCompare {
                     left: Box::new(value.as_expr().clone()),
                     ops: match bool_op.op {
                         BoolOp::Or => vec![CmpOp::In],
@@ -146,13 +145,9 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                         ctx: ExprContext::Load,
                     })],
                     range: bool_op.range(),
-                }));
-
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    content,
-                    bool_op.range(),
-                )));
-            }
+                })),
+                bool_op.range(),
+            )));
 
             checker.diagnostics.push(diagnostic);
         }

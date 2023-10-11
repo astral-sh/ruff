@@ -5,7 +5,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{checkers::ast::Checker, registry::AsRule};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for iterations over `set` literals.
@@ -54,17 +54,15 @@ pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
 
     let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
 
-    if checker.patch(diagnostic.kind.rule()) {
-        let tuple = checker.generator().expr(&Expr::Tuple(ast::ExprTuple {
-            elts: elts.clone(),
-            ctx: ExprContext::Store,
-            range: TextRange::default(),
-        }));
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            format!("({tuple})"),
-            expr.range(),
-        )));
-    }
+    let tuple = checker.generator().expr(&Expr::Tuple(ast::ExprTuple {
+        elts: elts.clone(),
+        ctx: ExprContext::Store,
+        range: TextRange::default(),
+    }));
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        format!("({tuple})"),
+        expr.range(),
+    )));
 
     checker.diagnostics.push(diagnostic);
 }

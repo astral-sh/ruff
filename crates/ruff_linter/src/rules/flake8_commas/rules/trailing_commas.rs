@@ -8,9 +8,6 @@ use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::registry::Rule;
-use crate::settings::LinterSettings;
-
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum TokenType {
@@ -225,7 +222,6 @@ pub(crate) fn trailing_commas(
     diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
     locator: &Locator,
-    settings: &LinterSettings,
 ) {
     let tokens = tokens
         .iter()
@@ -324,9 +320,7 @@ pub(crate) fn trailing_commas(
         if comma_prohibited {
             let comma = prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, comma.1);
-            if settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
             diagnostics.push(diagnostic);
         }
 
@@ -359,17 +353,15 @@ pub(crate) fn trailing_commas(
                 MissingTrailingComma,
                 TextRange::empty(missing_comma.1.end()),
             );
-            if settings.rules.should_fix(Rule::MissingTrailingComma) {
-                // Create a replacement that includes the final bracket (or other token),
-                // rather than just inserting a comma at the end. This prevents the UP034 fix
-                // removing any brackets in the same linter pass - doing both at the same time could
-                // lead to a syntax error.
-                let contents = locator.slice(missing_comma.1);
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    format!("{contents},"),
-                    missing_comma.1,
-                )));
-            }
+            // Create a replacement that includes the final bracket (or other token),
+            // rather than just inserting a comma at the end. This prevents the UP034 fix
+            // removing any brackets in the same linter pass - doing both at the same time could
+            // lead to a syntax error.
+            let contents = locator.slice(missing_comma.1);
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                format!("{contents},"),
+                missing_comma.1,
+            )));
             diagnostics.push(diagnostic);
         }
 

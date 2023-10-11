@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for the presence of the `pass` statement within a class body
@@ -60,13 +59,10 @@ pub(crate) fn pass_in_class_body(checker: &mut Checker, class_def: &ast::StmtCla
         }
 
         let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            let edit =
-                fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
-            diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
-                checker.semantic().current_statement_id(),
-            )));
-        }
+        let edit = fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
+        diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
+            checker.semantic().current_statement_id(),
+        )));
         checker.diagnostics.push(diagnostic);
     }
 }

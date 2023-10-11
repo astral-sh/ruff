@@ -11,7 +11,7 @@ use ruff_python_ast::call_path::CallPath;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for `try-except` blocks with duplicate exception handlers.
@@ -146,24 +146,22 @@ fn duplicate_handler_exceptions<'a>(
                 },
                 expr.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    // Single exceptions don't require parentheses, but since we're _removing_
-                    // parentheses, insert whitespace as needed.
-                    if let [elt] = unique_elts.as_slice() {
-                        pad(
-                            checker.generator().expr(elt),
-                            expr.range(),
-                            checker.locator(),
-                        )
-                    } else {
-                        // Multiple exceptions must always be parenthesized. This is done
-                        // manually as the generator never parenthesizes lone tuples.
-                        format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
-                    },
-                    expr.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                // Single exceptions don't require parentheses, but since we're _removing_
+                // parentheses, insert whitespace as needed.
+                if let [elt] = unique_elts.as_slice() {
+                    pad(
+                        checker.generator().expr(elt),
+                        expr.range(),
+                        checker.locator(),
+                    )
+                } else {
+                    // Multiple exceptions must always be parenthesized. This is done
+                    // manually as the generator never parenthesizes lone tuples.
+                    format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
+                },
+                expr.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

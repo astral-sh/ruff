@@ -4,7 +4,6 @@ use ruff_python_ast::{self as ast, Arguments, Constant, ElifElseClause, Expr, Ex
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `bool`.
@@ -100,49 +99,47 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
 
     let condition = checker.generator().expr(if_test);
     let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, range);
-    if checker.patch(diagnostic.kind.rule()) {
-        if matches!(if_return, Bool::True)
-            && matches!(else_return, Bool::False)
-            && !checker.indexer().has_comments(&range, checker.locator())
-            && (if_test.is_compare_expr() || checker.semantic().is_builtin("bool"))
-        {
-            if if_test.is_compare_expr() {
-                // If the condition is a comparison, we can replace it with the condition.
-                let node = ast::StmtReturn {
-                    value: Some(Box::new(if_test.clone())),
-                    range: TextRange::default(),
-                };
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    checker.generator().stmt(&node.into()),
-                    range,
-                )));
-            } else {
-                // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
-                // verified, above, that `bool` is a builtin.)
-                let node = ast::ExprName {
-                    id: "bool".into(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                };
-                let node1 = ast::ExprCall {
-                    func: Box::new(node.into()),
-                    arguments: Arguments {
-                        args: vec![if_test.clone()],
-                        keywords: vec![],
-                        range: TextRange::default(),
-                    },
-                    range: TextRange::default(),
-                };
-                let node2 = ast::StmtReturn {
-                    value: Some(Box::new(node1.into())),
-                    range: TextRange::default(),
-                };
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    checker.generator().stmt(&node2.into()),
-                    range,
-                )));
+    if matches!(if_return, Bool::True)
+        && matches!(else_return, Bool::False)
+        && !checker.indexer().has_comments(&range, checker.locator())
+        && (if_test.is_compare_expr() || checker.semantic().is_builtin("bool"))
+    {
+        if if_test.is_compare_expr() {
+            // If the condition is a comparison, we can replace it with the condition.
+            let node = ast::StmtReturn {
+                value: Some(Box::new(if_test.clone())),
+                range: TextRange::default(),
             };
-        }
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().stmt(&node.into()),
+                range,
+            )));
+        } else {
+            // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
+            // verified, above, that `bool` is a builtin.)
+            let node = ast::ExprName {
+                id: "bool".into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            };
+            let node1 = ast::ExprCall {
+                func: Box::new(node.into()),
+                arguments: Arguments {
+                    args: vec![if_test.clone()],
+                    keywords: vec![],
+                    range: TextRange::default(),
+                },
+                range: TextRange::default(),
+            };
+            let node2 = ast::StmtReturn {
+                value: Some(Box::new(node1.into())),
+                range: TextRange::default(),
+            };
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().stmt(&node2.into()),
+                range,
+            )));
+        };
     }
     checker.diagnostics.push(diagnostic);
 }
