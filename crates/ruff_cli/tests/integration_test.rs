@@ -486,7 +486,7 @@ fn stdin_format_jupyter() {
     }
 
     ----- stderr -----
-    warning: `ruff format` is a work-in-progress, subject to change at any time, and intended only for experimentation.
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
 }
 
