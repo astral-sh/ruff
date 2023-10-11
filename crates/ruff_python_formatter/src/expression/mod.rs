@@ -185,7 +185,24 @@ fn format_with_parentheses_comments(
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
     // First part: Split the comments
-    // TODO: deduplicate
+
+    // TODO: This is copied from `parenthesized_range`, except that we don't have the parent, which
+    // is a problem:
+    // ```python
+    // f(
+    //     # a
+    //     (a)
+    // )
+    // ```
+    // gets formatted as
+    // ```python
+    // f(
+    //     (
+    //         # a
+    //         a
+    //     )
+    // )
+    // ```
     let right_tokenizer = SimpleTokenizer::new(
         f.context().source(),
         TextRange::new(expression.end(), f.context().source().text_len()),
