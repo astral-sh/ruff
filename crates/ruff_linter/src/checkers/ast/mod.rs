@@ -1367,7 +1367,7 @@ where
     fn visit_match_case(&mut self, match_case: &'b MatchCase) {
         self.visit_pattern(&match_case.pattern);
         if let Some(expr) = &match_case.guard {
-            self.visit_expr(expr);
+            self.visit_boolean_test(expr);
         }
 
         self.semantic.push_branch();
