@@ -57,7 +57,7 @@ impl<'a> AnyString<'a> {
                     Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
                         let string_content = locator.slice(*range);
                         if triple_quoted {
-                            string_content.contains(r#"""""#) || string_content.contains(r#"'''"#)
+                            string_content.contains(r#"""""#) || string_content.contains("'''")
                         } else {
                             string_content.contains(['"', '\''])
                         }
