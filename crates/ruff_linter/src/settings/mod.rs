@@ -90,12 +90,21 @@ pub struct LinterSettings {
     pub pyupgrade: pyupgrade::settings::Settings,
 }
 
-pub const PREFIXES: &[RuleSelector] = &[
+pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
+    RuleSelector::Linter(Linter::Pyflakes),
+    // Only include pycodestyle rules that do not overlap with the formatter
     RuleSelector::Prefix {
-        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E),
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E4),
         redirected_from: None,
     },
-    RuleSelector::Linter(Linter::Pyflakes),
+    RuleSelector::Prefix {
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E7),
+        redirected_from: None,
+    },
+    RuleSelector::Prefix {
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E9),
+        redirected_from: None,
+    },
 ];
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
@@ -124,7 +133,7 @@ impl LinterSettings {
         Self {
             target_version: PythonVersion::default(),
             project_root: project_root.to_path_buf(),
-            rules: PREFIXES
+            rules: DEFAULT_SELECTORS
                 .iter()
                 .flat_map(|selector| selector.rules(&PreviewOptions::default()))
                 .collect(),

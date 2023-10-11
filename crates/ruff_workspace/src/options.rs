@@ -593,11 +593,11 @@ pub struct LintOptions {
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
     #[option(
-        default = r#"["E", "F"]"#,
+        default = r#"["E4", "E7", "E9", "F"]"#,
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            select = ["E", "F", "B", "Q"]
+            # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            select = ["E4", "E7", "E9", "F", "B", "Q"]
         "#
     )]
     pub select: Option<Vec<RuleSelector>>,

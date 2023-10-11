@@ -6,7 +6,7 @@ Yes. Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-bo
 the `line-length` setting is consistent between the two.
 
 As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
-stylistic lint rules that are obviated by autoformatting.
+stylistic lint rules that are obviated by automated formatting.
 
 Note that Ruff and Black treat line-length enforcement a little differently. Black makes a
 best-effort attempt to adhere to the `line-length`, but avoids automatic line-wrapping in some cases
