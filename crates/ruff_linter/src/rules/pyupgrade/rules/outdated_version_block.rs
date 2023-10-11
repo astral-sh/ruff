@@ -109,7 +109,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                         return;
                     };
                     let target = checker.settings.target_version;
-                    match compare_version(&version, target, op == &CmpOp::LtE) {
+                    match version_always_less_than(&version, target, op == &CmpOp::LtE) {
                         Ok(false) => {}
                         Ok(true) => {
                             let mut diagnostic = Diagnostic::new(
@@ -138,7 +138,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                         return;
                     };
                     let target = checker.settings.target_version;
-                    match compare_version(
+                    match version_always_less_than(
                         &version,
                         target,
                         // When making comparisons with >= we must reverse the behavior when equal
@@ -216,15 +216,15 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
     }
 }
 
-/// Returns true if the `target_version` is always less than the [`PythonVersion`].
-fn compare_version(
-    target_version: &[Int],
+/// Returns true if the `check_version` is always less than the [`PythonVersion`].
+fn version_always_less_than(
+    check_version: &[Int],
     py_version: PythonVersion,
     or_equal: bool,
 ) -> Result<bool> {
-    let mut target_version_iter = target_version.iter();
+    let mut check_version_iter = check_version.iter();
 
-    let Some(if_major) = target_version_iter.next() else {
+    let Some(if_major) = check_version_iter.next() else {
         return Ok(false);
     };
     let Some(if_major) = if_major.as_u8() else {
@@ -237,7 +237,7 @@ fn compare_version(
         Ordering::Less => Ok(true),
         Ordering::Greater => Ok(false),
         Ordering::Equal => {
-            let Some(if_minor) = target_version_iter.next() else {
+            let Some(if_minor) = check_version_iter.next() else {
                 return Ok(true);
             };
             let Some(if_minor) = if_minor.as_u8() else {
@@ -467,7 +467,7 @@ mod tests {
         expected: bool,
     ) -> Result<()> {
         let target_versions: Vec<_> = target_versions.iter().map(|int| Int::from(*int)).collect();
-        let actual = compare_version(&target_versions, version, or_equal)?;
+        let actual = version_always_less_than(&target_versions, version, or_equal)?;
         assert_eq!(actual, expected);
         Ok(())
     }
