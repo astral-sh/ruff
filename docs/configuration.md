@@ -393,6 +393,36 @@ whether a rule supports fixing, see [_Rules_](rules.md).
 
 Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when applying safe fixes, but the meaning could be changed when applying unsafe fixes.
 
+For example, `unnecessary-iterable-allocation-for-first-element` (`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
+
+```shell
+$ python -m timeit "head = list(range(99999999))[0]"
+1 loop, best of 5: 1.69 sec per loop
+```
+
+```shell
+$ python -m timeit "head = next(iter(range(99999999)))"
+5000000 loops, best of 5: 70.8 nsec per loop
+```
+
+However, when the collection is empty, this changes the raised exception from an `IndexError` to `StopIteration`:
+
+```shell
+$ python -c 'list(range(0))[0]'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+IndexError: list index out of range
+```
+
+```shell
+$ python -c 'next(iter(range(0)))[0]'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+StopIteration
+```
+
+Since this could break error handling, this fix is categorized as unsafe.
+
 Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing the `--unsafe-fixes` flag to `ruff check`:
 
 ```shell
