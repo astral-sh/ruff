@@ -66,7 +66,7 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
     }
 
     fn fix_title(&self) -> String {
-        format!("Consider merging multiple comparisons. Use a `set` if the elements are hashable.")
+        format!("Merge multiple comparisons")
     }
 }
 
@@ -148,7 +148,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                     range: bool_op.range(),
                 }));
 
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     content,
                     bool_op.range(),
                 )));
