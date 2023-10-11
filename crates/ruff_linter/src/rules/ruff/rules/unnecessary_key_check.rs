@@ -9,10 +9,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// TODO
+/// Checks for unnecessary key check before subscripting a dictionary.
 ///
 /// ## Why is this bad?
-/// TODO
+/// `get` can be used to get a value from a dictionary without having to check
+/// if the key exists first.
 ///
 /// ## Examples
 /// ```python
