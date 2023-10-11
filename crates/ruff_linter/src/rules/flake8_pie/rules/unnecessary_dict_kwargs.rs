@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
 
@@ -47,7 +48,7 @@ impl AlwaysFixableViolation for UnnecessaryDictKwargs {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary `dict` kwargs")
+        format!("Remove unnecessary kwargs")
     }
 }
 
@@ -55,69 +56,68 @@ impl AlwaysFixableViolation for UnnecessaryDictKwargs {
 pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
     for kw in kwargs {
         // keyword is a spread operator (indicated by None)
-        if kw.arg.is_none() {
-            if let Expr::Dict(ast::ExprDict { keys, values, .. }) = &kw.value {
-                // handle case of foo(**{**bar})
-                if keys.len() == 1 && keys[0].is_none() {
-                    let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
-
-                    if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            format!("**{}", checker.locator().slice(values[0].range())),
-                            kw.range(),
-                        )));
-                    }
-                    checker.diagnostics.push(diagnostic);
-                    return;
-                }
-
-                // ensure foo(**{"bar-bar": 1}) doesn't error
-                if keys
-                    .iter()
-                    .all(|expr| expr.as_ref().is_some_and(is_valid_kwarg_name))
-                {
-                    let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        let mut contents = vec![];
-
-                        for item in keys.iter().zip(values.iter()) {
-                            if let (Some(key), value) = item {
-                                let content = format!(
-                                    "{}={}",
-                                    key.as_constant_expr()
-                                        .unwrap()
-                                        .value
-                                        .as_str()
-                                        .unwrap()
-                                        .value,
-                                    checker.locator().slice(value.range())
-                                );
-
-                                contents.push(content);
-                            }
-                        }
-
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            format!("{}", contents.join(", ")),
-                            kw.range(),
-                        )));
-                    }
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
+        if kw.arg.is_some() {
+            continue;
         }
+
+        let Expr::Dict(ast::ExprDict { keys, values, .. }) = &kw.value else {
+            continue;
+        };
+
+        // Ex) `foo(**{**bar})`
+        if matches!(keys.as_slice(), [None]) {
+            let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
+
+            if checker.patch(diagnostic.kind.rule()) {
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    format!("**{}", checker.locator().slice(values[0].range())),
+                    kw.range(),
+                )));
+            }
+
+            checker.diagnostics.push(diagnostic);
+            continue;
+        }
+
+        // Ensure that every keyword is a valid keyword argument (e.g., avoid errors for cases like
+        // `foo(**{"bar-bar": 1})`).
+        let kwargs = keys
+            .iter()
+            .filter_map(|key| key.as_ref().and_then(as_kwarg))
+            .collect::<Vec<_>>();
+        if kwargs.len() != keys.len() {
+            continue;
+        }
+
+        let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
+
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                kwargs
+                    .iter()
+                    .zip(values.iter())
+                    .map(|(kwarg, value)| {
+                        format!("{}={}", kwarg.value, checker.locator().slice(value.range()))
+                    })
+                    .join(", "),
+                kw.range(),
+            )));
+        }
+
+        checker.diagnostics.push(diagnostic);
     }
 }
 
-/// Return `true` if a key is a valid keyword argument name.
-fn is_valid_kwarg_name(key: &Expr) -> bool {
+/// Return `Some` if a key is a valid keyword argument name, or `None` otherwise.
+fn as_kwarg(key: &Expr) -> Option<&ast::StringConstant> {
     if let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
     }) = key
     {
-        is_identifier(value)
-    } else {
-        false
+        if is_identifier(value) {
+            return Some(value);
+        }
     }
+    None
 }
