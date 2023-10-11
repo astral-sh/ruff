@@ -51,7 +51,7 @@ impl<'a> AnyString<'a> {
                 let unprefixed = locator
                     .slice(f_string.range)
                     .trim_start_matches(|c| c != '"' && c != '\'');
-                let triple_quotes =
+                let triple_quoted =
                     unprefixed.starts_with(r#"""""#) || unprefixed.starts_with(r#"'''"#);
                 if f_string.values.iter().any(|value| match value {
                     Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
