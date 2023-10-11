@@ -13,7 +13,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
-use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
 use ruff_text_size::TextSize;
 
 use crate::index::NotebookIndex;
@@ -179,7 +179,7 @@ impl Notebook {
             .iter()
             .enumerate()
             .filter(|(_, cell)| cell.is_valid_code_cell())
-            .map(|(idx, _)| u32::try_from(idx).unwrap())
+            .map(|(cell_index, _)| u32::try_from(cell_index).unwrap())
             .collect::<Vec<_>>();
 
         let mut contents = Vec::with_capacity(valid_code_cells.len());
@@ -321,16 +321,16 @@ impl Notebook {
     /// The index building is expensive as it needs to go through the content of
     /// every valid code cell.
     fn build_index(&self) -> NotebookIndex {
-        let mut row_to_cell = vec![0];
-        let mut row_to_row_in_cell = vec![0];
+        let mut row_to_cell = Vec::new();
+        let mut row_to_row_in_cell = Vec::new();
 
-        for &idx in &self.valid_code_cells {
-            let line_count = match &self.raw.cells[idx as usize].source() {
+        for &cell_index in &self.valid_code_cells {
+            let line_count = match &self.raw.cells[cell_index as usize].source() {
                 SourceValue::String(string) => {
                     if string.is_empty() {
                         1
                     } else {
-                        u32::try_from(NewlineWithTrailingNewline::from(string).count()).unwrap()
+                        NewlineWithTrailingNewline::from(string).count()
                     }
                 }
                 SourceValue::StringArray(string_array) => {
@@ -339,12 +339,14 @@ impl Notebook {
                     } else {
                         let trailing_newline =
                             usize::from(string_array.last().is_some_and(|s| s.ends_with('\n')));
-                        u32::try_from(string_array.len() + trailing_newline).unwrap()
+                        string_array.len() + trailing_newline
                     }
                 }
             };
-            row_to_cell.extend(iter::repeat(idx + 1).take(line_count as usize));
-            row_to_row_in_cell.extend(1..=line_count);
+            row_to_cell.extend(
+                iter::repeat(OneIndexed::from_zero_indexed(cell_index as usize)).take(line_count),
+            );
+            row_to_row_in_cell.extend((0..line_count).map(OneIndexed::from_zero_indexed));
         }
 
         NotebookIndex {
@@ -435,6 +437,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use ruff_source_file::OneIndexed;
+
     use crate::{Cell, Notebook, NotebookError, NotebookIndex};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
@@ -514,8 +518,40 @@ print("after empty cells")
         assert_eq!(
             notebook.index(),
             &NotebookIndex {
-                row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 5, 7, 7, 8],
-                row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 1, 1, 2, 1],
+                row_to_cell: vec![
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(4),
+                    OneIndexed::from_zero_indexed(6),
+                    OneIndexed::from_zero_indexed(6),
+                    OneIndexed::from_zero_indexed(7)
+                ],
+                row_to_row_in_cell: vec![
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(3),
+                    OneIndexed::from_zero_indexed(4),
+                    OneIndexed::from_zero_indexed(5),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(3),
+                    OneIndexed::from_zero_indexed(4),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(0)
+                ],
             }
         );
         assert_eq!(
