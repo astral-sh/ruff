@@ -133,9 +133,16 @@ fn is_closed(semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
         return false;
     };
+
+    if !arguments.is_empty() {
+        return false;
+    }
 
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
         return false;
