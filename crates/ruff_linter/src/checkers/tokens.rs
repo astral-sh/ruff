@@ -137,7 +137,7 @@ pub(crate) fn check_tokens(
         flake8_implicit_str_concat::rules::implicit(
             &mut diagnostics,
             tokens,
-            &settings,
+            settings,
             locator,
             indexer,
         );
