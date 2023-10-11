@@ -88,16 +88,20 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
 
         let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
 
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            kwargs
-                .iter()
-                .zip(values.iter())
-                .map(|(kwarg, value)| {
-                    format!("{}={}", kwarg.value, checker.locator().slice(value.range()))
-                })
-                .join(", "),
-            kw.range(),
-        )));
+        if values.is_empty() {
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(kw.start(), kw.end())));
+        } else {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                kwargs
+                    .iter()
+                    .zip(values.iter())
+                    .map(|(kwarg, value)| {
+                        format!("{}={}", kwarg.value, checker.locator().slice(value.range()))
+                    })
+                    .join(", "),
+                kw.range(),
+            )));
+        }
 
         checker.diagnostics.push(diagnostic);
     }
