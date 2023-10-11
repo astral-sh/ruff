@@ -378,7 +378,7 @@ with the exception of `F401`.
 ## Fixes
 
 Ruff supports automatic fixes for a variety of lint errors. For example, Ruff can remove unused
-imports, reformat docstrings, rewrite type annotations to use the latest PEP syntax, and more.
+imports, reformat docstrings, rewrite type annotations to use newer Python syntax, and more.
 
 To enable fixes, pass the `--fix` flag to `ruff check`:
 
