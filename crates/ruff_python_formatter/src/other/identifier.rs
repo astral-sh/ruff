@@ -1,5 +1,6 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::Identifier;
+use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
@@ -31,6 +32,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Identifier {
 /// A formatter for a dot-delimited identifier, as seen in import statements:
 /// ```python
 /// import foo.bar
+/// from tqdm   . auto import tqdm
 /// ```
 ///
 /// Dot-delimited identifiers can contain newlines via continuations (backslashes) after the
@@ -54,14 +56,25 @@ impl<'a> DotDelimitedIdentifier<'a> {
 
 impl Format<PyFormatContext<'_>> for DotDelimitedIdentifier<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        // An import identifier can contain newlines by inserting continuations (backslashes) after
+        // An import identifier can contain whitespace around the dots:
+        // ```python
+        // import importlib   .   metadata
+        // ```
+        // It can also contain newlines by inserting continuations (backslashes) after
         // a dot-delimited segment, as in:
         // ```python
         // import foo\
-        //    .bar
+        //     .bar
         // ```
-        if memchr::memchr(b'\\', f.context().source()[self.0.range()].as_bytes()).is_some() {
-            text(self.0.as_str(), Some(self.0.start())).fmt(f)
+        if f.context().source()[self.0.range()]
+            .chars()
+            .any(|c| is_python_whitespace(c) || matches!(c, '\n' | '\r' | '\\'))
+        {
+            let no_whitespace: String = f.context().source()[self.0.range()]
+                .chars()
+                .filter(|c| !is_python_whitespace(*c) && !matches!(c, '\n' | '\r' | '\\'))
+                .collect();
+            text(&no_whitespace, Some(self.0.start())).fmt(f)
         } else {
             source_text_slice(self.0.range()).fmt(f)
         }
