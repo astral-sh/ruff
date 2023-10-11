@@ -84,7 +84,7 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
                     checker.semantic(),
                 )?;
                 let replacement_edit = Edit::range_replacement(binding, expr.range());
-                Ok(Fix::unsafe_edits(import_edit, [replacement_edit]))
+                Ok(Fix::safe_edits(import_edit, [replacement_edit]))
             });
         }
         checker.diagnostics.push(diagnostic);

@@ -107,8 +107,28 @@
         }
       }
     },
+    "extend-safe-fixes": {
+      "description": "A list of rule codes or prefixes for which unsafe fixes should be considered safe.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
+    "extend-unsafe-fixes": {
+      "description": "A list of rule codes or prefixes for which safe fixes should be considered unsafe.",
       "type": [
         "array",
         "null"
@@ -1556,6 +1576,7 @@
       "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=320",
       "type": "integer",
       "format": "uint16",
+      "maximum": 320.0,
       "minimum": 1.0
     },
     "LintOptions": {
@@ -1611,8 +1632,28 @@
             }
           }
         },
+        "extend-safe-fixes": {
+          "description": "A list of rule codes or prefixes for which unsafe fixes should be considered safe.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
         "extend-select": {
           "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "extend-unsafe-fixes": {
+          "description": "A list of rule codes or prefixes for which safe fixes should be considered unsafe.",
           "type": [
             "array",
             "null"

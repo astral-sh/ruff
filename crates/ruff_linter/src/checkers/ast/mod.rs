@@ -1168,13 +1168,14 @@ where
                                 range: _,
                             }) = slice.as_ref()
                             {
-                                if let Some(expr) = elts.first() {
+                                let mut iter = elts.iter();
+                                if let Some(expr) = iter.next() {
                                     self.visit_expr(expr);
-                                    for expr in elts.iter().skip(1) {
-                                        self.visit_non_type_definition(expr);
-                                    }
-                                    self.visit_expr_context(ctx);
                                 }
+                                for expr in iter {
+                                    self.visit_non_type_definition(expr);
+                                }
+                                self.visit_expr_context(ctx);
                             } else {
                                 debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
@@ -1618,10 +1619,12 @@ impl<'a> Checker<'a> {
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
         let parent = self.semantic.current_statement();
 
+        // Match the left-hand side of an annotated assignment, like `x` in `x: int`.
         if matches!(
             parent,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) {
+        ) && !self.semantic.in_annotation()
+        {
             self.add_binding(
                 id,
                 expr.range(),

@@ -328,6 +328,7 @@ pub(crate) fn f_strings(
     let Some(mut summary) = FormatSummaryValues::try_from_call(call, checker.locator()) else {
         return;
     };
+
     let mut patches: Vec<(TextRange, String)> = vec![];
     let mut lex = lexer::lex_starts_at(
         checker.locator().slice(call.func.range()),
@@ -405,6 +406,25 @@ pub(crate) fn f_strings(
         return;
     }
 
+    // Finally, avoid refactors that would introduce a runtime error.
+    // For example, Django's `gettext` supports `format`-style arguments, but not f-strings.
+    // See: https://docs.djangoproject.com/en/4.2/topics/i18n/translation
+    if checker.semantic().current_expressions().any(|expr| {
+        expr.as_call_expr().is_some_and(|call| {
+            checker
+                .semantic()
+                .resolve_call_path(call.func.as_ref())
+                .map_or(false, |call_path| {
+                    matches!(
+                        call_path.as_slice(),
+                        ["django", "utils", "translation", "gettext" | "gettext_lazy"]
+                    )
+                })
+        })
+    }) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(FString, call.range());
 
     // Avoid fix if there are comments within the call:
@@ -419,7 +439,7 @@ pub(crate) fn f_strings(
             .comment_ranges()
             .intersects(call.arguments.range())
     {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             contents,
             call.range(),
         )));

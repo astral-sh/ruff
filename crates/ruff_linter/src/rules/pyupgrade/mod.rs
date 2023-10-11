@@ -28,6 +28,7 @@ mod tests {
     #[test_case(Rule::FString, Path::new("UP032_0.py"))]
     #[test_case(Rule::FString, Path::new("UP032_1.py"))]
     #[test_case(Rule::FString, Path::new("UP032_2.py"))]
+    #[test_case(Rule::FString, Path::new("UP032_3.py"))]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_0.py"))]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_1.py"))]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_0.py"))]
