@@ -165,12 +165,7 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    eprintln!(
-        "{}{} The formatter is not stable yet. Code style, configuration and CLI are still subject \
-        to change.",
-        "note".yellow().bold(),
-        ":".bold()
-    );
+    warn_user_once!("`ruff format` is not yet stable, and subject to change in future versions.");
 
     let (cli, overrides) = args.partition();
 
