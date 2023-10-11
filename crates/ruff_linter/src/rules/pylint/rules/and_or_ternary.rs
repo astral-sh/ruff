@@ -1,11 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, ExprBoolOp, ExprIfExp};
+use ruff_python_ast::{BoolOp, Expr, ExprBoolOp, ExprIfExp};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::pylint::helpers::parse_and_or_ternary;
 
 /// ## What it does
 /// Checks if pre-python 2.5 ternary syntax is used.
@@ -68,7 +67,17 @@ fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<(Expr, Expr, Expr)> {
 }
 
 pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
-    let Some([condition, true_value, false_value]) = parse_and_or_ternary(bool_op) else {
+    if checker.semantic().current_statement().is_if_stmt() {
+        return;
+    }
+    if checker
+        .semantic()
+        .current_expression_parent()
+        .is_some_and(Expr::is_bool_op_expr)
+    {
+        return;
+    }
+    let Some((condition, true_value, false_value)) = parse_and_or_ternary(bool_op) else {
         return;
     };
 
