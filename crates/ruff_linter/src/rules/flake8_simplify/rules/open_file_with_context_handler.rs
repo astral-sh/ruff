@@ -127,9 +127,38 @@ fn is_open(checker: &mut Checker, func: &Expr) -> bool {
     }
 }
 
+/// Return `true` if the current expression is followed by a `close` call.
+fn is_closed(semantic: &SemanticModel) -> bool {
+    let Some(expr) = semantic.current_expression_grandparent() else {
+        return false;
+    };
+
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
+        return false;
+    };
+
+    if !arguments.is_empty() {
+        return false;
+    }
+
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+        return false;
+    };
+
+    attr.as_str() == "close"
+}
+
 /// SIM115
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     if !is_open(checker, func) {
+        return;
+    }
+
+    // Ex) `open("foo.txt").close()`
+    if is_closed(checker.semantic()) {
         return;
     }
 
