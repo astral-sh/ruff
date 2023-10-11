@@ -1,10 +1,11 @@
+use ast::ExprContext;
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
+use crate::{checkers::ast::Checker, registry::AsRule};
 
 /// ## What it does
 /// Checks for iterations over `set` literals.
@@ -30,9 +31,13 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct IterationOverSet;
 
-impl Violation for IterationOverSet {
+impl AlwaysFixableViolation for IterationOverSet {
     #[derive_message_formats]
     fn message(&self) -> String {
+        format!("Use a sequence type instead of a `set` when iterating over values")
+    }
+
+    fn fix_title(&self) -> String {
         format!("Use a sequence type instead of a `set` when iterating over values")
     }
 }
@@ -47,7 +52,19 @@ pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(IterationOverSet, expr.range()));
+    let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
+
+    if checker.patch(diagnostic.kind.rule()) {
+        let tuple = checker.generator().expr(&Expr::Tuple(ast::ExprTuple {
+            elts: elts.clone(),
+            ctx: ExprContext::Store,
+            range: TextRange::default(),
+        }));
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            format!("({tuple})"),
+            expr.range(),
+        )));
+    }
+
+    checker.diagnostics.push(diagnostic);
 }
