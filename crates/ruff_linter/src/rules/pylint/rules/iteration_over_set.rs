@@ -55,14 +55,13 @@ pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
     let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
 
     if checker.patch(diagnostic.kind.rule()) {
-        let tuple_replacement = checker.generator().expr(&Expr::Tuple(ast::ExprTuple {
+        let tuple = checker.generator().expr(&Expr::Tuple(ast::ExprTuple {
             elts: elts.clone(),
             ctx: ExprContext::Store,
             range: TextRange::default(),
         }));
-
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            format!("({tuple_replacement})"),
+            format!("({tuple})"),
             expr.range(),
         )));
     }
