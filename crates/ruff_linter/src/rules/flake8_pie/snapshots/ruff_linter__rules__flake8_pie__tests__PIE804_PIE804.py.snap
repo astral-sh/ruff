@@ -80,13 +80,15 @@ PIE804.py:7:1: PIE804 [*] Unnecessary `dict` kwargs
 10 10 | 
 
 PIE804.py:9:1: PIE804 [*] Unnecessary `dict` kwargs
-  |
-7 | Foo.objects.create(**{"_id": some_id})  # PIE804
-8 | 
-9 | Foo.objects.create(**{**bar})  # PIE804
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE804
-  |
-  = help: Remove unnecessary kwargs
+   |
+ 7 | Foo.objects.create(**{"_id": some_id})  # PIE804
+ 8 | 
+ 9 | Foo.objects.create(**{**bar})  # PIE804
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE804
+10 | 
+11 | foo(**{})
+   |
+   = help: Remove unnecessary kwargs
 
 ℹ Fix
 6  6  | 
@@ -95,7 +97,26 @@ PIE804.py:9:1: PIE804 [*] Unnecessary `dict` kwargs
 9     |-Foo.objects.create(**{**bar})  # PIE804
    9  |+Foo.objects.create(**bar)  # PIE804
 10 10 | 
-11 11 | 
-12 12 | foo(**{**data, "foo": "buzz"})
+11 11 | foo(**{})
+12 12 | 
+
+PIE804.py:11:1: PIE804 [*] Unnecessary `dict` kwargs
+   |
+ 9 | Foo.objects.create(**{**bar})  # PIE804
+10 | 
+11 | foo(**{})
+   | ^^^^^^^^^ PIE804
+   |
+   = help: Remove unnecessary kwargs
+
+ℹ Fix
+8  8  | 
+9  9  | Foo.objects.create(**{**bar})  # PIE804
+10 10 | 
+11    |-foo(**{})
+   11 |+foo()
+12 12 | 
+13 13 | 
+14 14 | foo(**{**data, "foo": "buzz"})
 
 
