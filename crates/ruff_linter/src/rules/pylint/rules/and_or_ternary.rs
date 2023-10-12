@@ -1,7 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{BoolOp, Expr, ExprBoolOp, ExprIfExp};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{
+    BoolOp, Expr, ExprBoolOp, ExprDictComp, ExprIfExp, ExprListComp, ExprSetComp,
+};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -66,15 +68,34 @@ fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<(Expr, Expr, Expr)> {
     None
 }
 
+/// Returns `true` if expr is used as comprehension-if.
+pub fn is_comprehension_if(parent: Option<&Expr>, expr: &ExprBoolOp) -> bool {
+    let mut comprehensions;
+    match parent {
+        Some(Expr::ListComp(ExprListComp { generators, .. })) => {
+            comprehensions = generators;
+        }
+        Some(Expr::SetComp(ExprSetComp { generators, .. })) => {
+            comprehensions = generators;
+        }
+        Some(Expr::DictComp(ExprDictComp { generators, .. })) => {
+            comprehensions = generators;
+        }
+        _ => {
+            return false;
+        }
+    }
+    comprehensions
+        .iter()
+        .any(|comp| comp.ifs.iter().any(|ifs| ifs.range() == expr.range()))
+}
+
 pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
     if checker.semantic().current_statement().is_if_stmt() {
         return;
     }
-    if checker
-        .semantic()
-        .current_expression_parent()
-        .is_some_and(Expr::is_bool_op_expr)
-    {
+    let parent_expr = checker.semantic().current_expression_parent();
+    if parent_expr.is_some_and(Expr::is_bool_op_expr) {
         return;
     }
     let Some((condition, true_value, false_value)) = parse_and_or_ternary(bool_op) else {
@@ -87,7 +108,12 @@ pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
         orelse: Box::new(false_value),
         range: TextRange::default(),
     });
-    let ternary = checker.generator().expr(&if_expr);
+
+    let ternary = if is_comprehension_if(parent_expr, bool_op) {
+        format!("({})", checker.generator().expr(&if_expr))
+    } else {
+        checker.generator().expr(&if_expr)
+    };
 
     let mut diagnostic = Diagnostic::new(
         AndOrTernary {
