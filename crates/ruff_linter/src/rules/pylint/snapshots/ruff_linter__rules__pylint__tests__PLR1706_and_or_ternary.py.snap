@@ -12,7 +12,7 @@ and_or_ternary.py:47:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `'a' if 1 < 2 else 'b'`
 
-ℹ Fix
+ℹ Suggested fix
 44 44 | 
 45 45 | # Ternary (Error)
 46 46 | 
@@ -33,7 +33,7 @@ and_or_ternary.py:49:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `'a' if (lambda x: x + 1) else 'b'`
 
-ℹ Fix
+ℹ Suggested fix
 46 46 | 
 47 47 | 1<2 and 'a' or 'b'
 48 48 | 
@@ -54,7 +54,7 @@ and_or_ternary.py:51:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `(lambda x: x + 1) if 'a' else 'orange'`
 
-ℹ Fix
+ℹ Suggested fix
 48 48 | 
 49 49 | (lambda x: x+1) and 'a' or 'b'
 50 50 | 
@@ -74,7 +74,7 @@ and_or_ternary.py:54:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `val[0] == '#' if len(val) == 7 else val in {'green'}`
 
-ℹ Fix
+ℹ Suggested fix
 51 51 | 'a' and (lambda x: x+1) or 'orange'
 52 52 | 
 53 53 | val = '#0000FF'
@@ -94,7 +94,7 @@ and_or_ternary.py:57:1: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `'field' in marker if isinstance(marker, dict) else marker in {}`
 
-ℹ Fix
+ℹ Suggested fix
 54 54 | (len(val) == 7 and val[0] == "#") or val in {'green'}
 55 55 | 
 56 56 | marker = 'marker'
@@ -114,7 +114,7 @@ and_or_ternary.py:60:12: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `False if apples else oranges`
 
-ℹ Fix
+ℹ Suggested fix
 57 57 | isinstance(marker, dict) and 'field' in marker or marker in {}
 58 58 | 
 59 59 | def has_oranges(oranges, apples=None) -> bool:
@@ -135,7 +135,7 @@ and_or_ternary.py:62:18: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `(b if a else c)`
 
-ℹ Fix
+ℹ Suggested fix
 59 59 | def has_oranges(oranges, apples=None) -> bool:
 60 60 |     return apples and False or oranges
 61 61 | 
@@ -156,7 +156,7 @@ and_or_ternary.py:64:21: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `(b if a else c)`
 
-ℹ Fix
+ℹ Suggested fix
 61 61 | 
 62 62 | [x for x in l if a and b or c]
 63 63 | 
@@ -177,7 +177,7 @@ and_or_ternary.py:66:18: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `(b if a else c)`
 
-ℹ Fix
+ℹ Suggested fix
 63 63 | 
 64 64 | {x: y for x in l if a and b or c}
 65 65 | 
@@ -198,7 +198,7 @@ and_or_ternary.py:71:8: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `(b if a else c)`
 
-ℹ Fix
+ℹ Suggested fix
 68 68 | new_list = [
 69 69 |     x
 70 70 |     for sublist in all_lists
@@ -218,7 +218,7 @@ and_or_ternary.py:73:8: PLR1706 [*] Pre-python 2.5 ternary syntax used
    |
    = help: Use `(x in operator if isinstance(operator, list) else x != operator)`
 
-ℹ Fix
+ℹ Suggested fix
 70 70 |     for sublist in all_lists
 71 71 |     if a and b or c
 72 72 |     for x in sublist
