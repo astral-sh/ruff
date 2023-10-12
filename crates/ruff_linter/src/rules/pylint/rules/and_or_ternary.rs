@@ -70,21 +70,14 @@ fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<(Expr, Expr, Expr)> {
 
 /// Returns `true` if expr is used as comprehension-if.
 fn is_comprehension_if(parent: Option<&Expr>, expr: &ExprBoolOp) -> bool {
-    let comprehensions;
-    match parent {
-        Some(Expr::ListComp(ExprListComp { generators, .. })) => {
-            comprehensions = generators;
-        }
-        Some(Expr::SetComp(ExprSetComp { generators, .. })) => {
-            comprehensions = generators;
-        }
-        Some(Expr::DictComp(ExprDictComp { generators, .. })) => {
-            comprehensions = generators;
-        }
+    let comprehensions = match parent {
+        Some(Expr::ListComp(ExprListComp { generators, .. })) => generators,
+        Some(Expr::SetComp(ExprSetComp { generators, .. })) => generators,
+        Some(Expr::DictComp(ExprDictComp { generators, .. })) => generators,
         _ => {
             return false;
         }
-    }
+    };
     comprehensions
         .iter()
         .any(|comp| comp.ifs.iter().any(|ifs| ifs.range() == expr.range()))
