@@ -128,11 +128,13 @@ impl Printer {
                     let fix_prefix = format!("[{}]", "*".cyan());
 
                     if self.unsafe_fixes.is_enabled() {
-                        writeln!(
-                            writer,
-                            "{fix_prefix} {} fixable with the --fix option.",
-                            fixables.applicable
-                        )?;
+                        if fixables.applicable > 0 {
+                            writeln!(
+                                writer,
+                                "{fix_prefix} {} fixable with the --fix option.",
+                                fixables.applicable
+                            )?;
+                        }
                     } else {
                         if fixables.applicable > 0 && fixables.unapplicable > 0 {
                             let es = if fixables.unapplicable == 1 { "" } else { "es" };
