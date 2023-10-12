@@ -6,7 +6,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for unnecessary key check before subscripting a dictionary.
@@ -100,16 +99,14 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                format!(
-                    "{}.get({})",
-                    checker.generator().expr(obj_left),
-                    checker.generator().expr(key_left)
-                ),
-                expr.range(),
-            )));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            format!(
+                "{}.get({})",
+                checker.generator().expr(obj_left),
+                checker.generator().expr(key_left)
+            ),
+            expr.range(),
+        )));
         checker.diagnostics.push(diagnostic);
     }
 }
