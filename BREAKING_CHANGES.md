@@ -7,8 +7,9 @@
 Previously, Ruff enabled all implemented rules in Pycodestyle (`E`) by default. Ruff now only includes the
 Pycodestyle prefixes `E4`, `E7`, and `E9` to exclude rules that conflict with automatic formatters. Consequently,
 the stable rule set no longer includes `line-too-long` (`E501`) and `mixed-spaces-and-tabs` (`E101`). Other
-excluded Pycodestyle rules include whitespace enforcement in `E1` and `E2` and are marked as unstable and
-not on by default already. These rules may still be enabled and if `select` has been configured there will be no change.
+excluded Pycodestyle rules include whitespace enforcement in `E1` and `E2`; these rules are currently in preview, and are already omitted by default.
+
+This change only affects those using Ruff under its default rule set. Users that include `E` in their `select` will experience no change in behavior.
 
 ## 0.0.288
 
