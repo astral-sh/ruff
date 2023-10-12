@@ -12,7 +12,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -344,10 +343,8 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
             },
             binding.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            if let Some(fix) = remove_unused_variable(binding, checker) {
-                diagnostic.set_fix(fix);
-            }
+        if let Some(fix) = remove_unused_variable(binding, checker) {
+            diagnostic.set_fix(fix);
         }
         diagnostics.push(diagnostic);
     }

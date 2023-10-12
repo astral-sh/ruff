@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
+
 use crate::settings::types::PythonVersion;
 
 use super::super::typing::type_hint_explicitly_allows_none;
@@ -205,10 +205,8 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    if kind.is_simple() {
-                        diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-                    }
+                if kind.is_simple() {
+                    diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -226,9 +224,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-            }
+            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
             checker.diagnostics.push(diagnostic);
         }
     }

@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -60,11 +60,9 @@ pub(crate) fn unnecessary_generator_set(
     }
     if let Expr::GeneratorExp(_) = argument {
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_generator_set(expr, checker).map(Fix::unsafe_edit)
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_generator_set(expr, checker).map(Fix::unsafe_edit)
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

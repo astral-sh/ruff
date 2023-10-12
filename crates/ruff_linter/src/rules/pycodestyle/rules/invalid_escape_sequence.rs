@@ -49,7 +49,6 @@ pub(crate) fn invalid_escape_sequence(
     indexer: &Indexer,
     token: &Tok,
     token_range: TextRange,
-    fix: bool,
 ) {
     let token_source_code = match token {
         Tok::FStringMiddle { value, is_raw } => {
@@ -158,37 +157,35 @@ pub(crate) fn invalid_escape_sequence(
         invalid_escape_sequence.push(Diagnostic::new(InvalidEscapeSequence(next_char), range));
     }
 
-    if fix {
-        if contains_valid_escape_sequence {
-            // Escape with backslash.
-            for diagnostic in &mut invalid_escape_sequence {
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    r"\".to_string(),
-                    diagnostic.start() + TextSize::from(1),
-                )));
-            }
+    if contains_valid_escape_sequence {
+        // Escape with backslash.
+        for diagnostic in &mut invalid_escape_sequence {
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                r"\".to_string(),
+                diagnostic.start() + TextSize::from(1),
+            )));
+        }
+    } else {
+        let tok_start = if token.is_f_string_middle() {
+            // SAFETY: If this is a `FStringMiddle` token, then the indexer
+            // must have the f-string range.
+            indexer
+                .fstring_ranges()
+                .innermost(token_range.start())
+                .unwrap()
+                .start()
         } else {
-            let tok_start = if token.is_f_string_middle() {
-                // SAFETY: If this is a `FStringMiddle` token, then the indexer
-                // must have the f-string range.
-                indexer
-                    .fstring_ranges()
-                    .innermost(token_range.start())
-                    .unwrap()
-                    .start()
-            } else {
-                token_range.start()
-            };
-            // Turn into raw string.
-            for diagnostic in &mut invalid_escape_sequence {
-                // If necessary, add a space between any leading keyword (`return`, `yield`,
-                // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
-                // `returnr"foo"` is not.
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    pad_start("r".to_string(), tok_start, locator),
-                    tok_start,
-                )));
-            }
+            token_range.start()
+        };
+        // Turn into raw string.
+        for diagnostic in &mut invalid_escape_sequence {
+            // If necessary, add a space between any leading keyword (`return`, `yield`,
+            // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
+            // `returnr"foo"` is not.
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                pad_start("r".to_string(), tok_start, locator),
+                tok_start,
+            )));
         }
     }
 

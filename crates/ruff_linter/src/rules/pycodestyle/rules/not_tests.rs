@@ -6,7 +6,7 @@ use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for negative comparison using `not {foo} in {bar}`.
@@ -94,46 +94,42 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
         [CmpOp::In] => {
             if checker.enabled(Rule::NotInTest) {
                 let mut diagnostic = Diagnostic::new(NotInTest, unary_op.operand.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        pad(
-                            generate_comparison(
-                                left,
-                                &[CmpOp::NotIn],
-                                comparators,
-                                unary_op.into(),
-                                checker.indexer().comment_ranges(),
-                                checker.locator(),
-                            ),
-                            unary_op.range(),
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    pad(
+                        generate_comparison(
+                            left,
+                            &[CmpOp::NotIn],
+                            comparators,
+                            unary_op.into(),
+                            checker.indexer().comment_ranges(),
                             checker.locator(),
                         ),
                         unary_op.range(),
-                    )));
-                }
+                        checker.locator(),
+                    ),
+                    unary_op.range(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }
         [CmpOp::Is] => {
             if checker.enabled(Rule::NotIsTest) {
                 let mut diagnostic = Diagnostic::new(NotIsTest, unary_op.operand.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        pad(
-                            generate_comparison(
-                                left,
-                                &[CmpOp::IsNot],
-                                comparators,
-                                unary_op.into(),
-                                checker.indexer().comment_ranges(),
-                                checker.locator(),
-                            ),
-                            unary_op.range(),
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    pad(
+                        generate_comparison(
+                            left,
+                            &[CmpOp::IsNot],
+                            comparators,
+                            unary_op.into(),
+                            checker.indexer().comment_ranges(),
                             checker.locator(),
                         ),
                         unary_op.range(),
-                    )));
-                }
+                        checker.locator(),
+                    ),
+                    unary_op.range(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }

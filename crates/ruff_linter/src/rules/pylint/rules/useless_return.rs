@@ -8,7 +8,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for functions that end with an unnecessary `return` or
@@ -103,12 +102,9 @@ pub(crate) fn useless_return(
     }
 
     let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let edit =
-            fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
-            checker.semantic().current_statement_id(),
-        )));
-    }
+    let edit = fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
+    diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
+        checker.semantic().current_statement_id(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

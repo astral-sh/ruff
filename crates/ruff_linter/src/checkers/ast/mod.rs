@@ -143,11 +143,6 @@ impl<'a> Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
-    /// Return `true` if a patch should be generated for a given [`Rule`].
-    pub(crate) fn patch(&self, code: Rule) -> bool {
-        self.settings.rules.should_fix(code)
-    }
-
     /// Return `true` if a [`Rule`] is disabled by a `noqa` directive.
     pub(crate) fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
@@ -1367,7 +1362,7 @@ where
     fn visit_match_case(&mut self, match_case: &'b MatchCase) {
         self.visit_pattern(&match_case.pattern);
         if let Some(expr) = &match_case.guard {
-            self.visit_expr(expr);
+            self.visit_boolean_test(expr);
         }
 
         self.semantic.push_branch();

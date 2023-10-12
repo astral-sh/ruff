@@ -7,7 +7,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Check for `if`-`else`-blocks that can be replaced with a ternary operator.
@@ -143,13 +142,11 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         },
         stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if !checker.indexer().has_comments(stmt, checker.locator()) {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                contents,
-                stmt.range(),
-            )));
-        }
+    if !checker.indexer().has_comments(stmt, checker.locator()) {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            contents,
+            stmt.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

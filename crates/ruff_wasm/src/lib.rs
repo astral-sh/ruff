@@ -10,7 +10,7 @@ use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::linter::{check_path, LinterResult};
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
-use ruff_linter::settings::{flags, DUMMY_VARIABLE_RGX, PREFIXES};
+use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
@@ -133,7 +133,7 @@ impl Workspace {
                 allowed_confusables: Some(Vec::default()),
                 dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
                 ignore: Some(Vec::default()),
-                select: Some(PREFIXES.to_vec()),
+                select: Some(DEFAULT_SELECTORS.to_vec()),
                 extend_fixable: Some(Vec::default()),
                 extend_select: Some(Vec::default()),
                 external: Some(Vec::default()),

@@ -334,11 +334,7 @@ pub(crate) fn typing_only_runtime_import(
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
     for ((node_id, import_type), imports) in errors_by_statement {
-        let fix = if checker.patch(rule_for(import_type)) {
-            fix_imports(checker, node_id, &imports).ok()
-        } else {
-            None
-        };
+        let fix = fix_imports(checker, node_id, &imports).ok();
 
         for ImportBinding {
             import,

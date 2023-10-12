@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Stm
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -221,18 +221,16 @@ pub(crate) fn unnecessary_map(
     };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_map(
-                expr,
-                parent,
-                object_type,
-                checker.locator(),
-                checker.stylist(),
-            )
-            .map(Fix::unsafe_edit)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_map(
+            expr,
+            parent,
+            object_type,
+            checker.locator(),
+            checker.stylist(),
+        )
+        .map(Fix::unsafe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }
 

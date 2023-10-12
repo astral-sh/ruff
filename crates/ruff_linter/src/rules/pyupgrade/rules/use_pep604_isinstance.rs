@@ -6,7 +6,6 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum CallKind {
@@ -120,12 +119,10 @@ pub(crate) fn use_pep604_isinstance(
                 }
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        checker.generator().expr(&union(elts)),
-                        types.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    checker.generator().expr(&union(elts)),
+                    types.range(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }

@@ -8,7 +8,6 @@ use ruff_text_size::Ranged;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for unnecessary `dict` kwargs.
@@ -68,12 +67,10 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
         if matches!(keys.as_slice(), [None]) {
             let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
 
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    format!("**{}", checker.locator().slice(values[0].range())),
-                    kw.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                format!("**{}", checker.locator().slice(values[0].range())),
+                kw.range(),
+            )));
 
             checker.diagnostics.push(diagnostic);
             continue;
@@ -91,7 +88,9 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
 
         let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
 
-        if checker.patch(diagnostic.kind.rule()) {
+        if values.is_empty() {
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(kw.start(), kw.end())));
+        } else {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 kwargs
                     .iter()

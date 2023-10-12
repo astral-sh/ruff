@@ -6,7 +6,6 @@ use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for the use of string and bytes literals longer than 50 characters
@@ -67,11 +66,9 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "...".to_string(),
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "...".to_string(),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

@@ -9,7 +9,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method
@@ -71,26 +70,24 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
         if arg == "inplace" {
             if is_const_true(&keyword.value) {
                 let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Avoid applying the fix if:
-                    // 1. The keyword argument is followed by a star argument (we can't be certain that
-                    //    the star argument _doesn't_ contain an override).
-                    // 2. The call is part of a larger expression (we're converting an expression to a
-                    //    statement, and expressions can't contain statements).
-                    let statement = checker.semantic().current_statement();
-                    if !seen_star
-                        && checker.semantic().current_expression_parent().is_none()
-                        && statement.is_expr_stmt()
-                    {
-                        if let Some(fix) = convert_inplace_argument_to_assignment(
-                            call,
-                            keyword,
-                            statement,
-                            checker.indexer().comment_ranges(),
-                            checker.locator(),
-                        ) {
-                            diagnostic.set_fix(fix);
-                        }
+                // Avoid applying the fix if:
+                // 1. The keyword argument is followed by a star argument (we can't be certain that
+                //    the star argument _doesn't_ contain an override).
+                // 2. The call is part of a larger expression (we're converting an expression to a
+                //    statement, and expressions can't contain statements).
+                let statement = checker.semantic().current_statement();
+                if !seen_star
+                    && checker.semantic().current_expression_parent().is_none()
+                    && statement.is_expr_stmt()
+                {
+                    if let Some(fix) = convert_inplace_argument_to_assignment(
+                        call,
+                        keyword,
+                        statement,
+                        checker.indexer().comment_ranges(),
+                        checker.locator(),
+                    ) {
+                        diagnostic.set_fix(fix);
                     }
                 }
 

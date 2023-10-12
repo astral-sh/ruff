@@ -7,7 +7,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for docstrings on class definitions that are not preceded by a
@@ -189,27 +189,23 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
         if checker.enabled(Rule::BlankLineBeforeClass) {
             if blank_lines_before != 0 {
                 let mut diagnostic = Diagnostic::new(BlankLineBeforeClass, docstring.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Delete the blank line before the class.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                        blank_lines_start,
-                        docstring.start() - docstring.indentation.text_len(),
-                    )));
-                }
+                // Delete the blank line before the class.
+                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                    blank_lines_start,
+                    docstring.start() - docstring.indentation.text_len(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }
         if checker.enabled(Rule::OneBlankLineBeforeClass) {
             if blank_lines_before != 1 {
                 let mut diagnostic = Diagnostic::new(OneBlankLineBeforeClass, docstring.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Insert one blank line before the class.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                        checker.stylist().line_ending().to_string(),
-                        blank_lines_start,
-                        docstring.start() - docstring.indentation.text_len(),
-                    )));
-                }
+                // Insert one blank line before the class.
+                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                    checker.stylist().line_ending().to_string(),
+                    blank_lines_start,
+                    docstring.start() - docstring.indentation.text_len(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -243,21 +239,19 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
                 let indentation = indentation_at_offset(docstring.start(), checker.locator())
                     .expect("Own line docstring must have indentation");
                 let mut diagnostic = Diagnostic::new(OneBlankLineAfterClass, docstring.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    let line_ending = checker.stylist().line_ending().as_str();
-                    // We have to trim the whitespace twice, once before the semicolon above and
-                    // once after the semicolon here, or we get invalid indents:
-                    // ```rust
-                    // class Priority:
-                    //     """Has priorities"""   ;   priorities=1
-                    // ```
-                    let next_statement = next_statement.trim_whitespace_start();
-                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                        line_ending.to_string() + line_ending + indentation + next_statement,
-                        replacement_start,
-                        first_line.end(),
-                    )));
-                }
+                let line_ending = checker.stylist().line_ending().as_str();
+                // We have to trim the whitespace twice, once before the semicolon above and
+                // once after the semicolon here, or we get invalid indents:
+                // ```rust
+                // class Priority:
+                //     """Has priorities"""   ;   priorities=1
+                // ```
+                let next_statement = next_statement.trim_whitespace_start();
+                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                    line_ending.to_string() + line_ending + indentation + next_statement,
+                    replacement_start,
+                    first_line.end(),
+                )));
                 checker.diagnostics.push(diagnostic);
                 return;
             } else if trailing.starts_with('#') {
@@ -280,14 +274,12 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
 
         if blank_lines_after != 1 {
             let mut diagnostic = Diagnostic::new(OneBlankLineAfterClass, docstring.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                // Insert a blank line before the class (replacing any existing lines).
-                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                    checker.stylist().line_ending().to_string(),
-                    replacement_start,
-                    blank_lines_end,
-                )));
-            }
+            // Insert a blank line before the class (replacing any existing lines).
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                checker.stylist().line_ending().to_string(),
+                replacement_start,
+                blank_lines_end,
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

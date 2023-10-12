@@ -39,7 +39,7 @@ if condition:
         print('Hy "Micha"')  # Should not change quotes
 
     ----- stderr -----
-    warning: `ruff format` is a work-in-progress, subject to change at any time, and intended only for experimentation.
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
 }
 
@@ -83,7 +83,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: `ruff format` is a work-in-progress, subject to change at any time, and intended only for experimentation.
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
     Ok(())
 }
@@ -139,7 +139,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: `ruff format` is a work-in-progress, subject to change at any time, and intended only for experimentation.
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
     Ok(())
 }

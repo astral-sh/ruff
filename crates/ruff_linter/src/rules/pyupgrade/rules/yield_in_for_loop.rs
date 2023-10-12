@@ -5,7 +5,6 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced with `yield from` expressions.
@@ -103,22 +102,20 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
     }
 
     let mut diagnostic = Diagnostic::new(YieldInForLoop, stmt_for.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let contents = checker.locator().slice(
-            parenthesized_range(
-                iter.as_ref().into(),
-                stmt_for.into(),
-                checker.indexer().comment_ranges(),
-                checker.locator().contents(),
-            )
-            .unwrap_or(iter.range()),
-        );
-        let contents = format!("yield from {contents}");
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            contents,
-            stmt_for.range(),
-        )));
-    }
+    let contents = checker.locator().slice(
+        parenthesized_range(
+            iter.as_ref().into(),
+            stmt_for.into(),
+            checker.indexer().comment_ranges(),
+            checker.locator().contents(),
+        )
+        .unwrap_or(iter.range()),
+    );
+    let contents = format!("yield from {contents}");
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        contents,
+        stmt_for.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

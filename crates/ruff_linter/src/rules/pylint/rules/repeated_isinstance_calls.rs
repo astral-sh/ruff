@@ -10,7 +10,7 @@ use ruff_python_ast::hashable::HashableExpr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
@@ -133,12 +133,10 @@ pub(crate) fn repeated_isinstance_calls(
                 },
                 expr.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    pad(call, expr.range(), checker.locator()),
-                    expr.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                pad(call, expr.range(), checker.locator()),
+                expr.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

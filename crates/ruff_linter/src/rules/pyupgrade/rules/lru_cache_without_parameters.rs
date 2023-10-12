@@ -4,7 +4,6 @@ use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for unnecessary parentheses on `functools.lru_cache` decorators.
@@ -77,9 +76,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
                 LRUCacheWithoutParameters,
                 TextRange::new(func.end(), decorator.end()),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
             checker.diagnostics.push(diagnostic);
         }
     }

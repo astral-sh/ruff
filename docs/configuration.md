@@ -11,10 +11,10 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
-# Enable the pycodestyle (`E`) and Pyflakes (`F`) rules by default.
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
 # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
 # McCabe complexity (`C901`) by default.
-select = ["E", "F"]
+select = ["E4", "E7", "E9", "F"]
 ignore = []
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -374,6 +374,100 @@ Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no
 
 Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
 with the exception of `F401`.
+
+## Fixes
+
+Ruff supports automatic fixes for a variety of lint errors. For example, Ruff can remove unused
+imports, reformat docstrings, rewrite type annotations to use newer Python syntax, and more.
+
+To enable fixes, pass the `--fix` flag to `ruff check`:
+
+```shell
+ruff check . --fix
+```
+
+By default, Ruff will fix all violations for which safe fixes are available; to determine
+whether a rule supports fixing, see [_Rules_](rules.md).
+
+### Fix safety
+
+Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when applying safe fixes, but the meaning could be changed when applying unsafe fixes.
+
+For example, [`unnecessary-iterable-allocation-for-first-element`](../rules/unnecessary-iterable-allocation-for-first-element) (`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
+
+```shell
+$ python -m timeit "head = list(range(99999999))[0]"
+1 loop, best of 5: 1.69 sec per loop
+```
+
+```shell
+$ python -m timeit "head = next(iter(range(99999999)))"
+5000000 loops, best of 5: 70.8 nsec per loop
+```
+
+However, when the collection is empty, this changes the raised exception from an `IndexError` to `StopIteration`:
+
+```shell
+$ python -c 'list(range(0))[0]'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+IndexError: list index out of range
+```
+
+```shell
+$ python -c 'next(iter(range(0)))[0]'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+StopIteration
+```
+
+Since this could break error handling, this fix is categorized as unsafe.
+
+Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing the `--unsafe-fixes` flag to `ruff check`:
+
+```shell
+# Show unsafe fixes
+ruff check . --unsafe-fixes
+
+# Apply unsafe fixes
+ruff check . --fix --unsafe-fixes 
+```
+
+The safety of fixes can be adjusted per rule using the [`extend-safe-fixes`](settings.md#extend-safe-fixes) and [`extend-unsafe-fixes`](settings.md#extend-unsafe-fixes) settings.
+
+For example, the following configuration would promote unsafe fixes for `F601` to safe fixes and demote safe fixes for `UP034` to unsafe fixes:
+
+```toml
+[tool.ruff.lint]
+extend-safe-fixes = ["F601"]
+extend-unsafe-fixes = ["UP034"]
+```
+
+You may use prefixes to select rules as well, e.g., `F` can be used to promote fixes for all rules in Pyflakes to safe.
+
+!!! note
+    All fixes will always be displayed by Ruff when using the `json` output format. The safety of each fix is available under the `applicability` field.
+
+### Disabling fixes
+
+To limit the set of rules that Ruff should fix, use the [`fixable`](settings.md#fixable) and [`unfixable`](settings.md#unfixable) settings, along with their [`extend-fixable`](settings.md#extend-fixable) and [`extend-unfixable`](settings.md#extend-unfixable)
+variants.
+
+For example, the following configuration would enable fixes for all rules except
+[`unused-imports`](rules/unused-import.md) (`F401`):
+
+```toml
+[tool.ruff.lint]
+fixable = ["ALL"]
+unfixable = ["F401"]
+```
+
+Conversely, the following configuration would only enable fixes for `F401`:
+
+```toml
+[tool.ruff.lint]
+fixable = ["F401"]
+```
 
 ## Error suppression
 

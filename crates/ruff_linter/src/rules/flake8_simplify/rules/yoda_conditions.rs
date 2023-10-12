@@ -14,7 +14,6 @@ use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
 use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for conditions that position a constant on the left-hand side of the
@@ -193,12 +192,10 @@ pub(crate) fn yoda_conditions(
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                pad(suggestion, expr.range(), checker.locator()),
-                expr.range(),
-            )));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(suggestion, expr.range(), checker.locator()),
+            expr.range(),
+        )));
         checker.diagnostics.push(diagnostic);
     } else {
         checker.diagnostics.push(Diagnostic::new(

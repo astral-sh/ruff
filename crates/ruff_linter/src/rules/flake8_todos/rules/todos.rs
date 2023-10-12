@@ -7,11 +7,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::settings::LinterSettings;
-use crate::{
-    directives::{TodoComment, TodoDirective, TodoDirectiveKind},
-    registry::Rule,
-};
+use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".
@@ -240,7 +236,6 @@ pub(crate) fn todos(
     todo_comments: &[TodoComment],
     locator: &Locator,
     indexer: &Indexer,
-    settings: &LinterSettings,
 ) {
     for todo_comment in todo_comments {
         let TodoComment {
@@ -256,7 +251,7 @@ pub(crate) fn todos(
             continue;
         }
 
-        directive_errors(diagnostics, directive, settings);
+        directive_errors(diagnostics, directive);
         static_errors(diagnostics, content, range, directive);
 
         let mut has_issue_link = false;
@@ -300,11 +295,7 @@ pub(crate) fn todos(
 }
 
 /// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
-fn directive_errors(
-    diagnostics: &mut Vec<Diagnostic>,
-    directive: &TodoDirective,
-    settings: &LinterSettings,
-) {
+fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective) {
     if directive.content == "TODO" {
         return;
     }
@@ -318,12 +309,10 @@ fn directive_errors(
             directive.range,
         );
 
-        if settings.rules.should_fix(Rule::InvalidTodoCapitalization) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                "TODO".to_string(),
-                directive.range,
-            )));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "TODO".to_string(),
+            directive.range,
+        )));
 
         diagnostics.push(diagnostic);
     } else {

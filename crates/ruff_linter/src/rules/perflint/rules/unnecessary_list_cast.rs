@@ -5,7 +5,6 @@ use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for explicit casts to `list` on for-loop iterables.
@@ -91,9 +90,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
             ..
         }) => {
             let mut diagnostic = Diagnostic::new(UnnecessaryListCast, *list_range);
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
-            }
+            diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
             checker.diagnostics.push(diagnostic);
         }
         Expr::Name(ast::ExprName {
@@ -119,9 +116,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
                             ) {
                                 let mut diagnostic =
                                     Diagnostic::new(UnnecessaryListCast, *list_range);
-                                if checker.patch(diagnostic.kind.rule()) {
-                                    diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
-                                }
+                                diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
                                 checker.diagnostics.push(diagnostic);
                             }
                         }
