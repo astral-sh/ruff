@@ -1,5 +1,15 @@
 # Breaking Changes
 
+## 0.1.0
+
+### Remove rules that overlap with formatters from the default set
+
+Previously, Ruff enabled all implemented rules in Pycodestyle (`E`) by default. Ruff now only includes the
+Pycodestyle prefixes `E4`, `E7`, and `E9` to exclude rules that conflict with automatic formatters. Consequently,
+the stable rule set no longer includes `line-too-long` (`E501`) and `mixed-spaces-and-tabs` (`E101`). Other
+excluded Pycodestyle rules include whitespace enforcement in `E1` and `E2` and are marked as unstable and
+not on by default already. These rules may still be enabled and if `select` has been configured there will be no change.
+
 ## 0.0.288
 
 ### Remove support for emoji identifiers ([#7212](https://github.com/astral-sh/ruff/pull/7212))
