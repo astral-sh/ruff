@@ -2,7 +2,7 @@
 
 ## 0.1.0
 
-### Remove rules that overlap with formatters from the default set
+### Remove formatter-conflicting rules from the default rule set
 
 Previously, Ruff enabled all implemented rules in Pycodestyle (`E`) by default. Ruff now only includes the
 Pycodestyle prefixes `E4`, `E7`, and `E9` to exclude rules that conflict with automatic formatters. Consequently,
