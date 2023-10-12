@@ -109,6 +109,8 @@ and_or_ternary.py:60:12: PLR1706 [*] Pre-python 2.5 ternary syntax used
 59 | def has_oranges(oranges, apples=None) -> bool:
 60 |     return apples and False or oranges
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1706
+61 | 
+62 | [x for x in l if a and b or c]
    |
    = help: Use `False if apples else oranges`
 
@@ -118,5 +120,110 @@ and_or_ternary.py:60:12: PLR1706 [*] Pre-python 2.5 ternary syntax used
 59 59 | def has_oranges(oranges, apples=None) -> bool:
 60    |-    return apples and False or oranges
    60 |+    return False if apples else oranges
+61 61 | 
+62 62 | [x for x in l if a and b or c]
+63 63 | 
+
+and_or_ternary.py:62:18: PLR1706 [*] Pre-python 2.5 ternary syntax used
+   |
+60 |     return apples and False or oranges
+61 | 
+62 | [x for x in l if a and b or c]
+   |                  ^^^^^^^^^^^^ PLR1706
+63 | 
+64 | {x: y for x in l if a and b or c}
+   |
+   = help: Use `(b if a else c)`
+
+ℹ Fix
+59 59 | def has_oranges(oranges, apples=None) -> bool:
+60 60 |     return apples and False or oranges
+61 61 | 
+62    |-[x for x in l if a and b or c]
+   62 |+[x for x in l if (b if a else c)]
+63 63 | 
+64 64 | {x: y for x in l if a and b or c}
+65 65 | 
+
+and_or_ternary.py:64:21: PLR1706 [*] Pre-python 2.5 ternary syntax used
+   |
+62 | [x for x in l if a and b or c]
+63 | 
+64 | {x: y for x in l if a and b or c}
+   |                     ^^^^^^^^^^^^ PLR1706
+65 | 
+66 | {x for x in l if a and b or c}
+   |
+   = help: Use `(b if a else c)`
+
+ℹ Fix
+61 61 | 
+62 62 | [x for x in l if a and b or c]
+63 63 | 
+64    |-{x: y for x in l if a and b or c}
+   64 |+{x: y for x in l if (b if a else c)}
+65 65 | 
+66 66 | {x for x in l if a and b or c}
+67 67 | 
+
+and_or_ternary.py:66:18: PLR1706 [*] Pre-python 2.5 ternary syntax used
+   |
+64 | {x: y for x in l if a and b or c}
+65 | 
+66 | {x for x in l if a and b or c}
+   |                  ^^^^^^^^^^^^ PLR1706
+67 | 
+68 | new_list = [
+   |
+   = help: Use `(b if a else c)`
+
+ℹ Fix
+63 63 | 
+64 64 | {x: y for x in l if a and b or c}
+65 65 | 
+66    |-{x for x in l if a and b or c}
+   66 |+{x for x in l if (b if a else c)}
+67 67 | 
+68 68 | new_list = [
+69 69 |     x
+
+and_or_ternary.py:71:8: PLR1706 [*] Pre-python 2.5 ternary syntax used
+   |
+69 |     x
+70 |     for sublist in all_lists
+71 |     if a and b or c
+   |        ^^^^^^^^^^^^ PLR1706
+72 |     for x in sublist
+73 |     if (isinstance(operator, list) and x in operator) or x != operator
+   |
+   = help: Use `(b if a else c)`
+
+ℹ Fix
+68 68 | new_list = [
+69 69 |     x
+70 70 |     for sublist in all_lists
+71    |-    if a and b or c
+   71 |+    if (b if a else c)
+72 72 |     for x in sublist
+73 73 |     if (isinstance(operator, list) and x in operator) or x != operator
+74 74 | ]
+
+and_or_ternary.py:73:8: PLR1706 [*] Pre-python 2.5 ternary syntax used
+   |
+71 |     if a and b or c
+72 |     for x in sublist
+73 |     if (isinstance(operator, list) and x in operator) or x != operator
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1706
+74 | ]
+   |
+   = help: Use `(x in operator if isinstance(operator, list) else x != operator)`
+
+ℹ Fix
+70 70 |     for sublist in all_lists
+71 71 |     if a and b or c
+72 72 |     for x in sublist
+73    |-    if (isinstance(operator, list) and x in operator) or x != operator
+   73 |+    if (x in operator if isinstance(operator, list) else x != operator)
+74 74 | ]
 
 
