@@ -9,7 +9,7 @@ RUF019.py:3:4: RUF019 [*] Unnecessary key check
   |    ^^^^^^^^^^^^^^^^^^^ RUF019
 4 |     pass
   |
-  = help: Replace `"k" in d` with `d.get("k")`
+  = help: Replace with `d.get("k")`
 
 ℹ Fix
 1 1 | d = {}
@@ -27,7 +27,7 @@ RUF019.py:7:4: RUF019 [*] Unnecessary key check
   |    ^^^^^^^^^^^^^^^ RUF019
 8 |     pass
   |
-  = help: Replace `k in d` with `d.get(k)`
+  = help: Replace with `d.get(k)`
 
 ℹ Fix
 4 4 |     pass

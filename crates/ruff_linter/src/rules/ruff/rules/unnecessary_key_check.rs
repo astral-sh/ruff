@@ -40,7 +40,7 @@ impl AlwaysFixableViolation for UnnecessaryKeyCheck {
 
     fn fix_title(&self) -> String {
         let UnnecessaryKeyCheck { key, dict } = self;
-        format!("Replace `{key} in {dict}` with `{dict}.get({key})`")
+        format!("Replace with `{dict}.get({key})`")
     }
 }
 
@@ -64,7 +64,7 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
     };
 
     let Expr::Compare(ast::ExprCompare {
-        left,
+        left: key_left,
         ops,
         comparators,
         ..
@@ -77,21 +77,26 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    let [comparator] = comparators.as_slice() else {
+    let [obj_left] = comparators.as_slice() else {
         return;
     };
 
-    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = right else {
+    let Expr::Subscript(ast::ExprSubscript {
+        value: obj_right,
+        slice: key_right,
+        ..
+    }) = right
+    else {
         return;
     };
 
-    if ComparableExpr::from(comparator) == ComparableExpr::from(value)
-        && ComparableExpr::from(left) == ComparableExpr::from(slice)
+    if ComparableExpr::from(obj_left) == ComparableExpr::from(obj_right)
+        && ComparableExpr::from(key_left) == ComparableExpr::from(key_right)
     {
         let mut diagnostic = Diagnostic::new(
             UnnecessaryKeyCheck {
-                key: checker.generator().expr(left),
-                dict: checker.generator().expr(value),
+                key: checker.generator().expr(key_left),
+                dict: checker.generator().expr(obj_left),
             },
             expr.range(),
         );
@@ -99,8 +104,8 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 format!(
                     "{}.get({})",
-                    checker.generator().expr(value),
-                    checker.generator().expr(left)
+                    checker.generator().expr(obj_left),
+                    checker.generator().expr(key_left)
                 ),
                 expr.range(),
             )));
