@@ -58,3 +58,17 @@ isinstance(marker, dict) and 'field' in marker or marker in {}
 
 def has_oranges(oranges, apples=None) -> bool:
     return apples and False or oranges
+
+[x for x in l if a and b or c]
+
+{x: y for x in l if a and b or c}
+
+{x for x in l if a and b or c}
+
+new_list = [
+    x
+    for sublist in all_lists
+    if a and b or c
+    for x in sublist
+    if (isinstance(operator, list) and x in operator) or x != operator
+]
