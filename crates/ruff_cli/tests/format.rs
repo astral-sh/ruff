@@ -1,6 +1,7 @@
 #![cfg(not(target_family = "wasm"))]
 
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 use std::str;
 
@@ -283,4 +284,115 @@ format = "json"
         "###);
     });
     Ok(())
+}
+
+#[test]
+fn test_diff() {
+    let args = ["format", "--isolated", "--diff"];
+    let fixtures = Path::new("resources").join("test").join("fixtures");
+    let paths = [
+        fixtures.join("unformatted.py"),
+        fixtures.join("formatted.py"),
+        fixtures.join("unformatted.ipynb"),
+    ];
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME)).args(args).args(paths),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- resources/test/fixtures/unformatted.ipynb
+    +++ resources/test/fixtures/unformatted.ipynb
+    @@ -1,3 +1,4 @@
+     import numpy
+    -maths = (numpy.arange(100)**2).sum()
+    -stats= numpy.asarray([1,2,3,4]).median()
+    +
+    +maths = (numpy.arange(100) ** 2).sum()
+    +stats = numpy.asarray([1, 2, 3, 4]).median()
+    --- resources/test/fixtures/unformatted.py
+    +++ resources/test/fixtures/unformatted.py
+    @@ -1,3 +1,3 @@
+     x = 1
+    -y=2
+    +y = 2
+     z = 3
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    2 files would be reformatted, 1 file left unchanged
+    "###);
+}
+
+#[test]
+fn test_diff_no_change() {
+    let args = ["format", "--isolated", "--diff"];
+    let fixtures = Path::new("resources").join("test").join("fixtures");
+    let paths = [fixtures.join("unformatted.py")];
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME)).args(args).args(paths),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- resources/test/fixtures/unformatted.py
+    +++ resources/test/fixtures/unformatted.py
+    @@ -1,3 +1,3 @@
+     x = 1
+    -y=2
+    +y = 2
+     z = 3
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    1 file would be reformatted
+    "###);
+}
+
+#[test]
+fn test_diff_stdin_unformatted() {
+    let args = [
+        "format",
+        "--isolated",
+        "--diff",
+        "-",
+        "--stdin-filename",
+        "unformatted.py",
+    ];
+    let fixtures = Path::new("resources").join("test").join("fixtures");
+    let unformatted = fs::read(fixtures.join("unformatted.py")).unwrap();
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME)).args(args).pass_stdin(unformatted),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- unformatted.py
+    +++ unformatted.py
+    @@ -1,3 +1,3 @@
+     x = 1
+    -y=2
+    +y = 2
+     z = 3
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    "###);
+}
+
+#[test]
+fn test_diff_stdin_formatted() {
+    let args = ["format", "--isolated", "--diff", "-"];
+    let fixtures = Path::new("resources").join("test").join("fixtures");
+    let unformatted = fs::read(fixtures.join("formatted.py")).unwrap();
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME)).args(args).pass_stdin(unformatted),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    "###);
 }

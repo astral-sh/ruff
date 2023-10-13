@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
+use std::io::stdout;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -9,6 +10,7 @@ use itertools::Itertools;
 use log::error;
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use similar::TextDiff;
 use thiserror::Error;
 use tracing::debug;
 
@@ -34,6 +36,20 @@ pub(crate) enum FormatMode {
     Write,
     /// Check if the file is formatted, but do not write the formatted contents back.
     Check,
+    /// Check if the file is formatted, show a diff if not.
+    Diff,
+}
+
+impl FormatMode {
+    pub(crate) fn from_cli(cli: &FormatArguments) -> Self {
+        if cli.diff {
+            FormatMode::Diff
+        } else if cli.check {
+            FormatMode::Check
+        } else {
+            FormatMode::Write
+        }
+    }
 }
 
 /// Format a set of files, and return the exit status.
@@ -48,11 +64,7 @@ pub(crate) fn format(
         overrides,
         cli.stdin_filename.as_deref(),
     )?;
-    let mode = if cli.check {
-        FormatMode::Check
-    } else {
-        FormatMode::Write
-    };
+    let mode = FormatMode::from_cli(cli);
     let (paths, resolver) = python_files_in_path(&cli.files, &pyproject_config, overrides)?;
 
     if paths.is_empty() {
@@ -126,9 +138,14 @@ pub(crate) fn format(
 
     // Report on the formatting changes.
     if log_level >= LogLevel::Default {
-        #[allow(clippy::print_stdout)]
+        #[allow(clippy::print_stdout, clippy::print_stderr)]
         {
-            println!("{summary}");
+            if mode.is_diff() {
+                // Allow piping the diff to e.g. a file by writing to stderr
+                eprintln!("{summary}");
+            } else {
+                println!("{summary}");
+            }
         }
     }
 
@@ -140,7 +157,7 @@ pub(crate) fn format(
                 Ok(ExitStatus::Error)
             }
         }
-        FormatMode::Check => {
+        FormatMode::Check | FormatMode::Diff => {
             if errors.is_empty() {
                 if summary.any_formatted() {
                     Ok(ExitStatus::Failure)
@@ -173,17 +190,26 @@ fn format_path(
 
     // Format the source.
     match format_source(source_kind, source_type, Some(path), settings)? {
-        FormattedSource::Formatted(formatted) => {
-            if mode.is_write() {
+        FormattedSource::Formatted {
+            unformatted,
+            formatted,
+        } => match mode {
+            FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
                     FormatCommandError::Write(Some(path.to_path_buf()), err.into())
                 })?;
                 formatted
                     .write(&mut writer)
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
+                Ok(FormatResult::Formatted)
             }
-            Ok(FormatResult::Formatted)
-        }
+            FormatMode::Check => Ok(FormatResult::Formatted),
+            FormatMode::Diff => Ok(FormatResult::Diff {
+                path: path.to_path_buf(),
+                unformatted,
+                formatted,
+            }),
+        },
         FormattedSource::Unchanged(_) => Ok(FormatResult::Unchanged),
     }
 }
@@ -191,7 +217,10 @@ fn format_path(
 #[derive(Debug)]
 pub(crate) enum FormattedSource {
     /// The source was formatted, and the [`SourceKind`] contains the transformed source code.
-    Formatted(SourceKind),
+    Formatted {
+        unformatted: SourceKind,
+        formatted: SourceKind,
+    },
     /// The source was unchanged, and the [`SourceKind`] contains the original source code.
     Unchanged(SourceKind),
 }
@@ -199,17 +228,8 @@ pub(crate) enum FormattedSource {
 impl From<FormattedSource> for FormatResult {
     fn from(value: FormattedSource) -> Self {
         match value {
-            FormattedSource::Formatted(_) => FormatResult::Formatted,
+            FormattedSource::Formatted { .. } => FormatResult::Formatted,
             FormattedSource::Unchanged(_) => FormatResult::Unchanged,
-        }
-    }
-}
-
-impl FormattedSource {
-    pub(crate) fn source_kind(&self) -> &SourceKind {
-        match self {
-            FormattedSource::Formatted(source_kind) => source_kind,
-            FormattedSource::Unchanged(source_kind) => source_kind,
         }
     }
 }
@@ -233,7 +253,10 @@ pub(crate) fn format_source(
             if formatted.len() == unformatted.len() && formatted == *unformatted {
                 Ok(FormattedSource::Unchanged(SourceKind::Python(unformatted)))
             } else {
-                Ok(FormattedSource::Formatted(SourceKind::Python(formatted)))
+                Ok(FormattedSource::Formatted {
+                    unformatted: SourceKind::Python(unformatted),
+                    formatted: SourceKind::Python(formatted),
+                })
             }
         }
         SourceKind::IpyNotebook(notebook) => {
@@ -298,21 +321,28 @@ pub(crate) fn format_source(
             output.push_str(slice);
 
             // Update the notebook.
-            let mut notebook = notebook.clone();
-            notebook.update(&source_map, output);
+            let mut formatted = notebook.clone();
+            formatted.update(&source_map, output);
 
-            Ok(FormattedSource::Formatted(SourceKind::IpyNotebook(
-                notebook,
-            )))
+            Ok(FormattedSource::Formatted {
+                unformatted: SourceKind::IpyNotebook(notebook),
+                formatted: SourceKind::IpyNotebook(formatted),
+            })
         }
     }
 }
 
 /// The result of an individual formatting operation.
-#[derive(Debug, Clone, Copy, is_macro::Is)]
+#[derive(Debug, Clone, is_macro::Is)]
 pub(crate) enum FormatResult {
     /// The file was formatted.
     Formatted,
+    /// The file was formatted.
+    Diff {
+        path: PathBuf,
+        unformatted: SourceKind,
+        formatted: SourceKind,
+    },
     /// The file was unchanged, as the formatted contents matched the existing contents.
     Unchanged,
 }
@@ -340,9 +370,10 @@ impl<'a> FormatSummary<'a> {
 
     /// Returns `true` if any of the files require formatting.
     fn any_formatted(&self) -> bool {
-        self.results
-            .iter()
-            .any(|result| result.result.is_formatted())
+        self.results.iter().any(|result| match result.result {
+            FormatResult::Formatted | FormatResult::Diff { .. } => true,
+            FormatResult::Unchanged => false,
+        })
     }
 }
 
@@ -352,7 +383,7 @@ impl Display for FormatSummary<'_> {
         let mut formatted = 0u32;
         let mut unchanged = 0u32;
         for result in self.results {
-            match result.result {
+            match &result.result {
                 FormatResult::Formatted => {
                     // If we're running in check mode, report on any files that would be formatted.
                     if self.mode.is_check() {
@@ -365,6 +396,23 @@ impl Display for FormatSummary<'_> {
                     formatted += 1;
                 }
                 FormatResult::Unchanged => unchanged += 1,
+                FormatResult::Diff {
+                    path,
+                    unformatted,
+                    formatted: formatted_source,
+                } => {
+                    // Diff
+                    let mut writer = stdout().lock();
+                    let text_diff = TextDiff::from_lines(
+                        unformatted.source_code(),
+                        formatted_source.source_code(),
+                    );
+                    let mut unified_diff = text_diff.unified_diff();
+                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                    unified_diff.to_writer(&mut writer).unwrap();
+
+                    formatted += 1;
+                }
             }
         }
 
@@ -377,7 +425,7 @@ impl Display for FormatSummary<'_> {
                 if formatted == 1 { "" } else { "s" },
                 match self.mode {
                     FormatMode::Write => "reformatted",
-                    FormatMode::Check => "would be reformatted",
+                    FormatMode::Check | FormatMode::Diff => "would be reformatted",
                 },
                 unchanged,
                 if unchanged == 1 { "" } else { "s" },
@@ -390,7 +438,7 @@ impl Display for FormatSummary<'_> {
                 if formatted == 1 { "" } else { "s" },
                 match self.mode {
                     FormatMode::Write => "reformatted",
-                    FormatMode::Check => "would be reformatted",
+                    FormatMode::Check | FormatMode::Diff => "would be reformatted",
                 }
             )
         } else if unchanged > 0 {
