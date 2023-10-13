@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{checkers::ast::Checker, registry::AsRule, rules::flake8_pyi::helpers::traverse_union};
+use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 
 /// ## What it does
 /// Checks for the presence of multiple `type`s in a union.
@@ -67,14 +67,17 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
         return;
     }
 
-    let mut type_exprs = Vec::new();
-
     // Check if `union` is a PEP604 union (e.g. `float | int`) or a `typing.Union[float, int]`
-    let is_pep604_union = !union.as_subscript_expr().is_some_and(|subscript| {
-        checker
+    let subscript = union.as_subscript_expr();
+    if subscript.is_some_and(|subscript| {
+        !checker
             .semantic()
             .match_typing_expr(&subscript.value, "Union")
-    });
+    }) {
+        return;
+    }
+
+    let mut type_exprs = Vec::new();
 
     let mut collect_type_exprs = |expr: &'a Expr, _| {
         let Some(subscript) = expr.as_subscript_expr() else {
@@ -101,32 +104,13 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
         let mut diagnostic = Diagnostic::new(
             UnnecessaryTypeUnion {
                 members: type_members.clone(),
-                is_pep604_union,
+                is_pep604_union: subscript.is_none(),
             },
             union.range(),
         );
 
-        if checker.patch(diagnostic.kind.rule()) {
-            let union_str = if is_pep604_union {
-                checker
-                    .generator()
-                    .expr(&Expr::Subscript(ast::ExprSubscript {
-                        value: Box::new(Expr::Name(ast::ExprName {
-                            id: "type".into(),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                        })),
-                        slice: Box::new(concatenate_bin_ors(
-                            type_exprs
-                                .clone()
-                                .into_iter()
-                                .map(std::convert::AsRef::as_ref)
-                                .collect(),
-                        )),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                    }))
-            } else {
+        if checker.semantic().is_builtin("type") {
+            let content = if let Some(subscript) = subscript {
                 checker
                     .generator()
                     .expr(&Expr::Subscript(ast::ExprSubscript {
@@ -136,11 +120,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                             range: TextRange::default(),
                         })),
                         slice: Box::new(Expr::Subscript(ast::ExprSubscript {
-                            value: Box::new(Expr::Name(ast::ExprName {
-                                id: "Union".into(),
-                                ctx: ExprContext::Load,
-                                range: TextRange::default(),
-                            })),
+                            value: subscript.value.clone(),
                             slice: Box::new(Expr::Tuple(ast::ExprTuple {
                                 elts: type_members
                                     .into_iter()
@@ -161,10 +141,29 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
                     }))
+            } else {
+                checker
+                    .generator()
+                    .expr(&Expr::Subscript(ast::ExprSubscript {
+                        value: Box::new(Expr::Name(ast::ExprName {
+                            id: "type".into(),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        })),
+                        slice: Box::new(concatenate_bin_ors(
+                            type_exprs
+                                .clone()
+                                .into_iter()
+                                .map(std::convert::AsRef::as_ref)
+                                .collect(),
+                        )),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    }))
             };
 
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                union_str,
+                content,
                 union.range(),
             )));
         }
