@@ -1,5 +1,4 @@
-
-# No Ternary (No Error)
+# OK
 
 1<2 and 'b' and 'c'
 
@@ -30,7 +29,7 @@ docid, token = None, None
 vendor, os_version = 'darwin', '14'
 vendor == "debian" and os_version in ["12"] or vendor == "ubuntu" and os_version in []
 
-# No emit if parent is `if` statement
+# Don't emit if the parent is an `if` statement.
 if (task_id in task_dict and task_dict[task_id] is not task) \
         or task_id in used_group_ids:
     pass
@@ -39,10 +38,10 @@ no_target, is_x64, target = True, False, 'target'
 if (no_target and not is_x64) or target == 'ARM_APPL_RUST_TARGET':
     pass
 
-# No emit if parent is bool_op expression
+# Don't emit if the parent is a `bool_op` expression.
 isinstance(val, str) and ((len(val) == 7 and val[0] == "#") or val in enums.NamedColor)
 
-# Ternary (Error)
+# Errors
 
 1<2 and 'a' or 'b'
 
