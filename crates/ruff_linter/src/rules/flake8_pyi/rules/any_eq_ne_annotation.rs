@@ -5,7 +5,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `__eq__` and `__ne__` implementations that use `typing.Any` as
@@ -78,14 +77,12 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters
             },
             annotation.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            // Ex) `def __eq__(self, obj: Any): ...`
-            if checker.semantic().is_builtin("object") {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    "object".to_string(),
-                    annotation.range(),
-                )));
-            }
+        // Ex) `def __eq__(self, obj: Any): ...`
+        if checker.semantic().is_builtin("object") {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "object".to_string(),
+                annotation.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

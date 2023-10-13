@@ -7,7 +7,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for unnecessary imports of builtins.
@@ -121,25 +120,23 @@ pub(crate) fn unnecessary_builtin_import(
         },
         stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let statement = checker.semantic().current_statement();
-            let parent = checker.semantic().current_statement_parent();
-            let edit = fix::edits::remove_unused_imports(
-                unused_imports
-                    .iter()
-                    .map(|alias| &alias.name)
-                    .map(ruff_python_ast::Identifier::as_str),
-                statement,
-                parent,
-                checker.locator(),
-                checker.stylist(),
-                checker.indexer(),
-            )?;
-            Ok(Fix::unsafe_edit(edit).isolate(Checker::isolation(
-                checker.semantic().current_statement_parent_id(),
-            )))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let statement = checker.semantic().current_statement();
+        let parent = checker.semantic().current_statement_parent();
+        let edit = fix::edits::remove_unused_imports(
+            unused_imports
+                .iter()
+                .map(|alias| &alias.name)
+                .map(ruff_python_ast::Identifier::as_str),
+            statement,
+            parent,
+            checker.locator(),
+            checker.stylist(),
+            checker.indexer(),
+        )?;
+        Ok(Fix::unsafe_edit(edit).isolate(Checker::isolation(
+            checker.semantic().current_statement_parent_id(),
+        )))
+    });
     checker.diagnostics.push(diagnostic);
 }

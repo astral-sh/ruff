@@ -13,7 +13,7 @@ use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::line_width::LineWidthBuilder;
-use crate::registry::AsRule;
+
 use crate::settings::LinterSettings;
 
 use super::super::block::Block;
@@ -138,11 +138,9 @@ pub(crate) fn organize_imports(
     }
 
     let mut diagnostic = Diagnostic::new(UnsortedImports, range);
-    if settings.rules.should_fix(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            indent(&expected, indentation).to_string(),
-            range,
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        indent(&expected, indentation).to_string(),
+        range,
+    )));
     Some(diagnostic)
 }

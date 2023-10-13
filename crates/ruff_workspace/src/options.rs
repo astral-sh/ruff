@@ -523,6 +523,30 @@ pub struct LintOptions {
     )]
     pub ignore: Option<Vec<RuleSelector>>,
 
+    /// A list of rule codes or prefixes for which unsafe fixes should be considered
+    /// safe.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Allow applying all unsafe fixes in the `E` rules and `F401` without the `--unsafe-fixes` flag
+            extend_safe_fixes = ["E", "F401"]
+        "#
+    )]
+    pub extend_safe_fixes: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes for which safe fixes should be considered
+    /// unsafe.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
+            extend_unsafe_fixes = ["E", "F401"]
+        "#
+    )]
+    pub extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+
     /// Avoid automatically removing unused imports in `__init__.py` files. Such
     /// imports will still be flagged, but with a dedicated message suggesting
     /// that the import is either added to the module's `__all__` symbol, or
@@ -569,11 +593,11 @@ pub struct LintOptions {
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
     #[option(
-        default = r#"["E", "F"]"#,
+        default = r#"["E4", "E7", "E9", "F"]"#,
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            select = ["E", "F", "B", "Q"]
+            # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            select = ["E4", "E7", "E9", "F", "B", "Q"]
         "#
     )]
     pub select: Option<Vec<RuleSelector>>,

@@ -5,7 +5,6 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for submodule imports that are aliased to the submodule name.
@@ -71,23 +70,21 @@ pub(crate) fn manual_from_import(
         },
         alias.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if names.len() == 1 {
-            let node = ast::StmtImportFrom {
-                module: Some(Identifier::new(module.to_string(), TextRange::default())),
-                names: vec![Alias {
-                    name: asname.clone(),
-                    asname: None,
-                    range: TextRange::default(),
-                }],
-                level: Some(0),
+    if names.len() == 1 {
+        let node = ast::StmtImportFrom {
+            module: Some(Identifier::new(module.to_string(), TextRange::default())),
+            names: vec![Alias {
+                name: asname.clone(),
+                asname: None,
                 range: TextRange::default(),
-            };
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                checker.generator().stmt(&node.into()),
-                stmt.range(),
-            )));
-        }
+            }],
+            level: Some(0),
+            range: TextRange::default(),
+        };
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            checker.generator().stmt(&node.into()),
+            stmt.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

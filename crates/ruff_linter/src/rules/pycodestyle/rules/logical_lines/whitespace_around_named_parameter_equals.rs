@@ -94,6 +94,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
     context: &mut LogicalLinesContext,
 ) {
     let mut parens = 0u32;
+    let mut fstrings = 0u32;
     let mut annotated_func_arg = false;
     let mut prev_end = TextSize::default();
 
@@ -108,6 +109,8 @@ pub(crate) fn whitespace_around_named_parameter_equals(
         }
 
         match kind {
+            TokenKind::FStringStart => fstrings += 1,
+            TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             TokenKind::Lpar | TokenKind::Lsqb => {
                 parens = parens.saturating_add(1);
             }
@@ -124,7 +127,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
             TokenKind::Comma if parens == 1 => {
                 annotated_func_arg = false;
             }
-            TokenKind::Equal if parens > 0 => {
+            TokenKind::Equal if parens > 0 && fstrings == 0 => {
                 if annotated_func_arg && parens == 1 {
                     let start = token.start();
                     if start == prev_end && prev_end != TextSize::new(0) {

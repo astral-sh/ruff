@@ -8,7 +8,6 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for key-existence checks against `dict.keys()` calls.
@@ -109,32 +108,30 @@ fn key_in_dict(
         },
         TextRange::new(left_range.start(), right_range.end()),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // Delete from the start of the dot to the end of the expression.
-        if let Some(dot) = SimpleTokenizer::starts_at(value.end(), checker.locator().contents())
-            .skip_trivia()
-            .find(|token| token.kind == SimpleTokenKind::Dot)
+    // Delete from the start of the dot to the end of the expression.
+    if let Some(dot) = SimpleTokenizer::starts_at(value.end(), checker.locator().contents())
+        .skip_trivia()
+        .find(|token| token.kind == SimpleTokenKind::Dot)
+    {
+        // If the `.keys()` is followed by (e.g.) a keyword, we need to insert a space,
+        // since we're removing parentheses, which could lead to invalid syntax, as in:
+        // ```python
+        // if key in foo.keys()and bar:
+        // ```
+        let range = TextRange::new(dot.start(), right.end());
+        if checker
+            .locator()
+            .after(range.end())
+            .chars()
+            .next()
+            .is_some_and(|char| char.is_ascii_alphabetic())
         {
-            // If the `.keys()` is followed by (e.g.) a keyword, we need to insert a space,
-            // since we're removing parentheses, which could lead to invalid syntax, as in:
-            // ```python
-            // if key in foo.keys()and bar:
-            // ```
-            let range = TextRange::new(dot.start(), right.end());
-            if checker
-                .locator()
-                .after(range.end())
-                .chars()
-                .next()
-                .is_some_and(|char| char.is_ascii_alphabetic())
-            {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    " ".to_string(),
-                    range,
-                )));
-            } else {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(range)));
-            }
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                " ".to_string(),
+                range,
+            )));
+        } else {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(range)));
         }
     }
     checker.diagnostics.push(diagnostic);

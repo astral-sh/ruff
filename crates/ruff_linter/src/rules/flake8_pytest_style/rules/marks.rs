@@ -6,7 +6,7 @@ use ruff_python_ast::call_path::CallPath;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 use super::helpers::get_mark_decorators;
 
@@ -130,9 +130,7 @@ fn pytest_mark_parentheses(
         },
         decorator.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(fix);
-    }
+    diagnostic.set_fix(fix);
     checker.diagnostics.push(diagnostic);
 }
 
@@ -184,9 +182,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, call_
 
     if !has_parameters {
         let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
-        }
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
         checker.diagnostics.push(diagnostic);
     }
 }

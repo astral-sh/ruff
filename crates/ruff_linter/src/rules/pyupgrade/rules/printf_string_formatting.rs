@@ -15,7 +15,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::pyupgrade::helpers::curly_escape;
 
 /// ## What it does
@@ -495,9 +495,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     //     0,  # 0
     // )
     // ```
-    if checker.patch(diagnostic.kind.rule())
-        && !checker.indexer().comment_ranges().intersects(right.range())
-    {
+    if !checker.indexer().comment_ranges().intersects(right.range()) {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
             expr.range(),

@@ -9,8 +9,8 @@ use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::{checkers::ast::Checker, registry::Rule};
 
 /// ## What it does
 /// Checks for the use of `sum()` to flatten lists of lists, which has
@@ -82,9 +82,7 @@ pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCa
     };
 
     let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
-    if checker.patch(Rule::QuadraticListSummation) {
-        diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
-    }
+    diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
     checker.diagnostics.push(diagnostic);
 }
 

@@ -48,10 +48,19 @@ impl<'a> AnyString<'a> {
         match self {
             Self::Constant(_) => Quoting::CanChange,
             Self::FString(f_string) => {
+                let unprefixed = locator
+                    .slice(f_string.range)
+                    .trim_start_matches(|c| c != '"' && c != '\'');
+                let triple_quoted =
+                    unprefixed.starts_with(r#"""""#) || unprefixed.starts_with(r#"'''"#);
                 if f_string.values.iter().any(|value| match value {
                     Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
                         let string_content = locator.slice(*range);
-                        string_content.contains(['"', '\''])
+                        if triple_quoted {
+                            string_content.contains(r#"""""#) || string_content.contains("'''")
+                        } else {
+                            string_content.contains(['"', '\''])
+                        }
                     }
                     _ => false,
                 }) {
