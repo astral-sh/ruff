@@ -14,7 +14,7 @@ license = { workspace = true }
 
 [dependencies]
 ruff_diagnostics = { path = "../ruff_diagnostics" }
-ruff_source_file = { path = "../ruff_source_file" }
+ruff_source_file = { path = "../ruff_source_file", features = ["serde"] }
 ruff_text_size = { path = "../ruff_text_size" }
 
 anyhow = { workspace = true }

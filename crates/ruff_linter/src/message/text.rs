@@ -87,18 +87,15 @@ impl Emitter for TextEmitter {
                     writer,
                     "cell {cell}{sep}",
                     cell = notebook_index
-                        .cell(start_location.row.get())
-                        .unwrap_or_default(),
+                        .cell(start_location.row)
+                        .unwrap_or(OneIndexed::MIN),
                     sep = ":".cyan(),
                 )?;
 
                 SourceLocation {
-                    row: OneIndexed::new(
-                        notebook_index
-                            .cell_row(start_location.row.get())
-                            .unwrap_or(1) as usize,
-                    )
-                    .unwrap(),
+                    row: notebook_index
+                        .cell_row(start_location.row)
+                        .unwrap_or(OneIndexed::MIN),
                     column: start_location.column,
                 }
             } else {
@@ -203,9 +200,9 @@ impl Display for MessageCodeFrame<'_> {
         // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
         if let Some(index) = self.notebook_index {
-            let content_start_cell = index.cell(content_start_index.get()).unwrap_or_default();
+            let content_start_cell = index.cell(content_start_index).unwrap_or(OneIndexed::MIN);
             while start_index < content_start_index {
-                if index.cell(start_index.get()).unwrap_or_default() == content_start_cell {
+                if index.cell(start_index).unwrap_or(OneIndexed::MIN) == content_start_cell {
                     break;
                 }
                 start_index = start_index.saturating_add(1);
@@ -228,9 +225,9 @@ impl Display for MessageCodeFrame<'_> {
         // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
         if let Some(index) = self.notebook_index {
-            let content_end_cell = index.cell(content_end_index.get()).unwrap_or_default();
+            let content_end_cell = index.cell(content_end_index).unwrap_or(OneIndexed::MIN);
             while end_index > content_end_index {
-                if index.cell(end_index.get()).unwrap_or_default() == content_end_cell {
+                if index.cell(end_index).unwrap_or(OneIndexed::MIN) == content_end_cell {
                     break;
                 }
                 end_index = end_index.saturating_sub(1);
@@ -270,8 +267,9 @@ impl Display for MessageCodeFrame<'_> {
                     || start_index.get(),
                     |notebook_index| {
                         notebook_index
-                            .cell_row(start_index.get())
-                            .unwrap_or_default() as usize
+                            .cell_row(start_index)
+                            .unwrap_or(OneIndexed::MIN)
+                            .get()
                     },
                 ),
                 annotations: vec![SourceAnnotation {
