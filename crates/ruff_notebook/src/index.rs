@@ -15,6 +15,13 @@ pub struct NotebookIndex {
 }
 
 impl NotebookIndex {
+    pub fn new(row_to_cell: Vec<OneIndexed>, row_to_row_in_cell: Vec<OneIndexed>) -> Self {
+        Self {
+            row_to_cell,
+            row_to_row_in_cell,
+        }
+    }
+
     /// Returns the cell number (1-based) for the given row (1-based).
     pub fn cell(&self, row: OneIndexed) -> Option<OneIndexed> {
         self.row_to_cell.get(row.to_zero_indexed()).copied()
