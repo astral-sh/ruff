@@ -1,12 +1,10 @@
-use ast::visitor::{self, Visitor};
-use ast::Expr;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::{
     analyze::{function_type, visibility},
-    Scope, ScopeKind,
+    Scope, ScopeId, ScopeKind,
 };
 use ruff_text_size::Ranged;
 
@@ -47,7 +45,12 @@ impl Violation for NoSelfUse {
 }
 
 /// PLR6301
-pub(crate) fn no_self_use(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
+pub(crate) fn no_self_use(
+    checker: &Checker,
+    scope_id: ScopeId,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
@@ -107,19 +110,28 @@ pub(crate) fn no_self_use(checker: &Checker, scope: &Scope, diagnostics: &mut Ve
         return;
     };
 
-    // Traverse the method's body looking for `super()` calls
-    let mut call_visitor = CallVisitor { is_super: false };
-    call_visitor.visit_body(body);
-
-    if call_visitor.is_super {
+    if parameter.name.as_str() != "self" {
         return;
     }
 
-    if parameter.name.as_str() == "self"
-        && scope
-            .get("self")
-            .map(|binding_id| checker.semantic().binding(binding_id))
-            .is_some_and(|binding| binding.kind.is_argument() && !binding.is_used())
+    // If the method contains a `super` reference, then it should be considered to use self
+    // implicitly.
+    if let Some(binding_id) = checker.semantic().global_scope().get("super") {
+        let binding = checker.semantic().binding(binding_id);
+        if binding.kind.is_builtin() {
+            if binding
+                .references()
+                .any(|id| checker.semantic().reference(id).scope_id() == scope_id)
+            {
+                return;
+            }
+        }
+    }
+
+    if scope
+        .get("self")
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .is_some_and(|binding| binding.kind.is_argument() && !binding.is_used())
     {
         diagnostics.push(Diagnostic::new(
             NoSelfUse {
@@ -127,25 +139,5 @@ pub(crate) fn no_self_use(checker: &Checker, scope: &Scope, diagnostics: &mut Ve
             },
             parameter.range(),
         ));
-    }
-}
-
-struct CallVisitor {
-    is_super: bool,
-}
-
-impl<'a> Visitor<'a> for CallVisitor {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
-                Expr::Name(expr_name) => {
-                    self.is_super = expr_name.id == "super";
-                }
-                _ => {
-                    visitor::walk_expr(self, expr);
-                }
-            },
-            _ => visitor::walk_expr(self, expr),
-        }
     }
 }
