@@ -7,7 +7,6 @@ use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `setattr` that take a constant attribute value as an
@@ -108,12 +107,10 @@ pub(crate) fn setattr_with_constant(
     {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    assignment(obj, name, value, checker.generator()),
-                    expr.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                assignment(obj, name, value, checker.generator()),
+                expr.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

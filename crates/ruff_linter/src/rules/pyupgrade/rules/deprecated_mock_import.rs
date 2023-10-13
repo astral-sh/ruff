@@ -17,7 +17,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
-use crate::registry::{AsRule, Rule};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MockReference {
@@ -261,12 +260,10 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 },
                 value.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    "mock".to_string(),
-                    value.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "mock".to_string(),
+                value.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -282,17 +279,13 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| &name.name == "mock" || &name.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(Rule::DeprecatedMockImport) {
-                    if let Some(indent) = indentation(checker.locator(), stmt) {
-                        match format_import(stmt, indent, checker.locator(), checker.stylist()) {
-                            Ok(content) => Some(content),
-                            Err(e) => {
-                                error!("Failed to rewrite `mock` import: {e}");
-                                None
-                            }
+                let content = if let Some(indent) = indentation(checker.locator(), stmt) {
+                    match format_import(stmt, indent, checker.locator(), checker.stylist()) {
+                        Ok(content) => Some(content),
+                        Err(e) => {
+                            error!("Failed to rewrite `mock` import: {e}");
+                            None
                         }
-                    } else {
-                        None
                     }
                 } else {
                     None
@@ -308,7 +301,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             name.range(),
                         );
                         if let Some(content) = content.as_ref() {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                                 content.clone(),
                                 stmt.range(),
                             )));
@@ -334,14 +327,12 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     },
                     stmt.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator(), stmt) {
-                        diagnostic.try_set_fix(|| {
-                            format_import_from(stmt, indent, checker.locator(), checker.stylist())
-                                .map(|content| Edit::range_replacement(content, stmt.range()))
-                                .map(Fix::unsafe_edit)
-                        });
-                    }
+                if let Some(indent) = indentation(checker.locator(), stmt) {
+                    diagnostic.try_set_fix(|| {
+                        format_import_from(stmt, indent, checker.locator(), checker.stylist())
+                            .map(|content| Edit::range_replacement(content, stmt.range()))
+                            .map(Fix::safe_edit)
+                    });
                 }
                 checker.diagnostics.push(diagnostic);
             }

@@ -8,6 +8,8 @@ Foo.objects.create(**{"_id": some_id})  # PIE804
 
 Foo.objects.create(**{**bar})  # PIE804
 
+foo(**{})
+
 
 foo(**{**data, "foo": "buzz"})
 foo(**buzz)

@@ -12,7 +12,6 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `NamedTuple` declarations that use functional syntax.
@@ -114,17 +113,15 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         },
         stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-        if checker.locator().is_at_start_of_line(stmt.start()) {
-            diagnostic.set_fix(convert_to_class(
-                stmt,
-                typename,
-                fields,
-                base_class,
-                checker.generator(),
-            ));
-        }
+    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+    if checker.locator().is_at_start_of_line(stmt.start()) {
+        diagnostic.set_fix(convert_to_class(
+            stmt,
+            typename,
+            fields,
+            base_class,
+            checker.generator(),
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -241,7 +238,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    Fix::unsafe_edit(Edit::range_replacement(
+    Fix::safe_edit(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(typename, body, base_class)),
         stmt.range(),
     ))

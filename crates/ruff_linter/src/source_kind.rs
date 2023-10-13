@@ -91,7 +91,7 @@ impl SourceKind {
     pub fn diff(&self, other: &Self, path: Option<&Path>, writer: &mut dyn Write) -> Result<()> {
         match (self, other) {
             (SourceKind::Python(src), SourceKind::Python(dst)) => {
-                let text_diff = TextDiff::from_lines(dst, src);
+                let text_diff = TextDiff::from_lines(src, dst);
                 let mut unified_diff = text_diff.unified_diff();
 
                 if let Some(path) = path {

@@ -1218,6 +1218,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     comparators,
                 );
             }
+            if checker.enabled(Rule::SingleItemMembershipTest) {
+                refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
+            }
         }
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. },
@@ -1408,6 +1411,17 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::RepeatedEqualityComparison) {
                 pylint::rules::repeated_equality_comparison(checker, bool_op);
+            }
+            if checker.enabled(Rule::AndOrTernary) {
+                pylint::rules::and_or_ternary(checker, bool_op);
+            }
+            if checker.enabled(Rule::UnnecessaryKeyCheck) {
+                ruff::rules::unnecessary_key_check(checker, expr);
+            }
+        }
+        Expr::NamedExpr(..) => {
+            if checker.enabled(Rule::AssignmentInAssert) {
+                ruff::rules::assignment_in_assert(checker, expr);
             }
         }
         _ => {}

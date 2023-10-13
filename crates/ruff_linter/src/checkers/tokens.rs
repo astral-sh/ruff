@@ -72,7 +72,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
-        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer, settings);
+        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer);
     }
 
     if settings.rules.enabled(Rule::InvalidEscapeSequence) {
@@ -83,7 +83,6 @@ pub(crate) fn check_tokens(
                 indexer,
                 tok,
                 *range,
-                settings.rules.should_fix(Rule::InvalidEscapeSequence),
             );
         }
     }
@@ -109,13 +108,7 @@ pub(crate) fn check_tokens(
         Rule::MultipleStatementsOnOneLineSemicolon,
         Rule::UselessSemicolon,
     ]) {
-        pycodestyle::rules::compound_statements(
-            &mut diagnostics,
-            tokens,
-            locator,
-            indexer,
-            settings,
-        );
+        pycodestyle::rules::compound_statements(&mut diagnostics, tokens, locator, indexer);
     }
 
     if settings.rules.enabled(Rule::AvoidableEscapedQuote) && settings.flake8_quotes.avoid_escape {
@@ -137,7 +130,7 @@ pub(crate) fn check_tokens(
         flake8_implicit_str_concat::rules::implicit(
             &mut diagnostics,
             tokens,
-            &settings.flake8_implicit_str_concat,
+            settings,
             locator,
             indexer,
         );
@@ -148,11 +141,11 @@ pub(crate) fn check_tokens(
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
     ]) {
-        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator, settings);
+        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator);
     }
 
     if settings.rules.enabled(Rule::ExtraneousParentheses) {
-        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator, settings);
+        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator);
     }
 
     if is_stub && settings.rules.enabled(Rule::TypeCommentInStub) {
@@ -166,7 +159,7 @@ pub(crate) fn check_tokens(
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(tokens, path, locator, settings, &mut diagnostics);
+        flake8_executable::rules::from_tokens(tokens, path, locator, &mut diagnostics);
     }
 
     if settings.rules.any_enabled(&[
@@ -191,7 +184,7 @@ pub(crate) fn check_tokens(
                 TodoComment::from_comment(comment, *comment_range, i)
             })
             .collect();
-        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer, settings);
+        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer);
         flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
     }
 

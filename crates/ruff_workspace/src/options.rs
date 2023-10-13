@@ -2,12 +2,11 @@ use std::collections::BTreeSet;
 use std::hash::BuildHasherDefault;
 
 use regex::Regex;
-use ruff_formatter::IndentStyle;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::options_base::{OptionsMetadata, Visit};
+use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
@@ -30,6 +29,7 @@ use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::QuoteStyle;
 
+use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -362,7 +362,6 @@ pub struct Options {
         line-length = 120
         "#
     )]
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))]
     pub line_length: Option<LineLength>,
 
     /// The tabulation size to calculate line length.
@@ -524,6 +523,30 @@ pub struct LintOptions {
     )]
     pub ignore: Option<Vec<RuleSelector>>,
 
+    /// A list of rule codes or prefixes for which unsafe fixes should be considered
+    /// safe.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Allow applying all unsafe fixes in the `E` rules and `F401` without the `--unsafe-fixes` flag
+            extend_safe_fixes = ["E", "F401"]
+        "#
+    )]
+    pub extend_safe_fixes: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes for which safe fixes should be considered
+    /// unsafe.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
+            extend_unsafe_fixes = ["E", "F401"]
+        "#
+    )]
+    pub extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+
     /// Avoid automatically removing unused imports in `__init__.py` files. Such
     /// imports will still be flagged, but with a dedicated message suggesting
     /// that the import is either added to the module's `__all__` symbol, or
@@ -570,11 +593,11 @@ pub struct LintOptions {
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
     #[option(
-        default = r#"["E", "F"]"#,
+        default = r#"["E4", "E7", "E9", "F"]"#,
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            select = ["E", "F", "B", "Q"]
+            # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            select = ["E4", "E7", "E9", "F", "B", "Q"]
         "#
     )]
     pub select: Option<Vec<RuleSelector>>,

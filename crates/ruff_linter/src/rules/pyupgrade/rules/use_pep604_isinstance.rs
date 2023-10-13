@@ -6,7 +6,6 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum CallKind {
@@ -39,8 +38,12 @@ impl CallKind {
 ///
 /// ## Why is this bad?
 /// Since Python 3.10, `isinstance` and `issubclass` can be passed a
-/// `|`-separated union of types, which is more concise and consistent
+/// `|`-separated union of types, which is consistent
 /// with the union operator introduced in [PEP 604].
+///
+/// Note that this results in slower code. Ignore this rule if the
+/// performance of an `isinstance` or `issubclass` check is a
+/// concern, e.g., in a hot loop.
 ///
 /// ## Example
 /// ```python
@@ -116,12 +119,10 @@ pub(crate) fn use_pep604_isinstance(
                 }
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        checker.generator().expr(&union(elts)),
-                        types.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    checker.generator().expr(&union(elts)),
+                    types.range(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }

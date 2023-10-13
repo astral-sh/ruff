@@ -27,7 +27,7 @@ use ruff_linter::settings::types::{
     UnsafeFixes, Version,
 };
 use ruff_linter::settings::{
-    resolve_per_file_ignores, LinterSettings, DUMMY_VARIABLE_RGX, PREFIXES, TASK_TAGS,
+    resolve_per_file_ignores, LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS,
 };
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
@@ -55,6 +55,51 @@ pub struct RuleSelection {
     pub fixable: Option<Vec<RuleSelector>>,
     pub unfixable: Vec<RuleSelector>,
     pub extend_fixable: Vec<RuleSelector>,
+}
+
+#[derive(Debug, Eq, PartialEq, is_macro::Is)]
+pub enum RuleSelectorKind {
+    /// Enables the selected rules
+    Enable,
+    /// Disables the selected rules
+    Disable,
+    /// Modifies the behavior of selected rules
+    Modify,
+}
+
+impl RuleSelection {
+    pub fn selectors_by_kind(&self) -> impl Iterator<Item = (RuleSelectorKind, &RuleSelector)> {
+        self.select
+            .iter()
+            .flatten()
+            .map(|selector| (RuleSelectorKind::Enable, selector))
+            .chain(
+                self.fixable
+                    .iter()
+                    .flatten()
+                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+            )
+            .chain(
+                self.ignore
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Disable, selector)),
+            )
+            .chain(
+                self.extend_select
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Enable, selector)),
+            )
+            .chain(
+                self.unfixable
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+            )
+            .chain(
+                self.extend_fixable
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+            )
+    }
 }
 
 #[derive(Debug, Default)]
@@ -181,6 +226,28 @@ impl Configuration {
                         .chain(lint.extend_per_file_ignores)
                         .collect(),
                 )?,
+
+                extend_safe_fixes: lint
+                    .extend_safe_fixes
+                    .iter()
+                    .flat_map(|selector| {
+                        selector.rules(&PreviewOptions {
+                            mode: preview,
+                            require_explicit: false,
+                        })
+                    })
+                    .collect(),
+                extend_unsafe_fixes: lint
+                    .extend_unsafe_fixes
+                    .iter()
+                    .flat_map(|selector| {
+                        selector.rules(&PreviewOptions {
+                            mode: preview,
+                            require_explicit: false,
+                        })
+                    })
+                    .collect(),
+
                 src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
                 explicit_preview_rules: lint.explicit_preview_rules.unwrap_or_default(),
 
@@ -449,6 +516,10 @@ pub struct LintConfiguration {
     pub rule_selections: Vec<RuleSelection>,
     pub explicit_preview_rules: Option<bool>,
 
+    // Fix configuration
+    pub extend_unsafe_fixes: Vec<RuleSelector>,
+    pub extend_safe_fixes: Vec<RuleSelector>,
+
     // Global lint settings
     pub allowed_confusables: Option<Vec<char>>,
     pub dummy_variable_rgx: Option<Regex>,
@@ -506,6 +577,8 @@ impl LintConfiguration {
                     .collect(),
                 extend_fixable: options.extend_fixable.unwrap_or_default(),
             }],
+            extend_safe_fixes: options.extend_safe_fixes.unwrap_or_default(),
+            extend_unsafe_fixes: options.extend_unsafe_fixes.unwrap_or_default(),
             allowed_confusables: options.allowed_confusables,
             dummy_variable_rgx: options
                 .dummy_variable_rgx
@@ -572,7 +645,7 @@ impl LintConfiguration {
         };
 
         // The select_set keeps track of which rules have been selected.
-        let mut select_set: RuleSet = PREFIXES
+        let mut select_set: RuleSet = DEFAULT_SELECTORS
             .iter()
             .flat_map(|selector| selector.rules(&preview))
             .collect();
@@ -704,16 +777,7 @@ impl LintConfiguration {
             }
 
             // Check for selections that require a warning
-            for selector in selection
-                .select
-                .iter()
-                .chain(selection.fixable.iter())
-                .flatten()
-                .chain(selection.ignore.iter())
-                .chain(selection.extend_select.iter())
-                .chain(selection.unfixable.iter())
-                .chain(selection.extend_fixable.iter())
-            {
+            for (kind, selector) in selection.selectors_by_kind() {
                 #[allow(deprecated)]
                 if matches!(selector, RuleSelector::Nursery) {
                     let suggestion = if preview.mode.is_disabled() {
@@ -725,7 +789,9 @@ impl LintConfiguration {
                     warn_user_once!("The `NURSERY` selector has been deprecated.{suggestion}");
                 };
 
-                if preview.mode.is_disabled() {
+                // Only warn for the following selectors if used to enable rules
+                // e.g. use with `--ignore` or `--fixable` is okay
+                if preview.mode.is_disabled() && kind.is_enable() {
                     if let RuleSelector::Rule { prefix, .. } = selector {
                         if prefix.rules().any(|rule| rule.is_nursery()) {
                             deprecated_nursery_selectors.insert(selector);
@@ -808,6 +874,16 @@ impl LintConfiguration {
                 .rule_selections
                 .into_iter()
                 .chain(self.rule_selections)
+                .collect(),
+            extend_safe_fixes: config
+                .extend_safe_fixes
+                .into_iter()
+                .chain(self.extend_safe_fixes)
+                .collect(),
+            extend_unsafe_fixes: config
+                .extend_unsafe_fixes
+                .into_iter()
+                .chain(self.extend_unsafe_fixes)
                 .collect(),
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
@@ -1000,6 +1076,8 @@ mod tests {
     ];
 
     const PREVIEW_RULES: &[Rule] = &[
+        Rule::AndOrTernary,
+        Rule::AssignmentInAssert,
         Rule::DirectLoggerInstantiation,
         Rule::InvalidGetLoggerArgument,
         Rule::ManualDictComprehension,

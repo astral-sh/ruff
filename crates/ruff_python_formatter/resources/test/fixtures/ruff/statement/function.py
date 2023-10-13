@@ -384,3 +384,29 @@ try:
     #comment
 except ImportError:
     pass
+
+# https://github.com/astral-sh/ruff/issues/7603
+def default_arg_comments(
+    a: str = #a
+    "a",
+    b: str =
+    #b
+    "b",
+    c: str =( #c
+        "c"
+    ),
+    d: str =(
+        #d
+        "d"
+    )
+):
+    print(a, b, c, d)
+
+def default_arg_comments2(#
+        x: int#=
+        = #
+        #
+        123#
+        #
+):
+    print(x)

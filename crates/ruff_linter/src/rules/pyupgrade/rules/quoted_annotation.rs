@@ -4,7 +4,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for the presence of unnecessary quotes in type annotations.
@@ -53,11 +52,9 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 /// UP037
 pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: TextRange) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotation, range);
-    if checker.patch(Rule::QuotedAnnotation) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            annotation.to_string(),
-            range,
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        annotation.to_string(),
+        range,
+    )));
     checker.diagnostics.push(diagnostic);
 }

@@ -5,7 +5,6 @@ use ruff_python_codegen::Generator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `print` calls with an empty string as the only positional
@@ -77,9 +76,6 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
     }
 
     match &call.arguments.args.as_slice() {
-        // Ex) `print(*args)` or `print(*args, sep="\t")`
-        [arg] if arg.is_starred_expr() => {}
-
         // Ex) `print("")` or `print("", sep="\t")`
         [arg] if is_empty_string(arg) => {
             let reason = if call.arguments.find_keyword("sep").is_some() {
@@ -90,13 +86,11 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
 
             let mut diagnostic = Diagnostic::new(PrintEmptyString { reason }, call.range());
 
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-                    generate_suggestion(call, Separator::Remove, checker.generator()),
-                    call.start(),
-                    call.end(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                generate_suggestion(call, Separator::Remove, checker.generator()),
+                call.start(),
+                call.end(),
+            )));
 
             checker.diagnostics.push(diagnostic);
         }
@@ -112,13 +106,11 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                     call.range(),
                 );
 
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-                        generate_suggestion(call, Separator::Remove, checker.generator()),
-                        call.start(),
-                        call.end(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                    generate_suggestion(call, Separator::Remove, checker.generator()),
+                    call.start(),
+                    call.end(),
+                )));
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -177,13 +169,11 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                 call.range(),
             );
 
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-                    generate_suggestion(call, separator, checker.generator()),
-                    call.start(),
-                    call.end(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                generate_suggestion(call, separator, checker.generator()),
+                call.start(),
+                call.end(),
+            )));
 
             checker.diagnostics.push(diagnostic);
         }

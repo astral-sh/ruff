@@ -54,11 +54,7 @@ impl AlwaysFixableViolation for WhitespaceBeforeParameters {
 }
 
 /// E211
-pub(crate) fn whitespace_before_parameters(
-    line: &LogicalLine,
-    fix: bool,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let previous = line.tokens().first().unwrap();
 
     let mut pre_pre_kind: Option<TokenKind> = None;
@@ -81,10 +77,7 @@ pub(crate) fn whitespace_before_parameters(
             let kind: WhitespaceBeforeParameters = WhitespaceBeforeParameters { bracket: kind };
 
             let mut diagnostic = Diagnostic::new(kind, TextRange::new(start, end));
-
-            if fix {
-                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
             context.push_diagnostic(diagnostic);
         }
         pre_pre_kind = Some(prev_token);

@@ -11,7 +11,6 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 use crate::line_width::LineWidthBuilder;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced with a builtin function, like
@@ -114,7 +113,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
-            if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("any") {
+            if checker.semantic().is_builtin("any") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),
@@ -200,7 +199,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
-            if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("all") {
+            if checker.semantic().is_builtin("all") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),

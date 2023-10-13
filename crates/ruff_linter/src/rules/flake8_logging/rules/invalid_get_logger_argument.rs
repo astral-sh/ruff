@@ -4,7 +4,6 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for any usage of `__cached__` and `__file__` as an argument to
@@ -80,13 +79,11 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
     }
 
     let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        if checker.semantic().is_builtin("__name__") {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                "__name__".to_string(),
-                expr.range(),
-            )));
-        }
+    if checker.semantic().is_builtin("__name__") {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            "__name__".to_string(),
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

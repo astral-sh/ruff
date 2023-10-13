@@ -6,7 +6,6 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for f-strings that do not contain any placeholder expressions.
@@ -108,13 +107,11 @@ pub(crate) fn f_string_missing_placeholders(fstring: &ast::ExprFString, checker:
             fstring_prefix_and_tok_range(fstring, checker.locator(), checker.source_type)
         {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(convert_f_string_to_regular_string(
-                    prefix_range,
-                    tok_range,
-                    checker.locator(),
-                ));
-            }
+            diagnostic.set_fix(convert_f_string_to_regular_string(
+                prefix_range,
+                tok_range,
+                checker.locator(),
+            ));
             checker.diagnostics.push(diagnostic);
         }
     }

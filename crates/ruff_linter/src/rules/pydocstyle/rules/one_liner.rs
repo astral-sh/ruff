@@ -6,7 +6,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for single-line docstrings that are broken across multiple lines.
@@ -65,24 +64,22 @@ pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
 
     if non_empty_line_count == 1 && line_count > 1 {
         let mut diagnostic = Diagnostic::new(FitsOnOneLine, docstring.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if let (Some(leading), Some(trailing)) = (
-                leading_quote(docstring.contents),
-                trailing_quote(docstring.contents),
-            ) {
-                // If removing whitespace would lead to an invalid string of quote
-                // characters, avoid applying the fix.
-                let body = docstring.body();
-                let trimmed = body.trim();
-                if trimmed.chars().rev().take_while(|c| *c == '\\').count() % 2 == 0
-                    && !trimmed.ends_with(trailing.chars().last().unwrap())
-                    && !trimmed.starts_with(leading.chars().last().unwrap())
-                {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        format!("{leading}{trimmed}{trailing}"),
-                        docstring.range(),
-                    )));
-                }
+        if let (Some(leading), Some(trailing)) = (
+            leading_quote(docstring.contents),
+            trailing_quote(docstring.contents),
+        ) {
+            // If removing whitespace would lead to an invalid string of quote
+            // characters, avoid applying the fix.
+            let body = docstring.body();
+            let trimmed = body.trim();
+            if trimmed.chars().rev().take_while(|c| *c == '\\').count() % 2 == 0
+                && !trimmed.ends_with(trailing.chars().last().unwrap())
+                && !trimmed.starts_with(leading.chars().last().unwrap())
+            {
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    format!("{leading}{trimmed}{trailing}"),
+                    docstring.range(),
+                )));
             }
         }
         checker.diagnostics.push(diagnostic);

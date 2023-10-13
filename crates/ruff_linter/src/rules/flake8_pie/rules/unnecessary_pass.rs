@@ -8,7 +8,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for unnecessary `pass` statements in functions, classes, and other
@@ -63,17 +62,14 @@ pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
         .filter(|stmt| stmt.is_pass_stmt())
         .for_each(|stmt| {
             let mut diagnostic = Diagnostic::new(UnnecessaryPass, stmt.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                let edit =
-                    if let Some(index) = trailing_comment_start_offset(stmt, checker.locator()) {
-                        Edit::range_deletion(stmt.range().add_end(index))
-                    } else {
-                        fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer())
-                    };
-                diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
-                    checker.semantic().current_statement_id(),
-                )));
-            }
+            let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.locator()) {
+                Edit::range_deletion(stmt.range().add_end(index))
+            } else {
+                fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer())
+            };
+            diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
+                checker.semantic().current_statement_id(),
+            )));
             checker.diagnostics.push(diagnostic);
         });
 }

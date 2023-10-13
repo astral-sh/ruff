@@ -1,15 +1,15 @@
 use itertools::Itertools;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
-use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_index::Indexer;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::rules::flake8_implicit_str_concat::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for implicitly concatenated strings on a single line.
@@ -94,7 +94,7 @@ impl Violation for MultiLineImplicitStringConcatenation {
 pub(crate) fn implicit(
     diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
-    settings: &Settings,
+    settings: &LinterSettings,
     locator: &Locator,
     indexer: &Indexer,
 ) {
@@ -102,7 +102,9 @@ pub(crate) fn implicit(
         .iter()
         .flatten()
         .filter(|(tok, _)| {
-            !tok.is_comment() && (settings.allow_multiline || !tok.is_non_logical_newline())
+            !tok.is_comment()
+                && (settings.flake8_implicit_str_concat.allow_multiline
+                    || !tok.is_non_logical_newline())
         })
         .tuple_windows()
     {

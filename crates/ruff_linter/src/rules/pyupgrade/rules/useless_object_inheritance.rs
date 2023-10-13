@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for classes that inherit from `object`.
@@ -68,17 +67,15 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
             },
             base.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                remove_argument(
-                    base,
-                    arguments,
-                    Parentheses::Remove,
-                    checker.locator().contents(),
-                )
-                .map(Fix::safe_edit)
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            remove_argument(
+                base,
+                arguments,
+                Parentheses::Remove,
+                checker.locator().contents(),
+            )
+            .map(Fix::safe_edit)
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

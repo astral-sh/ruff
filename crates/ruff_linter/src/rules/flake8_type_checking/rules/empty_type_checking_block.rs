@@ -6,7 +6,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for an empty type-checking block.
@@ -56,14 +55,12 @@ pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtI
     }
 
     let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, stmt.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        // Delete the entire type-checking block.
-        let stmt = checker.semantic().current_statement();
-        let parent = checker.semantic().current_statement_parent();
-        let edit = fix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
-            checker.semantic().current_statement_parent_id(),
-        )));
-    }
+    // Delete the entire type-checking block.
+    let stmt = checker.semantic().current_statement();
+    let parent = checker.semantic().current_statement_parent();
+    let edit = fix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
+    diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
+        checker.semantic().current_statement_parent_id(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

@@ -143,11 +143,6 @@ impl<'a> Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
-    /// Return `true` if a patch should be generated for a given [`Rule`].
-    pub(crate) fn patch(&self, code: Rule) -> bool {
-        self.settings.rules.should_fix(code)
-    }
-
     /// Return `true` if a [`Rule`] is disabled by a `noqa` directive.
     pub(crate) fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
@@ -1168,13 +1163,14 @@ where
                                 range: _,
                             }) = slice.as_ref()
                             {
-                                if let Some(expr) = elts.first() {
+                                let mut iter = elts.iter();
+                                if let Some(expr) = iter.next() {
                                     self.visit_expr(expr);
-                                    for expr in elts.iter().skip(1) {
-                                        self.visit_non_type_definition(expr);
-                                    }
-                                    self.visit_expr_context(ctx);
                                 }
+                                for expr in iter {
+                                    self.visit_non_type_definition(expr);
+                                }
+                                self.visit_expr_context(ctx);
                             } else {
                                 debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
@@ -1366,7 +1362,7 @@ where
     fn visit_match_case(&mut self, match_case: &'b MatchCase) {
         self.visit_pattern(&match_case.pattern);
         if let Some(expr) = &match_case.guard {
-            self.visit_expr(expr);
+            self.visit_boolean_test(expr);
         }
 
         self.semantic.push_branch();
@@ -1618,10 +1614,12 @@ impl<'a> Checker<'a> {
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
         let parent = self.semantic.current_statement();
 
+        // Match the left-hand side of an annotated assignment, like `x` in `x: int`.
         if matches!(
             parent,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) {
+        ) && !self.semantic.in_annotation()
+        {
             self.add_binding(
                 id,
                 expr.range(),

@@ -15,7 +15,7 @@ use crate::cst::matchers::{
     match_attribute, match_call_mut, match_expression, transform_expression_text,
 };
 use crate::fix::codemods::CodegenStylist;
-use crate::registry::AsRule;
+
 use crate::rules::pyflakes::format::FormatSummary;
 
 /// ## What it does
@@ -113,13 +113,10 @@ pub(crate) fn format_literals(
     };
 
     let mut diagnostic = Diagnostic::new(FormatLiterals, call.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            generate_call(call, arguments, checker.locator(), checker.stylist()).map(|suggestion| {
-                Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range()))
-            })
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        generate_call(call, arguments, checker.locator(), checker.stylist())
+            .map(|suggestion| Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range())))
+    });
     checker.diagnostics.push(diagnostic);
 }
 
