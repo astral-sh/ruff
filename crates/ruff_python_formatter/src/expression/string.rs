@@ -496,7 +496,7 @@ impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
 
 bitflags! {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    pub(super) struct StringPrefix: u8 {
+    pub(crate) struct StringPrefix: u8 {
         const UNICODE   = 0b0000_0001;
         /// `r"test"`
         const RAW       = 0b0000_0010;
@@ -508,7 +508,7 @@ bitflags! {
 }
 
 impl StringPrefix {
-    pub(super) fn parse(input: &str) -> StringPrefix {
+    pub(crate) fn parse(input: &str) -> StringPrefix {
         let chars = input.chars();
         let mut prefix = StringPrefix::empty();
 
@@ -533,15 +533,15 @@ impl StringPrefix {
         prefix
     }
 
-    pub(super) const fn text_len(self) -> TextSize {
+    pub(crate) const fn text_len(self) -> TextSize {
         TextSize::new(self.bits().count_ones())
     }
 
-    pub(super) const fn is_raw_string(self) -> bool {
+    pub(crate) const fn is_raw_string(self) -> bool {
         self.contains(StringPrefix::RAW) || self.contains(StringPrefix::RAW_UPPER)
     }
 
-    pub(super) const fn is_fstring(self) -> bool {
+    pub(crate) const fn is_fstring(self) -> bool {
         self.contains(StringPrefix::F_STRING)
     }
 }

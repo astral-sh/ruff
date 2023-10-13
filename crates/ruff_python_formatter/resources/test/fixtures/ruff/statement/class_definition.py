@@ -102,6 +102,11 @@ class Test:
     x = 1
 
 
+class EmptyLineBeforeRawDocstring:
+
+    r"""Character and line based layer over a BufferedIOBase object, buffer."""
+
+
 class C(): # comment
     pass
 

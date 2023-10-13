@@ -10,7 +10,7 @@ use crate::comments::{
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_constant::ExprConstantLayout;
-use crate::expression::string::StringLayout;
+use crate::expression::string::{StringLayout, StringPrefix};
 use crate::prelude::*;
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
@@ -99,9 +99,13 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
             SuiteKind::Class => {
                 if let Some(docstring) = DocstringStmt::try_from_statement(first) {
+                    let prefix =
+                        StringPrefix::parse(f.context().locator().slice(docstring.0.range()));
                     if !comments.has_leading(first)
                         && lines_before(first.start(), source) > 1
                         && !source_type.is_stub()
+                        // For some reason black removes the empty line before raw docstrings
+                        && !prefix.is_raw_string()
                     {
                         // Allow up to one empty line before a class docstring, e.g., this is
                         // stable formatting:
@@ -484,8 +488,10 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 }
 
 /// A statement representing a docstring.
+///
+/// We keep both the outer statement and the inner constant here for convenience.
 #[derive(Copy, Clone)]
-pub(crate) struct DocstringStmt<'a>(&'a Stmt);
+pub(crate) struct DocstringStmt<'a>(&'a Stmt, &'a ExprConstant);
 
 impl<'a> DocstringStmt<'a> {
     /// Checks if the statement is a simple string that can be formatted as a docstring
@@ -494,9 +500,9 @@ impl<'a> DocstringStmt<'a> {
             return None;
         };
 
-        if let Expr::Constant(ExprConstant { value, .. }) = value.as_ref() {
-            if !value.is_implicit_concatenated() {
-                return Some(DocstringStmt(stmt));
+        if let Expr::Constant(expr_constant @ ExprConstant { value, .. }) = value.as_ref() {
+            if (value.is_str() || value.is_unicode_string()) && !value.is_implicit_concatenated() {
+                return Some(DocstringStmt(stmt, expr_constant));
             }
         }
 
@@ -512,21 +518,12 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
         if FormatStmtExpr.is_suppressed(node_comments.trailing, f.context()) {
             suppressed_node(self.0).fmt(f)
         } else {
-            // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ConstantExpr`.
-            let constant = self
-                .0
-                .as_expr_stmt()
-                .unwrap()
-                .value
-                .as_constant_expr()
-                .unwrap();
-
             // We format the expression, but the statement carries the comments
             write!(
                 f,
                 [
                     leading_comments(node_comments.leading),
-                    constant
+                    self.1
                         .format()
                         .with_options(ExprConstantLayout::String(StringLayout::DocString)),
                     trailing_comments(node_comments.trailing),
