@@ -100,3 +100,26 @@ _New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
 ### Playground
 
 - Fix playground `Quick Fix` action ([#7824](https://github.com/astral-sh/ruff/pull/7824))
+
+### Contributors
+
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@Hoxbro](https://github.com/Hoxbro)
+- [@JelleZijlstra](https://github.com/JelleZijlstra)
+- [@T-256](https://github.com/T-256)
+- [@bluthej](https://github.com/bluthej)
+- [@cberry31](https://github.com/cberry31)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@cnpryer](https://github.com/cnpryer)
+- [@cosmojg](https://github.com/cosmojg)
+- [@danbi2990](https://github.com/danbi2990)
+- [@dependabot](https://github.com/dependabot)
+- [@dhruvmanila](https://github.com/dhruvmanila)
+- [@diceroll123](https://github.com/diceroll123)
+- [@flying-sheep](https://github.com/flying-sheep)
+- [@harupy](https://github.com/harupy)
+- [@henryiii](https://github.com/henryiii)
+- [@konstin](https://github.com/konstin)
+- [@timobrembeck](https://github.com/timobrembeck)
+- [@tjkuson](https://github.com/tjkuson)
+- [@zanieb](https://github.com/zanieb)
