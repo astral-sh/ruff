@@ -112,6 +112,7 @@ class EmptyLineBeforeRawDocstring:
 
     r"""Character and line based layer over a BufferedIOBase object, buffer."""
 
+
 class C(): # comment
     pass
 
