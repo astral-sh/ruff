@@ -1,5 +1,9 @@
 # Changelog
 
+This is the first release which uses the `CHANGELOG` file. See [GitHub Releases](https://github.com/astral-sh/ruff/releases) for prior changelog entries.
+
+Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
+
 ## 0.1.0
 
 ### Breaking changes
@@ -25,6 +29,8 @@
 - Add `assignment-in-assert` to prevent walrus expressions in assert statements (#7856)
 - [`refurb`] Add `single-item-membership-test` (`FURB171`) (#7815)
 - [`pylint`] Add `and-or-ternary` (`R1706`) (#7811)
+
+_New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
 
 ### Configuration
 - Add `unsafe-fixes` setting (#7769)
