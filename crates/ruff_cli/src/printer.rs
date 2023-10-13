@@ -161,7 +161,7 @@ impl Printer {
                                 "es"
                             };
                             writeln!(writer,
-                                "{} hidden fix{es} can be enabled with the `--unsafe-fixes` option.",
+                                "No fixes available ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.unapplicable_unsafe
                             )?;
                         }

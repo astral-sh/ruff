@@ -945,7 +945,7 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
     Found 1 error.
-    1 hidden fix can be enabled with the `--unsafe-fixes` option.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
@@ -1002,7 +1002,7 @@ fn fix_applies_safe_fixes_by_default() {
     ----- stderr -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
     Found 2 errors (1 fixed, 1 remaining).
-    1 hidden fix can be enabled with the `--unsafe-fixes` option.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
 }
 
@@ -1112,7 +1112,7 @@ fn fix_only_unsafe_fixes_available() {
     ----- stderr -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
     Found 1 error.
-    1 hidden fix can be enabled with the `--unsafe-fixes` option.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
 }
 
@@ -1317,7 +1317,7 @@ extend-unsafe-fixes = ["UP034"]
     -:1:14: F601 Dictionary key literal `'a'` repeated
     -:2:7: UP034 Avoid extraneous parentheses
     Found 2 errors.
-    2 hidden fixes can be enabled with the `--unsafe-fixes` option.
+    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
@@ -1397,7 +1397,7 @@ extend-safe-fixes = ["UP034"]
     -:1:14: F601 Dictionary key literal `'a'` repeated
     -:2:7: UP034 Avoid extraneous parentheses
     Found 2 errors.
-    2 hidden fixes can be enabled with the `--unsafe-fixes` option.
+    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
