@@ -73,7 +73,7 @@ pub(crate) fn format(
     }
 
     let start = Instant::now();
-    let (mut results, errors): (Vec<_>, Vec<_>) = paths
+    let (mut results, mut errors): (Vec<_>, Vec<_>) = paths
         .into_par_iter()
         .filter_map(|entry| {
             match entry {
@@ -120,6 +120,27 @@ pub(crate) fn format(
             Err(err) => Right(err),
         });
     let duration = start.elapsed();
+
+    // Make output deterministic, at least as long as we have a path
+    results.sort_by(|x, y| x.path.cmp(&y.path));
+    errors.sort_by(|x, y| {
+        fn get_key(error: &FormatCommandError) -> Option<&PathBuf> {
+            match &error {
+                FormatCommandError::Ignore(ignore) => {
+                    if let ignore::Error::WithPath { path, .. } = ignore {
+                        Some(path)
+                    } else {
+                        None
+                    }
+                }
+                FormatCommandError::Panic(path, _)
+                | FormatCommandError::Read(path, _)
+                | FormatCommandError::Format(path, _)
+                | FormatCommandError::Write(path, _) => path.as_ref(),
+            }
+        }
+        get_key(x).cmp(&get_key(y))
+    });
 
     debug!(
         "Formatted {} files in {:.2?}",

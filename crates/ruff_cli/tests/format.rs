@@ -305,13 +305,6 @@ fn test_diff() {
         success: false
         exit_code: 1
         ----- stdout -----
-        --- resources/test/fixtures/unformatted.py
-        +++ resources/test/fixtures/unformatted.py
-        @@ -1,3 +1,3 @@
-         x = 1
-        -y=2
-        +y = 2
-         z = 3
         --- resources/test/fixtures/unformatted.ipynb
         +++ resources/test/fixtures/unformatted.ipynb
         @@ -1,3 +1,4 @@
@@ -321,6 +314,13 @@ fn test_diff() {
         +
         +maths = (numpy.arange(100) ** 2).sum()
         +stats = numpy.asarray([1, 2, 3, 4]).median()
+        --- resources/test/fixtures/unformatted.py
+        +++ resources/test/fixtures/unformatted.py
+        @@ -1,3 +1,3 @@
+         x = 1
+        -y=2
+        +y = 2
+         z = 3
 
         ----- stderr -----
         warning: `ruff format` is not yet stable, and subject to change in future versions.
