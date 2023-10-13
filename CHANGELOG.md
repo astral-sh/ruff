@@ -113,7 +113,6 @@ _New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
 - [@cnpryer](https://github.com/cnpryer)
 - [@cosmojg](https://github.com/cosmojg)
 - [@danbi2990](https://github.com/danbi2990)
-- [@dependabot](https://github.com/dependabot)
 - [@dhruvmanila](https://github.com/dhruvmanila)
 - [@diceroll123](https://github.com/diceroll123)
 - [@flying-sheep](https://github.com/flying-sheep)
