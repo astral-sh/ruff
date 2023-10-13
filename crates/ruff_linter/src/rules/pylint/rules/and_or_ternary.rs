@@ -91,6 +91,7 @@ fn is_comprehension_if(parent: Option<&Expr>, expr: &ExprBoolOp) -> bool {
         .any(|comp| comp.ifs.iter().any(|ifs| ifs.range() == expr.range()))
 }
 
+/// PLR1706
 pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
     if checker.semantic().current_statement().is_if_stmt() {
         return;
