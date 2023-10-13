@@ -6,13 +6,19 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks if pre-python 2.5 ternary syntax is used.
+/// Checks for uses of the known pre-Python 2.5 ternary syntax.
 ///
 /// ## Why is this bad?
-/// If-expressions are more readable than logical ternary expressions.
+/// Prior to the introduction of the if-expression (ternary) operator in Python
+/// 2.5, the only way to express a conditional expression was to use the `and`
+/// and `or` operators.
+///
+/// The if-expression construct is clearer and more explicit, and should be
+/// preferred over the use of `and` and `or` for ternary expressions.
 ///
 /// ## Example
 /// ```python
@@ -27,7 +33,7 @@ use crate::registry::AsRule;
 /// ```
 #[violation]
 pub struct AndOrTernary {
-    ternary: String,
+    ternary: SourceCodeSnippet,
 }
 
 impl Violation for AndOrTernary {
@@ -35,18 +41,20 @@ impl Violation for AndOrTernary {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Pre-python 2.5 ternary syntax used")
+        if let Some(ternary) = self.ternary.full_display() {
+            format!("Consider using if-else expression (`{ternary}`)")
+        } else {
+            format!("Consider using if-else expression")
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let AndOrTernary { ternary } = self;
-        Some(format!("Use `{ternary}`"))
+        Some(format!("Convert to if-else expression"))
     }
 }
 
-/// Returns `Some((condition, true_value, false_value))`
-/// if `bool_op` is `condition and true_value or false_value` form.
-fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<(Expr, Expr, Expr)> {
+/// Returns `Some((condition, true_value, false_value))`, if `bool_op` is of the form `condition and true_value or false_value`.
+fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<(&Expr, &Expr, &Expr)> {
     if bool_op.op != BoolOp::Or {
         return None;
     }
@@ -62,13 +70,13 @@ fn parse_and_or_ternary(bool_op: &ExprBoolOp) -> Option<(Expr, Expr, Expr)> {
     let [condition, true_value] = and_op.values.as_slice() else {
         return None;
     };
-    if !false_value.is_bool_op_expr() && !true_value.is_bool_op_expr() {
-        return Some((condition.clone(), true_value.clone(), false_value.clone()));
+    if false_value.is_bool_op_expr() || true_value.is_bool_op_expr() {
+        return None;
     }
-    None
+    Some((condition, true_value, false_value))
 }
 
-/// Returns `true` if expr is used as comprehension-if.
+/// Returns `true` if the expression is used within a comprehension.
 fn is_comprehension_if(parent: Option<&Expr>, expr: &ExprBoolOp) -> bool {
     let comprehensions = match parent {
         Some(Expr::ListComp(ExprListComp { generators, .. })) => generators,
@@ -96,9 +104,9 @@ pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
     };
 
     let if_expr = Expr::IfExp(ExprIfExp {
-        test: Box::new(condition),
-        body: Box::new(true_value),
-        orelse: Box::new(false_value),
+        test: Box::new(condition.clone()),
+        body: Box::new(true_value.clone()),
+        orelse: Box::new(false_value.clone()),
         range: TextRange::default(),
     });
 
@@ -110,7 +118,7 @@ pub(crate) fn and_or_ternary(checker: &mut Checker, bool_op: &ExprBoolOp) {
 
     let mut diagnostic = Diagnostic::new(
         AndOrTernary {
-            ternary: ternary.clone(),
+            ternary: SourceCodeSnippet::new(ternary.clone()),
         },
         bool_op.range,
     );
