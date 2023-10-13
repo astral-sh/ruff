@@ -52,8 +52,8 @@ use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_semantic::analyze::{typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport,
-    SubmoduleImport,
+    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, Snapshot,
+    StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_source_file::Locator;
@@ -1844,6 +1844,7 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
+        let mut visited_lambdas: Vec<(&Expr, Snapshot)> = vec![];
         while !self.deferred.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.deferred.lambdas);
             for (expr, snapshot) in lambdas {
@@ -1859,11 +1860,21 @@ impl<'a> Checker<'a> {
                         self.visit_parameters(parameters);
                     }
                     self.visit_expr(body);
+
+                    visited_lambdas.push((expr, snapshot));
                 } else {
                     unreachable!("Expected Expr::Lambda");
                 }
             }
         }
+
+        // all deferred lambdas must be visited before we can analyze them, because they might
+        // be nested
+        for (expr, snapshot) in visited_lambdas {
+            self.semantic.restore(snapshot);
+            analyze::lambda(expr, self);
+        }
+
         self.semantic.restore(snapshot);
     }
 
@@ -1980,8 +1991,8 @@ pub(crate) fn check_ast(
     checker.visit_deferred_type_param_definitions();
     let allocator = typed_arena::Arena::new();
     checker.visit_deferred_string_type_definitions(&allocator);
-    checker.visit_exports();
 
+    checker.visit_exports();
     // Check docstrings, bindings, and unresolved references.
     analyze::deferred_for_loops(&mut checker);
     analyze::definitions(&mut checker);

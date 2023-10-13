@@ -254,6 +254,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R5501") => (RuleGroup::Unspecified, rules::pylint::rules::CollapsibleElseIf),
         #[allow(deprecated)]
         (Pylint, "R6301") => (RuleGroup::Nursery, rules::pylint::rules::NoSelfUse),
+        (Pylint, "W0108") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryLambda),
         (Pylint, "W0120") => (RuleGroup::Unspecified, rules::pylint::rules::UselessElseOnLoop),
         (Pylint, "W0127") => (RuleGroup::Unspecified, rules::pylint::rules::SelfAssigningVariable),
         (Pylint, "W0129") => (RuleGroup::Unspecified, rules::pylint::rules::AssertOnStringLiteral),
