@@ -29,6 +29,7 @@ SECTIONS: list[Section] = [
     Section("Rules", "rules.md", generated=True),
     Section("Settings", "settings.md", generated=True),
     Section("Editor Integrations", "editor-integrations.md", generated=False),
+    Section("Versioning", "versioning.md", generated=False),
     Section("FAQ", "faq.md", generated=False),
     Section("Contributing", "contributing.md", generated=True),
 ]
