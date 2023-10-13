@@ -1,5 +1,25 @@
 # Breaking Changes
 
+## 0.1.0
+
+### Unsafe fixes are not applied by default ([#7769](https://github.com/astral-sh/ruff/pull/7769))
+
+Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when applying safe
+fixes, but the meaning could be changed when applying unsafe fixes. Previously, unsafe fixes were always displayed
+and applied when fixing was enabled. Now, unsafe fixes are hidden by default and not applied. The `--unsafe-fixes`
+flag or `unsafe-fixes` configuration option can be used to enable unsafe fixes.
+
+See the [docs](https://docs.astral.sh/ruff/configuration/#fix-safety) for details.
+
+### Remove formatter-conflicting rules from the default rule set  ([#7900](https://github.com/astral-sh/ruff/pull/7900))
+
+Previously, Ruff enabled all implemented rules in Pycodestyle (`E`) by default. Ruff now only includes the
+Pycodestyle prefixes `E4`, `E7`, and `E9` to exclude rules that conflict with automatic formatters. Consequently,
+the stable rule set no longer includes `line-too-long` (`E501`) and `mixed-spaces-and-tabs` (`E101`). Other
+excluded Pycodestyle rules include whitespace enforcement in `E1` and `E2`; these rules are currently in preview, and are already omitted by default.
+
+This change only affects those using Ruff under its default rule set. Users that include `E` in their `select` will experience no change in behavior.
+
 ## 0.0.288
 
 ### Remove support for emoji identifiers ([#7212](https://github.com/astral-sh/ruff/pull/7212))
