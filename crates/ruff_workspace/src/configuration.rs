@@ -1076,6 +1076,8 @@ mod tests {
     ];
 
     const PREVIEW_RULES: &[Rule] = &[
+        Rule::AndOrTernary,
+        Rule::AssignmentInAssert,
         Rule::DirectLoggerInstantiation,
         Rule::InvalidGetLoggerArgument,
         Rule::ManualDictComprehension,
@@ -1085,7 +1087,6 @@ mod tests {
         Rule::TooManyPublicMethods,
         Rule::UndocumentedWarn,
         Rule::UnnecessaryEnumerate,
-        Rule::AssignmentInAssert,
     ];
 
     #[allow(clippy::needless_pass_by_value)]
