@@ -1,5 +1,5 @@
 use ast::{ExprContext, Operator};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
@@ -10,8 +10,8 @@ use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 /// Checks for the presence of multiple `type`s in a union.
 ///
 /// ## Why is this bad?
-/// The `type` built-in function accepts unions, and it is
-/// clearer to explicitly specify them as a single `type`.
+/// The `type` built-in function accepts unions, and it is clearer to
+/// explicitly specify them as a single `type`.
 ///
 /// ## Example
 /// ```python
@@ -28,7 +28,9 @@ pub struct UnnecessaryTypeUnion {
     is_pep604_union: bool,
 }
 
-impl AlwaysFixableViolation for UnnecessaryTypeUnion {
+impl Violation for UnnecessaryTypeUnion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let union_str = if self.is_pep604_union {
@@ -42,8 +44,8 @@ impl AlwaysFixableViolation for UnnecessaryTypeUnion {
         )
     }
 
-    fn fix_title(&self) -> String {
-        format!("Combine multiple `type` members into one union")
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Combine multiple `type` members"))
     }
 }
 
