@@ -35,6 +35,7 @@ impl<'a> Diff<'a> {
 
 impl Display for Diff<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // TODO(dhruvmanila): Add support for Notebook cells once it's user-facing
         let mut output = String::with_capacity(self.source_code.source_text().len());
         let mut last_end = TextSize::default();
 

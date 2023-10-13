@@ -168,6 +168,7 @@ import os
     ----- stdout -----
     [
       {
+        "cell": null,
         "code": "F401",
         "end_location": {
           "column": 10,
