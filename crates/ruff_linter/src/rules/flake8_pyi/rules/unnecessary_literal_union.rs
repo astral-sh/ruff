@@ -102,11 +102,14 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
 
     // for the sake of consistency and correctness, we'll use the first Literal subscript attribute
     let mut literal_subscript = None;
+    let mut total_literals = 0;
 
     // Adds a member to `literal_exprs` if it is a `Literal` annotation.
     let mut collect_literal_expr = |expr: &'a Expr, _| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if checker.semantic().match_typing_expr(value, "Literal") {
+                total_literals += 1;
+
                 // flatten already-unioned literals to later union again
                 if let Expr::Tuple(ast::ExprTuple {
                     elts,
@@ -145,7 +148,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
     }
 
     // Raise a violation if more than one.
-    if literal_exprs.len() > 1 {
+    if total_literals > 1 {
         let literal_members: Vec<String> = literal_exprs
             .clone()
             .into_iter()
