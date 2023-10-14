@@ -9,7 +9,7 @@ use super::settings::{RelativeImportsOrder, Settings};
 use super::types::EitherImport::{Import, ImportFrom};
 use super::types::{AliasData, EitherImport, ImportFromData, Importable};
 
-#[derive(PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum Prefix {
     Constants,
     Classes,
@@ -62,23 +62,6 @@ pub(crate) fn cmp_modules(alias1: &AliasData, alias2: &AliasData, settings: &Set
             (Some(_), None) => Ordering::Greater,
             (Some(asname1), Some(asname2)) => natord::compare(asname1, asname2),
         })
-}
-
-/// Compare two member imports within `Stmt::ImportFrom` blocks.
-pub(crate) fn cmp_members(alias1: &AliasData, alias2: &AliasData, settings: &Settings) -> Ordering {
-    match (alias1.name == "*", alias2.name == "*") {
-        (true, false) => Ordering::Less,
-        (false, true) => Ordering::Greater,
-        _ => {
-            if settings.order_by_type {
-                prefix(alias1.name, settings)
-                    .cmp(&prefix(alias2.name, settings))
-                    .then_with(|| cmp_modules(alias1, alias2, settings))
-            } else {
-                cmp_modules(alias1, alias2, settings)
-            }
-        }
-    }
 }
 
 /// Compare two relative import levels.
@@ -192,16 +175,14 @@ impl PartialOrd for NatOrdString {
     }
 }
 
-pub(crate) fn module_key(
-    name: &str,
-    asname: Option<&str>,
-    settings: &Settings,
-) -> (
+type ModuleKey = (
     bool,
     Option<NatOrdString>,
     NatOrdString,
     Option<NatOrdString>,
-) {
+);
+
+pub(crate) fn module_key(name: &str, asname: Option<&str>, settings: &Settings) -> ModuleKey {
     let force_to_top = !settings.force_to_top.contains(name);
     let maybe_lower_case_name = (!settings.case_sensitive)
         .then_some(name.to_lowercase())
@@ -210,4 +191,15 @@ pub(crate) fn module_key(
     let asname = asname.map(String::from).map(NatOrdString);
 
     (force_to_top, maybe_lower_case_name, module_name, asname)
+}
+
+pub(crate) fn member_key(
+    name: &str,
+    asname: Option<&str>,
+    settings: &Settings,
+) -> (bool, Option<Prefix>, ModuleKey) {
+    let is_star = name != "*";
+    let prefix = settings.order_by_type.then_some(prefix(name, settings));
+
+    (is_star, prefix, module_key(name, asname, settings))
 }
