@@ -176,32 +176,71 @@ impl PartialOrd for NatOrdString {
 }
 
 type ModuleKey = (
+    Option<i64>,
+    Option<bool>,
+    Option<NatOrdString>,
+    Option<NatOrdString>,
+    Option<NatOrdString>,
+    Option<MemberKey>,
+);
+
+pub(crate) fn module_key(
+    name: Option<&str>,
+    asname: Option<&str>,
+    level: Option<u32>,
+    first_alias: Option<&AliasData>,
+    settings: &Settings,
+) -> ModuleKey {
+    let level = level
+        .map(i64::from)
+        .map(|l| match settings.relative_imports_order {
+            RelativeImportsOrder::ClosestToFurthest => l,
+            RelativeImportsOrder::FurthestToClosest => -l,
+        });
+    let force_to_top = name.map(|name| !settings.force_to_top.contains(name));
+    let maybe_lower_case_name = name.and_then(|name| {
+        (!settings.case_sensitive)
+            .then_some(name.to_lowercase())
+            .map(NatOrdString)
+    });
+    let module_name = name.map(String::from).map(NatOrdString);
+    let asname = asname.map(String::from).map(NatOrdString);
+    let first_alias = first_alias.map(|alias| member_key(alias.name, alias.asname, settings));
+
+    (
+        level,
+        force_to_top,
+        maybe_lower_case_name,
+        module_name,
+        asname,
+        first_alias,
+    )
+}
+
+type MemberKey = (
     bool,
+    Option<MemberType>,
     Option<NatOrdString>,
     NatOrdString,
     Option<NatOrdString>,
 );
 
-pub(crate) fn module_key(name: &str, asname: Option<&str>, settings: &Settings) -> ModuleKey {
-    let force_to_top = !settings.force_to_top.contains(name);
+pub(crate) fn member_key(name: &str, asname: Option<&str>, settings: &Settings) -> MemberKey {
+    let is_star = name != "*";
+    let member_type = settings
+        .order_by_type
+        .then_some(member_type(name, settings));
     let maybe_lower_case_name = (!settings.case_sensitive)
         .then_some(name.to_lowercase())
         .map(NatOrdString);
     let module_name = NatOrdString(name.to_string());
     let asname = asname.map(String::from).map(NatOrdString);
 
-    (force_to_top, maybe_lower_case_name, module_name, asname)
-}
-
-pub(crate) fn member_key(
-    name: &str,
-    asname: Option<&str>,
-    settings: &Settings,
-) -> (bool, Option<MemberType>, ModuleKey) {
-    let is_star = name != "*";
-    let member_type = settings
-        .order_by_type
-        .then_some(member_type(name, settings));
-
-    (is_star, member_type, module_key(name, asname, settings))
+    (
+        is_star,
+        member_type,
+        maybe_lower_case_name,
+        module_name,
+        asname,
+    )
 }
