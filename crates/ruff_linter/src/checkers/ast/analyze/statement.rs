@@ -1004,6 +1004,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_raise::rules::unnecessary_paren_on_raise_exception(checker, expr);
                 }
             }
+            if checker.enabled(Rule::MisplacedBareRaise) {
+                if exc.is_none() {
+                    pylint::rules::misplaced_bare_raise(checker, stmt);
+                }
+            }
         }
         Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
             if checker.enabled(Rule::GlobalStatement) {
