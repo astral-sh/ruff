@@ -10,31 +10,31 @@ use super::types::EitherImport::{Import, ImportFrom};
 use super::types::{AliasData, EitherImport, ImportFromData, Importable};
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum Prefix {
-    Constants,
-    Classes,
-    Variables,
+pub(crate) enum MemberType {
+    Constant,
+    Class,
+    Variable,
 }
 
-fn prefix(name: &str, settings: &Settings) -> Prefix {
+fn member_type(name: &str, settings: &Settings) -> MemberType {
     if settings.constants.contains(name) {
         // Ex) `CONSTANT`
-        Prefix::Constants
+        MemberType::Constant
     } else if settings.classes.contains(name) {
         // Ex) `CLASS`
-        Prefix::Classes
+        MemberType::Class
     } else if settings.variables.contains(name) {
         // Ex) `variable`
-        Prefix::Variables
+        MemberType::Variable
     } else if name.len() > 1 && str::is_cased_uppercase(name) {
         // Ex) `CONSTANT`
-        Prefix::Constants
+        MemberType::Constant
     } else if name.chars().next().is_some_and(char::is_uppercase) {
         // Ex) `Class`
-        Prefix::Classes
+        MemberType::Class
     } else {
         // Ex) `variable`
-        Prefix::Variables
+        MemberType::Variable
     }
 }
 
@@ -197,9 +197,11 @@ pub(crate) fn member_key(
     name: &str,
     asname: Option<&str>,
     settings: &Settings,
-) -> (bool, Option<Prefix>, ModuleKey) {
+) -> (bool, Option<MemberType>, ModuleKey) {
     let is_star = name != "*";
-    let prefix = settings.order_by_type.then_some(prefix(name, settings));
+    let member_type = settings
+        .order_by_type
+        .then_some(member_type(name, settings));
 
-    (is_star, prefix, module_key(name, asname, settings))
+    (is_star, member_type, module_key(name, asname, settings))
 }
