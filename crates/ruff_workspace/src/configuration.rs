@@ -377,7 +377,7 @@ impl Configuration {
                 .cache_dir
                 .map(|dir| {
                     let dir = shellexpand::full(&dir);
-                    dir.map(|dir| PathBuf::from(dir.as_ref()))
+                    dir.map(|dir| fs::normalize_path_to(dir.as_ref(), project_root))
                 })
                 .transpose()
                 .map_err(|e| anyhow!("Invalid `cache-dir` value: {e}"))?,
