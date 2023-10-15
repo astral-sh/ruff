@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E721.py:2:4: E721 Do not compare types, use `isinstance()`
+E721.py:2:4: E721 [*] Do not compare types, use `isinstance()`
   |
 1 | #: E721
 2 | if type(res) == type(42):
@@ -9,8 +9,17 @@ E721.py:2:4: E721 Do not compare types, use `isinstance()`
 3 |     pass
 4 | #: E721
   |
+  = help: Do not compare types, use `isinstance()`
 
-E721.py:5:4: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+1 1 | #: E721
+2   |-if type(res) == type(42):
+  2 |+if isinstance(res, int):
+3 3 |     pass
+4 4 | #: E721
+5 5 | if type(res) != type(""):
+
+E721.py:5:4: E721 [*] Do not compare types, use `isinstance()`
   |
 3 |     pass
 4 | #: E721
@@ -19,8 +28,19 @@ E721.py:5:4: E721 Do not compare types, use `isinstance()`
 6 |     pass
 7 | #: E721
   |
+  = help: Do not compare types, use `isinstance()`
 
-E721.py:15:4: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+2 2 | if type(res) == type(42):
+3 3 |     pass
+4 4 | #: E721
+5   |-if type(res) != type(""):
+  5 |+if not isinstance(res, str):
+6 6 |     pass
+7 7 | #: E721
+8 8 | import types
+
+E721.py:15:4: E721 [*] Do not compare types, use `isinstance()`
    |
 13 | import types
 14 | 
@@ -29,8 +49,19 @@ E721.py:15:4: E721 Do not compare types, use `isinstance()`
 16 |     pass
 17 | #: E721
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:18:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+12 12 | #: E721
+13 13 | import types
+14 14 | 
+15    |-if type(res) is not types.ListType:
+   15 |+if not isinstance(res, types.ListType):
+16 16 |     pass
+17 17 | #: E721
+18 18 | assert type(res) == type(False)
+
+E721.py:18:8: E721 [*] Do not compare types, use `isinstance()`
    |
 16 |     pass
 17 | #: E721
@@ -39,8 +70,19 @@ E721.py:18:8: E721 Do not compare types, use `isinstance()`
 19 | #: E721
 20 | assert type(res) == type([])
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:20:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+15 15 | if type(res) is not types.ListType:
+16 16 |     pass
+17 17 | #: E721
+18    |-assert type(res) == type(False)
+   18 |+assert isinstance(res, bool)
+19 19 | #: E721
+20 20 | assert type(res) == type([])
+21 21 | #: E721
+
+E721.py:20:8: E721 [*] Do not compare types, use `isinstance()`
    |
 18 | assert type(res) == type(False)
 19 | #: E721
@@ -49,8 +91,19 @@ E721.py:20:8: E721 Do not compare types, use `isinstance()`
 21 | #: E721
 22 | assert type(res) == type(())
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:22:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+17 17 | #: E721
+18 18 | assert type(res) == type(False)
+19 19 | #: E721
+20    |-assert type(res) == type([])
+   20 |+assert isinstance(res, list)
+21 21 | #: E721
+22 22 | assert type(res) == type(())
+23 23 | #: E721
+
+E721.py:22:8: E721 [*] Do not compare types, use `isinstance()`
    |
 20 | assert type(res) == type([])
 21 | #: E721
@@ -59,8 +112,19 @@ E721.py:22:8: E721 Do not compare types, use `isinstance()`
 23 | #: E721
 24 | assert type(res) == type((0,))
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:24:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+19 19 | #: E721
+20 20 | assert type(res) == type([])
+21 21 | #: E721
+22    |-assert type(res) == type(())
+   22 |+assert isinstance(res, tuple)
+23 23 | #: E721
+24 24 | assert type(res) == type((0,))
+25 25 | #: E721
+
+E721.py:24:8: E721 [*] Do not compare types, use `isinstance()`
    |
 22 | assert type(res) == type(())
 23 | #: E721
@@ -69,8 +133,19 @@ E721.py:24:8: E721 Do not compare types, use `isinstance()`
 25 | #: E721
 26 | assert type(res) == type((0))
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:26:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+21 21 | #: E721
+22 22 | assert type(res) == type(())
+23 23 | #: E721
+24    |-assert type(res) == type((0,))
+   24 |+assert isinstance(res, tuple)
+25 25 | #: E721
+26 26 | assert type(res) == type((0))
+27 27 | #: E721
+
+E721.py:26:8: E721 [*] Do not compare types, use `isinstance()`
    |
 24 | assert type(res) == type((0,))
 25 | #: E721
@@ -79,8 +154,19 @@ E721.py:26:8: E721 Do not compare types, use `isinstance()`
 27 | #: E721
 28 | assert type(res) != type((1,))
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:28:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+23 23 | #: E721
+24 24 | assert type(res) == type((0,))
+25 25 | #: E721
+26    |-assert type(res) == type((0))
+   26 |+assert isinstance(res, int)
+27 27 | #: E721
+28 28 | assert type(res) != type((1,))
+29 29 | #: E721
+
+E721.py:28:8: E721 [*] Do not compare types, use `isinstance()`
    |
 26 | assert type(res) == type((0))
 27 | #: E721
@@ -89,8 +175,19 @@ E721.py:28:8: E721 Do not compare types, use `isinstance()`
 29 | #: E721
 30 | assert type(res) is type((1,))
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:30:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+25 25 | #: E721
+26 26 | assert type(res) == type((0))
+27 27 | #: E721
+28    |-assert type(res) != type((1,))
+   28 |+assert not isinstance(res, tuple)
+29 29 | #: E721
+30 30 | assert type(res) is type((1,))
+31 31 | #: E721
+
+E721.py:30:8: E721 [*] Do not compare types, use `isinstance()`
    |
 28 | assert type(res) != type((1,))
 29 | #: E721
@@ -99,8 +196,19 @@ E721.py:30:8: E721 Do not compare types, use `isinstance()`
 31 | #: E721
 32 | assert type(res) is not type((1,))
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:32:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+27 27 | #: E721
+28 28 | assert type(res) != type((1,))
+29 29 | #: E721
+30    |-assert type(res) is type((1,))
+   30 |+assert isinstance(res, tuple)
+31 31 | #: E721
+32 32 | assert type(res) is not type((1,))
+33 33 | #: E211 E721
+
+E721.py:32:8: E721 [*] Do not compare types, use `isinstance()`
    |
 30 | assert type(res) is type((1,))
 31 | #: E721
@@ -109,8 +217,19 @@ E721.py:32:8: E721 Do not compare types, use `isinstance()`
 33 | #: E211 E721
 34 | assert type(res) == type(
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:34:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+29 29 | #: E721
+30 30 | assert type(res) is type((1,))
+31 31 | #: E721
+32    |-assert type(res) is not type((1,))
+   32 |+assert not isinstance(res, tuple)
+33 33 | #: E211 E721
+34 34 | assert type(res) == type(
+35 35 |     [
+
+E721.py:34:8: E721 [*] Do not compare types, use `isinstance()`
    |
 32 |   assert type(res) is not type((1,))
 33 |   #: E211 E721
@@ -124,8 +243,23 @@ E721.py:34:8: E721 Do not compare types, use `isinstance()`
 39 |   #: E201 E201 E202 E721
 40 |   assert type(res) == type(())
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:40:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+31 31 | #: E721
+32 32 | assert type(res) is not type((1,))
+33 33 | #: E211 E721
+34    |-assert type(res) == type(
+35    |-    [
+36    |-        2,
+37    |-    ]
+38    |-)
+   34 |+assert isinstance(res, list)
+39 35 | #: E201 E201 E202 E721
+40 36 | assert type(res) == type(())
+41 37 | #: E201 E202 E721
+
+E721.py:40:8: E721 [*] Do not compare types, use `isinstance()`
    |
 38 | )
 39 | #: E201 E201 E202 E721
@@ -134,8 +268,19 @@ E721.py:40:8: E721 Do not compare types, use `isinstance()`
 41 | #: E201 E202 E721
 42 | assert type(res) == type((0,))
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:42:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+37 37 |     ]
+38 38 | )
+39 39 | #: E201 E201 E202 E721
+40    |-assert type(res) == type(())
+   40 |+assert isinstance(res, tuple)
+41 41 | #: E201 E202 E721
+42 42 | assert type(res) == type((0,))
+43 43 | 
+
+E721.py:42:8: E721 [*] Do not compare types, use `isinstance()`
    |
 40 | assert type(res) == type(())
 41 | #: E201 E202 E721
@@ -144,15 +289,37 @@ E721.py:42:8: E721 Do not compare types, use `isinstance()`
 43 | 
 44 | #: Okay
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:63:8: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+39 39 | #: E201 E201 E202 E721
+40 40 | assert type(res) == type(())
+41 41 | #: E201 E202 E721
+42    |-assert type(res) == type((0,))
+   42 |+assert isinstance(res, tuple)
+43 43 | 
+44 44 | #: Okay
+45 45 | import types
+
+E721.py:63:8: E721 [*] Do not compare types, use `isinstance()`
    |
 62 | #: E721
 63 | assert type(res) is int
    |        ^^^^^^^^^^^^^^^^ E721
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:69:12: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+60 60 |     pass
+61 61 | 
+62 62 | #: E721
+63    |-assert type(res) is int
+   63 |+assert isinstance(res, int)
+64 64 | 
+65 65 | 
+66 66 | class Foo:
+
+E721.py:69:12: E721 [*] Do not compare types, use `isinstance()`
    |
 67 |     def asdf(self, value: str | None):
 68 |         #: E721
@@ -160,8 +327,19 @@ E721.py:69:12: E721 Do not compare types, use `isinstance()`
    |            ^^^^^^^^^^^^^^^^^^ E721
 70 |             ...
    |
+   = help: Do not compare types, use `isinstance()`
 
-E721.py:79:12: E721 Do not compare types, use `isinstance()`
+ℹ Fix
+66 66 | class Foo:
+67 67 |     def asdf(self, value: str | None):
+68 68 |         #: E721
+69    |-        if type(value) is str:
+   69 |+        if isinstance(value, str):
+70 70 |             ...
+71 71 | 
+72 72 | 
+
+E721.py:79:12: E721 [*] Do not compare types, use `isinstance()`
    |
 77 |     def asdf(self, value: str | None):
 78 |         #: E721
@@ -169,5 +347,16 @@ E721.py:79:12: E721 Do not compare types, use `isinstance()`
    |            ^^^^^^^^^^^^^^^^^^ E721
 80 |             ...
    |
+   = help: Do not compare types, use `isinstance()`
+
+ℹ Fix
+76 76 | 
+77 77 |     def asdf(self, value: str | None):
+78 78 |         #: E721
+79    |-        if type(value) is str:
+   79 |+        if isinstance(value, str):
+80 80 |             ...
+81 81 | 
+82 82 | 
 
 
