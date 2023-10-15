@@ -39,12 +39,6 @@ fn member_type(name: &str, settings: &Settings) -> MemberType {
 #[derive(Eq, PartialEq, Debug)]
 pub(crate) struct NatOrdString(String);
 
-impl std::fmt::Display for NatOrdString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
 impl Ord for NatOrdString {
     fn cmp(&self, other: &Self) -> Ordering {
         natord::compare(&self.0, &other.0)
