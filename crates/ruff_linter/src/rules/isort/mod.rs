@@ -189,7 +189,7 @@ fn format_import_block(
                         import_from.module,
                         None,
                         import_from.level,
-                        aliases.first().map(|(alias, _)| alias),
+                        aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
                         settings,
                     ),
                 })

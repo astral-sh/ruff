@@ -5,7 +5,6 @@ use std::cmp::Ordering;
 use ruff_python_stdlib::str;
 
 use super::settings::{RelativeImportsOrder, Settings};
-use super::types::AliasData;
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MemberType {
@@ -51,12 +50,6 @@ impl PartialOrd for NatOrdString {
     }
 }
 
-impl From<&str> for NatOrdString {
-    fn from(value: &str) -> Self {
-        Self(value.to_string())
-    }
-}
-
 #[derive(Eq, PartialEq, Debug)]
 pub(crate) struct NatOrdStr<'a>(&'a str);
 
@@ -78,14 +71,14 @@ type ModuleKey<'a> = (
     Option<NatOrdString>,
     Option<NatOrdStr<'a>>,
     Option<NatOrdStr<'a>>,
-    Option<MemberKey>,
+    Option<MemberKey<'a>>,
 );
 
 pub(crate) fn module_key<'a>(
     name: Option<&'a str>,
     asname: Option<&'a str>,
     level: Option<u32>,
-    first_alias: Option<&AliasData>,
+    first_alias: Option<(&'a str, Option<&'a str>)>,
     settings: &Settings,
 ) -> ModuleKey<'a> {
     let level = level
@@ -100,7 +93,7 @@ pub(crate) fn module_key<'a>(
         .and_then(|name| (!settings.case_sensitive).then_some(NatOrdString(name.to_lowercase())));
     let module_name = name.map(NatOrdStr);
     let asname = asname.map(NatOrdStr);
-    let first_alias = first_alias.map(|alias| member_key(alias.name, alias.asname, settings));
+    let first_alias = first_alias.map(|(name, asname)| member_key(name, asname, settings));
 
     (
         level,
@@ -112,23 +105,27 @@ pub(crate) fn module_key<'a>(
     )
 }
 
-type MemberKey = (
+type MemberKey<'a> = (
     bool,
     Option<MemberType>,
     Option<NatOrdString>,
-    NatOrdString,
-    Option<NatOrdString>,
+    NatOrdStr<'a>,
+    Option<NatOrdStr<'a>>,
 );
 
-pub(crate) fn member_key(name: &str, asname: Option<&str>, settings: &Settings) -> MemberKey {
+pub(crate) fn member_key<'a>(
+    name: &'a str,
+    asname: Option<&'a str>,
+    settings: &Settings,
+) -> MemberKey<'a> {
     let not_star_import = name != "*"; // `false` < `true` so we get star imports first
     let member_type = settings
         .order_by_type
         .then_some(member_type(name, settings));
     let maybe_lower_case_name =
         (!settings.case_sensitive).then_some(NatOrdString(name.to_lowercase()));
-    let module_name = NatOrdString::from(name);
-    let asname = asname.map(NatOrdString::from);
+    let module_name = NatOrdStr(name);
+    let asname = asname.map(NatOrdStr);
 
     (
         not_star_import,
