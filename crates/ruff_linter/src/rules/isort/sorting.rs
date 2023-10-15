@@ -51,22 +51,43 @@ impl PartialOrd for NatOrdString {
     }
 }
 
-type ModuleKey = (
+impl From<&str> for NatOrdString {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+#[derive(Eq, PartialEq, Debug)]
+pub(crate) struct NatOrdStr<'a>(&'a str);
+
+impl Ord for NatOrdStr<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        natord::compare(self.0, other.0)
+    }
+}
+
+impl PartialOrd for NatOrdStr<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+type ModuleKey<'a> = (
     i64,
     Option<bool>,
     Option<NatOrdString>,
-    Option<NatOrdString>,
-    Option<NatOrdString>,
+    Option<NatOrdStr<'a>>,
+    Option<NatOrdStr<'a>>,
     Option<MemberKey>,
 );
 
-pub(crate) fn module_key(
-    name: Option<&str>,
-    asname: Option<&str>,
+pub(crate) fn module_key<'a>(
+    name: Option<&'a str>,
+    asname: Option<&'a str>,
     level: Option<u32>,
     first_alias: Option<&AliasData>,
     settings: &Settings,
-) -> ModuleKey {
+) -> ModuleKey<'a> {
     let level = level
         .map(i64::from)
         .map(|l| match settings.relative_imports_order {
@@ -75,13 +96,10 @@ pub(crate) fn module_key(
         })
         .unwrap_or_default();
     let force_to_top = name.map(|name| !settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
-    let maybe_lower_case_name = name.and_then(|name| {
-        (!settings.case_sensitive)
-            .then_some(name.to_lowercase())
-            .map(NatOrdString)
-    });
-    let module_name = name.map(String::from).map(NatOrdString);
-    let asname = asname.map(String::from).map(NatOrdString);
+    let maybe_lower_case_name = name
+        .and_then(|name| (!settings.case_sensitive).then_some(NatOrdString(name.to_lowercase())));
+    let module_name = name.map(NatOrdStr);
+    let asname = asname.map(NatOrdStr);
     let first_alias = first_alias.map(|alias| member_key(alias.name, alias.asname, settings));
 
     (
@@ -107,11 +125,10 @@ pub(crate) fn member_key(name: &str, asname: Option<&str>, settings: &Settings) 
     let member_type = settings
         .order_by_type
         .then_some(member_type(name, settings));
-    let maybe_lower_case_name = (!settings.case_sensitive)
-        .then_some(name.to_lowercase())
-        .map(NatOrdString);
-    let module_name = NatOrdString(name.to_string());
-    let asname = asname.map(String::from).map(NatOrdString);
+    let maybe_lower_case_name =
+        (!settings.case_sensitive).then_some(NatOrdString(name.to_lowercase()));
+    let module_name = NatOrdString::from(name);
+    let asname = asname.map(NatOrdString::from);
 
     (
         not_star_import,
