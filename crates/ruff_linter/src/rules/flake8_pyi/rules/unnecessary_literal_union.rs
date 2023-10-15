@@ -1,5 +1,5 @@
 use ast::{ExprSubscript, Operator};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
@@ -33,7 +33,9 @@ pub struct UnnecessaryLiteralUnion {
     members: Vec<String>,
 }
 
-impl AlwaysFixableViolation for UnnecessaryLiteralUnion {
+impl Violation for UnnecessaryLiteralUnion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -42,8 +44,8 @@ impl AlwaysFixableViolation for UnnecessaryLiteralUnion {
         )
     }
 
-    fn fix_title(&self) -> String {
-        format!("Replace with a single `Literal`")
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Replace with a single `Literal`",))
     }
 }
 
@@ -162,28 +164,31 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
             expr.range(),
         );
 
-        let literals = make_literal_expr(literal_subscript, literal_exprs.into_iter().collect());
+        if checker.settings.preview.is_enabled() {
+            let literals =
+                make_literal_expr(literal_subscript, literal_exprs.into_iter().collect());
 
-        if other_exprs.is_empty() {
-            // if the union is only literals, we just replace the whole thing with a single literal
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                checker.generator().expr(&literals),
-                expr.range(),
-            )));
-        } else {
-            let mut expr_vec: Vec<&Expr> = other_exprs.clone().into_iter().collect();
-            expr_vec.insert(0, &literals);
-
-            let content = if let Some(subscript) = union_subscript {
-                checker.generator().expr(&make_union(subscript, expr_vec))
+            if other_exprs.is_empty() {
+                // if the union is only literals, we just replace the whole thing with a single literal
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    checker.generator().expr(&literals),
+                    expr.range(),
+                )));
             } else {
-                checker.generator().expr(&concatenate_bin_ors(expr_vec))
-            };
+                let mut expr_vec: Vec<&Expr> = other_exprs.clone().into_iter().collect();
+                expr_vec.insert(0, &literals);
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                content,
-                expr.range(),
-            )));
+                let content = if let Some(subscript) = union_subscript {
+                    checker.generator().expr(&make_union(subscript, expr_vec))
+                } else {
+                    checker.generator().expr(&concatenate_bin_ors(expr_vec))
+                };
+
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    content,
+                    expr.range(),
+                )));
+            }
         }
 
         checker.diagnostics.push(diagnostic);
