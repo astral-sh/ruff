@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Quote;
 use ruff_text_size::Ranged;
@@ -36,9 +36,17 @@ pub struct TripleSingleQuotes {
     expected_quote: Quote,
 }
 
-impl Violation for TripleSingleQuotes {
+impl AlwaysFixableViolation for TripleSingleQuotes {
     #[derive_message_formats]
     fn message(&self) -> String {
+        let TripleSingleQuotes { expected_quote } = self;
+        match expected_quote {
+            Quote::Double => format!(r#"Use triple double quotes `"""`"#),
+            Quote::Single => format!(r#"Use triple single quotes `'''`"#),
+        }
+    }
+
+    fn fix_title(&self) -> String {
         let TripleSingleQuotes { expected_quote } = self;
         match expected_quote {
             Quote::Double => format!(r#"Use triple double quotes `"""`"#),
@@ -51,6 +59,11 @@ impl Violation for TripleSingleQuotes {
 pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     let leading_quote = docstring.leading_quote();
 
+    let prefixes = docstring
+        .leading_quote()
+        .trim_end_matches(|c| c == '\'' || c == '"')
+        .to_owned();
+
     let expected_quote = if docstring.body().contains("\"\"\"") {
         Quote::Single
     } else {
@@ -60,18 +73,28 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     match expected_quote {
         Quote::Single => {
             if !leading_quote.ends_with("'''") {
-                checker.diagnostics.push(Diagnostic::new(
-                    TripleSingleQuotes { expected_quote },
+                let mut diagnostic =
+                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    prefixes + &format!("'''{}'''", docstring.body().as_str()),
                     docstring.range(),
-                ));
+                )));
+
+                checker.diagnostics.push(diagnostic);
             }
         }
         Quote::Double => {
             if !leading_quote.ends_with("\"\"\"") {
-                checker.diagnostics.push(Diagnostic::new(
-                    TripleSingleQuotes { expected_quote },
+                let mut diagnostic =
+                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    prefixes + &format!("\"\"\"{}\"\"\"", docstring.body().as_str()),
                     docstring.range(),
-                ));
+                )));
+
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
