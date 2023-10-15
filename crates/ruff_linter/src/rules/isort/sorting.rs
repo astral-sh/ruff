@@ -80,7 +80,7 @@ pub(crate) fn module_key(
             RelativeImportsOrder::FurthestToClosest => -l,
         })
         .unwrap_or_default();
-    let force_to_top = name.map(|name| !settings.force_to_top.contains(name));
+    let force_to_top = name.map(|name| !settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
     let maybe_lower_case_name = name.and_then(|name| {
         (!settings.case_sensitive)
             .then_some(name.to_lowercase())
@@ -109,7 +109,7 @@ type MemberKey = (
 );
 
 pub(crate) fn member_key(name: &str, asname: Option<&str>, settings: &Settings) -> MemberKey {
-    let is_star = name != "*";
+    let not_star_import = name != "*"; // `false` < `true` so we get star imports first
     let member_type = settings
         .order_by_type
         .then_some(member_type(name, settings));
@@ -120,7 +120,7 @@ pub(crate) fn member_key(name: &str, asname: Option<&str>, settings: &Settings) 
     let asname = asname.map(String::from).map(NatOrdString);
 
     (
-        is_star,
+        not_star_import,
         member_type,
         maybe_lower_case_name,
         module_name,
