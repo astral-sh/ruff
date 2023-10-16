@@ -156,25 +156,29 @@ format = "json"
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--select", "F401", "--no-cache", "--config"])
-        .arg(&ruff_toml)
-        .arg("-")
-        .pass_stdin(r#"
-import os
-"#), @r###"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+    insta::with_settings!({filters => vec![
+        (&*regex::escape(tempdir.path().to_str().unwrap()), "[TMPDIR]"),
+    ]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--select", "F401", "--no-cache", "--config"])
+            .arg(&ruff_toml)
+            .arg("-")
+            .pass_stdin(r#"
+    import os
+    "#), @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to parse `/var/folders/bc/qlsk3t6x7c9fhhbvvcg68k9c0000gp/T/.tmpTaP0Od/ruff.toml`: TOML parse error at line 2, column 10
-      |
-    2 | format = "json"
-      |          ^^^^^^
-    invalid type: string "json", expected struct FormatOptions
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to parse `[TMPDIR]/ruff.toml`: TOML parse error at line 2, column 10
+          |
+        2 | format = "json"
+          |          ^^^^^^
+        invalid type: string "json", expected struct FormatOptions
 
-    "###);
+        "###);
+    });
     Ok(())
 }
