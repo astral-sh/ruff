@@ -429,7 +429,7 @@ impl<'a> FormatResults<'a> {
 
         // Write out a summary of the formatting results.
         if changed > 0 && unchanged > 0 {
-            write!(
+            writeln!(
                 f,
                 "{} file{} {}, {} file{} left unchanged",
                 changed,
@@ -442,7 +442,7 @@ impl<'a> FormatResults<'a> {
                 if unchanged == 1 { "" } else { "s" },
             )
         } else if changed > 0 {
-            write!(
+            writeln!(
                 f,
                 "{} file{} {}",
                 changed,
@@ -453,7 +453,7 @@ impl<'a> FormatResults<'a> {
                 }
             )
         } else if unchanged > 0 {
-            write!(
+            writeln!(
                 f,
                 "{} file{} left unchanged",
                 unchanged,
