@@ -580,7 +580,9 @@ where
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit_expr(value);
+                // The value in a `type` alias has annotation semantics, in that it's never
+                // evaluated at runtime.
+                self.visit_annotation(value);
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -1766,7 +1768,7 @@ impl<'a> Checker<'a> {
                     bound: Some(bound), ..
                 }) = type_param
                 {
-                    self.visit_expr(bound);
+                    self.visit_annotation(bound);
                 }
             }
         }
