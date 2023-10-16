@@ -157,7 +157,7 @@ format = "json"
     )?;
 
     insta::with_settings!({filters => vec![
-        (&*regex::escape(tempdir.path().to_str().unwrap()), "[TMPDIR]"),
+        (&*regex::escape(ruff_toml.to_str().unwrap()), "[RUFF-TOML-PATH]"),
     ]}, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(["check", "--select", "F401", "--no-cache", "--config"])
@@ -172,7 +172,7 @@ format = "json"
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to parse `[TMPDIR]/ruff.toml`: TOML parse error at line 2, column 10
+          Cause: Failed to parse `[RUFF-TOML-PATH]`: TOML parse error at line 2, column 10
           |
         2 | format = "json"
           |          ^^^^^^
