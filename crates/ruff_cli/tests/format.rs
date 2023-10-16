@@ -13,7 +13,7 @@ const BIN_NAME: &str = "ruff";
 #[test]
 fn default_options() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated"])
+        .args(["format", "--isolated", "--stdin-filename", "test.py"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -81,6 +81,108 @@ if condition:
 
     if condition:
     	print('Should change quotes')
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    "###);
+    Ok(())
+}
+
+#[test]
+fn exclude() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend-exclude = ["out"]
+
+[format]
+exclude = ["test.py", "generated.py"]
+"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#,
+    )?;
+
+    // Excluded file but passed to the CLI directly, should be formatted
+    let test_path = tempdir.path().join("test.py");
+    fs::write(
+        &test_path,
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("generated.py"),
+        r#"NUMBERS = [
+     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+]
+OTHER = "OTHER"
+"#,
+    )?;
+
+    let out_dir = tempdir.path().join("out");
+    fs::create_dir(&out_dir)?;
+
+    fs::write(out_dir.join("a.py"), "a = a")?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--check", "--config"])
+        .arg(ruff_toml.file_name().unwrap())
+        // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
+        .arg(test_path.file_name().unwrap())
+        // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
+        .arg("."), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    Would reformat: test.py
+    2 files would be reformatted
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    "###);
+    Ok(())
+}
+
+#[test]
+fn exclude_stdin() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend-select = ["B", "Q"]
+
+[format]
+exclude = ["generated.py"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--config", &ruff_toml.file_name().unwrap().to_string_lossy(), "--stdin-filename", "generated.py", "-"])
+        .pass_stdin(r#"
+from test import say_hy
+
+if __name__ == '__main__':
+    say_hy("dear Ruff contributor")
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
 
     ----- stderr -----
     warning: `ruff format` is not yet stable, and subject to change in future versions.

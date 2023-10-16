@@ -157,6 +157,7 @@ impl Configuration {
         let format_defaults = FormatterSettings::default();
         // TODO(micha): Support changing the tab-width but disallow changing the number of spaces
         let formatter = FormatterSettings {
+            exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             preview: match format.preview.unwrap_or(preview) {
                 PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
                 PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
@@ -204,6 +205,7 @@ impl Configuration {
 
             linter: LinterSettings {
                 rules: lint.as_rule_table(preview),
+                exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 target_version,
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
@@ -365,10 +367,14 @@ impl Configuration {
     }
 
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
-        let lint = if let Some(lint) = options.lint {
-            lint.combine(options.lint_top_level)
+        let lint = if let Some(mut lint) = options.lint {
+            lint.common = lint.common.combine(options.lint_top_level);
+            lint
         } else {
-            options.lint_top_level
+            LintOptions {
+                common: options.lint_top_level,
+                ..LintOptions::default()
+            }
         };
 
         Ok(Self {
@@ -455,7 +461,10 @@ impl Configuration {
             target_version: options.target_version,
 
             lint: LintConfiguration::from_options(lint, project_root)?,
-            format: FormatConfiguration::from_options(options.format.unwrap_or_default())?,
+            format: FormatConfiguration::from_options(
+                options.format.unwrap_or_default(),
+                project_root,
+            )?,
         })
     }
 
@@ -501,6 +510,8 @@ impl Configuration {
 
 #[derive(Debug, Default)]
 pub struct LintConfiguration {
+    pub exclude: Option<Vec<FilePattern>>,
+
     // Rule selection
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
@@ -550,33 +561,47 @@ pub struct LintConfiguration {
 impl LintConfiguration {
     fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
         Ok(LintConfiguration {
+            exclude: options.exclude.map(|paths| {
+                paths
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
+
             rule_selections: vec![RuleSelection {
-                select: options.select,
+                select: options.common.select,
                 ignore: options
+                    .common
                     .ignore
                     .into_iter()
                     .flatten()
-                    .chain(options.extend_ignore.into_iter().flatten())
+                    .chain(options.common.extend_ignore.into_iter().flatten())
                     .collect(),
-                extend_select: options.extend_select.unwrap_or_default(),
-                fixable: options.fixable,
+                extend_select: options.common.extend_select.unwrap_or_default(),
+                fixable: options.common.fixable,
                 unfixable: options
+                    .common
                     .unfixable
                     .into_iter()
                     .flatten()
-                    .chain(options.extend_unfixable.into_iter().flatten())
+                    .chain(options.common.extend_unfixable.into_iter().flatten())
                     .collect(),
-                extend_fixable: options.extend_fixable.unwrap_or_default(),
+                extend_fixable: options.common.extend_fixable.unwrap_or_default(),
             }],
-            extend_safe_fixes: options.extend_safe_fixes.unwrap_or_default(),
-            extend_unsafe_fixes: options.extend_unsafe_fixes.unwrap_or_default(),
-            allowed_confusables: options.allowed_confusables,
+            extend_safe_fixes: options.common.extend_safe_fixes.unwrap_or_default(),
+            extend_unsafe_fixes: options.common.extend_unsafe_fixes.unwrap_or_default(),
+            allowed_confusables: options.common.allowed_confusables,
             dummy_variable_rgx: options
+                .common
                 .dummy_variable_rgx
                 .map(|pattern| Regex::new(&pattern))
                 .transpose()
                 .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
             extend_per_file_ignores: options
+                .common
                 .extend_per_file_ignores
                 .map(|per_file_ignores| {
                     per_file_ignores
@@ -587,10 +612,10 @@ impl LintConfiguration {
                         .collect()
                 })
                 .unwrap_or_default(),
-            external: options.external,
-            ignore_init_module_imports: options.ignore_init_module_imports,
-            explicit_preview_rules: options.explicit_preview_rules,
-            per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
+            external: options.common.external,
+            ignore_init_module_imports: options.common.ignore_init_module_imports,
+            explicit_preview_rules: options.common.explicit_preview_rules,
+            per_file_ignores: options.common.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
                     .into_iter()
                     .map(|(pattern, prefixes)| {
@@ -598,34 +623,34 @@ impl LintConfiguration {
                     })
                     .collect()
             }),
-            task_tags: options.task_tags,
-            logger_objects: options.logger_objects,
-            typing_modules: options.typing_modules,
+            task_tags: options.common.task_tags,
+            logger_objects: options.common.logger_objects,
+            typing_modules: options.common.typing_modules,
             // Plugins
-            flake8_annotations: options.flake8_annotations,
-            flake8_bandit: options.flake8_bandit,
-            flake8_bugbear: options.flake8_bugbear,
-            flake8_builtins: options.flake8_builtins,
-            flake8_comprehensions: options.flake8_comprehensions,
-            flake8_copyright: options.flake8_copyright,
-            flake8_errmsg: options.flake8_errmsg,
-            flake8_gettext: options.flake8_gettext,
-            flake8_implicit_str_concat: options.flake8_implicit_str_concat,
-            flake8_import_conventions: options.flake8_import_conventions,
-            flake8_pytest_style: options.flake8_pytest_style,
-            flake8_quotes: options.flake8_quotes,
-            flake8_self: options.flake8_self,
-            flake8_tidy_imports: options.flake8_tidy_imports,
-            flake8_type_checking: options.flake8_type_checking,
-            flake8_unused_arguments: options.flake8_unused_arguments,
-            isort: options.isort,
-            mccabe: options.mccabe,
-            pep8_naming: options.pep8_naming,
-            pycodestyle: options.pycodestyle,
-            pydocstyle: options.pydocstyle,
-            pyflakes: options.pyflakes,
-            pylint: options.pylint,
-            pyupgrade: options.pyupgrade,
+            flake8_annotations: options.common.flake8_annotations,
+            flake8_bandit: options.common.flake8_bandit,
+            flake8_bugbear: options.common.flake8_bugbear,
+            flake8_builtins: options.common.flake8_builtins,
+            flake8_comprehensions: options.common.flake8_comprehensions,
+            flake8_copyright: options.common.flake8_copyright,
+            flake8_errmsg: options.common.flake8_errmsg,
+            flake8_gettext: options.common.flake8_gettext,
+            flake8_implicit_str_concat: options.common.flake8_implicit_str_concat,
+            flake8_import_conventions: options.common.flake8_import_conventions,
+            flake8_pytest_style: options.common.flake8_pytest_style,
+            flake8_quotes: options.common.flake8_quotes,
+            flake8_self: options.common.flake8_self,
+            flake8_tidy_imports: options.common.flake8_tidy_imports,
+            flake8_type_checking: options.common.flake8_type_checking,
+            flake8_unused_arguments: options.common.flake8_unused_arguments,
+            isort: options.common.isort,
+            mccabe: options.common.mccabe,
+            pep8_naming: options.common.pep8_naming,
+            pycodestyle: options.common.pycodestyle,
+            pydocstyle: options.common.pydocstyle,
+            pyflakes: options.common.pyflakes,
+            pylint: options.common.pylint,
+            pyupgrade: options.common.pyupgrade,
         })
     }
 
@@ -861,6 +886,7 @@ impl LintConfiguration {
     #[must_use]
     pub fn combine(self, config: Self) -> Self {
         Self {
+            exclude: self.exclude.or(config.exclude),
             rule_selections: config
                 .rule_selections
                 .into_iter()
@@ -935,21 +961,28 @@ impl LintConfiguration {
 
 #[derive(Debug, Default)]
 pub struct FormatConfiguration {
+    pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
 
     pub indent_style: Option<IndentStyle>,
-
     pub quote_style: Option<QuoteStyle>,
-
     pub magic_trailing_comma: Option<MagicTrailingComma>,
-
     pub line_ending: Option<LineEnding>,
 }
 
 impl FormatConfiguration {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: FormatOptions) -> Result<Self> {
+    pub fn from_options(options: FormatOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
+            exclude: options.exclude.map(|paths| {
+                paths
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
             preview: options.preview.map(PreviewMode::from),
             indent_style: options.indent_style,
             quote_style: options.quote_style,
@@ -968,6 +1001,7 @@ impl FormatConfiguration {
     #[allow(clippy::needless_pass_by_value)]
     pub fn combine(self, other: Self) -> Self {
         Self {
+            exclude: self.exclude.or(other.exclude),
             preview: self.preview.or(other.preview),
             indent_style: self.indent_style.or(other.indent_style),
             quote_style: self.quote_style.or(other.quote_style),

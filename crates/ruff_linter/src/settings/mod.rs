@@ -23,7 +23,7 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion};
 use crate::{codes, RuleSelector};
 
 use super::line_width::{LineLength, TabSize};
@@ -38,6 +38,7 @@ pub mod types;
 
 #[derive(Debug, CacheKey)]
 pub struct LinterSettings {
+    pub exclude: FilePatternSet,
     pub project_root: PathBuf,
 
     pub rules: RuleTable,
@@ -131,6 +132,7 @@ impl LinterSettings {
 
     pub fn new(project_root: &Path) -> Self {
         Self {
+            exclude: FilePatternSet::default(),
             target_version: PythonVersion::default(),
             project_root: project_root.to_path_buf(),
             rules: DEFAULT_SELECTORS

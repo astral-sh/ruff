@@ -153,7 +153,7 @@ pub struct Options {
     pub preview: Option<bool>,
 
     // File resolver options
-    /// A list of file patterns to exclude from linting.
+    /// A list of file patterns to exclude from formatting and linting.
     ///
     /// Exclusions are based on globs, and can be either:
     ///
@@ -178,7 +178,7 @@ pub struct Options {
     )]
     pub exclude: Option<Vec<String>>,
 
-    /// A list of file patterns to omit from linting, in addition to those
+    /// A list of file patterns to omit from formatting and linting, in addition to those
     /// specified by `exclude`.
     ///
     /// Exclusions are based on globs, and can be either:
@@ -377,12 +377,45 @@ pub struct Options {
 
     /// The lint sections specified at the top level.
     #[serde(flatten)]
-    pub lint_top_level: LintOptions,
+    pub lint_top_level: LintCommonOptions,
 
     /// Options to configure code formatting.
     #[option_group]
     pub format: Option<FormatOptions>,
 }
+
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct LintOptions {
+    #[serde(flatten)]
+    pub common: LintCommonOptions,
+
+    /// A list of file patterns to exclude from linting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+}
+
+// Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
+// is removed.
 
 /// Experimental section to configure Ruff's linting. This new section will eventually
 /// replace the top-level linting options.
@@ -393,7 +426,7 @@ pub struct Options {
     Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct LintOptions {
+pub struct LintCommonOptions {
     /// A list of allowed "confusable" Unicode characters to ignore when
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     #[option(
@@ -2469,6 +2502,31 @@ impl PyUpgradeOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct FormatOptions {
+    /// A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    ///
+    /// Note that you'll typically want to use
+    /// [`extend-exclude`](#extend-exclude) to modify the excluded paths.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+
     /// Whether to enable the unstable preview style formatting.
     #[option(
         default = "false",
