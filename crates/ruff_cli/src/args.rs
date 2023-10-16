@@ -117,16 +117,6 @@ pub struct CheckCommand {
     #[arg(long)]
     ignore_noqa: bool,
 
-    /// Output serialization format for violations. (Deprecated: Use `--output-format` instead).
-    #[arg(
-        long,
-        value_enum,
-        env = "RUFF_FORMAT",
-        conflicts_with = "output_format",
-        hide = true
-    )]
-    pub format: Option<SerializationFormat>,
-
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     pub output_format: Option<SerializationFormat>,
@@ -507,7 +497,7 @@ impl CheckCommand {
                 unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                     .map(UnsafeFixes::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                output_format: self.output_format.or(self.format),
+                output_format: self.output_format,
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             },
         )
