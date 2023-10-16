@@ -93,13 +93,10 @@ fn format_source_code(
     };
 
     // Format the source.
-    let formatted = format_source(source_kind, source_type, path, settings)?;
+    let formatted = format_source(&source_kind, source_type, path, settings)?;
 
     match &formatted {
-        FormattedSource::Formatted {
-            unformatted,
-            formatted,
-        } => match mode {
+        FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
                 let mut writer = stdout().lock();
                 formatted
@@ -110,7 +107,7 @@ fn format_source_code(
             FormatMode::Diff => {
                 let mut writer = stdout().lock();
                 let text_diff =
-                    TextDiff::from_lines(unformatted.source_code(), formatted.source_code());
+                    TextDiff::from_lines(source_kind.source_code(), formatted.source_code());
                 let mut unified_diff = text_diff.unified_diff();
                 if let Some(path) = path {
                     unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
@@ -118,11 +115,11 @@ fn format_source_code(
                 unified_diff.to_writer(&mut writer).unwrap();
             }
         },
-        FormattedSource::Unchanged(formatted) => {
+        FormattedSource::Unchanged => {
             // Write to stdout regardless of whether the source was formatted
             if mode.is_write() {
                 let mut writer = stdout().lock();
-                formatted
+                source_kind
                     .write(&mut writer)
                     .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
             }

@@ -97,12 +97,31 @@ pub(crate) fn format(
                         return None;
                     }
 
+                    // Extract the sources from the file.
+                    let unformatted = match SourceKind::from_path(&path, source_type) {
+                        Ok(Some(source_kind)) => source_kind,
+                        Ok(None) => return None,
+                        Err(err) => {
+                            return Some(Err(FormatCommandError::Read(
+                                Some(path.to_path_buf()),
+                                err,
+                            )));
+                        }
+                    };
+
                     Some(
                         match catch_unwind(|| {
-                            format_path(path, &resolved_settings.formatter, source_type, mode)
+                            format_path(
+                                path,
+                                &resolved_settings.formatter,
+                                &unformatted,
+                                source_type,
+                                mode,
+                            )
                         }) {
                             Ok(inner) => inner.map(|result| FormatPathResult {
                                 path: resolved_file.into_path(),
+                                unformatted,
                                 result,
                             }),
                             Err(error) => Err(FormatCommandError::Panic(
@@ -197,24 +216,13 @@ pub(crate) fn format(
 fn format_path(
     path: &Path,
     settings: &FormatterSettings,
+    unformatted: &SourceKind,
     source_type: PySourceType,
     mode: FormatMode,
 ) -> Result<FormatResult, FormatCommandError> {
-    // Extract the sources from the file.
-    let source_kind = match SourceKind::from_path(path, source_type) {
-        Ok(Some(source_kind)) => source_kind,
-        Ok(None) => return Ok(FormatResult::Unchanged),
-        Err(err) => {
-            return Err(FormatCommandError::Read(Some(path.to_path_buf()), err));
-        }
-    };
-
     // Format the source.
-    match format_source(source_kind, source_type, Some(path), settings)? {
-        FormattedSource::Formatted {
-            unformatted,
-            formatted,
-        } => match mode {
+    let format_result = match format_source(&unformatted, source_type, Some(path), settings)? {
+        FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
                     FormatCommandError::Write(Some(path.to_path_buf()), err.into())
@@ -222,35 +230,29 @@ fn format_path(
                 formatted
                     .write(&mut writer)
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
-                Ok(FormatResult::Formatted)
+                FormatResult::Formatted
             }
-            FormatMode::Check => Ok(FormatResult::Formatted),
-            FormatMode::Diff => Ok(FormatResult::Diff {
-                path: path.to_path_buf(),
-                unformatted,
-                formatted,
-            }),
+            FormatMode::Check => FormatResult::Formatted,
+            FormatMode::Diff => FormatResult::Diff(formatted),
         },
-        FormattedSource::Unchanged(_) => Ok(FormatResult::Unchanged),
-    }
+        FormattedSource::Unchanged => FormatResult::Unchanged,
+    };
+    Ok(format_result)
 }
 
 #[derive(Debug)]
 pub(crate) enum FormattedSource {
     /// The source was formatted, and the [`SourceKind`] contains the transformed source code.
-    Formatted {
-        unformatted: SourceKind,
-        formatted: SourceKind,
-    },
-    /// The source was unchanged, and the [`SourceKind`] contains the original source code.
-    Unchanged(SourceKind),
+    Formatted(SourceKind),
+    /// The source was unchanged.
+    Unchanged,
 }
 
 impl From<FormattedSource> for FormatResult {
     fn from(value: FormattedSource) -> Self {
         match value {
-            FormattedSource::Formatted { .. } => FormatResult::Formatted,
-            FormattedSource::Unchanged(_) => FormatResult::Unchanged,
+            FormattedSource::Formatted(_) => FormatResult::Formatted,
+            FormattedSource::Unchanged => FormatResult::Unchanged,
         }
     }
 }
@@ -258,7 +260,7 @@ impl From<FormattedSource> for FormatResult {
 /// Format a [`SourceKind`], returning the transformed [`SourceKind`], or `None` if the source was
 /// unchanged.
 pub(crate) fn format_source(
-    source_kind: SourceKind,
+    source_kind: &SourceKind,
     source_type: PySourceType,
     path: Option<&Path>,
     settings: &FormatterSettings,
@@ -272,19 +274,14 @@ pub(crate) fn format_source(
 
             let formatted = formatted.into_code();
             if formatted.len() == unformatted.len() && formatted == *unformatted {
-                Ok(FormattedSource::Unchanged(SourceKind::Python(unformatted)))
+                Ok(FormattedSource::Unchanged)
             } else {
-                Ok(FormattedSource::Formatted {
-                    unformatted: SourceKind::Python(unformatted),
-                    formatted: SourceKind::Python(formatted),
-                })
+                Ok(FormattedSource::Formatted(SourceKind::Python(formatted)))
             }
         }
         SourceKind::IpyNotebook(notebook) => {
             if !notebook.is_python_notebook() {
-                return Ok(FormattedSource::Unchanged(SourceKind::IpyNotebook(
-                    notebook,
-                )));
+                return Ok(FormattedSource::Unchanged);
             }
 
             let options = settings.to_format_options(source_type, notebook.source_code());
@@ -332,9 +329,7 @@ pub(crate) fn format_source(
 
             // If the file was unchanged, return `None`.
             let (Some(mut output), Some(last)) = (output, last) else {
-                return Ok(FormattedSource::Unchanged(SourceKind::IpyNotebook(
-                    notebook,
-                )));
+                return Ok(FormattedSource::Unchanged);
             };
 
             // Add the remaining content.
@@ -345,10 +340,9 @@ pub(crate) fn format_source(
             let mut formatted = notebook.clone();
             formatted.update(&source_map, output);
 
-            Ok(FormattedSource::Formatted {
-                unformatted: SourceKind::IpyNotebook(notebook),
-                formatted: SourceKind::IpyNotebook(formatted),
-            })
+            Ok(FormattedSource::Formatted(SourceKind::IpyNotebook(
+                formatted,
+            )))
         }
     }
 }
@@ -358,12 +352,8 @@ pub(crate) fn format_source(
 pub(crate) enum FormatResult {
     /// The file was formatted.
     Formatted,
-    /// The file was formatted.
-    Diff {
-        path: PathBuf,
-        unformatted: SourceKind,
-        formatted: SourceKind,
-    },
+    /// The file was formatted, [`SourceKind`] contains the formatted code
+    Diff(SourceKind),
     /// The file was unchanged, as the formatted contents matched the existing contents.
     Unchanged,
 }
@@ -372,6 +362,7 @@ pub(crate) enum FormatResult {
 #[derive(Debug)]
 struct FormatPathResult {
     path: PathBuf,
+    unformatted: SourceKind,
     result: FormatResult,
 }
 
@@ -401,7 +392,7 @@ impl<'a> FormatSummary<'a> {
 impl Display for FormatSummary<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // Compute the number of changed and unchanged files.
-        let mut formatted = 0u32;
+        let mut changed = 0u32;
         let mut unchanged = 0u32;
         for result in self.results {
             match &result.result {
@@ -414,36 +405,34 @@ impl Display for FormatSummary<'_> {
                             fs::relativize_path(&result.path).bold()
                         )?;
                     }
-                    formatted += 1;
+                    changed += 1;
                 }
                 FormatResult::Unchanged => unchanged += 1,
-                FormatResult::Diff {
-                    path,
-                    unformatted,
-                    formatted: formatted_source,
-                } => {
-                    // Diff
+                FormatResult::Diff(formatted) => {
                     let mut writer = stdout().lock();
                     let text_diff = TextDiff::from_lines(
-                        unformatted.source_code(),
-                        formatted_source.source_code(),
+                        result.unformatted.source_code(),
+                        formatted.source_code(),
                     );
                     let mut unified_diff = text_diff.unified_diff();
-                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                    unified_diff.header(
+                        &fs::relativize_path(&result.path),
+                        &fs::relativize_path(&result.path),
+                    );
                     unified_diff.to_writer(&mut writer).unwrap();
 
-                    formatted += 1;
+                    changed += 1;
                 }
             }
         }
 
         // Write out a summary of the formatting results.
-        if formatted > 0 && unchanged > 0 {
+        if changed > 0 && unchanged > 0 {
             write!(
                 f,
                 "{} file{} {}, {} file{} left unchanged",
-                formatted,
-                if formatted == 1 { "" } else { "s" },
+                changed,
+                if changed == 1 { "" } else { "s" },
                 match self.mode {
                     FormatMode::Write => "reformatted",
                     FormatMode::Check | FormatMode::Diff => "would be reformatted",
@@ -451,12 +440,12 @@ impl Display for FormatSummary<'_> {
                 unchanged,
                 if unchanged == 1 { "" } else { "s" },
             )
-        } else if formatted > 0 {
+        } else if changed > 0 {
             write!(
                 f,
                 "{} file{} {}",
-                formatted,
-                if formatted == 1 { "" } else { "s" },
+                changed,
+                if changed == 1 { "" } else { "s" },
                 match self.mode {
                     FormatMode::Write => "reformatted",
                     FormatMode::Check | FormatMode::Diff => "would be reformatted",
