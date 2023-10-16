@@ -50,7 +50,7 @@ tracing = { version = "0.1.37" }
 tracing-indicatif = { version = "0.3.4" }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 unicode-ident = { version = "1.0.12" }
-unicode_names2 = { git = "https://github.com/konstin/unicode_names2", rev = "e2ee8155795a13afbea5caa4dbce8d1f93bc26eb" }
+unicode_names2 = { version = "1.2.0" }
 unicode-width = { version = "0.1.11" }
 uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 wsl = { version = "0.1.0" }
