@@ -355,10 +355,10 @@
       ]
     },
     "format": {
-      "description": "Options to configure the code formatting.\n\nPreviously: The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).\n\nThis option has been **deprecated** in favor of `output-format` to avoid ambiguity with Ruff's upcoming formatter.",
+      "description": "Options to configure code formatting.",
       "anyOf": [
         {
-          "$ref": "#/definitions/FormatOrOutputFormat"
+          "$ref": "#/definitions/FormatOptions"
         },
         {
           "type": "null"
@@ -1258,16 +1258,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "FormatOrOutputFormat": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/FormatOptions"
-        },
-        {
-          "$ref": "#/definitions/SerializationFormat"
-        }
-      ]
     },
     "ImportSection": {
       "anyOf": [

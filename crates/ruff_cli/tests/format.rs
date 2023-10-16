@@ -144,7 +144,7 @@ if condition:
     Ok(())
 }
 
-/// Tests that the legacy `format` option continues to work but emits a warning.
+/// Since 0.1.0 the legacy format option is no longer supported
 #[test]
 fn legacy_format_option() -> Result<()> {
     let tempdir = TempDir::new()?;
@@ -164,45 +164,17 @@ format = "json"
 import os
 "#), @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    [
-      {
-        "cell": null,
-        "code": "F401",
-        "end_location": {
-          "column": 10,
-          "row": 2
-        },
-        "filename": "-",
-        "fix": {
-          "applicability": "safe",
-          "edits": [
-            {
-              "content": "",
-              "end_location": {
-                "column": 1,
-                "row": 3
-              },
-              "location": {
-                "column": 1,
-                "row": 2
-              }
-            }
-          ],
-          "message": "Remove unused import: `os`"
-        },
-        "location": {
-          "column": 8,
-          "row": 2
-        },
-        "message": "`os` imported but unused",
-        "noqa_row": 2,
-        "url": "https://docs.astral.sh/ruff/rules/unused-import"
-      }
-    ]
+
     ----- stderr -----
-    warning: The option `format` has been deprecated to avoid ambiguity with Ruff's upcoming formatter. Use `output-format` instead.
+    ruff failed
+      Cause: Failed to parse `/var/folders/bc/qlsk3t6x7c9fhhbvvcg68k9c0000gp/T/.tmpTaP0Od/ruff.toml`: TOML parse error at line 2, column 10
+      |
+    2 | format = "json"
+      |          ^^^^^^
+    invalid type: string "json", expected struct FormatOptions
+
     "###);
     Ok(())
 }
