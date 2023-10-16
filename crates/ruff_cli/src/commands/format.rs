@@ -141,7 +141,7 @@ pub(crate) fn format(
     let duration = start.elapsed();
 
     // Make output deterministic, at least as long as we have a path
-    results.sort_by(|x, y| x.path.cmp(&y.path));
+    results.sort_unstable_by(|x, y| x.path.cmp(&y.path));
     errors.sort_by(|x, y| {
         fn get_key(error: &FormatCommandError) -> Option<&PathBuf> {
             match &error {
