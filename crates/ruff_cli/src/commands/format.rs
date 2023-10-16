@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
-use std::io::stdout;
+use std::io;
+use std::io::{stderr, stdout, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -169,24 +170,20 @@ pub(crate) fn format(
         error!("{error}");
     }
 
-<<<<<<< HEAD
     results.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+    let results = FormatResults::new(results.as_slice(), mode);
 
-    let summary = FormatSummary::new(results.as_slice(), mode);
-=======
-    let summary = FormatResults::new(results.as_slice(), mode);
->>>>>>> 70d7e67fb (Review (micha))
+    if mode.is_diff() {
+        results.write_diff(&mut stdout().lock())?;
+    }
 
     // Report on the formatting changes.
     if log_level >= LogLevel::Default {
-        #[allow(clippy::print_stdout, clippy::print_stderr)]
-        {
-            if mode.is_diff() {
-                // Allow piping the diff to e.g. a file by writing the summary to stderr
-                eprintln!("{summary}");
-            } else {
-                println!("{summary}");
-            }
+        if mode.is_diff() {
+            // Allow piping the diff to e.g. a file by writing the summary to stderr
+            results.write_summary(&mut stderr().lock())?;
+        } else {
+            results.write_summary(&mut stdout().lock())?;
         }
     }
 
@@ -200,7 +197,7 @@ pub(crate) fn format(
         }
         FormatMode::Check | FormatMode::Diff => {
             if errors.is_empty() {
-                if summary.any_formatted() {
+                if results.any_formatted() {
                     Ok(ExitStatus::Failure)
                 } else {
                     Ok(ExitStatus::Success)
@@ -388,14 +385,28 @@ impl<'a> FormatResults<'a> {
             FormatResult::Unchanged => false,
         })
     }
-}
 
-impl Display for FormatResults<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn write_diff(&self, f: &mut impl Write) -> io::Result<()> {
+        for result in self.results {
+            if let FormatResult::Diff(formatted) = &result.result {
+                let text_diff =
+                    TextDiff::from_lines(result.unformatted.source_code(), formatted.source_code());
+                let mut unified_diff = text_diff.unified_diff();
+                unified_diff.header(
+                    &fs::relativize_path(&result.path),
+                    &fs::relativize_path(&result.path),
+                );
+                unified_diff.to_writer(&mut *f)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn write_summary(&self, f: &mut impl Write) -> io::Result<()> {
         // Compute the number of changed and unchanged files.
         let mut changed = 0u32;
         let mut unchanged = 0u32;
-        let mut writer = stdout().lock();
         for result in self.results {
             match &result.result {
                 FormatResult::Formatted => {
@@ -410,18 +421,7 @@ impl Display for FormatResults<'_> {
                     changed += 1;
                 }
                 FormatResult::Unchanged => unchanged += 1,
-                FormatResult::Diff(formatted) => {
-                    let text_diff = TextDiff::from_lines(
-                        result.unformatted.source_code(),
-                        formatted.source_code(),
-                    );
-                    let mut unified_diff = text_diff.unified_diff();
-                    unified_diff.header(
-                        &fs::relativize_path(&result.path),
-                        &fs::relativize_path(&result.path),
-                    );
-                    unified_diff.to_writer(&mut writer).unwrap();
-
+                FormatResult::Diff(_) => {
                     changed += 1;
                 }
             }
