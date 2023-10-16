@@ -102,10 +102,7 @@ pub(crate) fn format(
                         Ok(Some(source_kind)) => source_kind,
                         Ok(None) => return None,
                         Err(err) => {
-                            return Some(Err(FormatCommandError::Read(
-                                Some(path.to_path_buf()),
-                                err,
-                            )));
+                            return Some(Err(FormatCommandError::Read(Some(path), err)));
                         }
                     };
 
@@ -172,9 +169,13 @@ pub(crate) fn format(
         error!("{error}");
     }
 
+<<<<<<< HEAD
     results.sort_unstable_by(|a, b| a.path.cmp(&b.path));
 
     let summary = FormatSummary::new(results.as_slice(), mode);
+=======
+    let summary = FormatResults::new(results.as_slice(), mode);
+>>>>>>> 70d7e67fb (Review (micha))
 
     // Report on the formatting changes.
     if log_level >= LogLevel::Default {
@@ -221,7 +222,7 @@ fn format_path(
     mode: FormatMode,
 ) -> Result<FormatResult, FormatCommandError> {
     // Format the source.
-    let format_result = match format_source(&unformatted, source_type, Some(path), settings)? {
+    let format_result = match format_source(unformatted, source_type, Some(path), settings)? {
         FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
@@ -267,9 +268,9 @@ pub(crate) fn format_source(
 ) -> Result<FormattedSource, FormatCommandError> {
     match source_kind {
         SourceKind::Python(unformatted) => {
-            let options = settings.to_format_options(source_type, &unformatted);
+            let options = settings.to_format_options(source_type, unformatted);
 
-            let formatted = format_module_source(&unformatted, options)
+            let formatted = format_module_source(unformatted, options)
                 .map_err(|err| FormatCommandError::Format(path.map(Path::to_path_buf), err))?;
 
             let formatted = formatted.into_code();
@@ -366,16 +367,16 @@ struct FormatPathResult {
     result: FormatResult,
 }
 
-/// A summary of the formatting results.
+/// The results of formatting a set of files
 #[derive(Debug)]
-struct FormatSummary<'a> {
+struct FormatResults<'a> {
     /// The individual formatting results.
     results: &'a [FormatPathResult],
     /// The format mode that was used.
     mode: FormatMode,
 }
 
-impl<'a> FormatSummary<'a> {
+impl<'a> FormatResults<'a> {
     fn new(results: &'a [FormatPathResult], mode: FormatMode) -> Self {
         Self { results, mode }
     }
@@ -389,11 +390,12 @@ impl<'a> FormatSummary<'a> {
     }
 }
 
-impl Display for FormatSummary<'_> {
+impl Display for FormatResults<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // Compute the number of changed and unchanged files.
         let mut changed = 0u32;
         let mut unchanged = 0u32;
+        let mut writer = stdout().lock();
         for result in self.results {
             match &result.result {
                 FormatResult::Formatted => {
@@ -409,7 +411,6 @@ impl Display for FormatSummary<'_> {
                 }
                 FormatResult::Unchanged => unchanged += 1,
                 FormatResult::Diff(formatted) => {
-                    let mut writer = stdout().lock();
                     let text_diff = TextDiff::from_lines(
                         result.unformatted.source_code(),
                         formatted.source_code(),
