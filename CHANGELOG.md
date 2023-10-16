@@ -76,6 +76,12 @@ _New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
 - Show custom message in `PTH118` for `Path.joinpath` with starred arguments ([#7852](https://github.com/astral-sh/ruff/pull/7852))
 - Fix false negative in `outdated-version-block` when using greater than comparisons ([#7920](https://github.com/astral-sh/ruff/pull/7920))
 - Avoid converting f-strings within Django `gettext` calls ([#7898](https://github.com/astral-sh/ruff/pull/7898))
+- Fix false positive in `PLR6301` ([#7933](https://github.com/astral-sh/ruff/pull/7933))
+- Treat type aliases as typing-only expressions e.g. resolves false positive in `TCH004` ([#7968](https://github.com/astral-sh/ruff/pull/7968))
+- Resolve `cache-dir` relative to project root ([#7962](https://github.com/astral-sh/ruff/pull/7962))
+- Respect subscripted base classes in type-checking rules e.g. resolves false positive in `TCH003` ([#7954](https://github.com/astral-sh/ruff/pull/7954))
+- Fix JSON schema limit for `line-length` ([#7883](https://github.com/astral-sh/ruff/pull/7883))
+- Fix commented-out `coalesce` keyword ([#7876](https://github.com/astral-sh/ruff/pull/7876))
 
 ### Documentation
 
@@ -100,6 +106,8 @@ _New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
 - Document one-call chaining deviation ([#7767](https://github.com/astral-sh/ruff/pull/7767))
 - Allow f-string modifications in line-shrinking cases ([#7818](https://github.com/astral-sh/ruff/pull/7818))
 - Add trailing comment deviation to README ([#7827](https://github.com/astral-sh/ruff/pull/7827))
+- Add trailing zero between dot and exponential ([#7956](https://github.com/astral-sh/ruff/pull/7956))
+- Force parentheses for power operations in unary expressions ([#7955](https://github.com/astral-sh/ruff/pull/7955))
 
 ### Playground
 
