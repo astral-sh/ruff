@@ -2390,6 +2390,11 @@ pub struct PylintOptions {
         example = r"max-public-methods = 20"
     )]
     pub max_public_methods: Option<usize>,
+
+    /// Maximum number of boolean expressions allowed for a single if statement
+    /// (see: `PLR0916`).
+    #[option(default = r"5", value_type = "int", example = r"max-bools = 5")]
+    pub max_bools: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2400,6 +2405,7 @@ impl PylintOptions {
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
             max_args: self.max_args.unwrap_or(defaults.max_args),
+            max_bools: self.max_bools.unwrap_or(defaults.max_bools),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),

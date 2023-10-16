@@ -229,6 +229,22 @@ mod tests {
     }
 
     #[test]
+    fn max_boolean_expressions() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_boolean_expressions.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_bools: 5,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::TooManyBooleanExpressions)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn max_statements() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_statements_params.py"),

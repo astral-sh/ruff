@@ -2224,6 +2224,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-bools": {
+          "description": "Maximum number of boolean expressions allowed for a single if statement (see: `PLR0916`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-branches": {
           "description": "Maximum number of branches allowed for a function or method body (see: `PLR0912`).",
           "type": [
@@ -2956,6 +2965,7 @@
         "PLR0912",
         "PLR0913",
         "PLR0915",
+        "PLR0916",
         "PLR1",
         "PLR17",
         "PLR170",
