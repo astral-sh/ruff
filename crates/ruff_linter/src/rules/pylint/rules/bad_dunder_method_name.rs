@@ -196,5 +196,13 @@ fn is_known_dunder_method(method: &str) -> bool {
             | "__trunc__"
             | "__weakref__"
             | "__xor__"
+            // Overridable sunder names from the `Enum` class.
+            // See: https://docs.python.org/3/library/enum.html#supported-sunder-names
+            | "_name_"
+            | "_value_"
+            | "_missing_"
+            | "_ignore_"
+            | "_order_"
+            | "_generate_next_value_"
     )
 }

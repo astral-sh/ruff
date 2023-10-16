@@ -63,6 +63,11 @@ class Apples:
     def __html__(self):
         pass
 
+    # Allow _missing_, used by enum.Enum.
+    @classmethod
+    def _missing_(cls, value):
+        pass
+
 
 def __foo_bar__():  # this is not checked by the [bad-dunder-name] rule
     ...
