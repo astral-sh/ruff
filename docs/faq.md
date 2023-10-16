@@ -436,38 +436,13 @@ For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) c
 
 ## Ruff tried to fix something — but it broke my code?
 
-Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when
-applying safe fixes, but the meaning could be changed when applying unsafe fixes.
-
-By default, Ruff will fix all violations for which safe fixes are available; unsafe fixes can be
-enabled by setting [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing
-the `--unsafe-fixes` flag to `ruff check`.
+Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
+fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
+setting, or passing the `--unsafe-fixes` flag to `ruff check`. For more, see [the fix documentation](configuration.md#fixes).
 
 Even still, given the dynamic nature of Python, it's difficult to have _complete_ certainty when
-making changes to code, even for the seemingly trivial fixes. If a "safe" fix breaks your code,
-please [file an Issue](https://github.com/astral-sh/ruff/issues/new).
-
-In the meantime, you can limit the set of rules that Ruff should fix via the [`extend-fixable`](settings.md#extend-fixable)
-and [`extend-unfixable`](settings.md#extend-unfixable) settings.
-
-Similarly, you can adjust the _safety_ of fixes on a per-rule basis using the [`extend-safe-fixes`](settings.md#extend-safe-fixes)
-and [`extend-unsafe-fixes`](settings.md#extend-unsafe-fixes) settings.
-
-For example, to prevent Ruff from attempting to fix flake8-bugbear violations, add the following
-to your `pyproject.toml`:
-
-```toml
-[tool.ruff]
-extend-unfixable = ["B"]
-```
-
-Alternatively, to require the `--unsafe-fixes` flag when for flake8-bugbear violations, add the
-following to your `pyproject.toml`:
-
-```toml
-[tool.ruff]
-extend-safe-fixes = ["B"]
-```
+making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks your code, please
+[file an Issue](https://github.com/astral-sh/ruff/issues/new).
 
 ## How can I disable Ruff's color output?
 
