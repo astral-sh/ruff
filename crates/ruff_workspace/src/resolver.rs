@@ -13,8 +13,8 @@ use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use ruff_linter::fs;
 use ruff_linter::packaging::is_package;
-use ruff_linter::{fs};
 
 use crate::configuration::Configuration;
 use crate::pyproject;

@@ -4,10 +4,10 @@
 
 ### The format option cannot be used to configure the output format
 
-Ruff previously used the `format` setting, `--format` CLI option, and `RUFF_FORMAT` environment variable to 
+Ruff previously used the `format` setting, `--format` CLI option, and `RUFF_FORMAT` environment variable to
 configure the output format of the CLI. This usage was deprecated in `v0.0.291` — the `format` setting is now used
-to control Ruff's code formatting. Now, the `--format` CLI option has been removed and the `format` setting and 
-may no longer be used to set the output format. Use the `output-format` setting, the `--output-format` CLI option, 
+to control Ruff's code formatting. Now, the `--format` CLI option has been removed and the `format` setting and
+may no longer be used to set the output format. Use the `output-format` setting, the `--output-format` CLI option,
 or the `RUFF_OUTPUT_FORMAT` environment variable instead.
 
 ### Unsafe fixes are not applied by default ([#7769](https://github.com/astral-sh/ruff/pull/7769))
