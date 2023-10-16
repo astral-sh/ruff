@@ -58,7 +58,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     };
 
     // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
-    // `(Rule::UnaryPrefixIncrement, RuleGroup::Unspecified, vec![])`).
+    // `(Rule::UnaryPrefixIncrement, RuleGroup::Stable, vec![])`).
     let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
     for arm in arms {
