@@ -181,7 +181,7 @@ pub(crate) fn format(
         #[allow(clippy::print_stdout, clippy::print_stderr)]
         {
             if mode.is_diff() {
-                // Allow piping the diff to e.g. a file by writing to stderr
+                // Allow piping the diff to e.g. a file by writing the summary to stderr
                 eprintln!("{summary}");
             } else {
                 println!("{summary}");
