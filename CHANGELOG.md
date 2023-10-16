@@ -28,6 +28,7 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - Add fix for `PYI055` ([#7886](https://github.com/astral-sh/ruff/pull/7886))
 - Update `non-pep695-type-alias` to require `--unsafe-fixes` outside of stub files ([#7836](https://github.com/astral-sh/ruff/pull/7836))
 - Improve fix message for `UP018` ([#7913](https://github.com/astral-sh/ruff/pull/7913))
+- Update `PLW3201` to support `Enum` [sunder names](https://docs.python.org/3/library/enum.html#supported-sunder-names) ([#7987](https://github.com/astral-sh/ruff/pull/7987))
 
 ### Preview features
 
