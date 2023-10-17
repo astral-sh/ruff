@@ -1197,6 +1197,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ComparisonWithItself) {
                 pylint::rules::comparison_with_itself(checker, left, ops, comparators);
             }
+            if checker.enabled(Rule::LiteralMembership) {
+                pylint::rules::literal_membership(checker, compare);
+            }
             if checker.enabled(Rule::ComparisonOfConstant) {
                 pylint::rules::comparison_of_constant(checker, left, ops, comparators);
             }
