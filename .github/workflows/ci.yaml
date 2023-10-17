@@ -129,8 +129,6 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
-        with:
           workspaces: "fuzz -> target"
       - name: "Install cargo-fuzz"
         uses: taiki-e/install-action@v2
