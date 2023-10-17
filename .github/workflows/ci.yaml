@@ -349,7 +349,7 @@ jobs:
       - uses: actions/checkout@v4
         name: "Download ruff-lsp source"
         with:
-          repository: 'astral-sh/ruff-lsp'
+          repository: "astral-sh/ruff-lsp"
 
       - uses: actions/setup-python@v4
         with:
@@ -365,7 +365,7 @@ jobs:
       - name: Install ruff-lsp dependencies
         run: |
           just install
-          
+
       - name: Setup development ruff version
         run: |
           # Make executable and prepend to path
@@ -377,7 +377,7 @@ jobs:
       - name: Run ruff-lsp tests
         run: |
           just test
-    
+
   benchmarks:
     runs-on: ubuntu-latest
     steps:
