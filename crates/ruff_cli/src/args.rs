@@ -399,7 +399,7 @@ pub struct FormatCommand {
     /// Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
     preview: bool,
-    #[clap(long, overrides_with("preview"), hide = true)]
+    #[clap(long, overrides_with("preview"))]
     no_preview: bool,
 }
 
