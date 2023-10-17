@@ -12,7 +12,7 @@ use ruff_python_trivia::{BackwardsTokenizer, CommentRanges, SimpleTokenKind, Sim
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::{leading_comments, trailing_comments, Comments};
+use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
@@ -113,11 +113,12 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Parentheses::Never => false,
         };
         if parenthesize {
-            let comments = f.context().comments().clone();
-            if !comments.has_leading(expression) && !comments.has_trailing(expression) {
+            let comment = f.context().comments().clone();
+            let node_comments = comment.leading_dangling_trailing(expression);
+            if !node_comments.has_leading() && !node_comments.has_trailing() {
                 parenthesized("(", &format_expr, ")").fmt(f)
             } else {
-                format_with_parentheses_comments(expression, &comments, f)
+                format_with_parentheses_comments(expression, &node_comments, f)
             }
         } else {
             let level = match f.context().node_level() {
@@ -181,7 +182,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 /// outermost parentheses the relevant ones and discard the others.
 fn format_with_parentheses_comments(
     expression: &Expr,
-    comments: &Comments,
+    node_comments: &LeadingDanglingTrailingComments,
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
     // First part: Split the comments
@@ -226,23 +227,22 @@ fn format_with_parentheses_comments(
         .last()
         .map(|(right, left)| TextRange::new(left.start(), right.end()));
 
-    let leading = comments.leading(expression);
-    let trailing = comments.trailing(expression);
-
     let (leading_split, trailing_split) = if let Some(range_with_parens) = range_with_parens {
-        let leading_split =
-            leading.partition_point(|comment| comment.start() < range_with_parens.start());
-        let trailing_split =
-            trailing.partition_point(|comment| comment.start() < range_with_parens.end());
+        let leading_split = node_comments
+            .leading
+            .partition_point(|comment| comment.start() < range_with_parens.start());
+        let trailing_split = node_comments
+            .trailing
+            .partition_point(|comment| comment.start() < range_with_parens.end());
         (leading_split, trailing_split)
     } else {
-        (0, trailing.len())
+        (0, node_comments.trailing.len())
     };
 
-    let leading_outer = &leading[..leading_split];
-    let leading_inner = &leading[leading_split..];
-    let trailing_inner = &trailing[..trailing_split];
-    let trailing_outer = &trailing[trailing_split..];
+    let leading_outer = &node_comments.leading[..leading_split];
+    let leading_inner = &node_comments.leading[leading_split..];
+    let trailing_inner = &node_comments.trailing[..trailing_split];
+    let trailing_outer = &node_comments.trailing[trailing_split..];
 
     // Preserve an opening parentheses comment
     // ```python
@@ -255,7 +255,7 @@ fn format_with_parentheses_comments(
         Some((first, rest)) if first.line_position().is_end_of_line() => {
             (slice::from_ref(first), rest)
         }
-        _ => (Default::default(), leading),
+        _ => (Default::default(), node_comments.leading),
     };
 
     // Second Part: Format
