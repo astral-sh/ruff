@@ -11,7 +11,6 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
-use ruff_linter::settings::types::UnsafeFixes;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -20,6 +19,7 @@ use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
+use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
@@ -61,7 +61,7 @@ impl FileCacheKey {
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
     pub(crate) messages: Vec<Message>,
-    pub(crate) fixed: FxHashMap<String, FixTable>,
+    pub(crate) fixed: FixMap,
     pub(crate) imports: ImportMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
@@ -74,7 +74,7 @@ impl Diagnostics {
     ) -> Self {
         Self {
             messages,
-            fixed: FxHashMap::default(),
+            fixed: FixMap::default(),
             imports,
             notebook_indexes,
         }
@@ -146,18 +146,55 @@ impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
         self.messages.extend(other.messages);
         self.imports.extend(other.imports);
-        for (filename, fixed) in other.fixed {
+        self.fixed += other.fixed;
+        self.notebook_indexes.extend(other.notebook_indexes);
+    }
+}
+
+/// A collection of fixes indexed by file path.
+#[derive(Debug, Default, PartialEq)]
+pub(crate) struct FixMap(FxHashMap<String, FixTable>);
+
+impl FixMap {
+    /// Returns `true` if there are no fixes in the map.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns an iterator over the fixes in the map, along with the file path.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &FixTable)> {
+        self.0.iter()
+    }
+
+    /// Returns an iterator over the fixes in the map.
+    pub(crate) fn values(&self) -> impl Iterator<Item = &FixTable> {
+        self.0.values()
+    }
+}
+
+impl FromIterator<(String, FixTable)> for FixMap {
+    fn from_iter<T: IntoIterator<Item = (String, FixTable)>>(iter: T) -> Self {
+        Self(
+            iter.into_iter()
+                .filter(|(_, fixes)| !fixes.is_empty())
+                .collect(),
+        )
+    }
+}
+
+impl AddAssign for FixMap {
+    fn add_assign(&mut self, rhs: Self) {
+        for (filename, fixed) in rhs.0 {
             if fixed.is_empty() {
                 continue;
             }
-            let fixed_in_file = self.fixed.entry(filename).or_default();
+            let fixed_in_file = self.0.entry(filename).or_default();
             for (rule, count) in fixed {
                 if count > 0 {
                     *fixed_in_file.entry(rule).or_default() += count;
                 }
             }
         }
-        self.notebook_indexes.extend(other.notebook_indexes);
     }
 }
 
@@ -318,7 +355,7 @@ pub(crate) fn lint_path(
 
     Ok(Diagnostics {
         messages,
-        fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
+        fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
         imports,
         notebook_indexes,
     })
@@ -436,7 +473,7 @@ pub(crate) fn lint_stdin(
 
     Ok(Diagnostics {
         messages,
-        fixed: FxHashMap::from_iter([(
+        fixed: FixMap::from_iter([(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
         )]),

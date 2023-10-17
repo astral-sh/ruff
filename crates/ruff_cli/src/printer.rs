@@ -7,11 +7,9 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
-use rustc_hash::FxHashMap;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
-use ruff_linter::linter::FixTable;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
@@ -22,7 +20,7 @@ use ruff_linter::registry::{AsRule, Rule};
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{SerializationFormat, UnsafeFixes};
 
-use crate::diagnostics::Diagnostics;
+use crate::diagnostics::{Diagnostics, FixMap};
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
@@ -462,7 +460,7 @@ fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics
     (!fix_mode.is_apply()) && fixables.is_some_and(FixableStatistics::any_applicable_fixes)
 }
 
-fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
+fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
     let total = fixed
         .values()
         .map(|table| table.values().sum::<usize>())
