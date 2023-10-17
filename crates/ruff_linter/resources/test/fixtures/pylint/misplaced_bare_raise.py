@@ -62,3 +62,10 @@ try:
 except:
     class C:
         raise # [misplaced-bare-raise]
+
+try:
+    pass
+except:
+    pass
+finally:
+    raise # [misplaced-bare-raise]
