@@ -1,32 +1,44 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Stmt;
-use ruff_python_semantic::NodeRef;
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::in_dunder_method;
 
 /// ## What it does
-///
-/// This rule triggers an error when a bare raise statement is not in an except or finally block.
+/// Checks for bare `raise` statements outside of exception handlers.
 ///
 /// ## Why is this bad?
+/// A bare `raise` statement without an exception object will re-raise the last
+/// exception that was active in the current scope, and is typically used
+/// within an exception handler to re-raise the caught exception.
 ///
-/// If raise statement is not in an except or finally block, there is no active exception to
-/// re-raise, so it will fail with a `RuntimeError` exception.
+/// If a bare `raise` is used outside of an exception handler, it will generate
+/// an error due to the lack of an active exception.
+///
+/// Note that a bare `raise` within a  `finally` block will work in some cases
+/// (namely, when the exception is raised within the `try` block), but should
+/// be avoided as it can lead to confusing behavior.
 ///
 /// ## Example
 /// ```python
-/// def validate_positive(x):
-///     if x <= 0:
+/// from typing import Any
+///
+///
+/// def is_some(obj: Any) -> bool:
+///     if obj is None:
 ///         raise
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def validate_positive(x):
-///     if x <= 0:
-///         raise ValueError(f"{x} is not positive")
+/// from typing import Any
+///
+///
+/// def is_some(obj: Any) -> bool:
+///     if obj is None:
+///         raise ValueError("`obj` cannot be `None`")
 /// ```
 #[violation]
 pub struct MisplacedBareRaise;
@@ -34,28 +46,25 @@ pub struct MisplacedBareRaise;
 impl Violation for MisplacedBareRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The raise statement is not inside an except clause")
+        format!("Bare `raise` statement is not inside an exception handler")
     }
 }
 
 /// PLE0704
-pub(crate) fn misplaced_bare_raise(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn misplaced_bare_raise(checker: &mut Checker, raise: &ast::StmtRaise) {
+    if raise.exc.is_some() {
+        return;
+    }
+
     if checker.semantic().in_exception_handler() {
         return;
     }
-    for id in checker.semantic().current_statement_ids() {
-        let node = checker.semantic().node(id);
-        if let NodeRef::Stmt(Stmt::FunctionDef(fd)) = node {
-            // allow bare raise in __exit__ methods
-            if let Some(Stmt::ClassDef(_)) = checker.semantic().parent_statement(id) {
-                if fd.name.as_str() == "__exit__" {
-                    return;
-                }
-            }
-            break;
-        }
+
+    if in_dunder_method("__exit__", checker.semantic(), checker.settings) {
+        return;
     }
+
     checker
         .diagnostics
-        .push(Diagnostic::new(MisplacedBareRaise, stmt.range()));
+        .push(Diagnostic::new(MisplacedBareRaise, raise.range()));
 }

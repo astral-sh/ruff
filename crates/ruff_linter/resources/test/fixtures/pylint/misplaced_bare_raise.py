@@ -50,3 +50,15 @@ def h():
     raise # [misplaced-bare-raise]
 
 raise # [misplaced-bare-raise]
+
+try:
+    pass
+except:
+    def i():
+        raise # [misplaced-bare-raise]
+
+try:
+    pass
+except:
+    class C:
+        raise # [misplaced-bare-raise]
