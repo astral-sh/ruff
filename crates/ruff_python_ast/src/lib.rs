@@ -2,7 +2,7 @@ use std::path::Path;
 
 pub use expression::*;
 pub use int::*;
-pub use node::{AnyNodeRef, AstNode};
+pub use node::{AnyNode, AnyNodeRef, AstNode};
 pub use nodes::*;
 
 pub mod all;
