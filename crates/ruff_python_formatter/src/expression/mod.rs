@@ -6,8 +6,8 @@ use ruff_formatter::{
     write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
 use ruff_python_ast as ast;
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::CommentRanges;
 

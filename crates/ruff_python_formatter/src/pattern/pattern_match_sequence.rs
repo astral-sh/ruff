@@ -1,6 +1,6 @@
 use crate::comments::SourceComment;
 use ruff_formatter::{format_args, Format, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchSequence;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};

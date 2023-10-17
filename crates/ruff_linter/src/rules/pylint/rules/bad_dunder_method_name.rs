@@ -54,7 +54,7 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt])
         .iter()
         .filter_map(ruff_python_ast::Stmt::as_function_def_stmt)
         .filter(|method| {
-            if is_known_dunder_method(&method.name) {
+            if is_known_dunder_method(&method.name) || matches!(method.name.as_str(), "_") {
                 return false;
             }
             method.name.starts_with('_') && method.name.ends_with('_')

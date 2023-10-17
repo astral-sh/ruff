@@ -292,7 +292,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff
-      # Include `--format=github` to enable automatic inline annotations.
+      # Update output format to enable automatic inline annotations.
       - name: Run Ruff
-        run: ruff check --format=github .
+        run: ruff check --output-format=github .
 ```

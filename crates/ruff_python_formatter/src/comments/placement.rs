@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, ModModule, Parameters};
 use ruff_python_trivia::{
     find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, CommentRanges,

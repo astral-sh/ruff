@@ -1,5 +1,5 @@
 use ruff_formatter::{write, Argument, Arguments, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
     ElifElseClause, ExceptHandlerExceptHandler, MatchCase, StmtClassDef, StmtFor, StmtFunctionDef,
     StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,

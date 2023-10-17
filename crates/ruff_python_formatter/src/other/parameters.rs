@@ -1,8 +1,8 @@
 use std::usize;
 
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::Parameters;
+use ruff_python_ast::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 

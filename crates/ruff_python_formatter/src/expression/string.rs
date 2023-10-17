@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use bitflags::bitflags;
 
 use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Constant, ExprConstant, ExprFString, ExpressionRef};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
