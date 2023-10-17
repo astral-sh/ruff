@@ -128,6 +128,11 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &St
         return;
     };
 
+    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit
+    if index_name == "_" || value_name == "_" {
+        return;
+    }
+
     // Get the first argument of the enumerate call
     let Some(Expr::Name(ast::ExprName { id: sequence, .. })) = arguments.args.first() else {
         return;
