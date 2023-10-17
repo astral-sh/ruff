@@ -184,7 +184,7 @@ pub(crate) fn collect_per_file_ignores(
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pair.prefix);
     }
     per_file_ignores
