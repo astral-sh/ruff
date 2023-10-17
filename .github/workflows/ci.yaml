@@ -340,6 +340,7 @@ jobs:
   check-ruff-lsp:
     name: "Check compatibility with ruff-lsp"
     runs-on: ubuntu-latest
+    needs: cargo-test
     steps:
       - uses: extractions/setup-just@v1
         env:
