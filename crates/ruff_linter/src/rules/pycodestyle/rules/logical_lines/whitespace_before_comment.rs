@@ -167,10 +167,10 @@ pub(crate) fn whitespace_before_comment(
             let symbol = parts.next().unwrap_or("");
             let comment = parts.next().unwrap_or("");
 
-            let bad_prefix = if symbol != "#" && symbol != "#:" {
-                Some(symbol.trim_start_matches('#').chars().next().unwrap_or('#'))
-            } else {
+            let bad_prefix = if matches!(symbol, "#" | "#:" | "#!" | "#%%") {
                 None
+            } else {
+                Some(symbol.trim_start_matches('#').chars().next().unwrap_or('#'))
             };
 
             if is_inline_comment {

@@ -72,3 +72,8 @@ a = 42  #  (Two spaces)
 # EF  Means test is giving error and Failing
 #!   Means test is segfaulting
 # 8   Means test runs forever
+
+#%%
+# %%
+# This is a comment
+# This is another comment

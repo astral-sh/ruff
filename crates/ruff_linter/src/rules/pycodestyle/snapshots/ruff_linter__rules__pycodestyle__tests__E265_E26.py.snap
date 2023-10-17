@@ -11,16 +11,6 @@ E26.py:10:1: E265 Block comment should start with `# `
 12 | #: E265:2:1
    |
 
-E26.py:14:1: E265 Block comment should start with `# `
-   |
-12 | #: E265:2:1
-13 | m = 42
-14 | #! This is important
-   | ^^^^^^^^^^^^^^^^^^^^ E265
-15 | mx = 42 - 42
-16 | #: E266:3:5 E266:6:5
-   |
-
 E26.py:25:1: E265 Block comment should start with `# `
    |
 23 |     return
@@ -38,15 +28,6 @@ E26.py:32:1: E265 Block comment should start with `# `
    | ^^^^^^^^^^^^^^^^^^^^^ E265
 33 | 
 34 | pass  # an inline comment
-   |
-
-E26.py:73:1: E265 Block comment should start with `# `
-   |
-71 | # F   Means test is failing (F)
-72 | # EF  Means test is giving error and Failing
-73 | #!   Means test is segfaulting
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E265
-74 | # 8   Means test runs forever
    |
 
 
