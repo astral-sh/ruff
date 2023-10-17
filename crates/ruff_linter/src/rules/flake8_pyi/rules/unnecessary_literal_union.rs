@@ -112,6 +112,10 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
             if checker.semantic().match_typing_expr(value, "Literal") {
                 total_literals += 1;
 
+                if literal_subscript.is_none() {
+                    literal_subscript = Some(*value.clone());
+                }
+
                 // flatten already-unioned literals to later union again
                 if let Expr::Tuple(ast::ExprTuple {
                     elts,
@@ -120,15 +124,9 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                 }) = slice.as_ref()
                 {
                     for expr in elts {
-                        if literal_subscript.is_none() {
-                            literal_subscript = Some(*value.clone());
-                        }
                         literal_exprs.push(expr);
                     }
                 } else {
-                    if literal_subscript.is_none() {
-                        literal_subscript = Some(*value.clone());
-                    }
                     literal_exprs.push(slice.as_ref());
                 }
             }
