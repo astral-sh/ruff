@@ -6,6 +6,14 @@ for item in {1}:
 for item in {"apples", "lemons", "water"}:  # flags in-line set literals
     print(f"I like {item}.")
 
+for item in {1,}:
+    print(f"I can count to {item}!")
+
+for item in {
+    "apples", "lemons", "water"
+}:  # flags in-line set literals
+    print(f"I like {item}.")
+
 numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
 
 numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
