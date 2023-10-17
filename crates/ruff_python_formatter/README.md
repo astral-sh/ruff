@@ -117,12 +117,11 @@ indent-style = "tab"
 quote-style = "single"
 ```
 
-The Ruff formatter also respects Ruff's [`line-length`](https://docs.astral.sh/ruff/settings/#line-length)
-setting, which also can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as
-in:
+The Ruff formatter also respects Ruff's [`line-width`](https://docs.astral.sh/ruff/settings/#line-width)
+setting, which also can be provided via a `pyproject.toml` or `ruff.toml` file:
 
-```console
-ruff format --line-length 100 /path/to/file.py
+```toml
+line-width = 100
 ```
 
 ### Excluding code from formatting

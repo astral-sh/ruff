@@ -205,8 +205,8 @@ exclude = [
     "venv",
 ]
 
-# Same as Black.
-line-length = 88
+# Same as Black's `line-length`.
+line-width = 88
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"

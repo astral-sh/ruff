@@ -3,7 +3,7 @@
 ## Is Ruff compatible with Black?
 
 Yes. Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
-the `line-length` setting is consistent between the two.
+Ruff's `line-width` setting is consistent with Black's `line-length` setting.
 
 As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
 stylistic lint rules that are obviated by automated formatting.
@@ -11,7 +11,7 @@ stylistic lint rules that are obviated by automated formatting.
 Note that Ruff and Black treat line-length enforcement a little differently. Black makes a
 best-effort attempt to adhere to the `line-length`, but avoids automatic line-wrapping in some cases
 (e.g., within comments). Ruff, on the other hand, will flag rule `E501` for any line that exceeds
-the `line-length` setting. As such, if `E501` is enabled, Ruff can still trigger line-length
+the `line-width` setting. As such, if `E501` is enabled, Ruff can still trigger line-width
 violations even when Black is enabled.
 
 ## How does Ruff compare to Flake8?
@@ -404,7 +404,7 @@ For example, given this `pyproject.toml`:
 
 ```toml
 [tool.ruff]
-line-length = 88
+line-width = 88
 
 [tool.ruff.pydocstyle]
 convention = "google"
@@ -413,7 +413,7 @@ convention = "google"
 You could instead use a `ruff.toml` file like so:
 
 ```toml
-line-length = 88
+line-width = 88
 
 [pydocstyle]
 convention = "google"

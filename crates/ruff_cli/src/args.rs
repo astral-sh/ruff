@@ -4,7 +4,7 @@ use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
-use ruff_linter::line_width::LineLength;
+use ruff_linter::line_width::LineWidth;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
@@ -259,9 +259,15 @@ pub struct CheckCommand {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
-    /// Set the line-length for length-associated rules and automatic formatting.
+    /// Set the line-width for width-associated rules.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
-    pub line_length: Option<LineLength>,
+    pub line_width: Option<LineWidth>,
+
+    /// Set the line-length for width-associated rules.
+    #[arg(long, help_heading = "Rule configuration", hide = true)]
+    #[deprecated(note = "Deprecated in favor of `--line-width`")]
+    pub line_length: Option<LineWidth>,
+
     /// Regular expression matching the name of dummy variables.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
@@ -389,9 +395,6 @@ pub struct FormatCommand {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
-    /// Set the line-length.
-    #[arg(long, help_heading = "Rule configuration", hide = true)]
-    pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
     pub isolated: bool,
@@ -465,6 +468,9 @@ impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
     pub fn partition(self) -> (CheckArguments, CliOverrides) {
+        #[allow(deprecated)]
+        let line_width = self.line_width.or(self.line_length);
+
         (
             CheckArguments {
                 add_noqa: self.add_noqa,
@@ -494,7 +500,7 @@ impl CheckCommand {
                 extend_unfixable: self.extend_unfixable,
                 fixable: self.fixable,
                 ignore: self.ignore,
-                line_length: self.line_length,
+                line_width,
                 per_file_ignores: self.per_file_ignores,
                 preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 respect_gitignore: resolve_bool_arg(
@@ -533,7 +539,7 @@ impl FormatCommand {
                 stdin_filename: self.stdin_filename,
             },
             CliOverrides {
-                line_length: self.line_length,
+                line_width: None,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,
@@ -605,7 +611,7 @@ pub struct CliOverrides {
     pub extend_unfixable: Option<Vec<RuleSelector>>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub ignore: Option<Vec<RuleSelector>>,
-    pub line_length: Option<LineLength>,
+    pub line_width: Option<LineWidth>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub preview: Option<PreviewMode>,
     pub respect_gitignore: Option<bool>,
@@ -672,8 +678,8 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
         }
-        if let Some(line_length) = &self.line_length {
-            config.line_length = Some(*line_length);
+        if let Some(line_width) = self.line_width {
+            config.line_width = Some(line_width);
         }
         if let Some(preview) = &self.preview {
             config.preview = Some(*preview);

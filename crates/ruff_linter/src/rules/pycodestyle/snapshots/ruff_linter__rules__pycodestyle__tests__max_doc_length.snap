@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-W505.py:2:51: W505 Doc line too long (57 > 50 characters)
+W505.py:2:51: W505 Doc line too long (57 > 50 width)
   |
 1 | #!/usr/bin/env python3
 2 | """Here's a top-level docstring that's over the limit."""
   |                                                   ^^^^^^^ W505
   |
 
-W505.py:6:51: W505 Doc line too long (56 > 50 characters)
+W505.py:6:51: W505 Doc line too long (56 > 50 width)
   |
 5 | def f1():
 6 |     """Here's a docstring that's also over the limit."""
@@ -17,7 +17,7 @@ W505.py:6:51: W505 Doc line too long (56 > 50 characters)
 8 |     x = 1  # Here's a comment that's over the limit, but it's not standalone.
   |
 
-W505.py:10:51: W505 Doc line too long (56 > 50 characters)
+W505.py:10:51: W505 Doc line too long (56 > 50 width)
    |
  8 |     x = 1  # Here's a comment that's over the limit, but it's not standalone.
  9 | 
@@ -27,7 +27,7 @@ W505.py:10:51: W505 Doc line too long (56 > 50 characters)
 12 |     x = 2
    |
 
-W505.py:13:51: W505 Doc line too long (93 > 50 characters)
+W505.py:13:51: W505 Doc line too long (93 > 50 width)
    |
 12 |     x = 2
 13 |     # Another standalone that is preceded by a newline and indent toke and is over the limit.
@@ -36,13 +36,13 @@ W505.py:13:51: W505 Doc line too long (93 > 50 characters)
 15 |     print("Here's a string that's over the limit, but it's not a docstring.")
    |
 
-W505.py:18:51: W505 Doc line too long (61 > 50 characters)
+W505.py:18:51: W505 Doc line too long (61 > 50 width)
    |
 18 | "This is also considered a docstring, and is over the limit."
    |                                                   ^^^^^^^^^^^ W505
    |
 
-W505.py:24:51: W505 Doc line too long (82 > 50 characters)
+W505.py:24:51: W505 Doc line too long (82 > 50 width)
    |
 22 |     """Here's a multi-line docstring.
 23 | 
@@ -51,7 +51,7 @@ W505.py:24:51: W505 Doc line too long (82 > 50 characters)
 25 |     """
    |
 
-W505.py:31:51: W505 Doc line too long (85 > 50 characters)
+W505.py:31:51: W505 Doc line too long (85 > 50 width)
    |
 29 |     """Here's a multi-line docstring.
 30 | 

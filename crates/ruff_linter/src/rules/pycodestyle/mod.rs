@@ -14,7 +14,7 @@ mod tests {
 
     use test_case::test_case;
 
-    use crate::line_width::LineLength;
+    use crate::line_width::LineWidth;
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
@@ -174,7 +174,7 @@ mod tests {
             Path::new("pycodestyle/W505.py"),
             &settings::LinterSettings {
                 pycodestyle: Settings {
-                    max_doc_length: Some(LineLength::try_from(50).unwrap()),
+                    max_doc_width: Some(LineWidth::try_from(50).unwrap()),
                     ..Settings::default()
                 },
                 ..settings::LinterSettings::for_rule(Rule::DocLineTooLong)
@@ -190,7 +190,7 @@ mod tests {
             Path::new("pycodestyle/W505_utf_8.py"),
             &settings::LinterSettings {
                 pycodestyle: Settings {
-                    max_doc_length: Some(LineLength::try_from(50).unwrap()),
+                    max_doc_width: Some(LineWidth::try_from(50).unwrap()),
                     ..Settings::default()
                 },
                 ..settings::LinterSettings::for_rule(Rule::DocLineTooLong)
@@ -210,7 +210,7 @@ mod tests {
             Path::new("pycodestyle/E501_2.py"),
             &settings::LinterSettings {
                 tab_size: NonZeroU8::new(tab_size).unwrap().into(),
-                line_length: LineLength::try_from(6).unwrap(),
+                line_width: LineWidth::try_from(6).unwrap(),
                 ..settings::LinterSettings::for_rule(Rule::LineTooLong)
             },
         )?;

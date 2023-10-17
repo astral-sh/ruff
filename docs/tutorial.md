@@ -81,15 +81,15 @@ Let's create a `pyproject.toml` file in our project's root directory:
 # overlap with the use of a formatter, like Black, but we can override this behavior by
 # explicitly adding the rule.
 extend-select = ["E501"]
-# Set the maximum line length to 79 characters.
-line-length = 79
+# Set the maximum line width to 79 characters.
+line-width = 79
 ```
 
 Running Ruff again, we can see that it now enforces a line length of 79 characters:
 
 ```shell
 ❯ ruff check .
-numbers/numbers.py:5:80: E501 Line too long (90 > 79 characters)
+numbers/numbers.py:5:80: E501 Line too long (90 > 79 width)
 Found 1 error.
 ```
 
@@ -104,8 +104,8 @@ requires-python = ">=3.10"
 [tool.ruff]
 # Add the `line-too-long` rule to the enforced rule set.
 extend-select = ["E501"]
-# Set the maximum line length to 79 characters.
-line-length = 79
+# Set the maximum line width to 79.
+line-width = 79
 ```
 
 ### Rule Selection

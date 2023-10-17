@@ -26,7 +26,7 @@ use crate::rules::{
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion};
 use crate::{codes, RuleSelector};
 
-use super::line_width::{LineLength, TabSize};
+use super::line_width::{LineWidth, TabSize};
 
 use self::rule_table::RuleTable;
 use self::types::PreviewMode;
@@ -56,7 +56,7 @@ pub struct LinterSettings {
     pub dummy_variable_rgx: Regex,
     pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
-    pub line_length: LineLength,
+    pub line_width: LineWidth,
     pub logger_objects: Vec<String>,
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,
@@ -147,7 +147,7 @@ impl LinterSettings {
 
             external: HashSet::default(),
             ignore_init_module_imports: false,
-            line_length: LineLength::default(),
+            line_width: LineWidth::default(),
             logger_objects: vec![],
             namespace_packages: vec![],
 

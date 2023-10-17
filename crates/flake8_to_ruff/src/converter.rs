@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use itertools::Itertools;
 
-use ruff_linter::line_width::LineLength;
+use ruff_linter::line_width::LineWidth;
 use ruff_linter::registry::Linter;
 use ruff_linter::rule_selector::RuleSelector;
 use ruff_linter::rules::flake8_pytest_style::types::{
@@ -117,8 +117,8 @@ pub(crate) fn convert(
                 "builtins" => {
                     options.builtins = Some(parser::parse_strings(value.as_ref()));
                 }
-                "max-line-length" | "max_line_length" => match LineLength::from_str(value) {
-                    Ok(line_length) => options.line_length = Some(line_length),
+                "max-line-length" | "max_line_length" => match LineWidth::from_str(value) {
+                    Ok(line_length) => options.line_width = Some(line_length),
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
                     }
@@ -401,7 +401,7 @@ pub(crate) fn convert(
     // Extract any settings from the existing `pyproject.toml`.
     if let Some(black) = &external_config.black {
         if let Some(line_length) = &black.line_length {
-            options.line_length = Some(*line_length);
+            options.line_width = Some(*line_length);
         }
 
         if let Some(target_version) = &black.target_version {
@@ -462,7 +462,7 @@ mod tests {
     use pep440_rs::VersionSpecifiers;
 
     use pretty_assertions::assert_eq;
-    use ruff_linter::line_width::LineLength;
+    use ruff_linter::line_width::LineWidth;
     use ruff_linter::registry::Linter;
     use ruff_linter::rule_selector::RuleSelector;
     use ruff_linter::rules::flake8_quotes;
@@ -523,7 +523,7 @@ mod tests {
             Some(vec![]),
         );
         let expected = Pyproject::new(Options {
-            line_length: Some(LineLength::try_from(100).unwrap()),
+            line_width: Some(LineWidth::try_from(100).unwrap()),
             lint: Some(LintOptions {
                 common: lint_default_options([]),
                 ..LintOptions::default()
@@ -544,7 +544,7 @@ mod tests {
             Some(vec![]),
         );
         let expected = Pyproject::new(Options {
-            line_length: Some(LineLength::try_from(100).unwrap()),
+            line_width: Some(LineWidth::try_from(100).unwrap()),
             lint: Some(LintOptions {
                 common: lint_default_options([]),
                 ..LintOptions::default()

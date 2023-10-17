@@ -399,7 +399,7 @@ pub(crate) fn f_strings(
         &contents,
         template.into(),
         checker.locator(),
-        checker.settings.line_length,
+        checker.settings.line_width,
         checker.settings.tab_size,
     ) {
         return;

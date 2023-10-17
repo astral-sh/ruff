@@ -15,15 +15,15 @@ use ruff_text_size::TextSize;
 /// The allowed range of values is 1..=320
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct LineLength(
+pub struct LineWidth(
     #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))] NonZeroU16,
 );
 
-impl LineLength {
-    /// Maximum allowed value for a valid [`LineLength`]
+impl LineWidth {
+    /// Maximum allowed value for a valid [`LineWidth`]
     pub const MAX: u16 = 320;
 
-    /// Return the numeric value for this [`LineLength`]
+    /// Return the numeric value for this [`LineWidth`]
     pub fn value(&self) -> u16 {
         self.0.get()
     }
@@ -33,23 +33,23 @@ impl LineLength {
     }
 }
 
-impl Default for LineLength {
+impl Default for LineWidth {
     fn default() -> Self {
         Self(NonZeroU16::new(88).unwrap())
     }
 }
 
-impl CacheKey for LineLength {
+impl CacheKey for LineWidth {
     fn cache_key(&self, state: &mut CacheKeyHasher) {
         state.write_u16(self.0.get());
     }
 }
 
-/// Error type returned when parsing a [`LineLength`] from a string fails
+/// Error type returned when parsing a [`LineWidth`] from a string fails
 pub enum ParseLineWidthError {
     /// The string could not be parsed as a valid [u16]
     ParseError(ParseIntError),
-    /// The [u16] value of the string is not a valid [LineLength]
+    /// The [u16] value of the string is not a valid [LineWidth]
     TryFromIntError(LineLengthFromIntError),
 }
 
@@ -70,7 +70,7 @@ impl std::fmt::Display for ParseLineWidthError {
 
 impl Error for ParseLineWidthError {}
 
-impl FromStr for LineLength {
+impl FromStr for LineWidth {
     type Err = ParseLineWidthError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -80,16 +80,16 @@ impl FromStr for LineLength {
     }
 }
 
-/// Error type returned when converting a u16 to a [`LineLength`] fails
+/// Error type returned when converting a u16 to a [`LineWidth`] fails
 #[derive(Clone, Copy, Debug)]
 pub struct LineLengthFromIntError(pub u16);
 
-impl TryFrom<u16> for LineLength {
+impl TryFrom<u16> for LineWidth {
     type Error = LineLengthFromIntError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match NonZeroU16::try_from(value) {
-            Ok(value) if value.get() <= Self::MAX => Ok(LineLength(value)),
+            Ok(value) if value.get() <= Self::MAX => Ok(LineWidth(value)),
             Ok(_) | Err(_) => Err(LineLengthFromIntError(value)),
         }
     }
@@ -100,19 +100,19 @@ impl std::fmt::Display for LineLengthFromIntError {
         writeln!(
             f,
             "The line width must be a value between 1 and {}.",
-            LineLength::MAX
+            LineWidth::MAX
         )
     }
 }
 
-impl From<LineLength> for u16 {
-    fn from(value: LineLength) -> Self {
+impl From<LineWidth> for u16 {
+    fn from(value: LineWidth) -> Self {
         value.0.get()
     }
 }
 
-impl From<LineLength> for NonZeroU16 {
-    fn from(value: LineLength) -> Self {
+impl From<LineWidth> for NonZeroU16 {
+    fn from(value: LineWidth) -> Self {
         value.0
     }
 }
@@ -120,7 +120,7 @@ impl From<LineLength> for NonZeroU16 {
 /// A measure of the width of a line of text.
 ///
 /// This is used to determine if a line is too long.
-/// It should be compared to a [`LineLength`].
+/// It should be compared to a [`LineWidth`].
 #[derive(Clone, Copy, Debug)]
 pub struct LineWidthBuilder {
     /// The width of the line.
@@ -219,14 +219,14 @@ impl LineWidthBuilder {
     }
 }
 
-impl PartialEq<LineLength> for LineWidthBuilder {
-    fn eq(&self, other: &LineLength) -> bool {
+impl PartialEq<LineWidth> for LineWidthBuilder {
+    fn eq(&self, other: &LineWidth) -> bool {
         self.width == (other.value() as usize)
     }
 }
 
-impl PartialOrd<LineLength> for LineWidthBuilder {
-    fn partial_cmp(&self, other: &LineLength) -> Option<std::cmp::Ordering> {
+impl PartialOrd<LineWidth> for LineWidthBuilder {
+    fn partial_cmp(&self, other: &LineWidth) -> Option<std::cmp::Ordering> {
         self.width.partial_cmp(&(other.value() as usize))
     }
 }

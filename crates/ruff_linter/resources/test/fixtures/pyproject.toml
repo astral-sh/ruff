@@ -1,5 +1,5 @@
 [tool.ruff]
-line-length = 88
+line-width = 88
 extend-exclude = [
   "excluded_file.py",
   "migrations",

@@ -52,7 +52,7 @@ fn format_options() -> Result<()> {
         &ruff_toml,
         r#"
 tab-size = 8
-line-length = 84
+line-width = 84
 
 [format]
 indent-style = "tab"

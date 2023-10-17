@@ -16,8 +16,8 @@ use shellexpand::LookupError;
 use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
-use ruff_formatter::{IndentStyle, IndentWidth, LineWidth};
-use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_formatter::{IndentStyle, IndentWidth};
+use ruff_linter::line_width::{LineWidth, TabSize};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
@@ -131,7 +131,7 @@ pub struct Configuration {
     pub target_version: Option<PythonVersion>,
 
     // Global formatting options
-    pub line_length: Option<LineLength>,
+    pub line_width: Option<LineWidth>,
     pub tab_size: Option<TabSize>,
 
     pub lint: LintConfiguration,
@@ -162,11 +162,9 @@ impl Configuration {
                 PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
                 PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
             },
-            line_width: self
-                .line_length
-                .map_or(format_defaults.line_width, |length| {
-                    LineWidth::from(NonZeroU16::from(length))
-                }),
+            line_width: self.line_width.map_or(format_defaults.line_width, |width| {
+                ruff_formatter::LineWidth::from(NonZeroU16::from(width))
+            }),
             line_ending: format.line_ending.unwrap_or(format_defaults.line_ending),
             indent_style: format.indent_style.unwrap_or(format_defaults.indent_style),
             indent_width: self
@@ -225,7 +223,7 @@ impl Configuration {
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
                 external: FxHashSet::from_iter(lint.external.unwrap_or_default()),
                 ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
-                line_length: self.line_length.unwrap_or_default(),
+                line_width: self.line_width.unwrap_or_default(),
                 tab_size: self.tab_size.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
                 per_file_ignores: resolve_per_file_ignores(
@@ -383,6 +381,15 @@ impl Configuration {
             }
         };
 
+        #[allow(deprecated)]
+        let line_width = {
+            if options.line_length.is_some() {
+                warn_user_once!("The option `line-length` has been renamed to `line-width` to emphasize that the limit is the width of a line and not the number of characters. Use `line-width` instead.");
+            }
+
+            options.line_width.or(options.line_length)
+        };
+
         Ok(Self {
             builtins: options.builtins,
             cache_dir: options
@@ -449,7 +456,7 @@ impl Configuration {
             unsafe_fixes: options.unsafe_fixes.map(UnsafeFixes::from),
             output_format: options.output_format,
             force_exclude: options.force_exclude,
-            line_length: options.line_length,
+            line_width,
             tab_size: options.tab_size,
             namespace_packages: options
                 .namespace_packages
@@ -497,7 +504,7 @@ impl Configuration {
             unsafe_fixes: self.unsafe_fixes.or(config.unsafe_fixes),
             output_format: self.output_format.or(config.output_format),
             force_exclude: self.force_exclude.or(config.force_exclude),
-            line_length: self.line_length.or(config.line_length),
+            line_width: self.line_width.or(config.line_width),
             tab_size: self.tab_size.or(config.tab_size),
             namespace_packages: self.namespace_packages.or(config.namespace_packages),
             required_version: self.required_version.or(config.required_version),

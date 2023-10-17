@@ -237,7 +237,7 @@ RUF100_0.py:85:8: F401 [*] `shelve` imported but unused
 87 86 | 
 88 87 | print(sys.path)
 
-RUF100_0.py:90:89: E501 Line too long (89 > 88 characters)
+RUF100_0.py:90:89: E501 Line too long (89 > 88 width)
    |
 88 | print(sys.path)
 89 | 

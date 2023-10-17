@@ -270,3 +270,79 @@ if __name__ == "__main__":
     "###);
     Ok(())
 }
+
+#[test]
+fn deprecated_length_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+line-length = 100
+select = ["E501", "W505"]
+
+[pycodestyle]
+max-doc-length = 80
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"
+_ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜亜亜亜亜亜亜亜"
+
+class Bar:
+    """
+    This is a long sentence that ends with a shortened URL and, therefore, could easily be broken across multiple lines ([source](https://ruff.rs))
+    """
+        "#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:91: E501 Line too long (109 > 100 width)
+    test.py:6:81: W505 Doc line too long (147 > 80 width)
+    test.py:6:101: E501 Line too long (147 > 100 width)
+    Found 3 errors.
+
+    ----- stderr -----
+    warning: The option `line-length` has been renamed to `line-width` to emphasize that the limit is the width of a line and not the number of characters. Use `line-width` instead.
+    warning: The option `pycodestyle.max-doc-length` has been renamed to `pycodestyle.max-doc-width` to emphasize that the limit is the width of a line and not the number of characters. Use `pycodestyle.max-doc-width` instead.
+    "###);
+    Ok(())
+}
+
+#[test]
+fn deprecated_line_length_cli_option() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+select = ["E501"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .args(["--stdin-filename", "test.py", "--line-length", "100"])
+        .arg("-")
+        .pass_stdin(r#"
+_ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜亜亜亜亜亜亜亜"
+        "#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:91: E501 Line too long (109 > 100 width)
+    Found 1 error.
+
+    ----- stderr -----
+    warning: The option `--line-length` has been renamed to `--line-width` to emphasize that the limit is the width of a line and not the number of characters. Use the option `--line-width` instead.
+    "###);
+    Ok(())
+}

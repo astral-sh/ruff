@@ -425,10 +425,22 @@
       ]
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`). Must be greater than `0` and less than or equal to `320`.",
+      "description": "The maximum [width](http://www.unicode.org/reports/tr11/#Overview) of each line when formatting code and when enforcing long-lines violations (like `E501`).\n\nMust be greater than `0` and less than or equal to `320`.\n\nNote: Formatted code may exceed the configured line width when it can't automatically split the line into shorter lines, e.g. because it is a too long comment or identifier.",
+      "deprecated": true,
       "anyOf": [
         {
-          "$ref": "#/definitions/LineLength"
+          "$ref": "#/definitions/LineWidth"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "line-width": {
+      "description": "The maximum [width](http://www.unicode.org/reports/tr11/#Overview) of a line when formatting code and when enforcing long-lines violations (like `E501`).\n\nMust be greater than `0` and less than or equal to `320`.\n\nNote: Formatted code may exceed the configured line width when it can't automatically split the line into shorter lines, e.g. because it is a too long comment or identifier.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/LineWidth"
         },
         {
           "type": "null"
@@ -1592,7 +1604,7 @@
         }
       ]
     },
-    "LineLength": {
+    "LineWidth": {
       "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=320",
       "type": "integer",
       "format": "uint16",
@@ -2196,9 +2208,21 @@
         },
         "max-doc-length": {
           "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments. By default, this is set to null which disables reporting violations.\n\nSee the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.",
+          "deprecated": true,
           "anyOf": [
             {
-              "$ref": "#/definitions/LineLength"
+              "$ref": "#/definitions/LineWidth"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max-doc-width": {
+          "description": "The maximum [width](http://www.unicode.org/reports/tr11/#Overview) to allow for [`doc-line-too-long`] violations within documentation (`W505`), including standalone comments. By default, this is set to null which disables reporting violations.\n\nSee the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LineWidth"
             },
             {
               "type": "null"

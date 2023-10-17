@@ -7,13 +7,13 @@ use crate::rules::pycodestyle::overlong::Overlong;
 use crate::settings::LinterSettings;
 
 /// ## What it does
-/// Checks for lines that exceed the specified maximum character length.
+/// Checks for lines that exceed the specified maximum width.
 ///
 /// ## Why is this bad?
 /// Overlong lines can hurt readability. [PEP 8], for example, recommends
-/// limiting lines to 79 characters. By default, this rule enforces a limit
-/// of 88 characters for compatibility with Black, though that limit is
-/// configurable via the [`line-length`] setting.
+/// limiting lines to 79 characters. By default, this rule enforces a [display-width](http://www.unicode.org/reports/tr11/#Overview)
+/// of 88 for compatibility with Black, though that limit is
+/// configurable via the [`line-width`] setting.
 ///
 /// In the interest of pragmatism, this rule makes a few exceptions when
 /// determining whether a line is overlong. Namely, it:
@@ -21,11 +21,11 @@ use crate::settings::LinterSettings;
 /// 1. Ignores lines that consist of a single "word" (i.e., without any
 ///    whitespace between its characters).
 /// 2. Ignores lines that end with a URL, as long as the URL starts before
-///    the line-length threshold.
+///    the `line-width` threshold.
 /// 3. Ignores line that end with a pragma comment (e.g., `# type: ignore`
 ///    or `# noqa`), as long as the pragma comment starts before the
-///    line-length threshold. That is, a line will not be flagged as
-///    overlong if a pragma comment _causes_ it to exceed the line length.
+///    `line-width` threshold. That is, a line will not be flagged as
+///    overlong if a pragma comment _causes_ it to exceed the line width.
 ///    (This behavior aligns with that of the Ruff formatter.)
 ///
 /// If [`pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
@@ -46,7 +46,7 @@ use crate::settings::LinterSettings;
 /// ```
 ///
 /// ## Options
-/// - `line-length`
+/// - `line-width`
 /// - `task-tags`
 /// - `pycodestyle.ignore-overlong-task-comments`
 ///
@@ -58,7 +58,7 @@ impl Violation for LineTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         let LineTooLong(width, limit) = self;
-        format!("Line too long ({width} > {limit} characters)")
+        format!("Line too long ({width} > {limit} width)")
     }
 }
 
@@ -68,7 +68,7 @@ pub(crate) fn line_too_long(
     indexer: &Indexer,
     settings: &LinterSettings,
 ) -> Option<Diagnostic> {
-    let limit = settings.line_length;
+    let limit = settings.line_width;
 
     Overlong::try_from_line(
         line,

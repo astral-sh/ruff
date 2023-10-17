@@ -47,7 +47,7 @@ extend-exclude = '''
 '''
 
 [tool.ruff]
-line-length = 120
+line-width = 120
 target-version = "py37"
 
 [tool.mypy]

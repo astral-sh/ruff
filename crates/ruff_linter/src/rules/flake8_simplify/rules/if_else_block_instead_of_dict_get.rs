@@ -182,7 +182,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
         &contents,
         stmt_if.into(),
         checker.locator(),
-        checker.settings.line_length,
+        checker.settings.line_width,
         checker.settings.tab_size,
     ) {
         return;

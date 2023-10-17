@@ -18,7 +18,7 @@ use sorting::cmp_either_import;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, EitherImport, ImportBlock, TrailingComma};
 
-use crate::line_width::{LineLength, LineWidthBuilder};
+use crate::line_width::{LineWidth, LineWidthBuilder};
 use crate::settings::types::PythonVersion;
 
 mod annotate;
@@ -65,7 +65,7 @@ pub(crate) fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
     locator: &Locator,
-    line_length: LineLength,
+    line_length: LineWidth,
     indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
@@ -138,7 +138,7 @@ pub(crate) fn format_imports(
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 fn format_import_block(
     block: ImportBlock,
-    line_length: LineLength,
+    line_length: LineWidth,
     indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],

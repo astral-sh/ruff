@@ -158,7 +158,7 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use ruff_linter::codes;
-    use ruff_linter::line_width::LineLength;
+    use ruff_linter::line_width::LineWidth;
     use ruff_linter::settings::types::PatternPrefixPair;
 
     use crate::options::{LintCommonOptions, Options};
@@ -195,14 +195,14 @@ mod tests {
             r#"
 [tool.black]
 [tool.ruff]
-line-length = 79
+line-width = 79
 "#,
         )?;
         assert_eq!(
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    line_length: Some(LineLength::try_from(79).unwrap()),
+                    line_width: Some(LineWidth::try_from(79).unwrap()),
                     ..Options::default()
                 })
             })
@@ -289,7 +289,7 @@ select = ["E123"]
             r#"
 [tool.black]
 [tool.ruff]
-line-length = 79
+line-width = 79
 other-attribute = 1
 "#,
         )
@@ -308,7 +308,7 @@ other-attribute = 1
         assert_eq!(
             config,
             Options {
-                line_length: Some(LineLength::try_from(88).unwrap()),
+                line_width: Some(LineWidth::try_from(88).unwrap()),
                 extend_exclude: Some(vec![
                     "excluded_file.py".to_string(),
                     "migrations".to_string(),

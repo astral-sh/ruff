@@ -7,7 +7,7 @@ use ruff_python_trivia::is_pragma_comment;
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange};
 
-use crate::line_width::{LineLength, LineWidthBuilder, TabSize};
+use crate::line_width::{LineWidth, LineWidthBuilder, TabSize};
 
 #[derive(Debug)]
 pub(super) struct Overlong {
@@ -21,7 +21,7 @@ impl Overlong {
     pub(super) fn try_from_line(
         line: &Line,
         indexer: &Indexer,
-        limit: LineLength,
+        limit: LineWidth,
         task_tags: &[String],
         tab_size: TabSize,
     ) -> Option<Self> {

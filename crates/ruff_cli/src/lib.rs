@@ -177,6 +177,11 @@ fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
 }
 
 pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
+    #[allow(deprecated)]
+    if args.line_length.is_some() {
+        warn_user_once!("The option `--line-length` has been renamed to `--line-width` to emphasize that the limit is the width of a line and not the number of characters. Use the option `--line-width` instead.");
+    }
+
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`

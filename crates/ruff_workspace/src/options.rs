@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use ruff_formatter::IndentStyle;
-use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_linter::line_width::{LineWidth, TabSize};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
@@ -66,7 +66,7 @@ pub struct Options {
             # Extend the `pyproject.toml` file in the parent directory.
             extend = "../pyproject.toml"
             # But use a different line length.
-            line-length = 100
+            line-width = 100
         "#
     )]
     pub extend: Option<String>,
@@ -351,17 +351,45 @@ pub struct Options {
     pub src: Option<Vec<String>>,
 
     // Global Formatting options
-    /// The line length to use when enforcing long-lines violations (like
-    /// `E501`). Must be greater than `0` and less than or equal to `320`.
+    /// The maximum [width](http://www.unicode.org/reports/tr11/#Overview) of a line when
+    /// formatting code and when enforcing long-lines violations (like
+    /// `E501`).
+    ///
+    /// Must be greater than `0` and less than or equal to `320`.
+    ///
+    /// Note: Formatted code may exceed the configured line width when it can't automatically
+    /// split the line into shorter lines, e.g. because it is a too long comment or identifier.
     #[option(
         default = "88",
         value_type = "int",
         example = r#"
-        # Allow lines to be as long as 120 characters.
+        # Allow lines to have a width up to 120.
+        line-width = 120
+        "#
+    )]
+    pub line_width: Option<LineWidth>,
+
+    /// The maximum [width](http://www.unicode.org/reports/tr11/#Overview) of each line when
+    /// formatting code and when enforcing long-lines violations (like
+    /// `E501`).
+    ///
+    /// Must be greater than `0` and less than or equal to `320`.
+    ///
+    /// Note: Formatted code may exceed the configured line width when it can't automatically
+    /// split the line into shorter lines, e.g. because it is a too long comment or identifier.
+    #[option(
+        default = "88",
+        value_type = "int",
+        example = r#"
+        # Allow lines to have a width up to 120.
         line-length = 120
         "#
     )]
-    pub line_length: Option<LineLength>,
+    #[deprecated(
+        since = "0.1.1",
+        note = "The `line-width` option has been renamed to `line-width` to emphasize that the limit is the line's width rather than the number of characters. Use `line-width = <value>` instead."
+    )]
+    pub line_length: Option<LineWidth>,
 
     /// The number of spaces a tab is equal to when enforcing long-line violations (like `E501`)
     /// or formatting code with the formatter.
@@ -2238,6 +2266,20 @@ impl Pep8NamingOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PycodestyleOptions {
+    /// The maximum [width](http://www.unicode.org/reports/tr11/#Overview) to allow for [`doc-line-too-long`] violations within
+    /// documentation (`W505`), including standalone comments. By default,
+    /// this is set to null which disables reporting violations.
+    ///
+    /// See the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.
+    #[option(
+        default = "null",
+        value_type = "int",
+        example = r#"
+            max-doc-width = 88
+        "#
+    )]
+    pub max_doc_width: Option<LineWidth>,
+
     /// The maximum line length to allow for line-length violations within
     /// documentation (`W505`), including standalone comments. By default,
     /// this is set to null which disables reporting violations.
@@ -2250,7 +2292,11 @@ pub struct PycodestyleOptions {
             max-doc-length = 88
         "#
     )]
-    pub max_doc_length: Option<LineLength>,
+    #[deprecated(
+        since = "0.1.1",
+        note = "The `max-doc-length` option has been renamed to `max-doc-width` to emphasize that the limit is the line's width rather than the number of characters. Use `max-doc-width = <value>` instead."
+    )]
+    pub max_doc_length: Option<LineWidth>,
 
     /// Whether line-length violations (`E501`) should be triggered for
     /// comments starting with `task-tags` (by default: \["TODO", "FIXME",
@@ -2267,8 +2313,16 @@ pub struct PycodestyleOptions {
 
 impl PycodestyleOptions {
     pub fn into_settings(self) -> pycodestyle::settings::Settings {
+        #[allow(deprecated)]
+        let max_doc_width = {
+            if self.max_doc_length.is_some() {
+                warn_user_once!("The option `pycodestyle.max-doc-length` has been renamed to `pycodestyle.max-doc-width` to emphasize that the limit is the width of a line and not the number of characters. Use `pycodestyle.max-doc-width` instead.");
+            }
+            self.max_doc_width.or(self.max_doc_length)
+        };
+
         pycodestyle::settings::Settings {
-            max_doc_length: self.max_doc_length,
+            max_doc_width,
             ignore_overlong_task_comments: self.ignore_overlong_task_comments.unwrap_or_default(),
         }
     }

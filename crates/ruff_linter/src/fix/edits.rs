@@ -14,7 +14,7 @@ use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::fix::codemods;
-use crate::line_width::{LineLength, LineWidthBuilder, TabSize};
+use crate::line_width::{LineWidth, LineWidthBuilder, TabSize};
 
 /// Return the `Fix` to use when deleting a `Stmt`.
 ///
@@ -292,10 +292,10 @@ pub(crate) fn fits(
     fix: &str,
     node: AnyNodeRef,
     locator: &Locator,
-    line_length: LineLength,
+    line_width: LineWidth,
     tab_size: TabSize,
 ) -> bool {
-    all_lines_fit(fix, node, locator, line_length.value() as usize, tab_size)
+    all_lines_fit(fix, node, locator, line_width.value() as usize, tab_size)
 }
 
 /// Returns `true` if the fix fits within the maximum configured line length, or produces lines that
@@ -304,11 +304,11 @@ pub(crate) fn fits_or_shrinks(
     fix: &str,
     node: AnyNodeRef,
     locator: &Locator,
-    line_length: LineLength,
+    line_width: LineWidth,
     tab_size: TabSize,
 ) -> bool {
     // Use the larger of the line length limit, or the longest line in the existing AST node.
-    let line_length = std::iter::once(line_length.value() as usize)
+    let line_length = std::iter::once(line_width.value() as usize)
         .chain(
             locator
                 .slice(locator.lines_range(node.range()))
@@ -316,7 +316,7 @@ pub(crate) fn fits_or_shrinks(
                 .map(|line| LineWidthBuilder::new(tab_size).add_str(&line).get()),
         )
         .max()
-        .unwrap_or(line_length.value() as usize);
+        .unwrap_or(line_width.value() as usize);
 
     all_lines_fit(fix, node, locator, line_length, tab_size)
 }
@@ -326,7 +326,7 @@ fn all_lines_fit(
     fix: &str,
     node: AnyNodeRef,
     locator: &Locator,
-    line_length: usize,
+    line_width: usize,
     tab_size: TabSize,
 ) -> bool {
     let prefix = locator.slice(TextRange::new(
@@ -343,7 +343,7 @@ fn all_lines_fit(
         // {}               -> offset = 0
         // """.format(0, 1) -> offset = 0
         // ```
-        let measured_length = if idx == 0 {
+        let measured_width = if idx == 0 {
             LineWidthBuilder::new(tab_size)
                 .add_str(prefix)
                 .add_str(&line)
@@ -352,7 +352,7 @@ fn all_lines_fit(
             LineWidthBuilder::new(tab_size).add_str(&line).get()
         };
 
-        measured_length <= line_length
+        measured_width <= line_width
     })
 }
 

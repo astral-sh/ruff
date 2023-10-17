@@ -101,7 +101,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 &contents,
                 stmt.into(),
                 checker.locator(),
-                checker.settings.line_length,
+                checker.settings.line_width,
                 checker.settings.tab_size,
             ) {
                 return;
@@ -188,7 +188,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                         .slice(TextRange::new(line_start, stmt.start())),
                 )
                 .add_str(&contents)
-                > checker.settings.line_length
+                > checker.settings.line_width
             {
                 return;
             }

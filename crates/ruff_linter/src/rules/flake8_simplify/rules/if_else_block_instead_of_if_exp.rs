@@ -130,7 +130,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
         &contents,
         stmt_if.into(),
         checker.locator(),
-        checker.settings.line_length,
+        checker.settings.line_width,
         checker.settings.tab_size,
     ) {
         return;

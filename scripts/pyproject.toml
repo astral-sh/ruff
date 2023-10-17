@@ -8,7 +8,7 @@ requires-python = ">=3.8"
 line-length = 88
 
 [tool.ruff]
-line-length = 88
+line-width = 88
 select = ["ALL"]
 ignore = [
   "C901",  # McCabe complexity

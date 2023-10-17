@@ -47,8 +47,8 @@ exclude = [
 ]
 per-file-ignores = {}
 
-# Same as Black.
-line-length = 88
+# Same as Black's line-length.
+line-width = 88
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
@@ -305,8 +305,8 @@ supports an [`extend`](settings.md#extend) field, which allows you to inherit th
 ```toml
 # Extend the `pyproject.toml` file in the parent directory.
 extend = "../pyproject.toml"
-# But use a different line length.
-line-length = 100
+# But use a different line width.
+line-width = 100
 ```
 
 All of the above rules apply equivalently to `ruff.toml` and `.ruff.toml` files. If Ruff detects

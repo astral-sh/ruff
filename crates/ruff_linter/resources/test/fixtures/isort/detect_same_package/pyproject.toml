@@ -1,2 +1,2 @@
 [tool.ruff]
-line-length = 88
+line-width = 88

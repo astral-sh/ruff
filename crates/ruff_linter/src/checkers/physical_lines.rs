@@ -93,7 +93,7 @@ mod tests {
     use ruff_python_parser::Mode;
     use ruff_source_file::Locator;
 
-    use crate::line_width::LineLength;
+    use crate::line_width::LineWidth;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
 
@@ -107,19 +107,19 @@ mod tests {
         let indexer = Indexer::from_tokens(&tokens, &locator);
         let stylist = Stylist::from_tokens(&tokens, &locator);
 
-        let check_with_max_line_length = |line_length: LineLength| {
+        let check_with_max_line_length = |line_width: LineWidth| {
             check_physical_lines(
                 &locator,
                 &stylist,
                 &indexer,
                 &[],
                 &LinterSettings {
-                    line_length,
+                    line_width,
                     ..LinterSettings::for_rule(Rule::LineTooLong)
                 },
             )
         };
-        let line_length = LineLength::try_from(8).unwrap();
+        let line_length = LineWidth::try_from(8).unwrap();
         assert_eq!(check_with_max_line_length(line_length), vec![]);
         assert_eq!(check_with_max_line_length(line_length), vec![]);
     }

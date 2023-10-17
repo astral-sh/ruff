@@ -1,6 +1,6 @@
 use ruff_python_codegen::Stylist;
 
-use crate::line_width::{LineLength, LineWidthBuilder};
+use crate::line_width::{LineWidth, LineWidthBuilder};
 
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 
@@ -45,7 +45,7 @@ pub(crate) fn format_import_from(
     import_from: &ImportFromData,
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
-    line_length: LineLength,
+    line_length: LineWidth,
     indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     force_wrap_aliases: bool,

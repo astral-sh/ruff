@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E501_2.py:2:7: E501 Line too long (7 > 6 characters)
+E501_2.py:2:7: E501 Line too long (7 > 6 width)
   |
 1 | # aaaa
 2 | # aaaaa
@@ -10,7 +10,7 @@ E501_2.py:2:7: E501 Line too long (7 > 6 characters)
 4 |     # a
   |
 
-E501_2.py:3:7: E501 Line too long (7 > 6 characters)
+E501_2.py:3:7: E501 Line too long (7 > 6 width)
   |
 1 | # aaaa
 2 | # aaaaa
@@ -20,7 +20,7 @@ E501_2.py:3:7: E501 Line too long (7 > 6 characters)
 5 |     # aa
   |
 
-E501_2.py:4:2: E501 Line too long (11 > 6 characters)
+E501_2.py:4:2: E501 Line too long (11 > 6 width)
   |
 2 | # aaaaa
 3 |     # a
@@ -30,7 +30,7 @@ E501_2.py:4:2: E501 Line too long (11 > 6 characters)
 6 |     # aaa
   |
 
-E501_2.py:5:2: E501 Line too long (12 > 6 characters)
+E501_2.py:5:2: E501 Line too long (12 > 6 width)
   |
 3 |     # a
 4 |     # a
@@ -40,7 +40,7 @@ E501_2.py:5:2: E501 Line too long (12 > 6 characters)
 7 |     # aaaa
   |
 
-E501_2.py:6:2: E501 Line too long (13 > 6 characters)
+E501_2.py:6:2: E501 Line too long (13 > 6 width)
   |
 4 |     # a
 5 |     # aa
@@ -50,7 +50,7 @@ E501_2.py:6:2: E501 Line too long (13 > 6 characters)
 8 |         # a
   |
 
-E501_2.py:7:2: E501 Line too long (14 > 6 characters)
+E501_2.py:7:2: E501 Line too long (14 > 6 width)
   |
 5 |     # aa
 6 |     # aaa
@@ -60,7 +60,7 @@ E501_2.py:7:2: E501 Line too long (14 > 6 characters)
 9 |         # aa
   |
 
-E501_2.py:8:2: E501 Line too long (19 > 6 characters)
+E501_2.py:8:2: E501 Line too long (19 > 6 width)
    |
  6 |     # aaa
  7 |     # aaaa
@@ -70,7 +70,7 @@ E501_2.py:8:2: E501 Line too long (19 > 6 characters)
 10 |         # aaa
    |
 
-E501_2.py:9:2: E501 Line too long (20 > 6 characters)
+E501_2.py:9:2: E501 Line too long (20 > 6 width)
    |
  7 |     # aaaa
  8 |         # a
@@ -79,7 +79,7 @@ E501_2.py:9:2: E501 Line too long (20 > 6 characters)
 10 |         # aaa
    |
 
-E501_2.py:10:2: E501 Line too long (21 > 6 characters)
+E501_2.py:10:2: E501 Line too long (21 > 6 width)
    |
  8 |         # a
  9 |         # aa
@@ -89,7 +89,7 @@ E501_2.py:10:2: E501 Line too long (21 > 6 characters)
 12 | if True: # noqa: E501
    |
 
-E501_2.py:14:2: E501 Line too long (13 > 6 characters)
+E501_2.py:14:2: E501 Line too long (13 > 6 width)
    |
 12 | if True: # noqa: E501
 13 |     [12]
@@ -99,7 +99,7 @@ E501_2.py:14:2: E501 Line too long (13 > 6 characters)
 16 |     [1, 2]
    |
 
-E501_2.py:16:2: E501 Line too long (14 > 6 characters)
+E501_2.py:16:2: E501 Line too long (14 > 6 width)
    |
 14 |     [12 ]
 15 |     [1,2]
