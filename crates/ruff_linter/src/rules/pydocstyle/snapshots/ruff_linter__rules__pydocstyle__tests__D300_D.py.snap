@@ -8,7 +8,7 @@ D.py:307:5: D300 [*] Use triple double quotes `"""`
 307 |     r'''Summary.'''
     |     ^^^^^^^^^^^^^^^ D300
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 304 304 | 
@@ -27,7 +27,7 @@ D.py:312:5: D300 [*] Use triple double quotes `"""`
 312 |     R'''Summary.'''
     |     ^^^^^^^^^^^^^^^ D300
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 309 309 | 
@@ -46,7 +46,7 @@ D.py:317:5: D300 [*] Use triple double quotes `"""`
 317 |     r'Summary.'
     |     ^^^^^^^^^^^ D300
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 314 314 | 
@@ -65,7 +65,7 @@ D.py:322:5: D300 [*] Use triple double quotes `"""`
 322 |     R'Summary.'
     |     ^^^^^^^^^^^ D300
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 319 319 | 
@@ -84,7 +84,7 @@ D.py:328:5: D300 [*] Use triple double quotes `"""`
 328 |     R'Sum\mary.'
     |     ^^^^^^^^^^^^ D300
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 325 325 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
@@ -106,7 +106,7 @@ D.py:645:5: D300 [*] Use triple double quotes `"""`
 647 |   
 648 |   class StatementOnSameLineAsDocstring:
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 642 642 | 
@@ -128,7 +128,7 @@ D.py:649:5: D300 [*] Use triple double quotes `"""`
 650 |     def sort_services(self):
 651 |         pass
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 646 646 |     "
@@ -146,7 +146,7 @@ D.py:654:5: D300 [*] Use triple double quotes `"""`
 654 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D300
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 651 651 |         pass
@@ -166,7 +166,7 @@ D.py:658:5: D300 [*] Use triple double quotes `"""`
 659 |     def sort_services(self):
 660 |         pass
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 655 655 | 
@@ -186,7 +186,7 @@ D.py:664:5: D300 [*] Use triple double quotes `"""`
 665 | |     but continuations shouldn't be considered multi-line"
     | |_________________________________________________________^ D300
     |
-    = help: Use triple double quotes `"""`
+    = help: Convert to triple double quotes
 
 ℹ Fix
 661 661 | 
