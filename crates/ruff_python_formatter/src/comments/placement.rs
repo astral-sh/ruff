@@ -347,9 +347,9 @@ fn handle_end_of_line_comment_around_body<'a>(
     // ```
     // The first earlier branch filters out ambiguities e.g. around try-except-finally.
     if let Some(preceding) = comment.preceding_node() {
-        if let Some(last_child) = last_child_in_body(preceding) {
+        if let Some(last_child) = preceding.last_child_in_body() {
             let innermost_child =
-                std::iter::successors(Some(last_child), |parent| last_child_in_body(*parent))
+                std::iter::successors(Some(last_child), AnyNodeRef::last_child_in_body)
                     .last()
                     .unwrap_or(last_child);
             return CommentPlacement::trailing(innermost_child, comment);
@@ -670,7 +670,7 @@ fn handle_own_line_comment_after_branch<'a>(
     preceding: AnyNodeRef<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let Some(last_child) = last_child_in_body(preceding) else {
+    let Some(last_child) = preceding.last_child_in_body() else {
         return CommentPlacement::Default(comment);
     };
 
@@ -734,7 +734,7 @@ fn handle_own_line_comment_after_branch<'a>(
                 return CommentPlacement::trailing(last_child_in_parent, comment);
             }
             Ordering::Greater => {
-                if let Some(nested_child) = last_child_in_body(last_child_in_parent) {
+                if let Some(nested_child) = last_child_in_parent.last_child_in_body() {
                     // The comment belongs to the inner block.
                     parent = Some(last_child_in_parent);
                     last_child_in_parent = nested_child;
@@ -2174,65 +2174,6 @@ where
     T: Into<AnyNodeRef<'a>>,
 {
     right.is_some_and(|right| left.ptr_eq(right.into()))
-}
-
-/// The last child of the last branch, if the node has multiple branches.
-fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
-    let body = match node {
-        AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
-        | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
-        | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
-        | AnyNodeRef::MatchCase(MatchCase { body, .. })
-        | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
-            body, ..
-        })
-        | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
-        AnyNodeRef::StmtIf(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
-
-        AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
-        | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
-            if orelse.is_empty() {
-                body
-            } else {
-                orelse
-            }
-        }
-
-        AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
-            return cases.last().map(AnyNodeRef::from);
-        }
-
-        AnyNodeRef::StmtTry(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
-            if finalbody.is_empty() {
-                if orelse.is_empty() {
-                    if handlers.is_empty() {
-                        body
-                    } else {
-                        return handlers.last().map(AnyNodeRef::from);
-                    }
-                } else {
-                    orelse
-                }
-            } else {
-                finalbody
-            }
-        }
-
-        // Not a node that contains an indented child node.
-        _ => return None,
-    };
-
-    body.last().map(AnyNodeRef::from)
 }
 
 /// Returns `true` if `statement` is the first statement in an alternate `body` (e.g. the else of an if statement)

@@ -155,13 +155,63 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         while let Some(following) = iter.next() {
             let following_comments = comments.leading_dangling_trailing(following);
 
+            let needs_empty_lines = if is_class_or_function_definition(following) {
+                // Here we insert empty lines even if the preceding has a trailing own line comment
+                true
+            } else if preceding_comments.has_trailing_own_line() {
+                // If there is a comment between preceding and following the empty lines were
+                // inserted before the comment by preceding and there are no extra empty lines after
+                // the comment, which also includes nested class/function definitions.
+                // ```python
+                // class Test:
+                //     def a(self):
+                //         pass
+                //         # trailing comment
+                //
+                //
+                // # two lines before, one line after
+                //
+                // c = 30
+                false
+            } else {
+                // Find nested class or function definitions that need an empty line after them.
+                //
+                // ```python
+                // def f():
+                //     if True:
+                //
+                //         def double(s):
+                //             return s + s
+                //
+                //     print("below function")
+                // ```
+                // Again, a empty lines are inserted before comments
+                // ```python
+                //     if True:
+                //
+                //         def double(s):
+                //             return s + s
+                //
+                //         #
+                //     print("below comment function")
+                // ```
+                std::iter::successors(Some(AnyNodeRef::from(preceding)), |parent| {
+                    parent
+                        .last_child_in_body()
+                        .filter(|last_child| !comments.has_trailing_own_line(*last_child))
+                })
+                .any(|last_child| {
+                    matches!(
+                        last_child,
+                        AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtClassDef(_)
+                    )
+                })
+            };
+
             // Add empty lines before and after a function or class definition. If the preceding
             // node is a function or class, and contains trailing comments, then the statement
             // itself will add the requisite empty lines when formatting its comments.
-            if (is_class_or_function_definition(preceding)
-                && !preceding_comments.has_trailing_own_line())
-                || is_class_or_function_definition(following)
-            {
+            if needs_empty_lines {
                 if source_type.is_stub() {
                     stub_file_empty_lines(
                         self.kind,
