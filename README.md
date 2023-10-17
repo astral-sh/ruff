@@ -140,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.292
+  rev: v0.1.0
   hooks:
     - id: ruff
 ```

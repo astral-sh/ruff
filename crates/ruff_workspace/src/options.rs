@@ -29,7 +29,6 @@ use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::QuoteStyle;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -380,19 +379,9 @@ pub struct Options {
     #[serde(flatten)]
     pub lint_top_level: LintOptions,
 
-    /// Options to configure the code formatting.
-    ///
-    /// Previously:
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
-    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
-    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
-    ///
-    /// This option has been **deprecated** in favor of `output-format`
-    /// to avoid ambiguity with Ruff's upcoming formatter.
+    /// Options to configure code formatting.
     #[option_group]
-    pub format: Option<FormatOrOutputFormat>,
+    pub format: Option<FormatOptions>,
 }
 
 /// Experimental section to configure Ruff's linting. This new section will eventually
@@ -2390,6 +2379,11 @@ pub struct PylintOptions {
         example = r"max-public-methods = 20"
     )]
     pub max_public_methods: Option<usize>,
+
+    /// Maximum number of Boolean expressions allowed within a single `if` statement
+    /// (see: `PLR0916`).
+    #[option(default = r"5", value_type = "int", example = r"max-bool-expr = 5")]
+    pub max_bool_expr: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2400,6 +2394,7 @@ impl PylintOptions {
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
             max_args: self.max_args.unwrap_or(defaults.max_args),
+            max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
@@ -2465,38 +2460,11 @@ impl PyUpgradeOptions {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum FormatOrOutputFormat {
-    Format(FormatOptions),
-    OutputFormat(SerializationFormat),
-}
-
-impl FormatOrOutputFormat {
-    pub const fn as_output_format(&self) -> Option<SerializationFormat> {
-        match self {
-            FormatOrOutputFormat::Format(_) => None,
-            FormatOrOutputFormat::OutputFormat(format) => Some(*format),
-        }
-    }
-}
-
-impl OptionsMetadata for FormatOrOutputFormat {
-    fn record(visit: &mut dyn Visit) {
-        FormatOptions::record(visit);
-    }
-
-    fn documentation() -> Option<&'static str> {
-        FormatOptions::documentation()
-    }
-}
-
 /// Experimental: Configures how `ruff format` formats your code.
 ///
 /// Please provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]

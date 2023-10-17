@@ -355,10 +355,10 @@
       ]
     },
     "format": {
-      "description": "Options to configure the code formatting.\n\nPreviously: The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).\n\nThis option has been **deprecated** in favor of `output-format` to avoid ambiguity with Ruff's upcoming formatter.",
+      "description": "Options to configure code formatting.",
       "anyOf": [
         {
-          "$ref": "#/definitions/FormatOrOutputFormat"
+          "$ref": "#/definitions/FormatOptions"
         },
         {
           "type": "null"
@@ -1258,16 +1258,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "FormatOrOutputFormat": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/FormatOptions"
-        },
-        {
-          "$ref": "#/definitions/SerializationFormat"
-        }
-      ]
     },
     "ImportSection": {
       "anyOf": [
@@ -2224,6 +2214,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-bool-expr": {
+          "description": "Maximum number of Boolean expressions allowed within a single `if` statement (see: `PLR0916`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-branches": {
           "description": "Maximum number of branches allowed for a function or method body (see: `PLR0912`).",
           "type": [
@@ -2905,6 +2904,9 @@
         "PLE060",
         "PLE0604",
         "PLE0605",
+        "PLE07",
+        "PLE070",
+        "PLE0704",
         "PLE1",
         "PLE11",
         "PLE114",
@@ -2956,6 +2958,7 @@
         "PLR0912",
         "PLR0913",
         "PLR0915",
+        "PLR0916",
         "PLR1",
         "PLR17",
         "PLR170",
@@ -2975,6 +2978,9 @@
         "PLR550",
         "PLR5501",
         "PLR6",
+        "PLR62",
+        "PLR620",
+        "PLR6201",
         "PLR63",
         "PLR630",
         "PLR6301",
@@ -3004,6 +3010,7 @@
         "PLW1509",
         "PLW151",
         "PLW1510",
+        "PLW1514",
         "PLW16",
         "PLW164",
         "PLW1641",

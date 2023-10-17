@@ -22,7 +22,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
-use ruff_workspace::options::{FormatOptions, FormatOrOutputFormat, LintOptions, Options};
+use ruff_workspace::options::{FormatOptions, LintOptions, Options};
 use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -140,11 +140,11 @@ impl Workspace {
 
                 ..LintOptions::default()
             }),
-            format: Some(FormatOrOutputFormat::Format(FormatOptions {
+            format: Some(FormatOptions {
                 indent_style: Some(IndentStyle::Space),
                 quote_style: Some(QuoteStyle::Double),
                 ..FormatOptions::default()
-            })),
+            }),
             ..Options::default()
         })
         .map_err(into_error)
