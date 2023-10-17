@@ -257,6 +257,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1711") => (RuleGroup::Stable, rules::pylint::rules::UselessReturn),
         (Pylint, "R1714") => (RuleGroup::Stable, rules::pylint::rules::RepeatedEqualityComparison),
         (Pylint, "R1706") => (RuleGroup::Preview, rules::pylint::rules::AndOrTernary),
+        (Pylint, "R1736") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryListIndexLookup),
         (Pylint, "R1722") => (RuleGroup::Stable, rules::pylint::rules::SysExitAlias),
         (Pylint, "R2004") => (RuleGroup::Stable, rules::pylint::rules::MagicValueComparison),
         (Pylint, "R5501") => (RuleGroup::Stable, rules::pylint::rules::CollapsibleElseIf),

@@ -154,6 +154,10 @@ mod tests {
         Rule::RepeatedKeywordArgument,
         Path::new("repeated_keyword_argument.py")
     )]
+    #[test_case(
+        Rule::UnnecessaryListIndexLookup,
+        Path::new("unnecessary_list_index_lookup.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
