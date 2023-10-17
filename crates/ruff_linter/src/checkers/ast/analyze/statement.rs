@@ -1280,6 +1280,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
                 pylint::rules::unnecessary_list_index_lookup(checker, for_stmt);
             }
+            if checker.enabled(Rule::UnnecessaryDictIndexLookup) {
+                pylint::rules::unnecessary_dict_index_lookup(checker, for_stmt);
+            }
             if !is_async {
                 if checker.enabled(Rule::ReimplementedBuiltin) {
                     flake8_simplify::rules::convert_for_loop_to_any_all(checker, stmt);
