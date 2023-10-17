@@ -203,9 +203,9 @@ fn format_with_parentheses_comments(
     //     )
     // )
     // ```
-    let right_tokenizer = SimpleTokenizer::new(
+    let right_tokenizer = SimpleTokenizer::starts_at(
+        expression.end(),
         f.context().source(),
-        TextRange::new(expression.end(), f.context().source().text_len()),
     )
     .skip_trivia()
     .take_while(|token| token.kind == SimpleTokenKind::RParen);
