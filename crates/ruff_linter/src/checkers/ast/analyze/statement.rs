@@ -964,7 +964,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::Raise(ast::StmtRaise { exc, .. }) => {
+        Stmt::Raise(raise @ ast::StmtRaise { exc, .. }) => {
             if checker.enabled(Rule::RaiseNotImplemented) {
                 if let Some(expr) = exc {
                     pyflakes::rules::raise_not_implemented(checker, expr);
@@ -1003,6 +1003,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if let Some(expr) = exc {
                     flake8_raise::rules::unnecessary_paren_on_raise_exception(checker, expr);
                 }
+            }
+            if checker.enabled(Rule::MisplacedBareRaise) {
+                pylint::rules::misplaced_bare_raise(checker, raise);
             }
         }
         Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
