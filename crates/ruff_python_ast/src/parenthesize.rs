@@ -1,7 +1,7 @@
 use ruff_python_trivia::{BackwardsTokenizer, CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
-use crate::node::AnyNodeRef;
+use crate::AnyNodeRef;
 use crate::ExpressionRef;
 
 /// Returns the [`TextRange`] of a given expression including parentheses, if the expression is

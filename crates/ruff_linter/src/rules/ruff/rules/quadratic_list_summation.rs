@@ -3,8 +3,8 @@ use itertools::Itertools;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::node::AstNode;
 use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::AstNode;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;

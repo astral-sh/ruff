@@ -3,7 +3,7 @@ use tracing::Level;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::tokens_and_ranges;
 use ruff_python_parser::lexer::LexicalError;

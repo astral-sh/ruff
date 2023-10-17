@@ -1,5 +1,5 @@
 use ruff_formatter::FormatRuleWithOptions;
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Constant, ExprConstant};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
