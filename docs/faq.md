@@ -436,22 +436,13 @@ For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) c
 
 ## Ruff tried to fix something — but it broke my code?
 
-Ruff's fixes are a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
-have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.
+Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
+fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
+setting, or passing the `--unsafe-fixes` flag to `ruff check`. For more, see [the fix documentation](configuration.md#fixes).
 
-In the future, Ruff will support enabling fix behavior based on the safety of the patch.
-
-In the meantime, if you find that the fixes are too aggressive, you can disable it on a per-rule or
-per-category basis using the [`unfixable`](settings.md#unfixable) mechanic.
-For example, to disable the fix for some possibly-unsafe rules, you could add the following to your
-`pyproject.toml`:
-
-```toml
-[tool.ruff]
-unfixable = ["B", "SIM", "TRY", "RUF"]
-```
-
-If you find a case where Ruff's fix breaks your code, please file an Issue!
+Even still, given the dynamic nature of Python, it's difficult to have _complete_ certainty when
+making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks your code, please
+[file an Issue](https://github.com/astral-sh/ruff/issues/new).
 
 ## How can I disable Ruff's color output?
 

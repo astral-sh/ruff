@@ -1,3 +1,4 @@
+pub(crate) use and_or_ternary::*;
 pub(crate) use assert_on_string_literal::*;
 pub(crate) use await_outside_async::*;
 pub(crate) use bad_dunder_method_name::*;
@@ -27,6 +28,7 @@ pub(crate) use load_before_global_declaration::*;
 pub(crate) use logging::*;
 pub(crate) use magic_value_comparison::*;
 pub(crate) use manual_import_from::*;
+pub(crate) use misplaced_bare_raise::*;
 pub(crate) use named_expr_without_context::*;
 pub(crate) use nested_min_max::*;
 pub(crate) use no_self_use::*;
@@ -58,6 +60,7 @@ pub(crate) use useless_return::*;
 pub(crate) use yield_from_in_async_function::*;
 pub(crate) use yield_in_init::*;
 
+mod and_or_ternary;
 mod assert_on_string_literal;
 mod await_outside_async;
 mod bad_dunder_method_name;
@@ -87,6 +90,7 @@ mod load_before_global_declaration;
 mod logging;
 mod magic_value_comparison;
 mod manual_import_from;
+mod misplaced_bare_raise;
 mod named_expr_without_context;
 mod nested_min_max;
 mod no_self_use;

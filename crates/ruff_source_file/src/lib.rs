@@ -68,6 +68,10 @@ impl<'src, 'index> SourceCode<'src, 'index> {
         self.index.line_end(line, self.text)
     }
 
+    pub fn line_end_exclusive(&self, line: OneIndexed) -> TextSize {
+        self.index.line_end_exclusive(line, self.text)
+    }
+
     pub fn line_range(&self, line: OneIndexed) -> TextRange {
         self.index.line_range(line, self.text)
     }

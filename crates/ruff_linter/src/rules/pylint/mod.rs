@@ -18,6 +18,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
+    #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(
@@ -135,6 +136,7 @@ mod tests {
     #[test_case(Rule::UnspecifiedEncoding, Path::new("unspecified_encoding.py"))]
     #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
     #[test_case(Rule::NoSelfUse, Path::new("no_self_use.py"))]
+    #[test_case(Rule::MisplacedBareRaise, Path::new("misplaced_bare_raise.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

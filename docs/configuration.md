@@ -109,8 +109,6 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
 - Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
     you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
     extension.
-- By default, Ruff's fixes are aggressive. If you find that it's too aggressive for your liking,
-    consider turning off fixes for specific rules or categories (see [_FAQ_](faq.md#ruff-tried-to-fix-something--but-it-broke-my-code)).
 
 ## Using `ruff.toml`
 
@@ -430,7 +428,7 @@ Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings
 ruff check . --unsafe-fixes
 
 # Apply unsafe fixes
-ruff check . --fix --unsafe-fixes 
+ruff check . --fix --unsafe-fixes
 ```
 
 The safety of fixes can be adjusted per rule using the [`extend-safe-fixes`](settings.md#extend-safe-fixes) and [`extend-unsafe-fixes`](settings.md#extend-unsafe-fixes) settings.

@@ -1,0 +1,105 @@
+---
+source: crates/ruff_linter/src/message/json.rs
+expression: content
+---
+[
+  {
+    "cell": 1,
+    "code": "F401",
+    "end_location": {
+      "column": 10,
+      "row": 2
+    },
+    "filename": "notebook.ipynb",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 10,
+            "row": 2
+          },
+          "location": {
+            "column": 1,
+            "row": 2
+          }
+        }
+      ],
+      "message": "Remove unused import: `os`"
+    },
+    "location": {
+      "column": 8,
+      "row": 2
+    },
+    "message": "`os` imported but unused",
+    "noqa_row": 2,
+    "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  },
+  {
+    "cell": 2,
+    "code": "F401",
+    "end_location": {
+      "column": 12,
+      "row": 2
+    },
+    "filename": "notebook.ipynb",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 1,
+            "row": 3
+          },
+          "location": {
+            "column": 1,
+            "row": 2
+          }
+        }
+      ],
+      "message": "Remove unused import: `math`"
+    },
+    "location": {
+      "column": 8,
+      "row": 2
+    },
+    "message": "`math` imported but unused",
+    "noqa_row": 2,
+    "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  },
+  {
+    "cell": 3,
+    "code": "F841",
+    "end_location": {
+      "column": 6,
+      "row": 4
+    },
+    "filename": "notebook.ipynb",
+    "fix": {
+      "applicability": "unsafe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 10,
+            "row": 4
+          },
+          "location": {
+            "column": 1,
+            "row": 4
+          }
+        }
+      ],
+      "message": "Remove assignment to unused variable `x`"
+    },
+    "location": {
+      "column": 5,
+      "row": 4
+    },
+    "message": "Local variable `x` is assigned to but never used",
+    "noqa_row": 4,
+    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+  }
+]

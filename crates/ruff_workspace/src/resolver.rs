@@ -13,11 +13,10 @@ use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use ruff_linter::fs;
 use ruff_linter::packaging::is_package;
-use ruff_linter::{fs, warn_user_once};
 
 use crate::configuration::Configuration;
-use crate::options::FormatOrOutputFormat;
 use crate::pyproject;
 use crate::pyproject::settings_toml;
 use crate::settings::Settings;
@@ -220,10 +219,6 @@ fn resolve_configuration(
         // Resolve the current path.
         let options = pyproject::load_options(&path)
             .map_err(|err| anyhow!("Failed to parse `{}`: {}", path.display(), err))?;
-
-        if matches!(options.format, Some(FormatOrOutputFormat::OutputFormat(_))) {
-            warn_user_once!("The option `format` has been deprecated to avoid ambiguity with Ruff's upcoming formatter. Use `output-format` instead.");
-        }
 
         let project_root = relativity.resolve(&path);
         let configuration = Configuration::from_options(options, &project_root)?;

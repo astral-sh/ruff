@@ -39,9 +39,9 @@ use crate::options::{
     Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
     Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, FormatOptions, FormatOrOutputFormat, IsortOptions, LintOptions,
-    McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydocstyleOptions, PyflakesOptions, PylintOptions,
+    Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintOptions, McCabeOptions, Options,
+    Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions,
+    PylintOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -377,7 +377,7 @@ impl Configuration {
                 .cache_dir
                 .map(|dir| {
                     let dir = shellexpand::full(&dir);
-                    dir.map(|dir| PathBuf::from(dir.as_ref()))
+                    dir.map(|dir| fs::normalize_path_to(dir.as_ref(), project_root))
                 })
                 .transpose()
                 .map_err(|e| anyhow!("Invalid `cache-dir` value: {e}"))?,
@@ -435,12 +435,7 @@ impl Configuration {
             fix: options.fix,
             fix_only: options.fix_only,
             unsafe_fixes: options.unsafe_fixes.map(UnsafeFixes::from),
-            output_format: options.output_format.or_else(|| {
-                options
-                    .format
-                    .as_ref()
-                    .and_then(FormatOrOutputFormat::as_output_format)
-            }),
+            output_format: options.output_format,
             force_exclude: options.force_exclude,
             line_length: options.line_length,
             tab_size: options.tab_size,
@@ -460,11 +455,7 @@ impl Configuration {
             target_version: options.target_version,
 
             lint: LintConfiguration::from_options(lint, project_root)?,
-            format: if let Some(FormatOrOutputFormat::Format(format)) = options.format {
-                FormatConfiguration::from_options(format)?
-            } else {
-                FormatConfiguration::default()
-            },
+            format: FormatConfiguration::from_options(options.format.unwrap_or_default())?,
         })
     }
 
@@ -1076,6 +1067,8 @@ mod tests {
     ];
 
     const PREVIEW_RULES: &[Rule] = &[
+        Rule::AndOrTernary,
+        Rule::AssignmentInAssert,
         Rule::DirectLoggerInstantiation,
         Rule::InvalidGetLoggerArgument,
         Rule::ManualDictComprehension,
@@ -1085,7 +1078,6 @@ mod tests {
         Rule::TooManyPublicMethods,
         Rule::UndocumentedWarn,
         Rule::UnnecessaryEnumerate,
-        Rule::AssignmentInAssert,
     ];
 
     #[allow(clippy::needless_pass_by_value)]
