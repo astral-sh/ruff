@@ -1,26 +1,30 @@
 use ast::{Expr, StmtIf};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for too many boolean expressions in an `if` statement.
+/// Checks for too many Boolean expressions in an `if` statement.
+///
+/// By default, this rule allows up to 5 expressions. This can be configured
+/// using the [`pylint.max-bool-expr`] option.
 ///
 /// ## Why is this bad?
-/// Too many boolean expressions in an `if` statement can make the code
-/// harder to understand.
+/// `if` statements with many Boolean expressions are harder to understand
+/// and maintain. Consider assigning the result of the Boolean expression,
+/// or any of its sub-expressions, to a variable.
 ///
 /// ## Example
 /// ```python
 /// if a and b and c and d and e and f and g and h:
-///    ...
+///     ...
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-bools`
+/// - `pylint.max-bool-expr`
 #[violation]
 pub struct TooManyBooleanExpressions {
     expressions: usize,
@@ -34,51 +38,52 @@ impl Violation for TooManyBooleanExpressions {
             expressions,
             max_expressions,
         } = self;
-        format!("Too many boolean expressions ({expressions} > {max_expressions})")
-    }
-}
-
-fn count_bools(expr: &Expr) -> usize {
-    match expr {
-        Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => match op {
-            ast::BoolOp::And | ast::BoolOp::Or => {
-                (values.len() - 1) + values.iter().map(count_bools).sum::<usize>()
-            }
-        },
-        Expr::Compare(ast::ExprCompare {
-            left, comparators, ..
-        }) => count_bools(left) + comparators.iter().map(count_bools).sum::<usize>(),
-        _ => 0,
+        format!("Too many Boolean expressions ({expressions} > {max_expressions})")
     }
 }
 
 /// PLR0916
 pub(crate) fn too_many_boolean_expressions(checker: &mut Checker, stmt: &StmtIf) {
-    let test_bool_count = count_bools(stmt.test.as_ref());
-
-    if test_bool_count > checker.settings.pylint.max_bools {
-        checker.diagnostics.push(Diagnostic::new(
-            TooManyBooleanExpressions {
-                expressions: test_bool_count,
-                max_expressions: checker.settings.pylint.max_bools,
-            },
-            stmt.test.as_ref().range(),
-        ));
+    if let Some(bool_op) = stmt.test.as_bool_op_expr() {
+        let expressions = count_bools(bool_op);
+        if expressions > checker.settings.pylint.max_bool_expr {
+            checker.diagnostics.push(Diagnostic::new(
+                TooManyBooleanExpressions {
+                    expressions,
+                    max_expressions: checker.settings.pylint.max_bool_expr,
+                },
+                bool_op.range(),
+            ));
+        }
     }
 
     for elif in &stmt.elif_else_clauses {
-        if let Some(test) = elif.test.as_ref() {
-            let elif_bool_count = count_bools(test);
-
-            if elif_bool_count > checker.settings.pylint.max_bools {
+        if let Some(bool_op) = elif.test.as_ref().and_then(Expr::as_bool_op_expr) {
+            let expressions = count_bools(bool_op);
+            if expressions > checker.settings.pylint.max_bool_expr {
                 checker.diagnostics.push(Diagnostic::new(
                     TooManyBooleanExpressions {
-                        expressions: elif_bool_count,
-                        max_expressions: checker.settings.pylint.max_bools,
+                        expressions,
+                        max_expressions: checker.settings.pylint.max_bool_expr,
                     },
-                    test.range(),
+                    bool_op.range(),
                 ));
             }
         }
     }
+}
+
+/// Count the number of Boolean expressions in a `bool_op` expression.
+fn count_bools(bool_op: &ast::ExprBoolOp) -> usize {
+    bool_op
+        .values
+        .iter()
+        .map(|expr| {
+            if let Expr::BoolOp(bool_op) = expr {
+                count_bools(bool_op)
+            } else {
+                1
+            }
+        })
+        .sum::<usize>()
 }

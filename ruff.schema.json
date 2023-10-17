@@ -2224,8 +2224,8 @@
           "format": "uint",
           "minimum": 0.0
         },
-        "max-bools": {
-          "description": "Maximum number of boolean expressions allowed for a single if statement (see: `PLR0916`).",
+        "max-bool-expr": {
+          "description": "Maximum number of Boolean expressions allowed within a single `if` statement (see: `PLR0916`).",
           "type": [
             "integer",
             "null"

@@ -234,7 +234,7 @@ mod tests {
             Path::new("pylint/too_many_boolean_expressions.py"),
             &LinterSettings {
                 pylint: pylint::settings::Settings {
-                    max_bools: 5,
+                    max_bool_expr: 5,
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::TooManyBooleanExpressions)
