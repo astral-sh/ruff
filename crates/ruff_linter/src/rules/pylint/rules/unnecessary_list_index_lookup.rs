@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, StmtFor};
+use ruff_python_ast::{self as ast, Expr, Stmt, StmtFor};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -79,6 +79,15 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
                 }
             }
             _ => visitor::walk_expr(self, expr),
+        }
+    }
+
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Assign(ast::StmtAssign { value, .. }) => {
+                self.visit_expr(value);
+            }
+            _ => visitor::walk_stmt(self, stmt),
         }
     }
 }
