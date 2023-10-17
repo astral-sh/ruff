@@ -133,6 +133,7 @@ mod tests {
         Rule::SubprocessRunWithoutCheck,
         Path::new("subprocess_run_without_check.py")
     )]
+    #[test_case(Rule::UnspecifiedEncoding, Path::new("unspecified_encoding.py"))]
     #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
     #[test_case(Rule::NoSelfUse, Path::new("no_self_use.py"))]
     #[test_case(Rule::MisplacedBareRaise, Path::new("misplaced_bare_raise.py"))]

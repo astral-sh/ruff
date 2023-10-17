@@ -786,6 +786,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SubprocessRunWithoutCheck) {
                 pylint::rules::subprocess_run_without_check(checker, call);
             }
+            if checker.enabled(Rule::UnspecifiedEncoding) {
+                pylint::rules::unspecified_encoding(checker, call);
+            }
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
                 Rule::PytestRaisesTooBroad,
