@@ -605,7 +605,7 @@
       }
     },
     "tab-size": {
-      "description": "The tabulation size to calculate line length.",
+      "description": "The number of spaces a tab is equal to when enforcing long-line violations (like `E501`) or formatting code with the formatter.\n\nThis option changes the number of spaces inserted by the formatter when using soft-tabs (`indent-style = space`).",
       "anyOf": [
         {
           "$ref": "#/definitions/TabSize"

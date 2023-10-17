@@ -1,6 +1,6 @@
 use path_absolutize::path_dedot;
 use ruff_cache::cache_dir;
-use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
+use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFormat, UnsafeFixes};
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
@@ -117,6 +117,7 @@ pub struct FormatterSettings {
     pub line_width: LineWidth,
 
     pub indent_style: IndentStyle,
+    pub indent_width: IndentWidth,
 
     pub quote_style: QuoteStyle,
 
@@ -150,6 +151,7 @@ impl FormatterSettings {
 
         PyFormatOptions::from_source_type(source_type)
             .with_indent_style(self.indent_style)
+            .with_indent_width(self.indent_width)
             .with_quote_style(self.quote_style)
             .with_magic_trailing_comma(self.magic_trailing_comma)
             .with_preview(self.preview)
@@ -164,10 +166,11 @@ impl Default for FormatterSettings {
 
         Self {
             exclude: FilePatternSet::default(),
-            preview: ruff_python_formatter::PreviewMode::Disabled,
+            preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),
             line_ending: LineEnding::Lf,
             indent_style: default_options.indent_style(),
+            indent_width: default_options.indent_width(),
             quote_style: default_options.quote_style(),
             magic_trailing_comma: default_options.magic_trailing_comma(),
         }
