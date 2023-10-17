@@ -3,61 +3,67 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
 set_membership.py:2:6: PLR6201 [*] Use a `set` when checking for element membership
   |
-1 | # PLR6201
+1 | # Errors
 2 | 1 in [1, 2, 3]
   |      ^^^^^^^^^ PLR6201
-3 | 
-4 | # PLR6201
+3 | 1 in (1, 2, 3)
+4 | 1 in (
   |
   = help: Use a `set` when checking for element membership
 
 ℹ Fix
-1 1 | # PLR6201
+1 1 | # Errors
 2   |-1 in [1, 2, 3]
   2 |+1 in {1, 2, 3}
-3 3 | 
-4 4 | # PLR6201
-5 5 | 1 in (1, 2, 3)
+3 3 | 1 in (1, 2, 3)
+4 4 | 1 in (
+5 5 |     1, 2, 3
 
-set_membership.py:5:6: PLR6201 [*] Use a `set` when checking for element membership
+set_membership.py:3:6: PLR6201 [*] Use a `set` when checking for element membership
   |
-4 | # PLR6201
-5 | 1 in (1, 2, 3)
+1 | # Errors
+2 | 1 in [1, 2, 3]
+3 | 1 in (1, 2, 3)
   |      ^^^^^^^^^ PLR6201
-6 | 
-7 | # PLR6201
+4 | 1 in (
+5 |     1, 2, 3
   |
   = help: Use a `set` when checking for element membership
 
 ℹ Fix
+1 1 | # Errors
 2 2 | 1 in [1, 2, 3]
-3 3 | 
-4 4 | # PLR6201
-5   |-1 in (1, 2, 3)
-  5 |+1 in {1, 2, 3}
-6 6 | 
-7 7 | # PLR6201
-8 8 | def fruit_is_dangerous_for_cat(fruit: str) -> bool:
+3   |-1 in (1, 2, 3)
+  3 |+1 in {1, 2, 3}
+4 4 | 1 in (
+5 5 |     1, 2, 3
+6 6 | )
 
-set_membership.py:9:21: PLR6201 [*] Use a `set` when checking for element membership
-   |
- 7 | # PLR6201
- 8 | def fruit_is_dangerous_for_cat(fruit: str) -> bool:
- 9 |     return fruit in ["cherry", "grapes"]
-   |                     ^^^^^^^^^^^^^^^^^^^^ PLR6201
-10 | 
-11 | # Ok
-   |
-   = help: Use a `set` when checking for element membership
+set_membership.py:4:6: PLR6201 [*] Use a `set` when checking for element membership
+  |
+2 |   1 in [1, 2, 3]
+3 |   1 in (1, 2, 3)
+4 |   1 in (
+  |  ______^
+5 | |     1, 2, 3
+6 | | )
+  | |_^ PLR6201
+7 |   
+8 |   # OK
+  |
+  = help: Use a `set` when checking for element membership
 
 ℹ Fix
-6  6  | 
-7  7  | # PLR6201
-8  8  | def fruit_is_dangerous_for_cat(fruit: str) -> bool:
-9     |-    return fruit in ["cherry", "grapes"]
-   9  |+    return fruit in {"cherry", "grapes"}
-10 10 | 
-11 11 | # Ok
-12 12 | fruits = ["cherry", "grapes"]
+1 1 | # Errors
+2 2 | 1 in [1, 2, 3]
+3 3 | 1 in (1, 2, 3)
+4   |-1 in (
+  4 |+1 in {
+5 5 |     1, 2, 3
+6   |-)
+  6 |+}
+7 7 | 
+8 8 | # OK
+9 9 | fruits = ["cherry", "grapes"]
 
 

@@ -1,16 +1,16 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for operations that checks a list or tuple for an element.
+/// Checks for membership tests on `list` and `tuple` literals.
 ///
 /// ## Why is this bad?
-/// Membership tests are more efficient when performed on a
-/// lookup-optimized datatype like `set`.
+/// When testing for membership in a static sequence, prefer a `set` literal
+/// over a `list` or `tuple`, as Python optimizes `set` membership tests.
 ///
 /// ## Example
 /// ```python
@@ -22,7 +22,7 @@ use crate::checkers::ast::Checker;
 /// 1 in {1, 2, 3}
 /// ```
 /// ## References
-/// - [Python 3.2 release notes](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
+/// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
 #[violation]
 pub struct SetMembership;
 
@@ -51,27 +51,15 @@ pub(crate) fn set_membership(checker: &mut Checker, compare: &ast::ExprCompare) 
         return;
     };
 
-    let (Expr::List(ast::ExprList {
-        elts: right_elements,
-        ..
-    })
-    | Expr::Tuple(ast::ExprTuple {
-        elts: right_elements,
-        ..
-    })) = right
-    else {
+    if !matches!(right, Expr::List(_) | Expr::Tuple(_)) {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(SetMembership, right.range());
 
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        checker.generator().expr(&Expr::Set(ast::ExprSet {
-            elts: right_elements.clone(),
-            range: TextRange::default(),
-        })),
-        right.range(),
-    )));
+    let literal = checker.locator().slice(right);
+    let set = format!("{{{}}}", &literal[1..literal.len() - 1]);
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(set, right.range())));
 
     checker.diagnostics.push(diagnostic);
 }
