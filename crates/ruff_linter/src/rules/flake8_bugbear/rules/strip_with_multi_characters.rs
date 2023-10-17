@@ -34,7 +34,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// "text.txt".strip(".txt")  # "ex"
+/// "text.txt".strip(".txt")  # "e"
 /// ```
 ///
 /// Use instead:
