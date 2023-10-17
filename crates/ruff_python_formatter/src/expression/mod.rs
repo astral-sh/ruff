@@ -9,7 +9,7 @@ use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::{BackwardsTokenizer, CommentRanges, SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
@@ -204,12 +204,9 @@ fn format_with_parentheses_comments(
     //     )
     // )
     // ```
-    let right_tokenizer = SimpleTokenizer::starts_at(
-        expression.end(),
-        f.context().source(),
-    )
-    .skip_trivia()
-    .take_while(|token| token.kind == SimpleTokenKind::RParen);
+    let right_tokenizer = SimpleTokenizer::starts_at(expression.end(), f.context().source())
+        .skip_trivia()
+        .take_while(|token| token.kind == SimpleTokenKind::RParen);
 
     let left_tokenizer = BackwardsTokenizer::up_to(
         expression.start(),
