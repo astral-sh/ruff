@@ -78,7 +78,7 @@ jobs:
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
+          shared-key: "ci"
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: "Clippy (wasm)"
@@ -100,7 +100,7 @@ jobs:
           tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
+          shared-key: "ci"
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: cargo insta test --all --all-features --unreferenced reject
@@ -151,7 +151,7 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.4.0
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
+          shared-key: "ci"
       - name: "Run wasm-pack"
         run: |
           cd crates/ruff_wasm
@@ -166,7 +166,7 @@ jobs:
         run: rustup component add rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
+          shared-key: "ci"
       - run: ./scripts/add_rule.py --name DoTheThing --prefix PL --code C0999 --linter pylint
       - run: cargo check
       - run: cargo fmt --all --check
@@ -236,7 +236,7 @@ jobs:
         run: rustup toolchain install nightly-2023-06-08
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
+          shared-key: "ci"
       - name: "Install cargo-udeps"
         uses: taiki-e/install-action@cargo-udeps
       - name: "Run cargo-udeps"
@@ -253,7 +253,7 @@ jobs:
           architecture: x64
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
+          shared-key: "ci"
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
@@ -280,7 +280,7 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
+          shared-key: "ci"
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Cache pre-commit"
@@ -315,7 +315,7 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
+          shared-key: "ci"
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: pip install -r docs/requirements-insiders.txt
@@ -369,7 +369,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}
+          shared-key: "ci"
 
       - name: "Build benchmarks"
         run: cargo codspeed build --features codspeed -p ruff_benchmark
