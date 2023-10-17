@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-set_membership.py:2:6: PLR6201 [*] Use a `set` when checking for element membership
+literal_membership.py:2:6: PLR6201 [*] Use a `set` literal when testing for membership
   |
 1 | # Errors
 2 | 1 in [1, 2, 3]
@@ -9,7 +9,7 @@ set_membership.py:2:6: PLR6201 [*] Use a `set` when checking for element members
 3 | 1 in (1, 2, 3)
 4 | 1 in (
   |
-  = help: Use a `set` when checking for element membership
+  = help: Convert to `set`
 
 ℹ Fix
 1 1 | # Errors
@@ -19,7 +19,7 @@ set_membership.py:2:6: PLR6201 [*] Use a `set` when checking for element members
 4 4 | 1 in (
 5 5 |     1, 2, 3
 
-set_membership.py:3:6: PLR6201 [*] Use a `set` when checking for element membership
+literal_membership.py:3:6: PLR6201 [*] Use a `set` literal when testing for membership
   |
 1 | # Errors
 2 | 1 in [1, 2, 3]
@@ -28,7 +28,7 @@ set_membership.py:3:6: PLR6201 [*] Use a `set` when checking for element members
 4 | 1 in (
 5 |     1, 2, 3
   |
-  = help: Use a `set` when checking for element membership
+  = help: Convert to `set`
 
 ℹ Fix
 1 1 | # Errors
@@ -39,7 +39,7 @@ set_membership.py:3:6: PLR6201 [*] Use a `set` when checking for element members
 5 5 |     1, 2, 3
 6 6 | )
 
-set_membership.py:4:6: PLR6201 [*] Use a `set` when checking for element membership
+literal_membership.py:4:6: PLR6201 [*] Use a `set` literal when testing for membership
   |
 2 |   1 in [1, 2, 3]
 3 |   1 in (1, 2, 3)
@@ -51,7 +51,7 @@ set_membership.py:4:6: PLR6201 [*] Use a `set` when checking for element members
 7 |   
 8 |   # OK
   |
-  = help: Use a `set` when checking for element membership
+  = help: Convert to `set`
 
 ℹ Fix
 1 1 | # Errors

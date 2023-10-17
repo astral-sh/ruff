@@ -24,21 +24,21 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
 #[violation]
-pub struct SetMembership;
+pub struct LiteralMembership;
 
-impl AlwaysFixableViolation for SetMembership {
+impl AlwaysFixableViolation for LiteralMembership {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a `set` when checking for element membership")
+        format!("Use a `set` literal when testing for membership")
     }
 
     fn fix_title(&self) -> String {
-        format!("Use a `set` when checking for element membership")
+        format!("Convert to `set`")
     }
 }
 
 /// PLR6201
-pub(crate) fn set_membership(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompare) {
     let [op] = compare.ops.as_slice() else {
         return;
     };
@@ -55,7 +55,7 @@ pub(crate) fn set_membership(checker: &mut Checker, compare: &ast::ExprCompare) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SetMembership, right.range());
+    let mut diagnostic = Diagnostic::new(LiteralMembership, right.range());
 
     let literal = checker.locator().slice(right);
     let set = format!("{{{}}}", &literal[1..literal.len() - 1]);
