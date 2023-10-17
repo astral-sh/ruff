@@ -187,8 +187,8 @@ fn format_with_parentheses_comments(
 ) -> FormatResult<()> {
     // First part: Split the comments
 
-    // TODO: This is copied from `parenthesized_range`, except that we don't have the parent, which
-    // is a problem:
+    // TODO(konstin): This is copied from `parenthesized_range`, except that we don't have the
+    // parent, which is a problem:
     // ```python
     // f(
     //     # a
