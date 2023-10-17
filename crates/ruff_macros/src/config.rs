@@ -1,11 +1,11 @@
-use proc_macro2::TokenTree;
 use quote::{quote, quote_spanned};
+use serde_derive_internals::Ctxt;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{
     AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput, ExprLit, Field,
-    Fields, Lit, LitStr, Meta, Path, PathArguments, PathSegment, Token, Type, TypePath,
+    Fields, Lit, LitStr, Path, PathArguments, PathSegment, Token, Type, TypePath,
 };
 
 use ruff_python_trivia::textwrap::dedent;
@@ -38,25 +38,14 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
                     .any(|attr| attr.path().is_ident("option_group"))
                 {
                     output.push(handle_option_group(field)?);
-                } else if let Some(serde) = field
-                    .attrs
-                    .iter()
-                    .find(|attr| attr.path().is_ident("serde"))
-                {
+                } else if let Type::Path(ty) = &field.ty {
+                    let serde_field = serde_field_metadata(field)?;
+
                     // If a field has the `serde(flatten)` attribute, flatten the options into the parent
                     // by calling `Type::record` instead of `visitor.visit_set`
-                    if let (Type::Path(ty), Meta::List(list)) = (&field.ty, &serde.meta) {
-                        for token in list.tokens.clone() {
-                            if let TokenTree::Ident(ident) = token {
-                                if ident == "flatten" {
-                                    let ty_name = ty.path.require_ident()?;
-                                    output.push(quote_spanned!(
-                                        ident.span() => (#ty_name::record(visit))
-                                    ));
-                                    break;
-                                }
-                            }
-                        }
+                    if serde_field.flatten() {
+                        let ty_name = ty.path.require_ident()?;
+                        output.push(quote_spanned!(ident.span() => (#ty_name::record(visit))));
                     }
                 }
             }
@@ -193,6 +182,10 @@ fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::To
     } = attr.parse_args::<FieldAttributes>()?;
     let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
+    let serde_field = serde_field_metadata(field)?;
+    let attributed_aliases = serde_field.aliases();
+    let aliases = quote!(BTreeSet::from_iter([#(#attributed_aliases),*]));
+
     Ok(quote_spanned!(
         ident.span() => {
             visit.record_field(#kebab_name, crate::options_base::OptionField{
@@ -200,6 +193,7 @@ fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::To
                 default: &#default,
                 value_type: &#value_type,
                 example: &#example,
+                aliases: #aliases
             })
         }
     ))
@@ -247,4 +241,18 @@ fn _parse_key_value(input: ParseStream, name: &str) -> syn::Result<String> {
         Lit::Str(v) => Ok(v.value()),
         _ => Err(syn::Error::new(value.span(), "Expected literal string")),
     }
+}
+
+fn serde_field_metadata(field: &Field) -> syn::Result<serde_derive_internals::attr::Field> {
+    let context = Ctxt::new();
+    let field = serde_derive_internals::attr::Field::from_ast(
+        &context,
+        0,
+        field,
+        None,
+        &serde_derive_internals::attr::Default::Default,
+    );
+    context.check()?;
+
+    Ok(field)
 }

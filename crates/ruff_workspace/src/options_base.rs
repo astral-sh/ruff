@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt::{Debug, Display, Formatter};
 
 /// Visits [`OptionsMetadata`].
@@ -89,7 +90,8 @@ impl OptionSet {
     /// ### Test for the existence of a child option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionField, OptionsMetadata, Visit};
+    /// # use std::collections::BTreeSet;
+    /// use ruff_workspace::options_base::{OptionField, OptionsMetadata, Visit};
     ///
     /// struct WithOptions;
     ///
@@ -100,6 +102,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             aliases: BTreeSet::new()
     ///         });
     ///     }
     /// }
@@ -110,7 +113,8 @@ impl OptionSet {
     /// ### Test for the existence of a nested option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionField, OptionsMetadata, Visit};
+    /// # use std::collections::BTreeSet;
+    /// use ruff_workspace::options_base::{OptionField, OptionsMetadata, Visit};
     ///
     /// struct Root;
     ///
@@ -121,6 +125,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             aliases: BTreeSet::new()
     ///         });
     ///
     ///         visit.record_set("format", Nested::metadata());
@@ -136,6 +141,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             aliases: BTreeSet::new()
     ///         });
     ///     }
     /// }
@@ -157,7 +163,8 @@ impl OptionSet {
     /// ### Find a child option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionEntry, OptionField, OptionsMetadata, Visit};
+    /// # use std::collections::BTreeSet;
+    /// use ruff_workspace::options_base::{OptionEntry, OptionField, OptionsMetadata, Visit};
     ///
     /// struct WithOptions;
     ///
@@ -166,6 +173,7 @@ impl OptionSet {
     ///     default: "false",
     ///     value_type: "bool",
     ///     example: "",
+    ///     aliases: BTreeSet::new()
     ///  };
     ///
     /// impl OptionsMetadata for WithOptions {
@@ -180,13 +188,15 @@ impl OptionSet {
     /// ### Find a nested option
     ///
     /// ```rust
-    /// # use ruff_workspace::options_base::{OptionEntry, OptionField, OptionsMetadata, Visit};
+    /// # use std::collections::BTreeSet;
+    /// use ruff_workspace::options_base::{OptionEntry, OptionField, OptionsMetadata, Visit};
     ///
     /// static HARD_TABS: OptionField = OptionField {
     ///     doc: "Use hard tabs for indentation and spaces for alignment.",
     ///     default: "false",
     ///     value_type: "bool",
     ///     example: "",
+    ///     aliases: BTreeSet::new()
     /// };
     ///
     /// struct Root;
@@ -198,6 +208,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             aliases: BTreeSet::new()
     ///         });
     ///
     ///         visit.record_set("format", Nested::metadata());
@@ -307,6 +318,7 @@ pub struct OptionField {
     pub doc: &'static str,
     pub default: &'static str,
     pub value_type: &'static str,
+    pub aliases: BTreeSet<&'static str>,
     pub example: &'static str,
 }
 

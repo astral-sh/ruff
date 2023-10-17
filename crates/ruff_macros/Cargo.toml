@@ -16,6 +16,7 @@ doctest = false
 
 [dependencies]
 ruff_python_trivia = { path = "../ruff_python_trivia" }
+serde_derive_internals = "0.29.0"
 
 proc-macro2 = { workspace = true }
 quote = { workspace = true }

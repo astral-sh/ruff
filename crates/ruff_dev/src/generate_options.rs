@@ -1,6 +1,7 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
 //!
 //! Used for <https://docs.astral.sh/ruff/settings/>.
+use itertools::Itertools;
 use std::fmt::Write;
 
 use ruff_workspace::options::Options;
@@ -107,6 +108,24 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
     output.push('\n');
     output.push_str(&format!("**Type**: `{}`\n", field.value_type));
     output.push('\n');
+
+    if !field.aliases.is_empty() {
+        let title = if field.aliases.len() == 1 {
+            "Alias"
+        } else {
+            "Aliases"
+        };
+        output.push_str(&format!(
+            "**{title}**: {}\n",
+            field
+                .aliases
+                .iter()
+                .map(|alias| format!("`{alias}`"))
+                .join(", ")
+        ));
+        output.push('\n');
+    }
+
     output.push_str(&format!(
         "**Example usage**:\n\n```toml\n[tool.ruff{}]\n{}\n```\n",
         if let Some(set_name) = parent_set.name() {
