@@ -141,7 +141,7 @@ pub struct Options {
     pub required_version: Option<Version>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
-    /// use unstable rules and fixes.
+    /// use unstable rules, fixes, and formatting.
     #[option(
         default = "false",
         value_type = "bool",
@@ -412,6 +412,18 @@ pub struct LintOptions {
         "#
     )]
     pub exclude: Option<Vec<String>>,
+
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will
+    /// use unstable rules and fixes.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features.
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
 }
 
 // Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
