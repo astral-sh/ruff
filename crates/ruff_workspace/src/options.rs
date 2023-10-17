@@ -2509,7 +2509,7 @@ pub struct FormatOptions {
     /// ```
     ///
     /// Ruff will change `a` to use single quotes when using `quote-style = "single"`. However,
-    /// `a` will be unchanged, as converting to single quotes would require the inner `'` to be
+    /// `b` will be unchanged, as converting to single quotes would require the inner `'` to be
     /// escaped, which leads to less readable code: `'It\'s monday morning'`.
     #[option(
         default = r#"double"#,
