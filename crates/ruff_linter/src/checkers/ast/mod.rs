@@ -524,6 +524,7 @@ where
                 );
                 self.semantic.push_definition(definition);
                 self.semantic.push_scope(ScopeKind::Function(function_def));
+                self.semantic.flags -= SemanticModelFlags::EXCEPTION_HANDLER;
 
                 self.deferred.functions.push(self.semantic.snapshot());
 
@@ -562,6 +563,7 @@ where
                 );
                 self.semantic.push_definition(definition);
                 self.semantic.push_scope(ScopeKind::Class(class_def));
+                self.semantic.flags -= SemanticModelFlags::EXCEPTION_HANDLER;
 
                 // Extract any global bindings from the class body.
                 if let Some(globals) = Globals::from_body(body) {
@@ -580,7 +582,9 @@ where
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit_expr(value);
+                // The value in a `type` alias has annotation semantics, in that it's never
+                // evaluated at runtime.
+                self.visit_annotation(value);
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -1766,7 +1770,7 @@ impl<'a> Checker<'a> {
                     bound: Some(bound), ..
                 }) = type_param
                 {
-                    self.visit_expr(bound);
+                    self.visit_annotation(bound);
                 }
             }
         }
