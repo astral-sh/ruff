@@ -347,12 +347,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/checkout@v4
+        name: "Download ruff-lsp source"
+        with:
+          repository: 'astral-sh/ruff-lsp'
+
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: actions/download-artifact@v3
-        name: Download Ruff binary
+        name: Download ruff binary
         id: ruff-target
         with:
           name: ruff
