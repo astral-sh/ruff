@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)]
+
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -27,6 +29,10 @@ mod panic;
 mod printer;
 pub mod resolve;
 mod stdin;
+
+use shadow_rs::shadow;
+
+shadow!(build);
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -134,6 +140,10 @@ pub fn run(
     set_up_logging(&log_level)?;
 
     match command {
+        Command::Version { output_format } => {
+            commands::version::version(output_format)?;
+            Ok(ExitStatus::Success)
+        }
         Command::Rule { rule, all, format } => {
             if all {
                 commands::rule::rules(format)?;

@@ -35,6 +35,11 @@ pub struct Args {
 pub enum Command {
     /// Run Ruff on the given files or directories (default).
     Check(CheckCommand),
+    /// Display full Ruff version information
+    Version {
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
     /// Explain a rule (or all rules).
     #[clap(alias = "--explain")]
     #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
