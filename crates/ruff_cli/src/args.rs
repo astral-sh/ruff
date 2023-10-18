@@ -35,11 +35,6 @@ pub struct Args {
 pub enum Command {
     /// Run Ruff on the given files or directories (default).
     Check(CheckCommand),
-    /// Display Ruff's version
-    Version {
-        #[arg(long, value_enum, default_value = "text")]
-        output_format: HelpFormat,
-    },
     /// Explain a rule (or all rules).
     #[clap(alias = "--explain")]
     #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
@@ -74,6 +69,11 @@ pub enum Command {
     #[doc(hidden)]
     #[clap(hide = true)]
     Format(FormatCommand),
+    /// Display Ruff's version
+    Version {
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
 }
 
 // The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
