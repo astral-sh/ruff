@@ -849,10 +849,9 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["" | "builtins", "eval"] => Some(SuspiciousEvalUsage.into()),
             // MarkSafe
             ["django", "utils", "safestring", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
-            // URLOpen
-            ["urllib", "urlopen" | "urlretrieve" | "Request"] |
-            ["urllib", "request", "urlopen" | "urlretrieve"] |
-            ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve"] => {
+            // URLOpen (`urlopen`, `urlretrieve`, `Request`)
+            ["urllib", "request", "urlopen" | "urlretrieve" | "Request"] |
+            ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" | "Request"] => {
                 // If the `url` argument is a string literal, allow `http` and `https` schemes.
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
                     if let Some(Expr::Constant(ast::ExprConstant { value: ast::Constant::Str(url), .. })) = &call.arguments.find_argument("url", 0) {
@@ -864,7 +863,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                 }
                 Some(SuspiciousURLOpenUsage.into())
             },
-            ["urllib", "URLopener" | "FancyURLopener"] |
+            // URLOpen (`URLopener`, `FancyURLopener`)
             ["urllib", "request", "URLopener" | "FancyURLopener"] |
             ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => Some(SuspiciousURLOpenUsage.into()),
             // NonCryptographicRandom
