@@ -150,7 +150,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         N: Ranged,
         Separator: Format<PyFormatContext<'ast>>,
     {
-        self.result = self.result.and_then(|_| {
+        self.result = self.result.and_then(|()| {
             if self.entries.is_one_or_more() {
                 write!(self.fmt, [token(","), separator])?;
             }
@@ -190,7 +190,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     }
 
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
-        self.result.and_then(|_| {
+        self.result.and_then(|()| {
             if let Some(last_end) = self.entries.position() {
                 let magic_trailing_comma = has_magic_trailing_comma(
                     TextRange::new(last_end, self.sequence_end),

@@ -20,7 +20,7 @@ use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use ruff_workspace::resolver::python_files_in_path;
+use ruff_workspace::resolver::{match_exclusion, python_files_in_path};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
@@ -61,26 +61,42 @@ pub(crate) fn format(
     }
 
     let start = Instant::now();
-    let (results, errors): (Vec<_>, Vec<_>) = paths
+    let (mut results, errors): (Vec<_>, Vec<_>) = paths
         .into_par_iter()
         .filter_map(|entry| {
             match entry {
-                Ok(entry) => {
-                    let path = entry.into_path();
-
+                Ok(resolved_file) => {
+                    let path = resolved_file.path();
                     let SourceType::Python(source_type) = SourceType::from(&path) else {
                         // Ignore any non-Python files.
                         return None;
                     };
 
-                    let resolved_settings = resolver.resolve(&path, &pyproject_config);
+                    let resolved_settings = resolver.resolve(path, &pyproject_config);
+
+                    // Ignore files that are excluded from formatting
+                    if !resolved_file.is_root()
+                        && match_exclusion(
+                            path,
+                            resolved_file.file_name(),
+                            &resolved_settings.formatter.exclude,
+                        )
+                    {
+                        return None;
+                    }
 
                     Some(
                         match catch_unwind(|| {
-                            format_path(&path, &resolved_settings.formatter, source_type, mode)
+                            format_path(path, &resolved_settings.formatter, source_type, mode)
                         }) {
-                            Ok(inner) => inner.map(|result| FormatPathResult { path, result }),
-                            Err(error) => Err(FormatCommandError::Panic(Some(path), error)),
+                            Ok(inner) => inner.map(|result| FormatPathResult {
+                                path: resolved_file.into_path(),
+                                result,
+                            }),
+                            Err(error) => Err(FormatCommandError::Panic(
+                                Some(resolved_file.into_path()),
+                                error,
+                            )),
                         },
                     )
                 }
@@ -103,6 +119,8 @@ pub(crate) fn format(
     for error in &errors {
         error!("{error}");
     }
+
+    results.sort_unstable_by(|a, b| a.path.cmp(&b.path));
 
     let summary = FormatSummary::new(results.as_slice(), mode);
 
@@ -137,7 +155,7 @@ pub(crate) fn format(
 }
 
 /// Format the file at the given [`Path`].
-#[tracing::instrument(skip_all, fields(path = %path.display()))]
+#[tracing::instrument(level="debug", skip_all, fields(path = %path.display()))]
 fn format_path(
     path: &Path,
     settings: &FormatterSettings,

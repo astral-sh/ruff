@@ -22,7 +22,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
-use ruff_workspace::options::{FormatOptions, LintOptions, Options};
+use ruff_workspace::options::{FormatOptions, LintCommonOptions, LintOptions, Options};
 use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -130,13 +130,16 @@ impl Workspace {
             target_version: Some(PythonVersion::default()),
 
             lint: Some(LintOptions {
-                allowed_confusables: Some(Vec::default()),
-                dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
-                ignore: Some(Vec::default()),
-                select: Some(DEFAULT_SELECTORS.to_vec()),
-                extend_fixable: Some(Vec::default()),
-                extend_select: Some(Vec::default()),
-                external: Some(Vec::default()),
+                common: LintCommonOptions {
+                    allowed_confusables: Some(Vec::default()),
+                    dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
+                    ignore: Some(Vec::default()),
+                    select: Some(DEFAULT_SELECTORS.to_vec()),
+                    extend_fixable: Some(Vec::default()),
+                    extend_select: Some(Vec::default()),
+                    external: Some(Vec::default()),
+                    ..LintCommonOptions::default()
+                },
 
                 ..LintOptions::default()
             }),
