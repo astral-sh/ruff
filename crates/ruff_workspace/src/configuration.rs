@@ -151,14 +151,14 @@ impl Configuration {
         }
 
         let target_version = self.target_version.unwrap_or_default();
-        let preview = self.preview.unwrap_or_default();
+        let global_preview = self.preview.unwrap_or_default();
 
         let format = self.format;
         let format_defaults = FormatterSettings::default();
         // TODO(micha): Support changing the tab-width but disallow changing the number of spaces
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
-            preview: match format.preview.unwrap_or(preview) {
+            preview: match format.preview.unwrap_or(global_preview) {
                 PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
                 PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
             },
@@ -176,6 +176,7 @@ impl Configuration {
         };
 
         let lint = self.lint;
+        let lint_preview = lint.preview.unwrap_or(global_preview);
 
         Ok(Settings {
             cache_dir: self
@@ -204,8 +205,9 @@ impl Configuration {
             },
 
             linter: LinterSettings {
-                rules: lint.as_rule_table(preview),
+                rules: lint.as_rule_table(lint_preview),
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
+                preview: lint_preview,
                 target_version,
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
@@ -234,7 +236,7 @@ impl Configuration {
                     .iter()
                     .flat_map(|selector| {
                         selector.rules(&PreviewOptions {
-                            mode: preview,
+                            mode: lint_preview,
                             require_explicit: false,
                         })
                     })
@@ -244,7 +246,7 @@ impl Configuration {
                     .iter()
                     .flat_map(|selector| {
                         selector.rules(&PreviewOptions {
-                            mode: preview,
+                            mode: lint_preview,
                             require_explicit: false,
                         })
                     })
@@ -257,7 +259,6 @@ impl Configuration {
                     .task_tags
                     .unwrap_or_else(|| TASK_TAGS.iter().map(ToString::to_string).collect()),
                 logger_objects: lint.logger_objects.unwrap_or_default(),
-                preview,
                 typing_modules: lint.typing_modules.unwrap_or_default(),
                 // Plugins
                 flake8_annotations: lint
@@ -511,6 +512,7 @@ impl Configuration {
 #[derive(Debug, Default)]
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
+    pub preview: Option<PreviewMode>,
 
     // Rule selection
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
@@ -570,6 +572,7 @@ impl LintConfiguration {
                     })
                     .collect()
             }),
+            preview: options.preview.map(PreviewMode::from),
 
             rule_selections: vec![RuleSelection {
                 select: options.common.select,
@@ -887,6 +890,7 @@ impl LintConfiguration {
     pub fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
+            preview: self.preview.or(config.preview),
             rule_selections: config
                 .rule_selections
                 .into_iter()

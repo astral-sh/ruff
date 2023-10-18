@@ -395,9 +395,9 @@ pub struct FormatCommand {
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
 
-    /// Enable preview mode; checks will include unstable rules and fixes.
+    /// Enable preview mode; enables unstable formatting.
     /// Use `--no-preview` to disable.
-    #[arg(long, overrides_with("no_preview"), hide = true)]
+    #[arg(long, overrides_with("no_preview"))]
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
@@ -668,6 +668,8 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(preview) = &self.preview {
             config.preview = Some(*preview);
+            config.lint.preview = Some(*preview);
+            config.format.preview = Some(*preview);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.lint.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
