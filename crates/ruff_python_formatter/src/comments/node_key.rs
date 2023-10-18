@@ -1,4 +1,4 @@
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 
@@ -52,7 +52,7 @@ impl<'a> From<AnyNodeRef<'a>> for NodeRefEqualityKey<'a> {
 #[cfg(test)]
 mod tests {
     use crate::comments::node_key::NodeRefEqualityKey;
-    use ruff_python_ast::node::AnyNodeRef;
+    use ruff_python_ast::AnyNodeRef;
     use ruff_python_ast::StmtContinue;
     use ruff_text_size::TextRange;
     use std::collections::hash_map::DefaultHasher;

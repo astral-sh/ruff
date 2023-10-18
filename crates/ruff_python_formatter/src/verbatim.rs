@@ -4,7 +4,7 @@ use std::iter::FusedIterator;
 use unicode_width::UnicodeWidthStr;
 
 use ruff_formatter::{write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
 use ruff_python_parser::lexer::{lex_starts_at, LexResult};
 use ruff_python_parser::{Mode, Tok};
