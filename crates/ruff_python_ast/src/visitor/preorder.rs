@@ -1,8 +1,8 @@
 use crate::{
     Alias, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ElifElseClause,
     ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault,
-    Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParams, UnaryOp,
-    WithItem,
+    Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt, TypeParam, TypeParams,
+    UnaryOp, WithItem,
 };
 use crate::{AnyNodeRef, AstNode};
 
@@ -43,6 +43,9 @@ pub trait PreorderVisitor<'a> {
 
     #[inline]
     fn visit_constant(&mut self, _constant: &'a Constant) {}
+
+    #[inline]
+    fn visit_singleton(&mut self, _singleton: &'a Singleton) {}
 
     #[inline]
     fn visit_bool_op(&mut self, bool_op: &'a BoolOp) {

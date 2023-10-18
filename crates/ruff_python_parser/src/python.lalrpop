@@ -655,7 +655,7 @@ AddOpExpr: ast::ParenthesizedExpr = {
 
 LiteralPattern: ast::Pattern = {
     <location:@L> "None" <end_location:@R> => ast::PatternMatchSingleton {
-        value: ast::Constant::None,
+        value: ast::Singleton::None,
         range: (location..end_location).into()
     }.into(),
     <location:@L> "True" <end_location:@R> => ast::PatternMatchSingleton {

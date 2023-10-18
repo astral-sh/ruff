@@ -3139,7 +3139,7 @@ impl AstNode for ast::PatternMatchSingleton {
         V: PreorderVisitor<'a> + ?Sized,
     {
         let ast::PatternMatchSingleton { value, range: _ } = self;
-        visitor.visit_constant(value);
+        visitor.visit_singleton(value);
     }
 }
 impl AstNode for ast::PatternMatchSequence {

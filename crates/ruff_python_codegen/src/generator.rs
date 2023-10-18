@@ -5,8 +5,8 @@ use std::ops::Deref;
 use ruff_python_ast::{
     self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
     DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters,
-    Pattern, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    WithItem,
+    Pattern, Singleton, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+    TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -672,7 +672,7 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(value, precedence::MAX);
             }
             Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range: _ }) => {
-                self.unparse_constant(value);
+                self.unparse_singleton(value);
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => {
                 self.p("[");
@@ -1163,6 +1163,14 @@ impl<'a> Generator<'a> {
             Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { kind, value, .. }) => {
                 self.p(&format!("{kind}{value}"));
             }
+        }
+    }
+
+    pub(crate) fn unparse_singleton(&mut self, singleton: &Singleton) {
+        match singleton {
+            Singleton::None => self.p("None"),
+            Singleton::True => self.p("True"),
+            Singleton::False => self.p("False"),
         }
     }
 

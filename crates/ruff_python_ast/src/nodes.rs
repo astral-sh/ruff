@@ -1923,7 +1923,7 @@ impl From<PatternMatchValue> for Pattern {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSingleton {
     pub range: TextRange,
-    pub value: Constant,
+    pub value: Singleton,
 }
 
 impl From<PatternMatchSingleton> for Pattern {
@@ -2575,6 +2575,23 @@ impl From<Identifier> for String {
 impl Ranged for Identifier {
     fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Singleton {
+    None,
+    True,
+    False,
+}
+
+impl From<bool> for Singleton {
+    fn from(value: bool) -> Self {
+        if value {
+            Singleton::True
+        } else {
+            Singleton::False
+        }
     }
 }
 
