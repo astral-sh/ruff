@@ -68,7 +68,7 @@ pub(crate) fn line_too_long(
     indexer: &Indexer,
     settings: &LinterSettings,
 ) -> Option<Diagnostic> {
-    let limit = settings.line_length;
+    let limit = settings.pycodestyle.max_line_width;
 
     Overlong::try_from_line(
         line,

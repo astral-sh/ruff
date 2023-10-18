@@ -2204,6 +2204,17 @@
               "type": "null"
             }
           ]
+        },
+        "max-line-width": {
+          "description": "The maximum [width](http://www.unicode.org/reports/tr11/#Overview) to allow for [`line-too-long`] violations. By default, this is set to the value of the global `line-width` option.\n\nOverriding the global [`line-width`] allows to use a lower limit for Ruff's formatter and warn about extra-long lines that can't be split by the formatter using [`line-too-long`]:\n\n```toml line-width = 88 # The formatter breaks line's with a width of 88.\n\n[pycodestyle] max-line-width = 100 # E501 reports lines that exceed the width of 100. ```\n\n[`line-too-long`].\n\nSee the [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) rule for more information.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LineWidth"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
