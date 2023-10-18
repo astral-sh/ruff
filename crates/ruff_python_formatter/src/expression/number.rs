@@ -142,7 +142,7 @@ fn normalize_floating_number(input: &str) -> Cow<str> {
 
     let mut chars = input.char_indices();
 
-    let fraction_ends_with_dot = if let Some((index, '.')) = chars.next() {
+    let mut prev_char_is_dot = if let Some((index, '.')) = chars.next() {
         // Add a leading `0` if `input` starts with `.`.
         output.push('0');
         output.push('.');
@@ -155,8 +155,8 @@ fn normalize_floating_number(input: &str) -> Cow<str> {
     loop {
         match chars.next() {
             Some((index, c @ ('e' | 'E'))) => {
-                if fraction_ends_with_dot {
-                    // Add `0` if fraction part ends with `.`.
+                if prev_char_is_dot {
+                    // Add `0` if the `e` immediately follows a `.` (e.g., `1.e1`).
                     output.push_str(&input[last_index..index]);
                     output.push('0');
                     last_index = index;
@@ -177,9 +177,12 @@ fn normalize_floating_number(input: &str) -> Cow<str> {
 
                 break;
             }
-            Some(_) => continue,
+            Some((_index, c)) => {
+                prev_char_is_dot = c == '.';
+                continue;
+            }
             None => {
-                if input.ends_with('.') {
+                if prev_char_is_dot {
                     // Add `0` if fraction part ends with `.`.
                     output.push_str(&input[last_index..]);
                     output.push('0');

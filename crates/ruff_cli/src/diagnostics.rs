@@ -2,7 +2,7 @@
 
 use std::fs::File;
 use std::io;
-use std::ops::AddAssign;
+use std::ops::{Add, AddAssign};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -139,6 +139,15 @@ impl Diagnostics {
 
             Self::default()
         }
+    }
+}
+
+impl Add for Diagnostics {
+    type Output = Diagnostics;
+
+    fn add(mut self, other: Self) -> Self::Output {
+        self += other;
+        self
     }
 }
 

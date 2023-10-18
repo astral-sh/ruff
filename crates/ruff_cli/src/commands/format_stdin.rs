@@ -6,7 +6,7 @@ use log::error;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::python_file_at_path;
+use ruff_workspace::resolver::{match_exclusion, python_file_at_path};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
@@ -31,6 +31,14 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
 
     if let Some(filename) = cli.stdin_filename.as_deref() {
         if !python_file_at_path(filename, &pyproject_config, overrides)? {
+            return Ok(ExitStatus::Success);
+        }
+
+        let format_settings = &pyproject_config.settings.formatter;
+        if filename
+            .file_name()
+            .is_some_and(|name| match_exclusion(filename, name, &format_settings.exclude))
+        {
             return Ok(ExitStatus::Success);
         }
     }

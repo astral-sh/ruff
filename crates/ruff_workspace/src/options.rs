@@ -29,7 +29,6 @@ use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::QuoteStyle;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -142,7 +141,7 @@ pub struct Options {
     pub required_version: Option<Version>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
-    /// use unstable rules and fixes.
+    /// use unstable rules, fixes, and formatting.
     #[option(
         default = "false",
         value_type = "bool",
@@ -154,7 +153,7 @@ pub struct Options {
     pub preview: Option<bool>,
 
     // File resolver options
-    /// A list of file patterns to exclude from linting.
+    /// A list of file patterns to exclude from formatting and linting.
     ///
     /// Exclusions are based on globs, and can be either:
     ///
@@ -179,7 +178,7 @@ pub struct Options {
     )]
     pub exclude: Option<Vec<String>>,
 
-    /// A list of file patterns to omit from linting, in addition to those
+    /// A list of file patterns to omit from formatting and linting, in addition to those
     /// specified by `exclude`.
     ///
     /// Exclusions are based on globs, and can be either:
@@ -378,22 +377,57 @@ pub struct Options {
 
     /// The lint sections specified at the top level.
     #[serde(flatten)]
-    pub lint_top_level: LintOptions,
+    pub lint_top_level: LintCommonOptions,
 
-    /// Options to configure the code formatting.
-    ///
-    /// Previously:
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
-    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
-    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
-    ///
-    /// This option has been **deprecated** in favor of `output-format`
-    /// to avoid ambiguity with Ruff's upcoming formatter.
+    /// Options to configure code formatting.
     #[option_group]
-    pub format: Option<FormatOrOutputFormat>,
+    pub format: Option<FormatOptions>,
 }
+
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct LintOptions {
+    #[serde(flatten)]
+    pub common: LintCommonOptions,
+
+    /// A list of file patterns to exclude from linting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will
+    /// use unstable rules and fixes.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features.
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
+}
+
+// Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
+// is removed.
 
 /// Experimental section to configure Ruff's linting. This new section will eventually
 /// replace the top-level linting options.
@@ -404,7 +438,7 @@ pub struct Options {
     Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct LintOptions {
+pub struct LintCommonOptions {
     /// A list of allowed "confusable" Unicode characters to ignore when
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     #[option(
@@ -2390,6 +2424,11 @@ pub struct PylintOptions {
         example = r"max-public-methods = 20"
     )]
     pub max_public_methods: Option<usize>,
+
+    /// Maximum number of Boolean expressions allowed within a single `if` statement
+    /// (see: `PLR0916`).
+    #[option(default = r"5", value_type = "int", example = r"max-bool-expr = 5")]
+    pub max_bool_expr: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2400,6 +2439,7 @@ impl PylintOptions {
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
             max_args: self.max_args.unwrap_or(defaults.max_args),
+            max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
@@ -2465,42 +2505,40 @@ impl PyUpgradeOptions {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum FormatOrOutputFormat {
-    Format(FormatOptions),
-    OutputFormat(SerializationFormat),
-}
-
-impl FormatOrOutputFormat {
-    pub const fn as_output_format(&self) -> Option<SerializationFormat> {
-        match self {
-            FormatOrOutputFormat::Format(_) => None,
-            FormatOrOutputFormat::OutputFormat(format) => Some(*format),
-        }
-    }
-}
-
-impl OptionsMetadata for FormatOrOutputFormat {
-    fn record(visit: &mut dyn Visit) {
-        FormatOptions::record(visit);
-    }
-
-    fn documentation() -> Option<&'static str> {
-        FormatOptions::documentation()
-    }
-}
-
 /// Experimental: Configures how `ruff format` formats your code.
 ///
 /// Please provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct FormatOptions {
+    /// A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    ///
+    /// Note that you'll typically want to use
+    /// [`extend-exclude`](#extend-exclude) to modify the excluded paths.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+
     /// Whether to enable the unstable preview style formatting.
     #[option(
         default = "false",
@@ -2541,7 +2579,7 @@ pub struct FormatOptions {
     /// ```
     ///
     /// Ruff will change `a` to use single quotes when using `quote-style = "single"`. However,
-    /// `a` will be unchanged, as converting to single quotes would require the inner `'` to be
+    /// `b` will be unchanged, as converting to single quotes would require the inner `'` to be
     /// escaped, which leads to less readable code: `'It\'s monday morning'`.
     #[option(
         default = r#"double"#,

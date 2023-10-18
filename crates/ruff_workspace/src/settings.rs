@@ -111,6 +111,7 @@ impl FileResolverSettings {
 
 #[derive(CacheKey, Clone, Debug)]
 pub struct FormatterSettings {
+    pub exclude: FilePatternSet,
     pub preview: PreviewMode,
 
     pub line_width: LineWidth,
@@ -162,6 +163,7 @@ impl Default for FormatterSettings {
         let default_options = PyFormatOptions::default();
 
         Self {
+            exclude: FilePatternSet::default(),
             preview: ruff_python_formatter::PreviewMode::Disabled,
             line_width: default_options.line_width(),
             line_ending: LineEnding::Lf,

@@ -1,8 +1,8 @@
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};

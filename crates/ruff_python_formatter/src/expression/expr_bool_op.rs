@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 
 use crate::expression::binary_like::BinaryLike;

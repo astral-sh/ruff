@@ -54,7 +54,7 @@ impl<'a> Printer<'a> {
 
     /// Prints the passed in element as well as all its content,
     /// starting at the specified indentation level
-    #[tracing::instrument(name = "Printer::print", skip_all)]
+    #[tracing::instrument(level = "debug", name = "Printer::print", skip_all)]
     pub fn print_with_indent(
         mut self,
         document: &'a Document,
