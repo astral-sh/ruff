@@ -582,9 +582,9 @@ where
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                // The value in a `type` alias has annotation semantics, in that it's never
-                // evaluated at runtime.
-                self.visit_annotation(value);
+                self.deferred
+                    .type_param_definitions
+                    .push((value, self.semantic.snapshot()));
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -1389,9 +1389,14 @@ where
             }
         }
         // Step 2: Traversal
-        self.deferred
-            .type_param_definitions
-            .push((type_param, self.semantic.snapshot()));
+        if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+            bound: Some(bound), ..
+        }) = type_param
+        {
+            self.deferred
+                .type_param_definitions
+                .push((bound, self.semantic.snapshot()));
+        }
     }
 }
 
@@ -1766,12 +1771,9 @@ impl<'a> Checker<'a> {
             for (type_param, snapshot) in type_params {
                 self.semantic.restore(snapshot);
 
-                if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                    bound: Some(bound), ..
-                }) = type_param
-                {
-                    self.visit_annotation(bound);
-                }
+                self.semantic.flags |=
+                    SemanticModelFlags::TYPE_PARAM_DEFINITION | SemanticModelFlags::TYPE_DEFINITION;
+                self.visit_expr(type_param);
             }
         }
         self.semantic.restore(snapshot);
