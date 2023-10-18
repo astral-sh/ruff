@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+non_ascii_name.py:1:1: PLC2401 Symbol name contains a non-ASCII character, consider renaming it.
+  |
+1 | ápple_count: int = 1  # C2401
+  | ^^^^^^^^^^^ PLC2401
+2 | ápple_count += 2  # C2401
+3 | ápple_count = 3  # C2401
+  |
+
+non_ascii_name.py:2:1: PLC2401 Symbol name contains a non-ASCII character, consider renaming it.
+  |
+1 | ápple_count: int = 1  # C2401
+2 | ápple_count += 2  # C2401
+  | ^^^^^^^^^^^ PLC2401
+3 | ápple_count = 3  # C2401
+  |
+
+non_ascii_name.py:3:1: PLC2401 Symbol name contains a non-ASCII character, consider renaming it.
+  |
+1 | ápple_count: int = 1  # C2401
+2 | ápple_count += 2  # C2401
+3 | ápple_count = 3  # C2401
+  | ^^^^^^^^^^^ PLC2401
+4 | 
+5 | # this rule only works on assignment!
+  |
+
+
