@@ -17,7 +17,7 @@ Preview mode can be configured separately for linting and formatting. To only en
 preview = true
 ```
 
-To enable preview style formatting without enabling any preview lint rules
+To enable preview style formatting without enabling any preview lint rules:
 
 ```toml
 [format]
