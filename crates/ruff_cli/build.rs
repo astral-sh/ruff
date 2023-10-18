@@ -17,7 +17,7 @@ fn commit_info() {
         .output()
     {
         Ok(output) if output.status.success() => output,
-        foo => foo.unwrap(),
+        _ => return,
     };
     let stdout = String::from_utf8(output.stdout).unwrap();
     let mut parts = stdout.split_whitespace();
