@@ -51,6 +51,9 @@ fn format_options() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
+tab-size = 8
+line-length = 84
+
 [format]
 indent-style = "tab"
 quote-style = "single"
@@ -65,7 +68,7 @@ line-ending = "cr-lf"
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
-    print("Shouldn't change quotes")
+    print("Shouldn't change quotes. It exceeds the line width with the tab size 8")
 
 
 if condition:
@@ -77,7 +80,9 @@ if condition:
     exit_code: 0
     ----- stdout -----
     def foo(arg1, arg2):
-    	print("Shouldn't change quotes")
+    	print(
+    		"Shouldn't change quotes. It exceeds the line width with the tab size 8"
+    	)
 
 
     if condition:

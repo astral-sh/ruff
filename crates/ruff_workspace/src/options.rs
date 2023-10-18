@@ -363,7 +363,11 @@ pub struct Options {
     )]
     pub line_length: Option<LineLength>,
 
-    /// The tabulation size to calculate line length.
+    /// The number of spaces a tab is equal to when enforcing long-line violations (like `E501`)
+    /// or formatting code with the formatter.
+    ///
+    /// This option changes the number of spaces inserted by the formatter when
+    /// using soft-tabs (`indent-style = space`).
     #[option(
         default = "4",
         value_type = "int",
