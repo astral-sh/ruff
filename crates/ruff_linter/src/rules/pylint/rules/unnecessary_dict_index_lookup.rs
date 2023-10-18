@@ -88,6 +88,14 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
             Stmt::Assign(ast::StmtAssign { value, .. }) => {
                 self.visit_expr(value);
             }
+            Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => {
+                if let Some(value) = value {
+                    self.visit_expr(value);
+                }
+            }
+            Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => {
+                self.visit_expr(value);
+            }
             _ => visitor::walk_stmt(self, stmt),
         }
     }
