@@ -53,20 +53,14 @@ impl AlwaysFixableViolation for EscapeSequenceInDocstring {
     }
 
     fn fix_title(&self) -> String {
-        format!(r#"Prefix docstring with `r`"#)
+        format!(r#"Add `r` prefix"#)
     }
 }
 
 /// D301
 pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     // Docstring is already raw.
-
-    let prefixes = docstring
-        .leading_quote()
-        .trim_end_matches(|c| c == '\'' || c == '"')
-        .to_owned();
-
-    if prefixes.contains(|c| c == 'r' || c == 'R') {
+    if docstring.leading_quote().contains(['r', 'R']) {
         return;
     }
 

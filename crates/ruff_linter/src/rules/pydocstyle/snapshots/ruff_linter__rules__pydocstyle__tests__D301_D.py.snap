@@ -8,7 +8,7 @@ D.py:333:5: D301 [*] Use `r"""` if any backslashes in a docstring
 333 |     """Sum\\mary."""
     |     ^^^^^^^^^^^^^^^^ D301
     |
-    = help: Prefix docstring with `r`
+    = help: Add `r` prefix
 
 ℹ Suggested fix
 330 330 | 
