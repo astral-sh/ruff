@@ -88,6 +88,10 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     name: "cargo test | ${{ matrix.os }}"
+    env:
+      CARGO_INCREMENTAL: 0
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -96,7 +100,10 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-insta
-      - uses: Swatinem/rust-cache@v2
+      - name: Set up basic Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.3
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: cargo insta test --all --all-features --unreferenced reject
