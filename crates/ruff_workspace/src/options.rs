@@ -471,9 +471,6 @@ pub struct LintCommonOptions {
 
     /// A list of rule codes or prefixes to ignore, in addition to those
     /// specified by `ignore`.
-    ///
-    /// This option has been **deprecated** in favor of `ignore`
-    /// since its usage is now interchangeable with `ignore`.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -482,7 +479,9 @@ pub struct LintCommonOptions {
             extend-ignore = ["F841"]
         "#
     )]
-    #[cfg_attr(feature = "schemars", schemars(skip))]
+    #[deprecated(
+        note = "The `extend-ignore` option is now interchangeable with `ignore`. Please update your configuration to use the `ignore` option instead."
+    )]
     pub extend_ignore: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes or prefixes to enable, in addition to those
@@ -511,10 +510,9 @@ pub struct LintCommonOptions {
 
     /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
     /// specified by `unfixable`.
-    ///
-    /// This option has been **deprecated** in favor of `unfixable` since its usage is now
-    /// interchangeable with `unfixable`.
-    #[cfg_attr(feature = "schemars", schemars(skip))]
+    #[deprecated(
+        note = "The `extend-unfixable` option is now interchangeable with `unfixable`. Please update your configuration to use the `unfixable` option instead."
+    )]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes that are unsupported by Ruff, but should be
