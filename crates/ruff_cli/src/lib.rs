@@ -29,10 +29,7 @@ mod panic;
 mod printer;
 pub mod resolve;
 mod stdin;
-
-use shadow_rs::shadow;
-
-shadow!(build);
+mod version;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {

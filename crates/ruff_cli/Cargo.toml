@@ -62,10 +62,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 walkdir = { version = "2.3.2" }
 wild = { version = "2" }
-shadow-rs = { version = "0.24.1" }
-
-[build-dependencies]
-shadow-rs = { version = "0.24.1" }
 
 [dev-dependencies]
 assert_cmd = { version = "2.0.8" }

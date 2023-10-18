@@ -35,7 +35,7 @@ pub struct Args {
 pub enum Command {
     /// Run Ruff on the given files or directories (default).
     Check(CheckCommand),
-    /// Display full Ruff version information
+    /// Display Ruff's version
     Version {
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,
