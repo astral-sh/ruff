@@ -545,6 +545,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
 
             for alias in names {
                 if let Some(asname) = &alias.asname {
+                    if checker.enabled(Rule::NonAsciiImportName) {
+                        pylint::rules::non_ascii_import_name(checker, asname);
+                    }
                     if checker.enabled(Rule::BuiltinVariableShadowing) {
                         flake8_builtins::rules::builtin_variable_shadowing(
                             checker,
@@ -713,6 +716,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.settings.target_version >= PythonVersion::Py37 {
                     if let Some("__future__") = module {
                         pyupgrade::rules::unnecessary_future_import(checker, stmt, names);
+                    }
+                }
+            }
+            if checker.enabled(Rule::NonAsciiImportName) {
+                for name in names {
+                    if let Some(asname) = name.asname.as_ref() {
+                        pylint::rules::non_ascii_import_name(checker, asname);
                     }
                 }
             }

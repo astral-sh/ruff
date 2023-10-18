@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+non_ascii_import_name.py:2:29: PLC2403 Symbol name contains a non-ASCII character, consider renaming it.
+  |
+1 | from os.path import join as los  # Ok
+2 | from os.path import join as łos  # Error
+  |                             ^^^ PLC2403
+3 | 
+4 | import os.path.join as łos  # Error
+  |
+
+non_ascii_import_name.py:4:24: PLC2403 Symbol name contains a non-ASCII character, consider renaming it.
+  |
+2 | from os.path import join as łos  # Error
+3 | 
+4 | import os.path.join as łos  # Error
+  |                        ^^^ PLC2403
+5 | import os.path.join as los  # Ok
+  |
+
+
