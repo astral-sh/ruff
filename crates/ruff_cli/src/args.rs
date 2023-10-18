@@ -353,6 +353,10 @@ pub struct FormatCommand {
     /// files would have been modified, and zero otherwise.
     #[arg(long)]
     pub check: bool,
+    /// Avoid writing any formatted files back; instead, exit with a non-zero status code and the
+    /// difference between the current file and how the formatted file would look like.
+    #[arg(long)]
+    pub diff: bool,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
@@ -520,6 +524,7 @@ impl FormatCommand {
         (
             FormatArguments {
                 check: self.check,
+                diff: self.diff,
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
@@ -577,6 +582,7 @@ pub struct CheckArguments {
 #[allow(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
+    pub diff: bool,
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,

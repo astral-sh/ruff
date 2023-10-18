@@ -3,6 +3,8 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::error;
+use ruff_linter::fs;
+use similar::TextDiff;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -10,7 +12,9 @@ use ruff_workspace::resolver::{match_exclusion, python_file_at_path};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
-use crate::commands::format::{format_source, FormatCommandError, FormatMode, FormatResult};
+use crate::commands::format::{
+    format_source, FormatCommandError, FormatMode, FormatResult, FormattedSource,
+};
 use crate::resolve::resolve;
 use crate::stdin::read_from_stdin;
 use crate::ExitStatus;
@@ -23,11 +27,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
         overrides,
         cli.stdin_filename.as_deref(),
     )?;
-    let mode = if cli.check {
-        FormatMode::Check
-    } else {
-        FormatMode::Write
-    };
+    let mode = FormatMode::from_cli(cli);
 
     if let Some(filename) = cli.stdin_filename.as_deref() {
         if !python_file_at_path(filename, &pyproject_config, overrides)? {
@@ -58,7 +58,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
     ) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
-            FormatMode::Check => {
+            FormatMode::Check | FormatMode::Diff => {
                 if result.is_formatted() {
                     Ok(ExitStatus::Failure)
                 } else {
@@ -93,15 +93,37 @@ fn format_source_code(
     };
 
     // Format the source.
-    let formatted = format_source(source_kind, source_type, path, settings)?;
+    let formatted = format_source(&source_kind, source_type, path, settings)?;
 
-    // Write to stdout regardless of whether the source was formatted.
-    if mode.is_write() {
-        let mut writer = stdout().lock();
-        formatted
-            .source_kind()
-            .write(&mut writer)
-            .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
+    match &formatted {
+        FormattedSource::Formatted(formatted) => match mode {
+            FormatMode::Write => {
+                let mut writer = stdout().lock();
+                formatted
+                    .write(&mut writer)
+                    .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
+            }
+            FormatMode::Check => {}
+            FormatMode::Diff => {
+                let mut writer = stdout().lock();
+                let text_diff =
+                    TextDiff::from_lines(source_kind.source_code(), formatted.source_code());
+                let mut unified_diff = text_diff.unified_diff();
+                if let Some(path) = path {
+                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                }
+                unified_diff.to_writer(&mut writer).unwrap();
+            }
+        },
+        FormattedSource::Unchanged => {
+            // Write to stdout regardless of whether the source was formatted
+            if mode.is_write() {
+                let mut writer = stdout().lock();
+                source_kind
+                    .write(&mut writer)
+                    .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
+            }
+        }
     }
 
     Ok(FormatResult::from(formatted))
