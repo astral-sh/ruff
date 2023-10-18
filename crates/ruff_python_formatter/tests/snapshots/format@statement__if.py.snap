@@ -410,6 +410,7 @@ else:
         pass
         # 3
 
+
 if True:
     print("a")  # 1
 elif True:
