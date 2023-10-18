@@ -249,7 +249,8 @@ if True:
     print()
 
 
-# NOTE: Please keep this the last block in this file
+# NOTE: Please keep this the last block in this file. This tests that we don't insert empty line at the end of the file
+# due to nested functions
 if True:
     def nested_trailing_function():
         pass
