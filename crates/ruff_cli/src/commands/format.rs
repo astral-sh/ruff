@@ -99,11 +99,14 @@ pub(crate) fn format(
                     }
 
                     // Extract the sources from the file.
-                    let unformatted = match SourceKind::from_path(&path, source_type) {
+                    let unformatted = match SourceKind::from_path(path, source_type) {
                         Ok(Some(source_kind)) => source_kind,
                         Ok(None) => return None,
                         Err(err) => {
-                            return Some(Err(FormatCommandError::Read(Some(path), err)));
+                            return Some(Err(FormatCommandError::Read(
+                                Some(path.to_path_buf()),
+                                err,
+                            )));
                         }
                     };
 
