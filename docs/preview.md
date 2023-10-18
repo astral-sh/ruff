@@ -10,7 +10,7 @@ Preview mode enables a collection of newer rules and fixes that are considered e
 Preview mode can be enabled with the `--preview` flag on the CLI or by setting `preview = true` in your Ruff
 configuration file (e.g. `pyproject.toml`).
 
-Preview mode can be configured separately for linting and formatting (Ruff version 0.1.1 or newer). To enable preview lint rules without preview style formatting:
+Preview mode can be configured separately for linting and formatting (requires Ruff v0.1.1+). To enable preview lint rules without preview style formatting:
 
 ```toml
 [lint]
