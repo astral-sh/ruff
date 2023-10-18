@@ -1252,8 +1252,8 @@ fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
             ])
             .pass_stdin("def add_to_list(item, some_list=[]): ..."),
             @r###"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
@@ -1276,8 +1276,8 @@ fn diff_only_unsafe_fixes_available() {
         ])
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
