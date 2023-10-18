@@ -80,7 +80,7 @@ pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     }) {
         let mut diagnostic = Diagnostic::new(EscapeSequenceInDocstring, docstring.range());
 
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "r".to_owned() + docstring.contents,
             docstring.range(),
         )));
