@@ -1,0 +1,11 @@
+[project]
+requires-python = ">=3.10"
+
+[tool.ruff]
+extend-select = [
+  "UP",  # pyupgrade
+  "D",   # pydocstyle
+]
+
+[tool.ruff.pydocstyle]
+convention = "google"

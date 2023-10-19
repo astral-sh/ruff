@@ -16,13 +16,13 @@ numbers
 Where `numbers.py` contains the following code:
 
 ```py
-from typing import List
+from typing import Sequence
 
 import os
 
 
-def sum_even_numbers(numbers: List[int]) -> int:
-    """Given a list of integers, return the sum of all even numbers in the list."""
+def sum_even_numbers(numbers: Sequence[int]) -> int:
+    """Given a sequence of integers, return the sum of all even numbers in the sequence."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
@@ -32,17 +32,17 @@ To start, we'll install Ruff through PyPI (or with your [preferred package manag
 > pip install ruff
 ```
 
-We can then run Ruff over our project via:
+We can then run Ruff over our project via `ruff check`:
 
 ```shell
 ❯ ruff check .
 numbers/numbers.py:3:8: F401 [*] `os` imported but unused
 Found 1 error.
-[*] 1 potentially fixable with the --fix option.
+[*] 1 fixable with the `--fix` option.
 ```
 
 Ruff identified an unused import, which is a common error in Python code. Ruff considers this a
-"fixable" error, so we can resolve the issue automatically by running:
+"fixable" error, so we can resolve the issue automatically by running `ruff check --fix`:
 
 ```shell
 ❯ ruff check --fix .
@@ -55,13 +55,13 @@ Running `git diff` shows the following:
 --- a/numbers/numbers.py
 +++ b/numbers/numbers.py
 @@ -1,7 +1,5 @@
- from typing import List
+ from typing import Sequence
 
 -import os
 -
 
-def sum_even_numbers(numbers: List[int]) -> int:
-    """Given a list of integers, return the sum of all even numbers in the list."""
+def sum_even_numbers(numbers: Sequence[int]) -> int:
+    """Given a sequence of integers, return the sum of all even numbers in the sequence."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
@@ -77,7 +77,9 @@ Let's create a `pyproject.toml` file in our project's root directory:
 
 ```toml
 [tool.ruff]
-# Decrease the maximum line length to 79 characters.
+# Add the `line-too-long` rule to the enforced rule set.
+extend-select = ["E501"]
+# Set the maximum line length to 79 characters.
 line-length = 79
 ```
 
@@ -85,7 +87,7 @@ Running Ruff again, we can see that it now enforces a line length of 79 characte
 
 ```shell
 ❯ ruff check .
-numbers/numbers.py:6:80: E501 Line too long (83 > 79 characters)
+numbers/numbers.py:5:80: E501 Line too long (90 > 79 characters)
 Found 1 error.
 ```
 
@@ -98,9 +100,10 @@ specifically, we'll want to make note of the minimum supported Python version:
 requires-python = ">=3.10"
 
 [tool.ruff]
-# Decrease the maximum line length to 79 characters.
+# Add the `line-too-long` rule to the enforced rule set.
+extend-select = ["E501"]
+# Set the maximum line length to 79 characters.
 line-length = 79
-src = ["src"]
 ```
 
 ### Rule Selection
@@ -109,8 +112,8 @@ Ruff supports [over 700 lint rules](rules.md) split across over 50 built-in plug
 determining the right set of rules will depend on your project's needs: some rules may be too
 strict, some are framework-specific, and so on.
 
-By default, Ruff enforces the `E`- and `F`-prefixed rules, which correspond to those derived from
-pycodestyle and Pyflakes, respectively.
+By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting the
+stylistic rules that conflict with the use of a formatter, like [Black](https://github.com/psf/black).
 
 If you're introducing a linter for the first time, **the default rule set is a great place to
 start**: it's narrow and focused while catching a wide variety of common errors (like unused
@@ -118,36 +121,37 @@ imports) with zero configuration.
 
 If you're migrating to Ruff from another linter, you can enable rules that are equivalent to
 those enforced in your previous configuration. For example, if we want to enforce the pyupgrade
-rules, we can add the following to our `pyproject.toml`:
+rules, we can set our `pyproject.toml` to the following:
 
 ```toml
+[project]
+requires-python = ">=3.10"
+
 [tool.ruff]
-select = [
-  "E",   # pycodestyle
-  "F",   # pyflakes
+extend-select = [
   "UP",  # pyupgrade
 ]
 ```
 
 If we run Ruff again, we'll see that it now enforces the pyupgrade rules. In particular, Ruff flags
-the use of `List` instead of its standard-library variant:
+the use of the deprecated `typing.Sequence` instead of `collections.abc.Sequence`:
 
 ```shell
 ❯ ruff check .
-numbers/numbers.py:5:31: UP006 [*] Use `list` instead of `List` for type annotations
-numbers/numbers.py:6:80: E501 Line too long (83 > 79 characters)
-Found 2 errors.
-[*] 1 potentially fixable with the --fix option.
+numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
 ```
 
 Over time, we may choose to enforce additional rules. For example, we may want to enforce that
 all functions have docstrings:
 
 ```toml
+[project]
+requires-python = ">=3.10"
+
 [tool.ruff]
-select = [
-  "E",   # pycodestyle
-  "F",   # pyflakes
+extend-select = [
   "UP",  # pyupgrade
   "D",   # pydocstyle
 ]
@@ -161,34 +165,32 @@ If we run Ruff again, we'll see that it now enforces the pydocstyle rules:
 ```shell
 ❯ ruff check .
 numbers/__init__.py:1:1: D104 Missing docstring in public package
+numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
 numbers/numbers.py:1:1: D100 Missing docstring in public module
-numbers/numbers.py:5:31: UP006 [*] Use `list` instead of `List` for type annotations
-numbers/numbers.py:5:80: E501 Line too long (83 > 79 characters)
 Found 3 errors.
-[*] 1 potentially fixable with the --fix option.
+[*] 1 fixable with the `--fix` option.
 ```
 
 ### Ignoring Errors
 
 Any lint rule can be ignored by adding a `# noqa` comment to the line in question. For example,
-let's ignore the `UP006` rule for the `List` import:
+let's ignore the `UP035` rule for the `Sequence` import:
 
 ```py
-from typing import List
+from typing import Sequence  # noqa: UP035
 
 
-def sum_even_numbers(numbers: List[int]) -> int:  # noqa: UP006
-    """Given a list of integers, return the sum of all even numbers in the list."""
+def sum_even_numbers(numbers: Sequence[int]) -> int:
+    """Given a sequence of integers, return the sum of all even numbers in the sequence."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-Running Ruff again, we'll see that it no longer flags the `List` import:
+Running Ruff again, we'll see that it no longer flags the `Sequence` import:
 
 ```shell
 ❯ ruff check .
 numbers/__init__.py:1:1: D104 Missing docstring in public package
 numbers/numbers.py:1:1: D100 Missing docstring in public module
-numbers/numbers.py:5:80: E501 Line too long (83 > 79 characters)
 Found 3 errors.
 ```
 
@@ -196,17 +198,16 @@ If we want to ignore a rule for an entire file, we can add a `# ruff: noqa` comm
 the file:
 
 ```py
-# ruff: noqa: UP006
-from typing import List
+# ruff: noqa: UP035
+from typing import Sequence
 
 
-def sum_even_numbers(numbers: List[int]) -> int:
-    """Given a list of integers, return the sum of all even numbers in the list."""
+def sum_even_numbers(numbers: Sequence[int]) -> int:
+    """Given a sequence of integers, return the sum of all even numbers in the sequence."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-For more in-depth instructions on ignoring errors,
-please see [_Configuration_](configuration.md#error-suppression).
+For more in-depth instructions on ignoring errors, see [_Configuration_](configuration.md#error-suppression).
 
 ### Adding Rules
 
@@ -215,10 +216,10 @@ violations of that rule and instead focus on enforcing it going forward.
 
 Ruff enables this workflow via the `--add-noqa` flag, which will adds a `# noqa` directive to each
 line based on its existing violations. We can combine `--add-noqa` with the `--select` command-line
-flag to add `# noqa` directives to all existing `UP006` violations:
+flag to add `# noqa` directives to all existing `UP035` violations:
 
 ```shell
-❯ ruff check --select UP006 --add-noqa .
+❯ ruff check --select UP035 --add-noqa .
 Added 1 noqa directive.
 ```
 
@@ -229,14 +230,12 @@ diff --git a/tutorial/src/main.py b/tutorial/src/main.py
 index b9291c5ca..b9f15b8c1 100644
 --- a/numbers/numbers.py
 +++ b/numbers/numbers.py
-@@ -1,6 +1,6 @@
- from typing import List
+@@ -1,4 +1,4 @@
+-from typing import Sequence
++from typing import Sequence  # noqa: UP035
 
 
--def sum_even_numbers(numbers: List[int]) -> int:
-+def sum_even_numbers(numbers: List[int]) -> int:  # noqa: UP006
-     """Given a list of integers, return the sum of all even numbers in the list."""
-     return sum(num for num in numbers if num % 2 == 0)
+ def sum_even_numbers(numbers: Sequence[int]) -> int:
 ```
 
 ## Continuous Integration
