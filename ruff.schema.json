@@ -708,8 +708,7 @@
         "complex",
         "float",
         "int",
-        "str",
-        "tuple"
+        "str"
       ]
     },
     "Convention": {
