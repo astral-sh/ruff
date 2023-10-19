@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Constant, ElifElseClause, Expr, ExprContext, Stmt};
+use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -48,16 +49,14 @@ impl Violation for NeedlessBool {
 }
 
 /// SIM103
-pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf {
+pub(crate) fn needless_bool(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+    let ast::StmtIf {
         test: if_test,
         body: if_body,
         elif_else_clauses,
         range: _,
-    }) = stmt
-    else {
-        return;
-    };
+    } = stmt_if;
+
     // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
     let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
         // if-else case
@@ -65,7 +64,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             body: else_body,
             test: None,
             ..
-        }] => (if_test.as_ref(), if_body, else_body, stmt.range()),
+        }] => (if_test.as_ref(), if_body, else_body, stmt_if.range()),
         // elif-else case
         [.., ElifElseClause {
             body: elif_body,
@@ -94,6 +93,16 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     // If the branches have the same condition, abort (although the code could be
     // simplified).
     if if_return == else_return {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
+    if is_sys_version_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
+    if is_type_checking_block(stmt_if, checker.semantic()) {
         return;
     }
 

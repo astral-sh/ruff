@@ -1044,16 +1044,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_simplify::rules::if_with_same_arms(checker, checker.locator, if_);
             }
             if checker.enabled(Rule::NeedlessBool) {
-                flake8_simplify::rules::needless_bool(checker, stmt);
+                flake8_simplify::rules::needless_bool(checker, if_);
             }
             if checker.enabled(Rule::IfElseBlockInsteadOfDictLookup) {
-                flake8_simplify::rules::manual_dict_lookup(checker, if_);
+                flake8_simplify::rules::if_else_block_instead_of_dict_lookup(checker, if_);
             }
             if checker.enabled(Rule::IfElseBlockInsteadOfIfExp) {
-                flake8_simplify::rules::use_ternary_operator(checker, stmt);
+                flake8_simplify::rules::if_else_block_instead_of_if_exp(checker, if_);
             }
             if checker.enabled(Rule::IfElseBlockInsteadOfDictGet) {
-                flake8_simplify::rules::use_dict_get_with_default(checker, if_);
+                flake8_simplify::rules::if_else_block_instead_of_dict_get(checker, if_);
             }
             if checker.enabled(Rule::TypeCheckWithoutTypeError) {
                 tryceratops::rules::type_check_without_type_error(
