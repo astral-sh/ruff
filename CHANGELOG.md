@@ -1,10 +1,54 @@
 # Changelog
 
+## 0.1.1
+
+### Rule changes
+- Add unsafe fix for `escape-sequence-in-docstring` (`D301`) (#7970)
+- Add fix for `triple-single-quotes` (`D300`) (#7967)
+
+### Configuration
+- Respect `#(deprecated)` attribute in configuration options (#8035)
+- Add `[format|lint].exclude` options (#8000)
+- Respect `tab-size` setting in formatter (#8006)
+- Add `lint.preview` (#8002)
+
+## Preview features
+- [`pylint`] Implement `literal-membership` (`PLR6201`) (#7973)
+- [`pylint`] Implement `too-many-boolean-expressions` (`PLR0916`) (#7975)
+- [`pylint`] Implement `misplaced-bare-raise` (`E0704`) (#7961)
+- [`pylint`] Implement `global-at-module-level` (`W0604`) (#8058)
+- [`pylint`] Implement `unspecified-encoding` (`PLW1514`) (#7939)
+
+
+### Formatter
+- New code style badge for `ruff format` (#7878)
+- Fix comments outside expression parentheses (#7873)
+- Add `--target-version` to `ruff format` (#8055)
+- Skip over parentheses when detecting `in` keyword (#8054)
+- Add `--diff` option to `ruff format` (#7937)
+- Insert newline after nested function or class statements (#7946)
+- Use `pass` over ellipsis in non-function/class contexts (#8049)
+
+### Bug fixes
+- Lazily evaluate all PEP 695 type alias values (#8033)
+- Avoid failed assertion when showing fixes from stdin (#8029)
+- Avoid flagging HTTP and HTTPS literals in urllib-open (#8046)
+- Avoid flagging `bad-dunder-method-name` for `_` (#8015)
+- Remove Python 2-only methods from `URLOpen` audit (#8047)
+- Use set bracket replacement for `iteration-over-set` to preserve whitespace and comments (#8001)
+
+### Documentation
+- Update tutorial to match revised Ruff defaults (#8066)
+- Update rule `B005` docs (#8028)
+- Update GitHub actions example in docs to use `--output-format` (#8014)
+- Document `lint.preview` and `format.preview` (#8032)
+- Clarify that new rules should be added to `RuleGroup::Preview`. (#7989)
+
+## 0.1.0
+
 This is the first release which uses the `CHANGELOG` file. See [GitHub Releases](https://github.com/astral-sh/ruff/releases) for prior changelog entries.
 
 Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
-
-## 0.1.0
 
 ### Breaking changes
 
