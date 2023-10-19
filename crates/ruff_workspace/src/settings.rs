@@ -168,7 +168,7 @@ impl Default for FormatterSettings {
             exclude: FilePatternSet::default(),
             preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),
-            line_ending: LineEnding::Lf,
+            line_ending: LineEnding::Auto,
             indent_style: default_options.indent_style(),
             indent_width: default_options.indent_width(),
             quote_style: default_options.quote_style(),
@@ -183,17 +183,17 @@ impl Default for FormatterSettings {
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum LineEnding {
-    ///  Line endings will be converted to `\n` as is common on Unix.
+    /// The newline style is detected automatically on a file per file basis.
+    /// Files with mixed line endings will be converted to the first detected line ending.
+    /// Defaults to [`LineEnding::Lf`] for a files that contain no line endings.
     #[default]
+    Auto,
+
+    ///  Line endings will be converted to `\n` as is common on Unix.
     Lf,
 
     /// Line endings will be converted to `\r\n` as is common on Windows.
     CrLf,
-
-    /// The newline style is detected automatically on a file per file basis.
-    /// Files with mixed line endings will be converted to the first detected line ending.
-    /// Defaults to [`LineEnding::Lf`] for a files that contain no line endings.
-    Auto,
 
     /// Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     Native,
