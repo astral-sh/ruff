@@ -4,7 +4,6 @@
 
 ### Rule changes
 - Add unsafe fix for `escape-sequence-in-docstring` (`D301`) (#7970)
-- Add fix for `triple-single-quotes` (`D300`) (#7967)
 
 ### Configuration
 - Respect `#(deprecated)` attribute in configuration options (#8035)
@@ -18,6 +17,7 @@
 - [`pylint`] Implement `misplaced-bare-raise` (`E0704`) (#7961)
 - [`pylint`] Implement `global-at-module-level` (`W0604`) (#8058)
 - [`pylint`] Implement `unspecified-encoding` (`PLW1514`) (#7939)
+- Add fix for `triple-single-quotes` (`D300`) (#7967)
 
 
 ### Formatter
