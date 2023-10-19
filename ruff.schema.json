@@ -1253,7 +1253,7 @@
           ]
         },
         "line-ending": {
-          "description": "The character Ruff uses at the end of a line.\n\n* `lf`: Line endings will be converted to `\\n`. The default line ending on Unix. * `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows. * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings. * `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
+          "description": "The character Ruff uses at the end of a line.\n\n* `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings. * `lf`: Line endings will be converted to `\\n`. The default line ending on Unix. * `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows. * `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineEnding"
@@ -1565,6 +1565,13 @@
     "LineEnding": {
       "oneOf": [
         {
+          "description": "The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to [`LineEnding::Lf`] for a files that contain no line endings.",
+          "type": "string",
+          "enum": [
+            "auto"
+          ]
+        },
+        {
           "description": "Line endings will be converted to `\\n` as is common on Unix.",
           "type": "string",
           "enum": [
@@ -1576,13 +1583,6 @@
           "type": "string",
           "enum": [
             "cr-lf"
-          ]
-        },
-        {
-          "description": "The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to [`LineEnding::Lf`] for a files that contain no line endings.",
-          "type": "string",
-          "enum": [
-            "auto"
           ]
         },
         {

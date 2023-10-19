@@ -2623,16 +2623,16 @@ pub struct FormatOptions {
 
     /// The character Ruff uses at the end of a line.
     ///
+    /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.
     /// * `lf`: Line endings will be converted to `\n`. The default line ending on Unix.
     /// * `cr-lf`: Line endings will be converted to `\r\n`. The default line ending on Windows.
-    /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.
     /// * `native`: Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     #[option(
-        default = r#"lf"#,
-        value_type = r#""lf" | "cr-lf" | "auto" | "native""#,
+        default = r#"auto"#,
+        value_type = r#""auto" | "lf" | "cr-lf" | "native""#,
         example = r#"
-            # Automatically detect the line ending on a file per file basis.
-            line-ending = "auto"
+            # Use `\n` line endings for all files
+            line-ending = "lf"
         "#
     )]
     pub line_ending: Option<LineEnding>,

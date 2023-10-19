@@ -95,6 +95,35 @@ if condition:
 }
 
 #[test]
+fn mixed_line_endings() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n",
+    )?;
+
+    fs::write(
+        tempdir.path().join("test.py"),
+        "def say_hy(name: str):\r\n    print(f\"Hy {name}\")\r\n",
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--diff", "--isolated"])
+        .arg("."), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    2 files left unchanged
+    "###);
+    Ok(())
+}
+
+#[test]
 fn exclude() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
