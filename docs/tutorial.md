@@ -249,7 +249,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.0
+  rev: v0.1.1
   hooks:
     - id: ruff
 ```
