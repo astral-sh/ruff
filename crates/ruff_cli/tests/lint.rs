@@ -278,11 +278,11 @@ fn line_too_long_width_override() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
-line-width = 80
+line-length = 80
 select = ["E501"]
 
 [pycodestyle]
-max-line-width = 100
+max-line-length = 100
 "#,
     )?;
 
@@ -293,15 +293,15 @@ max-line-width = 100
         .args(["--stdin-filename", "test.py"])
         .arg("-")
         .pass_stdin(r#"
-# wider than 80, but less than 100
+# longer than 80, but less than 100
 _ = "---------------------------------------------------------------------------亜亜亜亜亜亜"
-# wider than 100
+# longer than 100
 _ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜亜亜亜亜亜亜亜"
 "#), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:5:91: E501 Line too long (109 > 100 width)
+    test.py:5:91: E501 Line too long (109 > 100)
     Found 1 error.
 
     ----- stderr -----

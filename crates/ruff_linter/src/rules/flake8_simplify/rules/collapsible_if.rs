@@ -128,7 +128,7 @@ pub(crate) fn nested_if_statements(
                         content,
                         (&nested_if).into(),
                         checker.locator(),
-                        checker.settings.line_length,
+                        checker.settings.pycodestyle.max_line_length,
                         checker.settings.tab_size,
                     )
                 }) {

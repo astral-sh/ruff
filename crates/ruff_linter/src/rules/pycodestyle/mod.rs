@@ -231,7 +231,7 @@ mod tests {
             &settings::LinterSettings {
                 tab_size: NonZeroU8::new(tab_size).unwrap().into(),
                 pycodestyle: pycodestyle::settings::Settings {
-                    max_line_width: LineLength::try_from(6).unwrap(),
+                    max_line_length: LineLength::try_from(6).unwrap(),
                     ..pycodestyle::settings::Settings::default()
                 },
                 ..settings::LinterSettings::for_rule(Rule::LineTooLong)

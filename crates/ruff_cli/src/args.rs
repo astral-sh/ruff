@@ -689,7 +689,7 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(line_length) = self.line_length {
             config.line_length = Some(line_length);
             config.lint.pycodestyle = Some(PycodestyleOptions {
-                max_line_width: Some(line_length),
+                max_line_length: Some(line_length),
                 ..config.lint.pycodestyle.unwrap_or_default()
             });
         }
