@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+non_ascii_file_name_à.py:1:1: PLW2402 File name contains a non-ASCII character, consider renaming it.
+  |
+1 | # file intentionally left blank
+  |  PLW2402
+  |
+
+

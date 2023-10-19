@@ -5,6 +5,7 @@ use ruff_diagnostics::Diagnostic;
 use crate::registry::Rule;
 use crate::rules::flake8_no_pep420::rules::implicit_namespace_package;
 use crate::rules::pep8_naming::rules::invalid_module_name;
+use crate::rules::pylint::rules::non_ascii_file_name;
 use crate::settings::LinterSettings;
 
 pub(crate) fn check_file_path(
@@ -28,6 +29,13 @@ pub(crate) fn check_file_path(
         if let Some(diagnostic) =
             invalid_module_name(path, package, &settings.pep8_naming.ignore_names)
         {
+            diagnostics.push(diagnostic);
+        }
+    }
+
+    // pylint-non-ascii-file-name
+    if settings.rules.enabled(Rule::NonAsciiFileName) {
+        if let Some(diagnostic) = non_ascii_file_name(path) {
             diagnostics.push(diagnostic);
         }
     }
