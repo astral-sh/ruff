@@ -1,13 +1,49 @@
-use std::process::Command;
+use std::{fs, path::Path, path::PathBuf, process::Command};
 
 fn main() {
-    commit_info();
+    // The workspace root directory is not available without walking up the tree
+    // https://github.com/rust-lang/cargo/issues/3946
+    let workspace_root = Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
+        .join("..")
+        .join("..");
+
+    commit_info(workspace_root);
+
     #[allow(clippy::disallowed_methods)]
     let target = std::env::var("TARGET").unwrap();
     println!("cargo:rustc-env=RUST_HOST_TARGET={target}");
 }
 
-fn commit_info() {
+fn commit_info(workspace_root: PathBuf) {
+    let git_dir = workspace_root.join(".git");
+    if !git_dir.exists() {
+        return;
+    }
+
+    let git_head_path = git_dir.join("HEAD");
+    println!(
+        "cargo:rerun-if-changed={}",
+        git_head_path.as_path().display()
+    );
+
+    let git_head_contents = fs::read_to_string(git_head_path);
+    if let Ok(git_head_contents) = git_head_contents {
+        // The contents are either a commit or a reference in the following formats
+        // "<commit>""
+        // "ref <ref>""
+        // If a commit, checking if the HEAD file has changed is sufficient
+        // If a ref we want to add the head file for that ref to rebuild on commit
+        let mut git_ref_parts = git_head_contents.split_whitespace();
+        git_ref_parts.next();
+        if let Some(git_ref) = git_ref_parts.next() {
+            let git_ref_path = git_dir.join(git_ref);
+            println!(
+                "cargo:rerun-if-changed={}",
+                git_ref_path.as_path().display()
+            );
+        }
+    }
+
     let output = match Command::new("git")
         .arg("log")
         .arg("-1")
