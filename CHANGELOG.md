@@ -3,24 +3,27 @@
 ## 0.1.1
 
 ### Rule changes
+
 - Add unsafe fix for `escape-sequence-in-docstring` (`D301`) (#7970)
 
 ### Configuration
+
 - Respect `#(deprecated)` attribute in configuration options (#8035)
 - Add `[format|lint].exclude` options (#8000)
 - Respect `tab-size` setting in formatter (#8006)
 - Add `lint.preview` (#8002)
 
 ## Preview features
-- [`pylint`] Implement `literal-membership` (`PLR6201`) (#7973)
-- [`pylint`] Implement `too-many-boolean-expressions` (`PLR0916`) (#7975)
-- [`pylint`] Implement `misplaced-bare-raise` (`E0704`) (#7961)
-- [`pylint`] Implement `global-at-module-level` (`W0604`) (#8058)
-- [`pylint`] Implement `unspecified-encoding` (`PLW1514`) (#7939)
+
+- \[`pylint`\] Implement `literal-membership` (`PLR6201`) (#7973)
+- \[`pylint`\] Implement `too-many-boolean-expressions` (`PLR0916`) (#7975)
+- \[`pylint`\] Implement `misplaced-bare-raise` (`E0704`) (#7961)
+- \[`pylint`\] Implement `global-at-module-level` (`W0604`) (#8058)
+- \[`pylint`\] Implement `unspecified-encoding` (`PLW1514`) (#7939)
 - Add fix for `triple-single-quotes` (`D300`) (#7967)
 
-
 ### Formatter
+
 - New code style badge for `ruff format` (#7878)
 - Fix comments outside expression parentheses (#7873)
 - Add `--target-version` to `ruff format` (#8055)
@@ -30,6 +33,7 @@
 - Use `pass` over ellipsis in non-function/class contexts (#8049)
 
 ### Bug fixes
+
 - Lazily evaluate all PEP 695 type alias values (#8033)
 - Avoid failed assertion when showing fixes from stdin (#8029)
 - Avoid flagging HTTP and HTTPS literals in urllib-open (#8046)
@@ -38,6 +42,7 @@
 - Use set bracket replacement for `iteration-over-set` to preserve whitespace and comments (#8001)
 
 ### Documentation
+
 - Update tutorial to match revised Ruff defaults (#8066)
 - Update rule `B005` docs (#8028)
 - Update GitHub actions example in docs to use `--output-format` (#8014)
