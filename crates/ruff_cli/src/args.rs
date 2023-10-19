@@ -365,6 +365,14 @@ pub struct FormatCommand {
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
+
+    /// Disable cache reads.
+    #[arg(short, long, help_heading = "Miscellaneous")]
+    pub no_cache: bool,
+    /// Path to the cache directory.
+    #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
+    pub cache_dir: Option<PathBuf>,
+
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -535,6 +543,7 @@ impl FormatCommand {
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
+                no_cache: self.no_cache,
                 stdin_filename: self.stdin_filename,
             },
             CliOverrides {
@@ -547,6 +556,8 @@ impl FormatCommand {
                 preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 target_version: self.target_version,
+                cache_dir: self.cache_dir,
+
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..CliOverrides::default()
             },
@@ -590,6 +601,7 @@ pub struct CheckArguments {
 #[allow(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
+    pub no_cache: bool,
     pub diff: bool,
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,

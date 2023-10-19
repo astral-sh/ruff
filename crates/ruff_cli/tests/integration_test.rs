@@ -1305,7 +1305,7 @@ extend-unsafe-fixes = ["UP034"]
         .args([
             "--output-format",
             "text",
-            "--no-cache", 
+            "--no-cache",
             "--select",
             "F601,UP034",
         ])
@@ -1344,7 +1344,7 @@ extend-safe-fixes = ["F601"]
         .args([
             "--output-format",
             "text",
-            "--no-cache", 
+            "--no-cache",
             "--select",
             "F601,UP034",
         ])

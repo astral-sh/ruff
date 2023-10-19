@@ -110,7 +110,7 @@ fn mixed_line_endings() -> Result<()> {
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--diff", "--isolated"])
+        .args(["format", "--no-cache", "--diff", "--isolated"])
         .arg("."), @r###"
     success: true
     exit_code: 0
@@ -173,7 +173,7 @@ OTHER = "OTHER"
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--check", "--config"])
+        .args(["format", "--no-cache", "--check", "--config"])
         .arg(ruff_toml.file_name().unwrap())
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
         .arg(test_path.file_name().unwrap())
@@ -322,7 +322,7 @@ format = "json"
 
 #[test]
 fn test_diff() {
-    let args = ["format", "--isolated", "--diff"];
+    let args = ["format", "--no-cache", "--isolated", "--diff"];
     let fixtures = Path::new("resources").join("test").join("fixtures");
     let paths = [
         fixtures.join("unformatted.py"),
@@ -365,7 +365,7 @@ fn test_diff() {
 
 #[test]
 fn test_diff_no_change() {
-    let args = ["format", "--isolated", "--diff"];
+    let args = ["format", "--no-cache", "--isolated", "--diff"];
     let fixtures = Path::new("resources").join("test").join("fixtures");
     let paths = [fixtures.join("unformatted.py")];
     insta::with_settings!({filters => vec![
