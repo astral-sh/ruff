@@ -250,7 +250,7 @@ fn format_with_parentheses_comments(
         Some((first, rest)) if first.line_position().is_end_of_line() => {
             (slice::from_ref(first), rest)
         }
-        _ => (Default::default(), node_comments.leading),
+        _ => (&[], node_comments.leading),
     };
 
     // Second Part: Format
