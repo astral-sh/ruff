@@ -567,6 +567,22 @@ pub struct LintConfiguration {
 
 impl LintConfiguration {
     fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
+        #[allow(deprecated)]
+        let ignore = options
+            .common
+            .ignore
+            .into_iter()
+            .flatten()
+            .chain(options.common.extend_ignore.into_iter().flatten())
+            .collect();
+        #[allow(deprecated)]
+        let unfixable = options
+            .common
+            .unfixable
+            .into_iter()
+            .flatten()
+            .chain(options.common.extend_unfixable.into_iter().flatten())
+            .collect();
         Ok(LintConfiguration {
             exclude: options.exclude.map(|paths| {
                 paths
@@ -581,22 +597,10 @@ impl LintConfiguration {
 
             rule_selections: vec![RuleSelection {
                 select: options.common.select,
-                ignore: options
-                    .common
-                    .ignore
-                    .into_iter()
-                    .flatten()
-                    .chain(options.common.extend_ignore.into_iter().flatten())
-                    .collect(),
+                ignore,
                 extend_select: options.common.extend_select.unwrap_or_default(),
                 fixable: options.common.fixable,
-                unfixable: options
-                    .common
-                    .unfixable
-                    .into_iter()
-                    .flatten()
-                    .chain(options.common.extend_unfixable.into_iter().flatten())
-                    .collect(),
+                unfixable,
                 extend_fixable: options.common.extend_fixable.unwrap_or_default(),
             }],
             extend_safe_fixes: options.common.extend_safe_fixes.unwrap_or_default(),

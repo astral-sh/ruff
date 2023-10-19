@@ -18,6 +18,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
             Ok(quote! {
                 impl crate::configuration::CombinePluginOptions for #ident {
                     fn combine(self, other: Self) -> Self {
+                        #[allow(deprecated)]
                         Self {
                         #(
                             #output
