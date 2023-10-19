@@ -29,10 +29,10 @@ fn commit_info(workspace_root: PathBuf) {
     let git_head_contents = fs::read_to_string(git_head_path);
     if let Ok(git_head_contents) = git_head_contents {
         // The contents are either a commit or a reference in the following formats
-        // "<commit>""
-        // "ref <ref>""
+        // - "<commit>" when the head is detached
+        // - "ref <ref>" when working on a branch
         // If a commit, checking if the HEAD file has changed is sufficient
-        // If a ref we want to add the head file for that ref to rebuild on commit
+        // If a ref, we need to add the head file for that ref to rebuild on commit
         let mut git_ref_parts = git_head_contents.split_whitespace();
         git_ref_parts.next();
         if let Some(git_ref) = git_ref_parts.next() {
