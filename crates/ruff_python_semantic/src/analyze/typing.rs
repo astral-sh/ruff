@@ -1,7 +1,7 @@
 //! Analysis rules for the `typing` module.
 
 use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
-use ruff_python_ast::helpers::{is_const_false, map_subscript};
+use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
 use ruff_python_ast::{
     self as ast, Constant, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt,
 };
@@ -302,7 +302,7 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     }
 }
 
-/// Return `true` if [`Expr`] is a guard for a type-checking block.
+/// Return `true` if [`ast::StmtIf`] is a guard for a type-checking block.
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
@@ -331,6 +331,17 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     }
 
     false
+}
+
+/// Returns `true` if the [`ast::StmtIf`] is a version-checking block (e.g., `if sys.version_info >= ...:`).
+pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
+    let ast::StmtIf { test, .. } = stmt;
+
+    any_over_expr(test, &|expr| {
+        semantic.resolve_call_path(expr).is_some_and(|call_path| {
+            matches!(call_path.as_slice(), ["sys", "version_info" | "platform"])
+        })
+    })
 }
 
 /// Abstraction for a type checker, conservatively checks for the intended type(s).
