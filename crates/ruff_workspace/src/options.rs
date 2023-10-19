@@ -2392,7 +2392,7 @@ pub struct PylintOptions {
     /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
     #[option(
         default = r#"["str", "bytes"]"#,
-        value_type = r#"list["str" | "bytes" | "complex" | "float" | "int" | "tuple"]"#,
+        value_type = r#"list["str" | "bytes" | "complex" | "float" | "int"]"#,
         example = r#"
             allow-magic-value-types = ["int"]
         "#

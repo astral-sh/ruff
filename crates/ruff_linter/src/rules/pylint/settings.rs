@@ -15,7 +15,6 @@ pub enum ConstantType {
     Float,
     Int,
     Str,
-    Tuple,
 }
 
 impl TryFrom<&Constant> for ConstantType {
