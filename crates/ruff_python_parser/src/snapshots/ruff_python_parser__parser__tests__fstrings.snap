@@ -13,16 +13,12 @@ expression: parse_ast
                         FormattedValue(
                             ExprFormattedValue {
                                 range: 2..8,
-                                value: Constant(
-                                    ExprConstant {
+                                value: StringLiteral(
+                                    ExprStringLiteral {
                                         range: 3..7,
-                                        value: Str(
-                                            StringConstant {
-                                                value: " f",
-                                                unicode: false,
-                                                implicit_concatenated: false,
-                                            },
-                                        ),
+                                        value: " f",
+                                        unicode: false,
+                                        implicit_concatenated: false,
                                     },
                                 ),
                                 debug_text: None,
@@ -78,8 +74,8 @@ expression: parse_ast
                                     ExprTuple {
                                         range: 24..26,
                                         elts: [
-                                            Constant(
-                                                ExprConstant {
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 24..25,
                                                     value: Int(
                                                         3,
@@ -114,8 +110,8 @@ expression: parse_ast
                                 value: Compare(
                                     ExprCompare {
                                         range: 32..36,
-                                        left: Constant(
-                                            ExprConstant {
+                                        left: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 32..33,
                                                 value: Int(
                                                     3,
@@ -126,8 +122,8 @@ expression: parse_ast
                                             NotEq,
                                         ],
                                         comparators: [
-                                            Constant(
-                                                ExprConstant {
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 35..36,
                                                     value: Int(
                                                         4,
@@ -166,8 +162,8 @@ expression: parse_ast
                         FormattedValue(
                             ExprFormattedValue {
                                 range: 42..54,
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 43..44,
                                         value: Int(
                                             3,
@@ -184,16 +180,12 @@ expression: parse_ast
                                                 FormattedValue(
                                                     ExprFormattedValue {
                                                         range: 45..50,
-                                                        value: Constant(
-                                                            ExprConstant {
+                                                        value: StringLiteral(
+                                                            ExprStringLiteral {
                                                                 range: 46..49,
-                                                                value: Str(
-                                                                    StringConstant {
-                                                                        value: "}",
-                                                                        unicode: false,
-                                                                        implicit_concatenated: false,
-                                                                    },
-                                                                ),
+                                                                value: "}",
+                                                                unicode: false,
+                                                                implicit_concatenated: false,
                                                             },
                                                         ),
                                                         debug_text: None,
@@ -201,16 +193,12 @@ expression: parse_ast
                                                         format_spec: None,
                                                     },
                                                 ),
-                                                Constant(
-                                                    ExprConstant {
+                                                StringLiteral(
+                                                    ExprStringLiteral {
                                                         range: 50..53,
-                                                        value: Str(
-                                                            StringConstant {
-                                                                value: ">10",
-                                                                unicode: false,
-                                                                implicit_concatenated: false,
-                                                            },
-                                                        ),
+                                                        value: ">10",
+                                                        unicode: false,
+                                                        implicit_concatenated: false,
                                                     },
                                                 ),
                                             ],
@@ -236,8 +224,8 @@ expression: parse_ast
                         FormattedValue(
                             ExprFormattedValue {
                                 range: 58..70,
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 59..60,
                                         value: Int(
                                             3,
@@ -254,16 +242,12 @@ expression: parse_ast
                                                 FormattedValue(
                                                     ExprFormattedValue {
                                                         range: 61..66,
-                                                        value: Constant(
-                                                            ExprConstant {
+                                                        value: StringLiteral(
+                                                            ExprStringLiteral {
                                                                 range: 62..65,
-                                                                value: Str(
-                                                                    StringConstant {
-                                                                        value: "{",
-                                                                        unicode: false,
-                                                                        implicit_concatenated: false,
-                                                                    },
-                                                                ),
+                                                                value: "{",
+                                                                unicode: false,
+                                                                implicit_concatenated: false,
                                                             },
                                                         ),
                                                         debug_text: None,
@@ -271,16 +255,12 @@ expression: parse_ast
                                                         format_spec: None,
                                                     },
                                                 ),
-                                                Constant(
-                                                    ExprConstant {
+                                                StringLiteral(
+                                                    ExprStringLiteral {
                                                         range: 66..69,
-                                                        value: Str(
-                                                            StringConstant {
-                                                                value: ">10",
-                                                                unicode: false,
-                                                                implicit_concatenated: false,
-                                                            },
-                                                        ),
+                                                        value: ">10",
+                                                        unicode: false,
+                                                        implicit_concatenated: false,
                                                     },
                                                 ),
                                             ],
@@ -358,16 +338,12 @@ expression: parse_ast
                                         ExprFString {
                                             range: 100..105,
                                             values: [
-                                                Constant(
-                                                    ExprConstant {
+                                                StringLiteral(
+                                                    ExprStringLiteral {
                                                         range: 100..105,
-                                                        value: Str(
-                                                            StringConstant {
-                                                                value: ".3f  ",
-                                                                unicode: false,
-                                                                implicit_concatenated: false,
-                                                            },
-                                                        ),
+                                                        value: ".3f  ",
+                                                        unicode: false,
+                                                        implicit_concatenated: false,
                                                     },
                                                 ),
                                             ],
@@ -430,16 +406,16 @@ expression: parse_ast
                                     ExprTuple {
                                         range: 132..136,
                                         elts: [
-                                            Constant(
-                                                ExprConstant {
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 132..133,
                                                     value: Int(
                                                         1,
                                                     ),
                                                 },
                                             ),
-                                            Constant(
-                                                ExprConstant {
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 135..136,
                                                     value: Int(
                                                         2,
@@ -483,8 +459,8 @@ expression: parse_ast
                                             FormattedValue(
                                                 ExprFormattedValue {
                                                     range: 149..162,
-                                                    value: Constant(
-                                                        ExprConstant {
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
                                                             range: 150..156,
                                                             value: Float(
                                                                 3.1415,
@@ -503,16 +479,12 @@ expression: parse_ast
                                                             ExprFString {
                                                                 range: 158..161,
                                                                 values: [
-                                                                    Constant(
-                                                                        ExprConstant {
+                                                                    StringLiteral(
+                                                                        ExprStringLiteral {
                                                                             range: 158..161,
-                                                                            value: Str(
-                                                                                StringConstant {
-                                                                                    value: ".1f",
-                                                                                    unicode: false,
-                                                                                    implicit_concatenated: false,
-                                                                                },
-                                                                            ),
+                                                                            value: ".1f",
+                                                                            unicode: false,
+                                                                            implicit_concatenated: false,
                                                                         },
                                                                     ),
                                                                 ],
@@ -533,16 +505,12 @@ expression: parse_ast
                                         ExprFString {
                                             range: 164..168,
                                             values: [
-                                                Constant(
-                                                    ExprConstant {
+                                                StringLiteral(
+                                                    ExprStringLiteral {
                                                         range: 164..168,
-                                                        value: Str(
-                                                            StringConstant {
-                                                                value: "*^20",
-                                                                unicode: false,
-                                                                implicit_concatenated: false,
-                                                            },
-                                                        ),
+                                                        value: "*^20",
+                                                        unicode: false,
+                                                        implicit_concatenated: false,
                                                     },
                                                 ),
                                             ],
@@ -570,16 +538,12 @@ expression: parse_ast
                                 ExprFString {
                                     range: 173..201,
                                     values: [
-                                        Constant(
-                                            ExprConstant {
+                                        StringLiteral(
+                                            ExprStringLiteral {
                                                 range: 174..186,
-                                                value: Str(
-                                                    StringConstant {
-                                                        value: "foo bar ",
-                                                        unicode: false,
-                                                        implicit_concatenated: true,
-                                                    },
-                                                ),
+                                                value: "foo bar ",
+                                                unicode: false,
+                                                implicit_concatenated: true,
                                             },
                                         ),
                                         FormattedValue(
@@ -610,16 +574,12 @@ expression: parse_ast
                                                 format_spec: None,
                                             },
                                         ),
-                                        Constant(
-                                            ExprConstant {
+                                        StringLiteral(
+                                            ExprStringLiteral {
                                                 range: 193..200,
-                                                value: Str(
-                                                    StringConstant {
-                                                        value: " baz",
-                                                        unicode: false,
-                                                        implicit_concatenated: true,
-                                                    },
-                                                ),
+                                                value: " baz",
+                                                unicode: false,
+                                                implicit_concatenated: true,
                                             },
                                         ),
                                     ],
@@ -629,8 +589,8 @@ expression: parse_ast
                         ),
                     ],
                     values: [
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 203..205,
                                 value: Int(
                                     10,
@@ -658,16 +618,12 @@ expression: parse_ast
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 227..232,
-                            value: Constant(
-                                ExprConstant {
+                            value: StringLiteral(
+                                ExprStringLiteral {
                                     range: 227..232,
-                                    value: Str(
-                                        StringConstant {
-                                            value: "one",
-                                            unicode: false,
-                                            implicit_concatenated: false,
-                                        },
-                                    ),
+                                    value: "one",
+                                    unicode: false,
+                                    implicit_concatenated: false,
                                 },
                             ),
                         },
@@ -686,16 +642,12 @@ expression: parse_ast
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 256..284,
-                            value: Constant(
-                                ExprConstant {
+                            value: StringLiteral(
+                                ExprStringLiteral {
                                     range: 256..284,
-                                    value: Str(
-                                        StringConstant {
-                                            value: "implicitly concatenated",
-                                            unicode: false,
-                                            implicit_concatenated: true,
-                                        },
-                                    ),
+                                    value: "implicitly concatenated",
+                                    unicode: false,
+                                    implicit_concatenated: true,
                                 },
                             ),
                         },
@@ -719,16 +671,12 @@ expression: parse_ast
                 ExprFString {
                     range: 300..317,
                     values: [
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 302..303,
-                                value: Str(
-                                    StringConstant {
-                                        value: "\\",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "\\",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                         FormattedValue(
@@ -746,16 +694,12 @@ expression: parse_ast
                                 format_spec: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 308..309,
-                                value: Str(
-                                    StringConstant {
-                                        value: "\\",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "\\",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                         FormattedValue(
@@ -775,16 +719,12 @@ expression: parse_ast
                                         ExprFString {
                                             range: 314..315,
                                             values: [
-                                                Constant(
-                                                    ExprConstant {
+                                                StringLiteral(
+                                                    ExprStringLiteral {
                                                         range: 314..315,
-                                                        value: Str(
-                                                            StringConstant {
-                                                                value: "\\",
-                                                                unicode: false,
-                                                                implicit_concatenated: false,
-                                                            },
-                                                        ),
+                                                        value: "\\",
+                                                        unicode: false,
+                                                        implicit_concatenated: false,
                                                     },
                                                 ),
                                             ],
@@ -807,16 +747,12 @@ expression: parse_ast
                 ExprFString {
                     range: 318..332,
                     values: [
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 320..331,
-                                value: Str(
-                                    StringConstant {
-                                        value: "\\{foo\\}",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "\\{foo\\}",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                     ],
@@ -849,16 +785,12 @@ expression: parse_ast
                                         ExprFString {
                                             range: 347..369,
                                             values: [
-                                                Constant(
-                                                    ExprConstant {
+                                                StringLiteral(
+                                                    ExprStringLiteral {
                                                         range: 347..369,
-                                                        value: Str(
-                                                            StringConstant {
-                                                                value: "x\n        y\n        z\n",
-                                                                unicode: false,
-                                                                implicit_concatenated: false,
-                                                            },
-                                                        ),
+                                                        value: "x\n        y\n        z\n",
+                                                        unicode: false,
+                                                        implicit_concatenated: false,
                                                     },
                                                 ),
                                             ],

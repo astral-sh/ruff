@@ -7,46 +7,34 @@ Dict(
         range: 0..25,
         keys: [
             Some(
-                Constant(
-                    ExprConstant {
+                StringLiteral(
+                    ExprStringLiteral {
                         range: 1..4,
-                        value: Str(
-                            StringConstant {
-                                value: "a",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
-                        ),
+                        value: "a",
+                        unicode: false,
+                        implicit_concatenated: false,
                     },
                 ),
             ),
             None,
             Some(
-                Constant(
-                    ExprConstant {
+                StringLiteral(
+                    ExprStringLiteral {
                         range: 16..19,
-                        value: Str(
-                            StringConstant {
-                                value: "d",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
-                        ),
+                        value: "d",
+                        unicode: false,
+                        implicit_concatenated: false,
                     },
                 ),
             ),
         ],
         values: [
-            Constant(
-                ExprConstant {
+            StringLiteral(
+                ExprStringLiteral {
                     range: 6..9,
-                    value: Str(
-                        StringConstant {
-                            value: "b",
-                            unicode: false,
-                            implicit_concatenated: false,
-                        },
-                    ),
+                    value: "b",
+                    unicode: false,
+                    implicit_concatenated: false,
                 },
             ),
             Name(
@@ -56,16 +44,12 @@ Dict(
                     ctx: Load,
                 },
             ),
-            Constant(
-                ExprConstant {
+            StringLiteral(
+                ExprStringLiteral {
                     range: 21..24,
-                    value: Str(
-                        StringConstant {
-                            value: "e",
-                            unicode: false,
-                            implicit_concatenated: false,
-                        },
-                    ),
+                    value: "e",
+                    unicode: false,
+                    implicit_concatenated: false,
                 },
             ),
         ],
