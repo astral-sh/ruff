@@ -237,7 +237,7 @@ linting command.
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
-By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting the
+By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
 stylistic rules that conflict with the use of a formatter, like [Black](https://github.com/psf/black).
 
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it

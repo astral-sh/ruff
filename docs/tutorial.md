@@ -77,7 +77,9 @@ Let's create a `pyproject.toml` file in our project's root directory:
 
 ```toml
 [tool.ruff]
-# Add the `line-too-long` rule to the enforced rule set.
+# Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
+# conflict with the use of a formatter, like Black, but we can override this behavior by
+# explicitly adding the rule.
 extend-select = ["E501"]
 # Set the maximum line length to 79 characters.
 line-length = 79
@@ -112,7 +114,7 @@ Ruff supports [over 700 lint rules](rules.md) split across over 50 built-in plug
 determining the right set of rules will depend on your project's needs: some rules may be too
 strict, some are framework-specific, and so on.
 
-By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting the
+By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
 stylistic rules that conflict with the use of a formatter, like [Black](https://github.com/psf/black).
 
 If you're introducing a linter for the first time, **the default rule set is a great place to
