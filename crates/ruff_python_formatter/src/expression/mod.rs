@@ -236,10 +236,8 @@ fn format_with_parentheses_comments(
         (0, node_comments.trailing.len())
     };
 
-    let leading_outer = &node_comments.leading[..leading_split];
-    let leading_inner = &node_comments.leading[leading_split..];
-    let trailing_inner = &node_comments.trailing[..trailing_split];
-    let trailing_outer = &node_comments.trailing[trailing_split..];
+    let (leading_outer, leading_inner) = node_comments.leading.split_at(leading_split);
+    let (trailing_inner, trailing_outer) = node_comments.trailing.split_at(trailing_split);
 
     // Preserve an opening parentheses comment
     // ```python
