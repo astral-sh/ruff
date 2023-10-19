@@ -21,6 +21,9 @@ use crate::settings::types::PythonVersion;
 pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
     match stmt {
         Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
+            if checker.enabled(Rule::GlobalAtModuleLevel) {
+                pylint::rules::global_at_module_level(checker, stmt);
+            }
             if checker.enabled(Rule::AmbiguousVariableName) {
                 checker.diagnostics.extend(names.iter().filter_map(|name| {
                     pycodestyle::rules::ambiguous_variable_name(name, name.range())
