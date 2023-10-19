@@ -161,3 +161,14 @@ if True:
                 + "WARNING: Removing listed files. Do you really want to continue. yes/n)? "
             ):
                 pass
+
+# https://github.com/astral-sh/ruff/issues/7448
+x = (
+    # a
+    not # b
+    # c
+    ( # d
+        # e
+        True
+    )
+)

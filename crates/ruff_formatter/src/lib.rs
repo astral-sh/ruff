@@ -575,6 +575,10 @@ where
             context: PhantomData,
         }
     }
+
+    pub fn rule(&self) -> &R {
+        &self.rule
+    }
 }
 
 impl<T, R, O, C> FormatRefWithRule<'_, T, R, C>
