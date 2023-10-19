@@ -3,7 +3,7 @@
 
 use std::iter::FusedIterator;
 
-use ruff_python_ast::{self as ast, Constant, Expr, Stmt, Suite};
+use ruff_python_ast::{self as ast, Stmt, Suite};
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_text_size::{Ranged, TextSize};
@@ -70,11 +70,7 @@ struct StringLinesVisitor<'a> {
 impl StatementVisitor<'_> for StringLinesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(..),
-                ..
-            }) = value.as_ref()
-            {
+            if value.is_string_literal_expr() {
                 for line in UniversalNewlineIterator::with_offset(
                     self.locator.slice(value.as_ref()),
                     value.start(),

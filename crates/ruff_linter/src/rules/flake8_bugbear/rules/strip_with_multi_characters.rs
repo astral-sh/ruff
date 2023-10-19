@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -68,11 +68,7 @@ pub(crate) fn strip_with_multi_characters(
         return;
     }
 
-    let [Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(value),
-        ..
-    })] = args
-    else {
+    let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = args else {
         return;
     };
 

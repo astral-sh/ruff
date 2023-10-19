@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -151,8 +151,8 @@ fn extract_cryptographic_key(
 
 fn extract_int_argument(call: &ExprCall, name: &str, position: usize) -> Option<(u16, TextRange)> {
     let argument = call.arguments.find_argument(name, position)?;
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(i),
+    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: ast::Number::Int(i),
         ..
     }) = argument
     else {

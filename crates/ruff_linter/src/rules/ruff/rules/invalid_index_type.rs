@@ -1,4 +1,4 @@
-use ruff_python_ast::{Constant, Expr, ExprConstant, ExprSlice, ExprSubscript};
+use ruff_python_ast::{Expr, ExprNumberLiteral, ExprSlice, ExprSubscript, Number};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -65,10 +65,8 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
             | Expr::ListComp(_)
             | Expr::Tuple(_)
             | Expr::FString(_)
-            | Expr::Constant(ExprConstant {
-                value: Constant::Str(_) | Constant::Bytes(_),
-                ..
-            })
+            | Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
     ) {
         return;
     }
@@ -87,56 +85,9 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
         return;
     };
 
-    // Then check the contents of the index
-    match index.as_ref() {
-        Expr::Constant(ExprConstant {
-            value: index_value, ..
-        }) => {
-            // If the index is a constant, require an integer
-            if !index_value.is_int() {
-                checker.diagnostics.push(Diagnostic::new(
-                    InvalidIndexType {
-                        value_type: value_type.to_string(),
-                        index_type: constant_type_name(index_value).to_string(),
-                        is_slice: false,
-                    },
-                    index.range(),
-                ));
-            }
-        }
-        Expr::Slice(ExprSlice {
-            lower, upper, step, ..
-        }) => {
-            // If the index is a slice, require integer or null bounds
-            for is_slice in [lower, upper, step].into_iter().flatten() {
-                if let Expr::Constant(ExprConstant {
-                    value: index_value, ..
-                }) = is_slice.as_ref()
-                {
-                    if !(index_value.is_int() || index_value.is_none()) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            InvalidIndexType {
-                                value_type: value_type.to_string(),
-                                index_type: constant_type_name(index_value).to_string(),
-                                is_slice: true,
-                            },
-                            is_slice.range(),
-                        ));
-                    }
-                } else if let Some(is_slice_type) = CheckableExprType::try_from(is_slice.as_ref()) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        InvalidIndexType {
-                            value_type: value_type.to_string(),
-                            index_type: is_slice_type.to_string(),
-                            is_slice: true,
-                        },
-                        is_slice.range(),
-                    ));
-                }
-            }
-        }
-        _ => {
-            // If it's some other checkable data type, it's a violation
+    if index_type.is_literal() {
+        // If the index is a literal, require an integer
+        if index_type != CheckableExprType::IntLiteral {
             checker.diagnostics.push(Diagnostic::new(
                 InvalidIndexType {
                     value_type: value_type.to_string(),
@@ -146,6 +97,50 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
                 index.range(),
             ));
         }
+    } else if let Expr::Slice(ExprSlice {
+        lower, upper, step, ..
+    }) = index.as_ref()
+    {
+        for is_slice in [lower, upper, step].into_iter().flatten() {
+            let Some(is_slice_type) = CheckableExprType::try_from(is_slice) else {
+                return;
+            };
+            if is_slice_type.is_literal() {
+                // If the index is a slice, require integer or null bounds
+                if !matches!(
+                    is_slice_type,
+                    CheckableExprType::IntLiteral | CheckableExprType::NoneLiteral
+                ) {
+                    checker.diagnostics.push(Diagnostic::new(
+                        InvalidIndexType {
+                            value_type: value_type.to_string(),
+                            index_type: is_slice_type.to_string(),
+                            is_slice: true,
+                        },
+                        is_slice.range(),
+                    ));
+                }
+            } else if let Some(is_slice_type) = CheckableExprType::try_from(is_slice.as_ref()) {
+                checker.diagnostics.push(Diagnostic::new(
+                    InvalidIndexType {
+                        value_type: value_type.to_string(),
+                        index_type: is_slice_type.to_string(),
+                        is_slice: true,
+                    },
+                    is_slice.range(),
+                ));
+            }
+        }
+    } else {
+        // If it's some other checkable data type, it's a violation
+        checker.diagnostics.push(Diagnostic::new(
+            InvalidIndexType {
+                value_type: value_type.to_string(),
+                index_type: index_type.to_string(),
+                is_slice: false,
+            },
+            index.range(),
+        ));
     }
 }
 
@@ -154,10 +149,17 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
 /// These are generally "literal" type expressions in that we know their concrete type
 /// without additional analysis; opposed to expressions like a function call where we
 /// cannot determine what type it may return.
-#[derive(Debug)]
-enum CheckableExprType<'a> {
-    Constant(&'a Constant),
+#[derive(Debug, PartialEq)]
+enum CheckableExprType {
     FString,
+    StringLiteral,
+    BytesLiteral,
+    IntLiteral,
+    FloatLiteral,
+    ComplexLiteral,
+    BooleanLiteral,
+    NoneLiteral,
+    EllipsisLiteral,
     List,
     ListComp,
     SetComp,
@@ -168,11 +170,18 @@ enum CheckableExprType<'a> {
     Slice,
 }
 
-impl fmt::Display for CheckableExprType<'_> {
+impl fmt::Display for CheckableExprType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Constant(constant) => f.write_str(constant_type_name(constant)),
             Self::FString => f.write_str("str"),
+            Self::StringLiteral => f.write_str("str"),
+            Self::BytesLiteral => f.write_str("bytes"),
+            Self::IntLiteral => f.write_str("int"),
+            Self::FloatLiteral => f.write_str("float"),
+            Self::ComplexLiteral => f.write_str("complex"),
+            Self::BooleanLiteral => f.write_str("bool"),
+            Self::NoneLiteral => f.write_str("None"),
+            Self::EllipsisLiteral => f.write_str("ellipsis"),
             Self::List => f.write_str("list"),
             Self::SetComp => f.write_str("set comprehension"),
             Self::ListComp => f.write_str("list comprehension"),
@@ -185,10 +194,19 @@ impl fmt::Display for CheckableExprType<'_> {
     }
 }
 
-impl<'a> CheckableExprType<'a> {
-    fn try_from(expr: &'a Expr) -> Option<Self> {
+impl CheckableExprType {
+    fn try_from(expr: &Expr) -> Option<Self> {
         match expr {
-            Expr::Constant(ExprConstant { value, .. }) => Some(Self::Constant(value)),
+            Expr::StringLiteral(_) => Some(Self::StringLiteral),
+            Expr::BytesLiteral(_) => Some(Self::BytesLiteral),
+            Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
+                Number::Int(_) => Some(Self::IntLiteral),
+                Number::Float(_) => Some(Self::FloatLiteral),
+                Number::Complex { .. } => Some(Self::ComplexLiteral),
+            },
+            Expr::BooleanLiteral(_) => Some(Self::BooleanLiteral),
+            Expr::NoneLiteral(_) => Some(Self::NoneLiteral),
+            Expr::EllipsisLiteral(_) => Some(Self::EllipsisLiteral),
             Expr::FString(_) => Some(Self::FString),
             Expr::List(_) => Some(Self::List),
             Expr::ListComp(_) => Some(Self::ListComp),
@@ -201,17 +219,18 @@ impl<'a> CheckableExprType<'a> {
             _ => None,
         }
     }
-}
 
-fn constant_type_name(constant: &Constant) -> &'static str {
-    match constant {
-        Constant::None => "None",
-        Constant::Bool(_) => "bool",
-        Constant::Str(_) => "str",
-        Constant::Bytes(_) => "bytes",
-        Constant::Int(_) => "int",
-        Constant::Float(_) => "float",
-        Constant::Complex { .. } => "complex",
-        Constant::Ellipsis => "ellipsis",
+    fn is_literal(&self) -> bool {
+        matches!(
+            self,
+            Self::StringLiteral
+                | Self::BytesLiteral
+                | Self::IntLiteral
+                | Self::FloatLiteral
+                | Self::ComplexLiteral
+                | Self::BooleanLiteral
+                | Self::NoneLiteral
+                | Self::EllipsisLiteral
+        )
     }
 }

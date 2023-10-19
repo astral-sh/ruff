@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, ConversionFlag, Expr};
+use ruff_python_ast::{self as ast, Arguments, ConversionFlag, Expr};
 use ruff_text_size::TextRange;
 
 /// Wrap an expression in a `FormattedValue` with no special formatting.
@@ -15,8 +15,10 @@ fn to_formatted_value_expr(inner: &Expr) -> Expr {
 
 /// Convert a string to a constant string expression.
 pub(super) fn to_constant_string(s: &str) -> Expr {
-    let node = ast::ExprConstant {
-        value: s.to_owned().into(),
+    let node = ast::ExprStringLiteral {
+        value: s.to_owned(),
+        unicode: false,
+        implicit_concatenated: false,
         range: TextRange::default(),
     };
     node.into()
@@ -54,20 +56,11 @@ fn is_simple_callee(func: &Expr) -> bool {
 pub(super) fn to_f_string_element(expr: &Expr) -> Option<Expr> {
     match expr {
         // These are directly handled by `unparse_f_string_element`:
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(_),
-            ..
-        })
-        | Expr::FString(_)
-        | Expr::FormattedValue(_) => Some(expr.clone()),
+        Expr::StringLiteral(_) | Expr::FString(_) | Expr::FormattedValue(_) => Some(expr.clone()),
         // These should be pretty safe to wrap in a formatted value.
-        Expr::Constant(ast::ExprConstant {
-            value:
-                Constant::Int(_) | Constant::Float(_) | Constant::Bool(_) | Constant::Complex { .. },
-            ..
-        })
-        | Expr::Name(_)
-        | Expr::Attribute(_) => Some(to_formatted_value_expr(expr)),
+        Expr::NumberLiteral(_) | Expr::BooleanLiteral(_) | Expr::Name(_) | Expr::Attribute(_) => {
+            Some(to_formatted_value_expr(expr))
+        }
         Expr::Call(_) if is_simple_call(expr) => Some(to_formatted_value_expr(expr)),
         _ => None,
     }

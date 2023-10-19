@@ -5,7 +5,7 @@ use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::{self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters};
+use ruff_python_ast::{self as ast, Expr, Operator, ParameterWithDefault, Parameters};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -127,8 +127,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let new_expr = Expr::BinOp(ast::ExprBinOp {
                 left: Box::new(expr.clone()),
                 op: Operator::BitOr,
-                right: Box::new(Expr::Constant(ast::ExprConstant {
-                    value: Constant::None,
+                right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral {
                     range: TextRange::default(),
                 })),
                 range: TextRange::default(),
@@ -184,9 +183,10 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
             continue;
         };
 
-        if let Expr::Constant(ast::ExprConstant {
+        if let Expr::StringLiteral(ast::ExprStringLiteral {
             range,
-            value: Constant::Str(string),
+            value: string,
+            ..
         }) = annotation.as_ref()
         {
             // Quoted annotation.

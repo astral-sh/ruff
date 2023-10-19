@@ -7,7 +7,7 @@ use ruff_formatter::{
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
-use ruff_python_ast::{AnyNodeRef, Constant, Expr, ExpressionRef, Operator};
+use ruff_python_ast::{AnyNodeRef, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
@@ -27,11 +27,13 @@ pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
 pub(crate) mod expr_bool_op;
+pub(crate) mod expr_boolean_literal;
+pub(crate) mod expr_bytes_literal;
 pub(crate) mod expr_call;
 pub(crate) mod expr_compare;
-pub(crate) mod expr_constant;
 pub(crate) mod expr_dict;
 pub(crate) mod expr_dict_comp;
+pub(crate) mod expr_ellipsis_literal;
 pub(crate) mod expr_f_string;
 pub(crate) mod expr_formatted_value;
 pub(crate) mod expr_generator_exp;
@@ -42,10 +44,13 @@ pub(crate) mod expr_list;
 pub(crate) mod expr_list_comp;
 pub(crate) mod expr_name;
 pub(crate) mod expr_named_expr;
+pub(crate) mod expr_none_literal;
+pub(crate) mod expr_number_literal;
 pub(crate) mod expr_set;
 pub(crate) mod expr_set_comp;
 pub(crate) mod expr_slice;
 pub(crate) mod expr_starred;
+pub(crate) mod expr_string_literal;
 pub(crate) mod expr_subscript;
 pub(crate) mod expr_tuple;
 pub(crate) mod expr_unary_op;
@@ -94,7 +99,12 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Call(expr) => expr.format().fmt(f),
             Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::FString(expr) => expr.format().fmt(f),
-            Expr::Constant(expr) => expr.format().fmt(f),
+            Expr::StringLiteral(expr) => expr.format().fmt(f),
+            Expr::BytesLiteral(expr) => expr.format().fmt(f),
+            Expr::NumberLiteral(expr) => expr.format().fmt(f),
+            Expr::BooleanLiteral(expr) => expr.format().fmt(f),
+            Expr::NoneLiteral(expr) => expr.format().fmt(f),
+            Expr::EllipsisLiteral(expr) => expr.format().fmt(f),
             Expr::Attribute(expr) => expr.format().fmt(f),
             Expr::Subscript(expr) => expr.format().fmt(f),
             Expr::Starred(expr) => expr.format().fmt(f),
@@ -274,7 +284,12 @@ fn format_with_parentheses_comments(
         Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::FormattedValue(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Constant(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::StringLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::BytesLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::NumberLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::BooleanLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::NoneLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::EllipsisLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Attribute(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Subscript(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Starred(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
@@ -468,7 +483,12 @@ impl NeedsParentheses for Expr {
             Expr::Call(expr) => expr.needs_parentheses(parent, context),
             Expr::FormattedValue(expr) => expr.needs_parentheses(parent, context),
             Expr::FString(expr) => expr.needs_parentheses(parent, context),
-            Expr::Constant(expr) => expr.needs_parentheses(parent, context),
+            Expr::StringLiteral(expr) => expr.needs_parentheses(parent, context),
+            Expr::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
+            Expr::NumberLiteral(expr) => expr.needs_parentheses(parent, context),
+            Expr::BooleanLiteral(expr) => expr.needs_parentheses(parent, context),
+            Expr::NoneLiteral(expr) => expr.needs_parentheses(parent, context),
+            Expr::EllipsisLiteral(expr) => expr.needs_parentheses(parent, context),
             Expr::Attribute(expr) => expr.needs_parentheses(parent, context),
             Expr::Subscript(expr) => expr.needs_parentheses(parent, context),
             Expr::Starred(expr) => expr.needs_parentheses(parent, context),
@@ -692,16 +712,12 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
-            Expr::Constant(ast::ExprConstant {
-                value:
-                    Constant::Str(ast::StringConstant {
-                        implicit_concatenated: true,
-                        ..
-                    })
-                    | Constant::Bytes(ast::BytesConstant {
-                        implicit_concatenated: true,
-                        ..
-                    }),
+            Expr::StringLiteral(ast::ExprStringLiteral {
+                implicit_concatenated: true,
+                ..
+            })
+            | Expr::BytesLiteral(ast::ExprBytesLiteral {
+                implicit_concatenated: true,
                 ..
             })
             | Expr::FString(ast::ExprFString {
@@ -726,7 +742,12 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::GeneratorExp(_)
             | Expr::FormattedValue(_)
             | Expr::FString(_)
-            | Expr::Constant(_)
+            | Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
+            | Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
             | Expr::Name(_)
             | Expr::Slice(_)
             | Expr::IpyEscapeCommand(_) => {}

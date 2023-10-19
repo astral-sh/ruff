@@ -1,8 +1,7 @@
 use crate::{
-    Alias, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ElifElseClause,
-    ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault,
-    Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt, TypeParam, TypeParams,
-    UnaryOp, WithItem,
+    Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr,
+    Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault, Parameters, Pattern,
+    PatternArguments, PatternKeyword, Singleton, Stmt, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 use crate::{AnyNodeRef, AstNode};
 
@@ -40,9 +39,6 @@ pub trait PreorderVisitor<'a> {
     fn visit_decorator(&mut self, decorator: &'a Decorator) {
         walk_decorator(self, decorator);
     }
-
-    #[inline]
-    fn visit_constant(&mut self, _constant: &'a Constant) {}
 
     #[inline]
     fn visit_singleton(&mut self, _singleton: &'a Singleton) {}
@@ -280,7 +276,12 @@ where
             Expr::Call(expr) => expr.visit_preorder(visitor),
             Expr::FormattedValue(expr) => expr.visit_preorder(visitor),
             Expr::FString(expr) => expr.visit_preorder(visitor),
-            Expr::Constant(expr) => expr.visit_preorder(visitor),
+            Expr::StringLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::BytesLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::NumberLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::BooleanLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::NoneLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::EllipsisLiteral(expr) => expr.visit_preorder(visitor),
             Expr::Attribute(expr) => expr.visit_preorder(visitor),
             Expr::Subscript(expr) => expr.visit_preorder(visitor),
             Expr::Starred(expr) => expr.visit_preorder(visitor),

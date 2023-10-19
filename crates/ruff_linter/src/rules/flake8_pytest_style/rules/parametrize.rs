@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::AstNode;
-use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext};
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprContext};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -248,37 +248,22 @@ impl Violation for PytestDuplicateParametrizeTestCases {
 }
 
 fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
-    let all_literals = elts.iter().all(|expr| {
-        matches!(
-            expr,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_),
-                ..
-            })
-        )
-    });
-
-    if !all_literals {
+    if !elts.iter().all(Expr::is_string_literal_expr) {
         return None;
     }
 
-    let node = Expr::Constant(ast::ExprConstant {
-        value: elts
-            .iter()
-            .fold(String::new(), |mut acc, elt| {
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(ast::StringConstant { value, .. }),
-                    ..
-                }) = elt
-                {
-                    if !acc.is_empty() {
-                        acc.push(',');
-                    }
-                    acc.push_str(value.as_str());
+    let node = Expr::StringLiteral(ast::ExprStringLiteral {
+        value: elts.iter().fold(String::new(), |mut acc, elt| {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
+                if !acc.is_empty() {
+                    acc.push(',');
                 }
-                acc
-            })
-            .into(),
+                acc.push_str(value.as_str());
+            }
+            acc
+        }),
+        unicode: false,
+        implicit_concatenated: false,
         range: TextRange::default(),
     });
     Some(generator.expr(&node))
@@ -317,10 +302,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(string),
-            ..
-        }) => {
+        Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {
             let names = split_names(string);
             if names.len() > 1 {
                 match names_type {
@@ -342,8 +324,10 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: names
                                 .iter()
                                 .map(|name| {
-                                    Expr::Constant(ast::ExprConstant {
-                                        value: (*name).to_string().into(),
+                                    Expr::StringLiteral(ast::ExprStringLiteral {
+                                        value: (*name).to_string(),
+                                        unicode: false,
+                                        implicit_concatenated: false,
                                         range: TextRange::default(),
                                     })
                                 })
@@ -375,8 +359,10 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: names
                                 .iter()
                                 .map(|name| {
-                                    Expr::Constant(ast::ExprConstant {
-                                        value: (*name).to_string().into(),
+                                    Expr::StringLiteral(ast::ExprStringLiteral {
+                                        value: (*name).to_string(),
+                                        unicode: false,
+                                        implicit_concatenated: false,
                                         range: TextRange::default(),
                                     })
                                 })
@@ -495,15 +481,12 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         .flake8_pytest_style
         .parametrize_values_row_type;
 
-    let is_multi_named = if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(string),
-        ..
-    }) = &names
-    {
-        split_names(string).len() > 1
-    } else {
-        true
-    };
+    let is_multi_named =
+        if let Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) = &names {
+            split_names(string).len() > 1
+        } else {
+            true
+        };
 
     match values {
         Expr::List(ast::ExprList { elts, .. }) => {

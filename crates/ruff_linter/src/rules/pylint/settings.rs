@@ -1,10 +1,9 @@
 //! Settings for the `pylint` plugin.
 
-use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::CacheKey;
-use ruff_python_ast::Constant;
+use ruff_python_ast::{Expr, ExprNumberLiteral, Number};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -17,19 +16,19 @@ pub enum ConstantType {
     Str,
 }
 
-impl TryFrom<&Constant> for ConstantType {
-    type Error = anyhow::Error;
+impl TryFrom<&Expr> for ConstantType {
+    type Error = ();
 
-    fn try_from(value: &Constant) -> Result<Self, Self::Error> {
+    fn try_from(value: &Expr) -> Result<Self, Self::Error> {
         match value {
-            Constant::Bytes(..) => Ok(Self::Bytes),
-            Constant::Complex { .. } => Ok(Self::Complex),
-            Constant::Float(..) => Ok(Self::Float),
-            Constant::Int(..) => Ok(Self::Int),
-            Constant::Str(..) => Ok(Self::Str),
-            Constant::Bool(..) | Constant::Ellipsis | Constant::None => {
-                Err(anyhow!("Singleton constants are unsupported"))
-            }
+            Expr::StringLiteral(_) => Ok(Self::Str),
+            Expr::BytesLiteral(_) => Ok(Self::Bytes),
+            Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
+                Number::Int(_) => Ok(Self::Int),
+                Number::Float(_) => Ok(Self::Float),
+                Number::Complex { .. } => Ok(Self::Complex),
+            },
+            _ => Err(()),
         }
     }
 }

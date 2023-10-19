@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest};
@@ -63,14 +63,10 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
         [] => {}
         // Ex) `Path(".").resolve()`
         [arg] => {
-            let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(str),
-                ..
-            }) = arg
-            else {
+            let Expr::StringLiteral(ast::ExprStringLiteral { value: str, .. }) = arg else {
                 return;
             };
-            if !matches!(str.value.as_str(), "" | ".") {
+            if !matches!(str.as_str(), "" | ".") {
                 return;
             }
         }

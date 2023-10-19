@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,14 +51,8 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
     }
 
     let length = match expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(s),
-            ..
-        }) => s.chars().count(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bytes(bytes),
-            ..
-        }) => bytes.len(),
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.chars().count(),
+        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.len(),
         _ => return,
     };
     if length <= 50 {

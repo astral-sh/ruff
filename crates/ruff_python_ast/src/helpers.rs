@@ -12,8 +12,7 @@ use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::AnyNodeRef;
 use crate::{
-    self as ast, Arguments, CmpOp, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt,
-    TypeParam,
+    self as ast, Arguments, CmpOp, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -69,7 +68,12 @@ where
         if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = expr {
             if !matches!(
                 left.as_ref(),
-                Expr::Constant(_)
+                Expr::StringLiteral(_)
+                    | Expr::BytesLiteral(_)
+                    | Expr::NumberLiteral(_)
+                    | Expr::BooleanLiteral(_)
+                    | Expr::NoneLiteral(_)
+                    | Expr::EllipsisLiteral(_)
                     | Expr::FString(_)
                     | Expr::List(_)
                     | Expr::Tuple(_)
@@ -83,7 +87,12 @@ where
             }
             if !matches!(
                 right.as_ref(),
-                Expr::Constant(_)
+                Expr::StringLiteral(_)
+                    | Expr::BytesLiteral(_)
+                    | Expr::NumberLiteral(_)
+                    | Expr::BooleanLiteral(_)
+                    | Expr::NoneLiteral(_)
+                    | Expr::EllipsisLiteral(_)
                     | Expr::FString(_)
                     | Expr::List(_)
                     | Expr::Tuple(_)
@@ -245,8 +254,14 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
                     .as_ref()
                     .is_some_and(|value| any_over_expr(value, func))
         }
-        Expr::Name(_) | Expr::Constant(_) => false,
-        Expr::IpyEscapeCommand(_) => false,
+        Expr::Name(_)
+        | Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
+        | Expr::IpyEscapeCommand(_) => false,
     }
 }
 
@@ -557,17 +572,19 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
 pub const fn is_singleton(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::None | Constant::Bool(_) | Constant::Ellipsis,
-            ..
-        })
+        Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_)
     )
 }
 
 /// Return `true` if the [`Expr`] is a constant or tuple of constants.
 pub fn is_constant(expr: &Expr) -> bool {
     match expr {
-        Expr::Constant(_) => true,
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_) => true,
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant),
         _ => false,
     }
@@ -580,23 +597,14 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
 
 /// Return `true` if an [`Expr`] is `None`.
 pub const fn is_const_none(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            ..
-        }),
-    )
+    expr.is_none_literal_expr()
 }
 
 /// Return `true` if an [`Expr`] is `True`.
 pub const fn is_const_true(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bool(true),
-            ..
-        }),
+        Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }),
     )
 }
 
@@ -604,10 +612,7 @@ pub const fn is_const_true(expr: &Expr) -> bool {
 pub const fn is_const_false(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bool(false),
-            ..
-        }),
+        Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: false, .. }),
     )
 }
 
@@ -939,13 +944,7 @@ where
 /// Return `true` if a `Stmt` is a docstring.
 pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
-        matches!(
-            value.as_ref(),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str { .. },
-                ..
-            })
-        )
+        value.is_string_literal_expr()
     } else {
         false
     }
@@ -1072,25 +1071,21 @@ impl Truthiness {
         F: Fn(&str) -> bool,
     {
         match expr {
-            Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                Constant::Bool(value) => Some(*value),
-                Constant::None => Some(false),
-                Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
-                Constant::Bytes(bytes) => Some(!bytes.is_empty()),
-                Constant::Int(int) => Some(*int != 0),
-                Constant::Float(float) => Some(*float != 0.0),
-                Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
-                Constant::Ellipsis => Some(true),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => Some(!value.is_empty()),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => Some(!value.is_empty()),
+            Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+                ast::Number::Int(int) => Some(*int != 0),
+                ast::Number::Float(float) => Some(*float != 0.0),
+                ast::Number::Complex { real, imag, .. } => Some(*real != 0.0 || *imag != 0.0),
             },
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
+            Expr::NoneLiteral(_) => Some(false),
+            Expr::EllipsisLiteral(_) => Some(true),
             Expr::FString(ast::ExprFString { values, .. }) => {
                 if values.is_empty() {
                     Some(false)
                 } else if values.iter().any(|value| {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(ast::StringConstant { value, .. }),
-                        ..
-                    }) = &value
-                    {
+                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &value {
                         !value.is_empty()
                     } else {
                         false
@@ -1196,8 +1191,9 @@ mod tests {
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
     use crate::{
-        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Int, Stmt, StmtTypeAlias,
-        TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
+        Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number, Stmt,
+        StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+        TypeParams,
     };
 
     #[test]
@@ -1245,16 +1241,16 @@ mod tests {
             range: TextRange::default(),
             ctx: ExprContext::Load,
         });
-        let constant_one = Expr::Constant(ExprConstant {
-            value: Constant::Int(1.into()),
+        let constant_one = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(1.into()),
             range: TextRange::default(),
         });
-        let constant_two = Expr::Constant(ExprConstant {
-            value: Constant::Int(2.into()),
+        let constant_two = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(2.into()),
             range: TextRange::default(),
         });
-        let constant_three = Expr::Constant(ExprConstant {
-            value: Constant::Int(3.into()),
+        let constant_three = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(3.into()),
             range: TextRange::default(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
@@ -1295,8 +1291,8 @@ mod tests {
         });
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
-        let bound = Expr::Constant(ExprConstant {
-            value: Constant::Int(Int::ONE),
+        let bound = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(Int::ONE),
             range: TextRange::default(),
         });
 

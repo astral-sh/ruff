@@ -3,8 +3,8 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -32,35 +32,54 @@ impl FromStr for LiteralType {
     }
 }
 
-impl From<LiteralType> for Constant {
-    fn from(value: LiteralType) -> Self {
-        match value {
-            LiteralType::Str => Constant::Str(ast::StringConstant {
+impl LiteralType {
+    fn as_zero_value_expr(self) -> Expr {
+        match self {
+            LiteralType::Str => ast::ExprStringLiteral {
                 value: String::new(),
                 unicode: false,
                 implicit_concatenated: false,
-            }),
-            LiteralType::Bytes => Constant::Bytes(ast::BytesConstant {
+                range: TextRange::default(),
+            }
+            .into(),
+            LiteralType::Bytes => ast::ExprBytesLiteral {
                 value: Vec::new(),
                 implicit_concatenated: false,
-            }),
-            LiteralType::Int => Constant::Int(0.into()),
-            LiteralType::Float => Constant::Float(0.0),
-            LiteralType::Bool => Constant::Bool(false),
+                range: TextRange::default(),
+            }
+            .into(),
+            LiteralType::Int => ast::ExprNumberLiteral {
+                value: ast::Number::Int(0.into()),
+                range: TextRange::default(),
+            }
+            .into(),
+            LiteralType::Float => ast::ExprNumberLiteral {
+                value: ast::Number::Float(0.0),
+                range: TextRange::default(),
+            }
+            .into(),
+            LiteralType::Bool => ast::ExprBooleanLiteral {
+                value: false,
+                range: TextRange::default(),
+            }
+            .into(),
         }
     }
 }
 
-impl TryFrom<&Constant> for LiteralType {
+impl TryFrom<&Expr> for LiteralType {
     type Error = ();
 
-    fn try_from(value: &Constant) -> Result<Self, Self::Error> {
-        match value {
-            Constant::Str(_) => Ok(LiteralType::Str),
-            Constant::Bytes(_) => Ok(LiteralType::Bytes),
-            Constant::Int(_) => Ok(LiteralType::Int),
-            Constant::Float(_) => Ok(LiteralType::Float),
-            Constant::Bool(_) => Ok(LiteralType::Bool),
+    fn try_from(expr: &Expr) -> Result<Self, Self::Error> {
+        match expr {
+            Expr::StringLiteral(_) => Ok(LiteralType::Str),
+            Expr::BytesLiteral(_) => Ok(LiteralType::Bytes),
+            Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+                ast::Number::Int(_) => Ok(LiteralType::Int),
+                ast::Number::Float(_) => Ok(LiteralType::Float),
+                ast::Number::Complex { .. } => Err(()),
+            },
+            Expr::BooleanLiteral(_) => Ok(LiteralType::Bool),
             _ => Err(()),
         }
     }
@@ -181,8 +200,8 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            let constant = Constant::from(literal_type);
-            let content = checker.generator().constant(&constant);
+            let expr = literal_type.as_zero_value_expr();
+            let content = checker.generator().expr(&expr);
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 content,
                 call.range(),
@@ -190,16 +209,12 @@ pub(crate) fn native_literals(
             checker.diagnostics.push(diagnostic);
         }
         Some(arg) => {
-            let Expr::Constant(ast::ExprConstant { value, .. }) = arg else {
-                return;
-            };
-
             // Skip implicit string concatenations.
-            if value.is_implicit_concatenated() {
+            if arg.is_implicit_concatenated_string() {
                 return;
             }
 
-            let Ok(arg_literal_type) = LiteralType::try_from(value) else {
+            let Ok(arg_literal_type) = LiteralType::try_from(arg) else {
                 return;
             };
 
@@ -213,8 +228,14 @@ pub(crate) fn native_literals(
             // Ex) `(7).denominator` is valid but `7.denominator` is not
             // Note that floats do not have this problem
             // Ex) `(1.0).real` is valid and `1.0.real` is too
-            let content = match (parent_expr, value) {
-                (Some(Expr::Attribute(_)), Constant::Int(_)) => format!("({arg_code})"),
+            let content = match (parent_expr, arg) {
+                (
+                    Some(Expr::Attribute(_)),
+                    Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(_),
+                        ..
+                    }),
+                ) => format!("({arg_code})"),
                 _ => arg_code.to_string(),
             };
 

@@ -68,6 +68,6 @@ pub(crate) fn should_ignore_docstring(docstring: &Expr) -> bool {
     // Python does consider these docstrings, but they're almost certainly a
     // user error, and supporting them "properly" is extremely difficult.
     docstring
-        .as_constant_expr()
-        .is_some_and(|constant| constant.value.is_implicit_concatenated())
+        .as_string_literal_expr()
+        .is_some_and(|string_literal| string_literal.implicit_concatenated)
 }

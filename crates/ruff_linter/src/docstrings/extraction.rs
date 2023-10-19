@@ -1,6 +1,6 @@
 //! Extract docstrings from an AST.
 
-use ruff_python_ast::{self as ast, Constant, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::{Definition, DefinitionId, Definitions, Member, MemberKind};
 
 /// Extract a docstring from a function or class body.
@@ -11,13 +11,7 @@ pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
         return None;
     };
     // Only match strings.
-    if !matches!(
-        value.as_ref(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(_),
-            ..
-        })
-    ) {
+    if !value.is_string_literal_expr() {
         return None;
     }
     Some(value)

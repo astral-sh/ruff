@@ -25,7 +25,12 @@ pub enum ExpressionRef<'a> {
     Call(&'a ast::ExprCall),
     FormattedValue(&'a ast::ExprFormattedValue),
     FString(&'a ast::ExprFString),
-    Constant(&'a ast::ExprConstant),
+    StringLiteral(&'a ast::ExprStringLiteral),
+    BytesLiteral(&'a ast::ExprBytesLiteral),
+    NumberLiteral(&'a ast::ExprNumberLiteral),
+    BooleanLiteral(&'a ast::ExprBooleanLiteral),
+    NoneLiteral(&'a ast::ExprNoneLiteral),
+    EllipsisLiteral(&'a ast::ExprEllipsisLiteral),
     Attribute(&'a ast::ExprAttribute),
     Subscript(&'a ast::ExprSubscript),
     Starred(&'a ast::ExprStarred),
@@ -64,7 +69,12 @@ impl<'a> From<&'a Expr> for ExpressionRef<'a> {
             Expr::Call(value) => ExpressionRef::Call(value),
             Expr::FormattedValue(value) => ExpressionRef::FormattedValue(value),
             Expr::FString(value) => ExpressionRef::FString(value),
-            Expr::Constant(value) => ExpressionRef::Constant(value),
+            Expr::StringLiteral(value) => ExpressionRef::StringLiteral(value),
+            Expr::BytesLiteral(value) => ExpressionRef::BytesLiteral(value),
+            Expr::NumberLiteral(value) => ExpressionRef::NumberLiteral(value),
+            Expr::BooleanLiteral(value) => ExpressionRef::BooleanLiteral(value),
+            Expr::NoneLiteral(value) => ExpressionRef::NoneLiteral(value),
+            Expr::EllipsisLiteral(value) => ExpressionRef::EllipsisLiteral(value),
             Expr::Attribute(value) => ExpressionRef::Attribute(value),
             Expr::Subscript(value) => ExpressionRef::Subscript(value),
             Expr::Starred(value) => ExpressionRef::Starred(value),
@@ -172,9 +182,34 @@ impl<'a> From<&'a ast::ExprFString> for ExpressionRef<'a> {
         Self::FString(value)
     }
 }
-impl<'a> From<&'a ast::ExprConstant> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprConstant) -> Self {
-        Self::Constant(value)
+impl<'a> From<&'a ast::ExprStringLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+        Self::StringLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprBytesLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+        Self::BytesLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprNumberLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprNumberLiteral) -> Self {
+        Self::NumberLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprBooleanLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprBooleanLiteral) -> Self {
+        Self::BooleanLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprNoneLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprNoneLiteral) -> Self {
+        Self::NoneLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprEllipsisLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprEllipsisLiteral) -> Self {
+        Self::EllipsisLiteral(value)
     }
 }
 impl<'a> From<&'a ast::ExprAttribute> for ExpressionRef<'a> {
@@ -240,7 +275,14 @@ impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
             ExpressionRef::Call(expression) => AnyNodeRef::ExprCall(expression),
             ExpressionRef::FormattedValue(expression) => AnyNodeRef::ExprFormattedValue(expression),
             ExpressionRef::FString(expression) => AnyNodeRef::ExprFString(expression),
-            ExpressionRef::Constant(expression) => AnyNodeRef::ExprConstant(expression),
+            ExpressionRef::StringLiteral(expression) => AnyNodeRef::ExprStringLiteral(expression),
+            ExpressionRef::BytesLiteral(expression) => AnyNodeRef::ExprBytesLiteral(expression),
+            ExpressionRef::NumberLiteral(expression) => AnyNodeRef::ExprNumberLiteral(expression),
+            ExpressionRef::BooleanLiteral(expression) => AnyNodeRef::ExprBooleanLiteral(expression),
+            ExpressionRef::NoneLiteral(expression) => AnyNodeRef::ExprNoneLiteral(expression),
+            ExpressionRef::EllipsisLiteral(expression) => {
+                AnyNodeRef::ExprEllipsisLiteral(expression)
+            }
             ExpressionRef::Attribute(expression) => AnyNodeRef::ExprAttribute(expression),
             ExpressionRef::Subscript(expression) => AnyNodeRef::ExprSubscript(expression),
             ExpressionRef::Starred(expression) => AnyNodeRef::ExprStarred(expression),
@@ -277,7 +319,12 @@ impl Ranged for ExpressionRef<'_> {
             ExpressionRef::Call(expression) => expression.range(),
             ExpressionRef::FormattedValue(expression) => expression.range(),
             ExpressionRef::FString(expression) => expression.range(),
-            ExpressionRef::Constant(expression) => expression.range(),
+            ExpressionRef::StringLiteral(expression) => expression.range(),
+            ExpressionRef::BytesLiteral(expression) => expression.range(),
+            ExpressionRef::NumberLiteral(expression) => expression.range(),
+            ExpressionRef::BooleanLiteral(expression) => expression.range(),
+            ExpressionRef::NoneLiteral(expression) => expression.range(),
+            ExpressionRef::EllipsisLiteral(expression) => expression.range(),
             ExpressionRef::Attribute(expression) => expression.range(),
             ExpressionRef::Subscript(expression) => expression.range(),
             ExpressionRef::Starred(expression) => expression.range(),

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Constant, Expr, ExprConstant, Stmt, StmtExpr};
+use ruff_python_ast::{Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -54,13 +54,7 @@ pub(crate) fn ellipsis_in_non_empty_class_body(checker: &mut Checker, body: &[St
             continue;
         };
 
-        if matches!(
-            value.as_ref(),
-            Expr::Constant(ExprConstant {
-                value: Constant::Ellipsis,
-                ..
-            })
-        ) {
+        if value.is_ellipsis_literal_expr() {
             let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
             let edit =
                 fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());

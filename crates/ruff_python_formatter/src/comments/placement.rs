@@ -281,7 +281,7 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
-        AnyNodeRef::ExprConstant(_) => {
+        AnyNodeRef::ExprStringLiteral(_) => {
             if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
                 CommentPlacement::dangling(fstring, comment)
             } else {

@@ -3,7 +3,7 @@ use itertools::Itertools;
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -61,31 +61,20 @@ fn is_static_length(elts: &[Expr]) -> bool {
 
 fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     // If all elements are string constants, join them into a single string.
-    if joinees.iter().all(|expr| {
-        matches!(
-            expr,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_),
-                ..
-            })
-        )
-    }) {
-        let node = ast::ExprConstant {
+    if joinees.iter().all(Expr::is_string_literal_expr) {
+        let node = ast::ExprStringLiteral {
             value: joinees
                 .iter()
                 .filter_map(|expr| {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(ast::StringConstant { value, .. }),
-                        ..
-                    }) = expr
-                    {
+                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                         Some(value.as_str())
                     } else {
                         None
                     }
                 })
-                .join(joiner)
-                .into(),
+                .join(joiner),
+            unicode: false,
+            implicit_concatenated: false,
             range: TextRange::default(),
         };
         return Some(node.into());
