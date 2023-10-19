@@ -5,11 +5,11 @@ use ruff_formatter::{
     write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
 use ruff_python_ast as ast;
+use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
-use ruff_python_trivia::{BackwardsTokenizer, CommentRanges, SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{AnyNodeRef, Constant, Expr, ExpressionRef, Operator};
+use ruff_python_trivia::CommentRanges;
+use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
@@ -187,8 +187,7 @@ fn format_with_parentheses_comments(
 ) -> FormatResult<()> {
     // First part: Split the comments
 
-    // TODO(konstin): This is copied from `parenthesized_range`, except that we don't have the
-    // parent, which is a problem:
+    // TODO(konstin): We don't have the parent, which is a problem:
     // ```python
     // f(
     //     # a
@@ -204,25 +203,13 @@ fn format_with_parentheses_comments(
     //     )
     // )
     // ```
-    let right_tokenizer = SimpleTokenizer::starts_at(expression.end(), f.context().source())
-        .skip_trivia()
-        .take_while(|token| token.kind == SimpleTokenKind::RParen);
-
-    let left_tokenizer = BackwardsTokenizer::up_to(
-        expression.start(),
-        f.context().source(),
+    let range_with_parens = parentheses_iterator(
+        expression.into(),
+        None,
         f.context().comments().ranges(),
+        f.context().source(),
     )
-    .skip_trivia()
-    .take_while(|token| token.kind == SimpleTokenKind::LParen);
-
-    // Zip closing parenthesis with opening parenthesis. The order is intentional, as testing for
-    // closing parentheses is cheaper, and `zip` will avoid progressing the `left_tokenizer` if
-    // the `right_tokenizer` is exhausted.
-    let range_with_parens = right_tokenizer
-        .zip(left_tokenizer)
-        .last()
-        .map(|(right, left)| TextRange::new(left.start(), right.end()));
+    .last();
 
     let (leading_split, trailing_split) = if let Some(range_with_parens) = range_with_parens {
         let leading_split = node_comments
@@ -250,7 +237,7 @@ fn format_with_parentheses_comments(
         Some((first, rest)) if first.line_position().is_end_of_line() => {
             (slice::from_ref(first), rest)
         }
-        _ => (&[], node_comments.leading),
+        _ => (Default::default(), node_comments.leading),
     };
 
     // Second Part: Format
