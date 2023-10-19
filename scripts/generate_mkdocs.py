@@ -48,7 +48,6 @@ LINK_REWRITES: dict[str, str] = {
     ),
     "https://docs.astral.sh/ruff/installation/": "installation.md",
     "https://docs.astral.sh/ruff/rules/": "rules.md",
-    "https://docs.astral.sh/ruff/rules/#error-e": "rules.md#error-e",
     "https://docs.astral.sh/ruff/settings/": "settings.md",
 }
 

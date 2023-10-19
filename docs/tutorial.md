@@ -16,12 +16,12 @@ numbers
 Where `numbers.py` contains the following code:
 
 ```py
-from typing import Sequence
+from typing import Iterable
 
 import os
 
 
-def sum_even_numbers(numbers: Sequence[int]) -> int:
+def sum_even_numbers(numbers: Iterable[int]) -> int:
     """Given a sequence of integers, return the sum of all even numbers in the sequence."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
@@ -55,12 +55,12 @@ Running `git diff` shows the following:
 --- a/numbers/numbers.py
 +++ b/numbers/numbers.py
 @@ -1,7 +1,5 @@
- from typing import Sequence
+ from typing import Iterable
 
 -import os
 -
 
-def sum_even_numbers(numbers: Sequence[int]) -> int:
+def sum_even_numbers(numbers: Iterable[int]) -> int:
     """Given a sequence of integers, return the sum of all even numbers in the sequence."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
@@ -78,7 +78,7 @@ Let's create a `pyproject.toml` file in our project's root directory:
 ```toml
 [tool.ruff]
 # Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
-# conflict with the use of a formatter, like Black, but we can override this behavior by
+# overlap with the use of a formatter, like Black, but we can override this behavior by
 # explicitly adding the rule.
 extend-select = ["E501"]
 # Set the maximum line length to 79 characters.
@@ -115,7 +115,8 @@ determining the right set of rules will depend on your project's needs: some rul
 strict, some are framework-specific, and so on.
 
 By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
-stylistic rules that conflict with the use of a formatter, like [Black](https://github.com/psf/black).
+stylistic rules that overlap with the use of a formatter, like
+[Black](https://github.com/psf/black).
 
 If you're introducing a linter for the first time, **the default rule set is a great place to
 start**: it's narrow and focused while catching a wide variety of common errors (like unused
@@ -136,11 +137,11 @@ extend-select = [
 ```
 
 If we run Ruff again, we'll see that it now enforces the pyupgrade rules. In particular, Ruff flags
-the use of the deprecated `typing.Sequence` instead of `collections.abc.Sequence`:
+the use of the deprecated `typing.Iterable` instead of `collections.abc.Iterable`:
 
 ```shell
 ❯ ruff check .
-numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
+numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 Found 1 error.
 [*] 1 fixable with the `--fix` option.
 ```
@@ -167,7 +168,7 @@ If we run Ruff again, we'll see that it now enforces the pydocstyle rules:
 ```shell
 ❯ ruff check .
 numbers/__init__.py:1:1: D104 Missing docstring in public package
-numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
+numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 numbers/numbers.py:1:1: D100 Missing docstring in public module
 Found 3 errors.
 [*] 1 fixable with the `--fix` option.
@@ -176,18 +177,18 @@ Found 3 errors.
 ### Ignoring Errors
 
 Any lint rule can be ignored by adding a `# noqa` comment to the line in question. For example,
-let's ignore the `UP035` rule for the `Sequence` import:
+let's ignore the `UP035` rule for the `Iterable` import:
 
 ```py
-from typing import Sequence  # noqa: UP035
+from typing import Iterable  # noqa: UP035
 
 
-def sum_even_numbers(numbers: Sequence[int]) -> int:
+def sum_even_numbers(numbers: Iterable[int]) -> int:
     """Given a sequence of integers, return the sum of all even numbers in the sequence."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-Running Ruff again, we'll see that it no longer flags the `Sequence` import:
+Running Ruff again, we'll see that it no longer flags the `Iterable` import:
 
 ```shell
 ❯ ruff check .
@@ -201,10 +202,10 @@ the file:
 
 ```py
 # ruff: noqa: UP035
-from typing import Sequence
+from typing import Iterable
 
 
-def sum_even_numbers(numbers: Sequence[int]) -> int:
+def sum_even_numbers(numbers: Iterable[int]) -> int:
     """Given a sequence of integers, return the sum of all even numbers in the sequence."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
@@ -233,11 +234,11 @@ index b9291c5ca..b9f15b8c1 100644
 --- a/numbers/numbers.py
 +++ b/numbers/numbers.py
 @@ -1,4 +1,4 @@
--from typing import Sequence
-+from typing import Sequence  # noqa: UP035
+-from typing import Iterable
++from typing import Iterable  # noqa: UP035
 
 
- def sum_even_numbers(numbers: Sequence[int]) -> int:
+ def sum_even_numbers(numbers: Iterable[int]) -> int:
 ```
 
 ## Continuous Integration
