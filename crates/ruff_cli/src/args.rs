@@ -398,7 +398,9 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
-
+    /// The minimum Python version that should be supported.
+    #[arg(long, value_enum)]
+    pub target_version: Option<PythonVersion>,
     /// Enable preview mode; enables unstable formatting.
     /// Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
@@ -539,6 +541,7 @@ impl FormatCommand {
                 exclude: self.exclude,
                 preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
+                target_version: self.target_version,
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..CliOverrides::default()
             },
