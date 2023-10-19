@@ -10,7 +10,6 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = "../../README.md"
-build = "build.rs"
 
 [[bin]]
 name = "ruff"
