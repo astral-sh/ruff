@@ -11,7 +11,7 @@ pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
 
     match output_format {
         HelpFormat::Text => {
-            writeln!(stdout, "{}", &version_info)?;
+            writeln!(stdout, "ruff {}", &version_info)?;
         }
         HelpFormat::Json => {
             serde_json::to_writer_pretty(stdout, &version_info)?;
