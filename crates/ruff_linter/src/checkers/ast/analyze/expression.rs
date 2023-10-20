@@ -1267,17 +1267,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
         }
-        Expr::Lambda(
-            lambda @ ast::ExprLambda {
-                parameters: _,
-                body: _,
-                range: _,
-            },
-        ) => {
-            if checker.enabled(Rule::ReimplementedListBuiltin) {
-                flake8_pie::rules::reimplemented_list_builtin(checker, lambda);
-            }
-        }
         Expr::IfExp(ast::ExprIfExp {
             test,
             body,

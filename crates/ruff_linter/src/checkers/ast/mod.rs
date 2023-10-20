@@ -1834,15 +1834,15 @@ impl<'a> Checker<'a> {
             for snapshot in deferred_functions {
                 self.semantic.restore(snapshot);
 
-                if let Stmt::FunctionDef(ast::StmtFunctionDef {
+                let Stmt::FunctionDef(ast::StmtFunctionDef {
                     body, parameters, ..
                 }) = self.semantic.current_statement()
-                {
-                    self.visit_parameters(parameters);
-                    self.visit_body(body);
-                } else {
+                else {
                     unreachable!("Expected Stmt::FunctionDef")
-                }
+                };
+
+                self.visit_parameters(parameters);
+                self.visit_body(body);
             }
         }
         self.semantic.restore(snapshot);
@@ -1856,19 +1856,19 @@ impl<'a> Checker<'a> {
             for snapshot in lambdas {
                 self.semantic.restore(snapshot);
 
-                if let Some(Expr::Lambda(ast::ExprLambda {
+                let Some(Expr::Lambda(ast::ExprLambda {
                     parameters,
                     body,
                     range: _,
                 })) = self.semantic.current_expression()
-                {
-                    if let Some(parameters) = parameters {
-                        self.visit_parameters(parameters);
-                    }
-                    self.visit_expr(body);
-                } else {
+                else {
                     unreachable!("Expected Expr::Lambda");
+                };
+
+                if let Some(parameters) = parameters {
+                    self.visit_parameters(parameters);
                 }
+                self.visit_expr(body);
 
                 deferred.push(snapshot);
             }
