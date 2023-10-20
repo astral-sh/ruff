@@ -8,7 +8,7 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use itertools::Itertools;
-use log::error;
+use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use similar::TextDiff;
@@ -18,12 +18,17 @@ use tracing::debug;
 use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
+use ruff_linter::registry::Rule;
+use ruff_linter::rules::isort;
+use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile};
+use ruff_workspace::resolver::{
+    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile, Resolver,
+};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
@@ -73,6 +78,8 @@ pub(crate) fn format(
         warn_user_once!("No Python files found under the given path(s)");
         return Ok(ExitStatus::Success);
     }
+
+    warn_incompatible_formatter_settings(&pyproject_config, Some(&resolver));
 
     // Discover the package root for each Python file.
     let package_roots = resolver.package_roots(
@@ -635,6 +642,72 @@ impl Display for FormatCommandError {
                     )
                 }
             }
+        }
+    }
+}
+
+pub(super) fn warn_incompatible_formatter_settings(
+    pyproject_config: &PyprojectConfig,
+    resolver: Option<&Resolver>,
+) {
+    for setting in std::iter::once(&pyproject_config.settings)
+        .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
+    {
+        let mut incompatible_rules = Vec::new();
+
+        for incompatible_rule in RuleTable::from_iter([
+            Rule::LineTooLong,
+            Rule::TabIndentation,
+            Rule::IndentationWithInvalidMultiple,
+            Rule::IndentationWithInvalidMultipleComment,
+            Rule::OverIndented,
+            Rule::IndentWithSpaces,
+            Rule::SingleLineImplicitStringConcatenation,
+            Rule::MissingTrailingComma,
+            Rule::ProhibitedTrailingComma,
+            Rule::BadQuotesInlineString,
+            Rule::BadQuotesMultilineString,
+            Rule::BadQuotesDocstring,
+            Rule::AvoidableEscapedQuote,
+        ])
+        .iter_enabled()
+        {
+            if setting.linter.rules.enabled(incompatible_rule) {
+                incompatible_rules.push(format!("'{}'", incompatible_rule.noqa_code()));
+            }
+        }
+
+        if !incompatible_rules.is_empty() {
+            incompatible_rules.sort();
+            warn!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.", incompatible_rules.join(", "));
+        }
+
+        let mut incompatible_options = Vec::new();
+
+        let isort_defaults = isort::settings::Settings::default();
+
+        if setting.linter.isort.force_single_line != isort_defaults.force_single_line {
+            incompatible_options.push("'isort.force-single-line'");
+        }
+
+        if setting.linter.isort.force_wrap_aliases != isort_defaults.force_wrap_aliases {
+            incompatible_options.push("'isort.force-wrap-aliases'");
+        }
+
+        if setting.linter.isort.lines_after_imports != isort_defaults.lines_after_imports {
+            incompatible_options.push("'isort.lines-after-imports'");
+        }
+
+        if setting.linter.isort.lines_between_types != isort_defaults.lines_between_types {
+            incompatible_options.push("'isort.lines_between_types'");
+        }
+
+        if setting.linter.isort.split_on_trailing_comma != isort_defaults.split_on_trailing_comma {
+            incompatible_options.push("'isort.split_on_trailing_comma'");
+        }
+
+        if !incompatible_options.is_empty() {
+            warn!("The following isort options may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these options by removing them from the configuration.", incompatible_options.join(", "));
         }
     }
 }
