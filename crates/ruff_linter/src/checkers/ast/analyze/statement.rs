@@ -1020,9 +1020,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-            if checker.enabled(Rule::NonAsciiName) {
-                pylint::rules::non_ascii_name(checker, target);
-            }
             if checker.enabled(Rule::GlobalStatement) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     pylint::rules::global_statement(checker, id);
@@ -1328,11 +1325,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
-            if checker.enabled(Rule::NonAsciiName) {
-                for target in targets {
-                    pylint::rules::non_ascii_name(checker, target);
-                }
-            }
+            checker.enabled(Rule::NonAsciiName);
             if checker.enabled(Rule::LambdaAssignment) {
                 if let [target] = &targets[..] {
                     pycodestyle::rules::lambda_assignment(checker, target, value, None, stmt);
@@ -1446,9 +1439,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ..
             },
         ) => {
-            if checker.enabled(Rule::NonAsciiName) {
-                pylint::rules::non_ascii_name(checker, target);
-            }
             if let Some(value) = value {
                 if checker.enabled(Rule::LambdaAssignment) {
                     pycodestyle::rules::lambda_assignment(

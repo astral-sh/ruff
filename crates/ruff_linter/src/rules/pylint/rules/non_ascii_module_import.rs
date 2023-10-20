@@ -10,8 +10,8 @@ use crate::checkers::ast::Checker;
 /// Checks for the use of non-ASCII characters in import statements.
 ///
 /// ## Why is this bad?
-/// Pylint discourages the use of non-ASCII characters in symbol names as
-/// they can cause confusion and compatibility issues.
+/// The use of non-ASCII characters in import statements can cause confusion
+/// and compatibility issues (see: [PEP 672]).
 ///
 /// ## Example
 /// ```python
@@ -28,8 +28,7 @@ use crate::checkers::ast::Checker;
 /// import bár as bar
 /// ```
 ///
-/// ## References
-/// - [PEP 672](https://peps.python.org/pep-0672/)
+/// [PEP 672]: https://peps.python.org/pep-0672/
 #[violation]
 pub struct NonAsciiImportName {
     name: String,
