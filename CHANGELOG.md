@@ -13,7 +13,7 @@
 - Respect `tab-size` setting in formatter ([#8006](https://github.com/astral-sh/ruff/pull/8006))
 - Add `lint.preview` ([#8002](https://github.com/astral-sh/ruff/pull/8002))
 
-## Preview features
+### Preview features
 
 - \[`pylint`\] Implement `literal-membership` (`PLR6201`) ([#7973](https://github.com/astral-sh/ruff/pull/7973))
 - \[`pylint`\] Implement `too-many-boolean-expressions` (`PLR0916`) ([#7975](https://github.com/astral-sh/ruff/pull/7975))
