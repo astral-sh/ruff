@@ -16,8 +16,8 @@ use shellexpand::LookupError;
 use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
-use ruff_formatter::{IndentStyle, IndentWidth, LineWidth};
-use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_formatter::IndentStyle;
+use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
@@ -133,7 +133,7 @@ pub struct Configuration {
 
     // Global formatting options
     pub line_length: Option<LineLength>,
-    pub tab_size: Option<TabSize>,
+    pub indent_width: Option<IndentWidth>,
 
     pub lint: LintConfiguration,
     pub format: FormatConfiguration,
@@ -166,14 +166,14 @@ impl Configuration {
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {
-                    LineWidth::from(NonZeroU16::from(length))
+                    ruff_formatter::LineWidth::from(NonZeroU16::from(length))
                 }),
             line_ending: format.line_ending.unwrap_or(format_defaults.line_ending),
             indent_style: format.indent_style.unwrap_or(format_defaults.indent_style),
             indent_width: self
-                .tab_size
+                .indent_width
                 .map_or(format_defaults.indent_width, |tab_size| {
-                    IndentWidth::from(NonZeroU8::from(tab_size))
+                    ruff_formatter::IndentWidth::from(NonZeroU8::from(tab_size))
                 }),
             quote_style: format.quote_style.unwrap_or(format_defaults.quote_style),
             magic_trailing_comma: format
@@ -228,7 +228,7 @@ impl Configuration {
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
                 external: FxHashSet::from_iter(lint.external.unwrap_or_default()),
                 ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
-                tab_size: self.tab_size.unwrap_or_default(),
+                tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
                 per_file_ignores: resolve_per_file_ignores(
                     lint.per_file_ignores
@@ -389,6 +389,15 @@ impl Configuration {
             }
         };
 
+        #[allow(deprecated)]
+        let indent_width = {
+            if options.tab_size.is_some() {
+                warn_user_once!("The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead.");
+            }
+
+            options.indent_width.or(options.tab_size)
+        };
+
         Ok(Self {
             builtins: options.builtins,
             cache_dir: options
@@ -456,7 +465,7 @@ impl Configuration {
             output_format: options.output_format,
             force_exclude: options.force_exclude,
             line_length: options.line_length,
-            tab_size: options.tab_size,
+            indent_width,
             namespace_packages: options
                 .namespace_packages
                 .map(|namespace_package| resolve_src(&namespace_package, project_root))
@@ -504,7 +513,7 @@ impl Configuration {
             output_format: self.output_format.or(config.output_format),
             force_exclude: self.force_exclude.or(config.force_exclude),
             line_length: self.line_length.or(config.line_length),
-            tab_size: self.tab_size.or(config.tab_size),
+            indent_width: self.indent_width.or(config.indent_width),
             namespace_packages: self.namespace_packages.or(config.namespace_packages),
             required_version: self.required_version.or(config.required_version),
             respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),

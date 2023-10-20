@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use ruff_formatter::IndentStyle;
-use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
@@ -374,6 +374,24 @@ pub struct Options {
     )]
     pub line_length: Option<LineLength>,
 
+    /// The number of spaces per indentation level (tab).
+    ///
+    /// Used by the formatter and when enforcing long-line violations (like `E501`) to determine the visual
+    /// width of a tab.
+    ///
+    /// This option changes the number of spaces the formatter inserts when
+    /// using soft-tabs (`indent-style = space`).
+    ///
+    /// PEP 8 recommends using 4 spaces per [indentation level](https://peps.python.org/pep-0008/#indentation).
+    #[option(
+        default = "4",
+        value_type = "int",
+        example = r#"
+            indent-width = 2
+        "#
+    )]
+    pub indent_width: Option<IndentWidth>,
+
     /// The number of spaces a tab is equal to when enforcing long-line violations (like `E501`)
     /// or formatting code with the formatter.
     ///
@@ -383,10 +401,14 @@ pub struct Options {
         default = "4",
         value_type = "int",
         example = r#"
-            tab-size = 8
+            tab-size = 2
         "#
     )]
-    pub tab_size: Option<TabSize>,
+    #[deprecated(
+        since = "0.1.2",
+        note = "The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead."
+    )]
+    pub tab_size: Option<IndentWidth>,
 
     pub lint: Option<LintOptions>,
 
@@ -2321,7 +2343,7 @@ impl PycodestyleOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PydocstyleOptions {
-    /// Whether to use Google-style or NumPy-style conventions or the PEP257
+    /// Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/)
     /// defaults when analyzing docstring sections.
     ///
     /// Enabling a convention will force-disable any rules that are not
@@ -2593,10 +2615,26 @@ pub struct FormatOptions {
     )]
     pub preview: Option<bool>,
 
-    /// Whether to use 4 spaces or hard tabs for indenting code.
+    /// Whether to use spaces or tabs for indentation.
     ///
-    /// Defaults to 4 spaces. We care about accessibility; if you do not need tabs for
-    /// accessibility, we do not recommend you use them.
+    /// `indent-style = "space"` (default):
+    ///
+    /// ```python
+    /// def f():
+    ///     print("Hello") #  Spaces indent the `print` statement.
+    /// ```
+    ///
+    /// `indent-style = "tab""`:
+    ///
+    /// ```python
+    /// def f():
+    ///     print("Hello") #  A tab `\t` indents the `print` statement.
+    /// ```
+    ///
+    /// PEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation).
+    /// We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.
+    ///
+    /// See [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.
     #[option(
         default = "space",
         value_type = r#""space" | "tab""#,

@@ -50,7 +50,7 @@ fn format_options() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
-tab-size = 8
+indent-width = 8
 line-length = 84
 
 [format]
@@ -275,6 +275,41 @@ if condition:
     ----- stderr -----
     warning: The following rules may cause conflicts when used with the formatter: 'Q000'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     "###);
+    Ok(())
+}
+
+#[test]
+fn deprecated_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+tab-size = 2
+"#,
+    )?;
+
+    insta::with_settings!({filters => vec![
+        (&*regex::escape(ruff_toml.to_str().unwrap()), "[RUFF-TOML-PATH]"),
+    ]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--config"])
+            .arg(&ruff_toml)
+            .arg("-")
+            .pass_stdin(r#"
+if True:
+    pass
+    "#), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        if True:
+          pass
+
+        ----- stderr -----
+        warning: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead.
+        "###);
+    });
     Ok(())
 }
 
