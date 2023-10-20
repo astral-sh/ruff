@@ -1,11 +1,17 @@
 # Tutorial
 
-This tutorial will walk you through the process of integrating Ruff into your project. For a more
-detailed overview, see [_Configuration_](configuration.md).
+This tutorial will walk you through the process of integrating Ruff's linter and formatter into
+your project. For a more detailed overview, see [_Configuring Ruff_](configuration.md).
 
 ## Getting Started
 
-Let's assume that our project structure looks like:
+To start, we'll install Ruff through PyPI (or with your [preferred package manager](installation.md)):
+
+```shell
+pip install ruff
+```
+
+Let's then assume that our project structure looks like:
 
 ```text
 numbers
@@ -13,7 +19,7 @@ numbers
   └── numbers.py
 ```
 
-Where `numbers.py` contains the following code:
+...where `numbers.py` contains the following code:
 
 ```py
 from typing import Iterable
@@ -23,16 +29,13 @@ import os
 
 def sum_even_numbers(numbers: Iterable[int]) -> int:
     """Given an iterable of integers, return the sum of all even numbers in the iterable."""
-    return sum(num for num in numbers if num % 2 == 0)
+    return sum(
+        num for num in numbers
+        if num % 2 == 0
+    )
 ```
 
-To start, we'll install Ruff through PyPI (or with your [preferred package manager](installation.md)):
-
-```shell
-> pip install ruff
-```
-
-We can then run Ruff over our project via `ruff check`:
+We can run the Ruff linter over our project via `ruff check`:
 
 ```shell
 ❯ ruff check .
@@ -62,7 +65,34 @@ Running `git diff` shows the following:
 
 def sum_even_numbers(numbers: Iterable[int]) -> int:
     """Given an iterable of integers, return the sum of all even numbers in the iterable."""
-    return sum(num for num in numbers if num % 2 == 0)
+    return sum(
+        num for num in numbers
+        if num % 2 == 0
+    )
+```
+
+Now that our project is passing `ruff check`, we can run the Ruff formatter via `ruff format`:
+
+```shell
+❯ ruff format .
+1 file reformatted
+```
+
+Running `git diff` shows that the `sum` call was reformatted to fit within the default 88-character
+line length limit:
+
+```diff
+--- a/numbers.py
++++ b/numbers.py
+@@ -3,7 +3,4 @@ from typing import Iterable
+
+ def sum_even_numbers(numbers: Iterable[int]) -> int:
+     """Given an iterable of integers, return the sum of all even numbers in the iterable."""
+-    return sum(
+-        num for num in numbers
+-        if num % 2 == 0
+-    )
++    return sum(num for num in numbers if num % 2 == 0)
 ```
 
 Thus far, we've been using Ruff's default configuration. Let's take a look at how we can customize
@@ -73,19 +103,21 @@ Ruff's behavior.
 To determine the appropriate settings for each Python file, Ruff looks for the first
 `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file in the file's directory or any parent directory.
 
-Let's create a `pyproject.toml` file in our project's root directory:
+To configure Ruff, let's create a `pyproject.toml` file in our project's root directory:
 
 ```toml
 [tool.ruff]
+# Set the maximum line length to 79 characters.
+line-length = 79
+
+[tool.ruff.linter]
 # Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
 # overlap with the use of a formatter, like Black, but we can override this behavior by
 # explicitly adding the rule.
 extend-select = ["E501"]
-# Set the maximum line length to 79 characters.
-line-length = 79
 ```
 
-Running Ruff again, we can see that it now enforces a line length of 79 characters:
+Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79 characters:
 
 ```shell
 ❯ ruff check .
@@ -102,10 +134,12 @@ specifically, we'll want to make note of the minimum supported Python version:
 requires-python = ">=3.10"
 
 [tool.ruff]
-# Add the `line-too-long` rule to the enforced rule set.
-extend-select = ["E501"]
 # Set the maximum line length to 79 characters.
 line-length = 79
+
+[tool.ruff.linter]
+# Add the `line-too-long` rule to the enforced rule set.
+extend-select = ["E501"]
 ```
 
 ### Rule Selection
@@ -115,7 +149,7 @@ determining the right set of rules will depend on your project's needs: some rul
 strict, some are framework-specific, and so on.
 
 By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
-stylistic rules that overlap with the use of a formatter, like
+stylistic rules that overlap with the use of a formatter, like `ruff format` or
 [Black](https://github.com/psf/black).
 
 If you're introducing a linter for the first time, **the default rule set is a great place to
@@ -130,7 +164,7 @@ rules, we can set our `pyproject.toml` to the following:
 [project]
 requires-python = ">=3.10"
 
-[tool.ruff]
+[tool.ruff.linter]
 extend-select = [
   "UP",  # pyupgrade
 ]
@@ -153,13 +187,13 @@ all functions have docstrings:
 [project]
 requires-python = ">=3.10"
 
-[tool.ruff]
+[tool.ruff.linter]
 extend-select = [
   "UP",  # pyupgrade
   "D",   # pydocstyle
 ]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.linter.pydocstyle]
 convention = "google"
 ```
 
@@ -188,7 +222,7 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-Running Ruff again, we'll see that it no longer flags the `Iterable` import:
+Running `ruff check` again, we'll see that it no longer flags the `Iterable` import:
 
 ```shell
 ❯ ruff check .
@@ -210,7 +244,7 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-For more in-depth instructions on ignoring errors, see [_Configuration_](configuration.md#error-suppression).
+For more in-depth instructions on ignoring errors, please see [_Error suppression_](linter.md#error-suppression).
 
 ### Adding Rules
 
@@ -241,24 +275,27 @@ index b9291c5ca..b9f15b8c1 100644
  def sum_even_numbers(numbers: Iterable[int]) -> int:
 ```
 
-## Continuous Integration
+## Integrations
 
 This tutorial has focused on Ruff's command-line interface, but Ruff can also be used as a
-[pre-commit](https://pre-commit.com) hook:
+[pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
 
 ```yaml
+# Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
   rev: v0.1.1
   hooks:
     - id: ruff
+# Run the Ruff formatter.
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.0.291
+  hooks:
+    - id: ruff-format
 ```
-
-See [_Usage_](usage.md) for more.
-
-## Editor Integrations
 
 Ruff can also be used as a [VS Code extension](https://github.com/astral-sh/ruff-vscode) or
 alongside any other editor through the [Ruff LSP](https://github.com/astral-sh/ruff-lsp).
 
-See [_Editor Integrations_](editor-integrations.md).
+For more, see [_Integrations_](integrations.md).

@@ -22,14 +22,15 @@ class Section(NamedTuple):
 SECTIONS: list[Section] = [
     Section("Overview", "index.md", generated=True),
     Section("Tutorial", "tutorial.md", generated=False),
-    Section("Installation", "installation.md", generated=False),
-    Section("Usage", "usage.md", generated=False),
-    Section("Configuration", "configuration.md", generated=False),
+    Section("Installing Ruff", "installation.md", generated=False),
+    Section("The Ruff Linter", "linter.md", generated=False),
+    Section("The Ruff Formatter", "formatter.md", generated=False),
+    Section("Configuring Ruff", "configuration.md", generated=False),
     Section("Preview", "preview.md", generated=False),
     Section("Rules", "rules.md", generated=True),
     Section("Settings", "settings.md", generated=True),
-    Section("Editor Integrations", "editor-integrations.md", generated=False),
     Section("Versioning", "versioning.md", generated=False),
+    Section("Integrations", "integrations.md", generated=False),
     Section("FAQ", "faq.md", generated=False),
     Section("Contributing", "contributing.md", generated=True),
 ]
@@ -42,7 +43,7 @@ LINK_REWRITES: dict[str, str] = {
         "configuration.md#pyprojecttoml-discovery"
     ),
     "https://docs.astral.sh/ruff/contributing/": "contributing.md",
-    "https://docs.astral.sh/ruff/editor-integrations/": "editor-integrations.md",
+    "https://docs.astral.sh/ruff/integrations/": "integrations.md",
     "https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8": (
         "faq.md#how-does-ruff-compare-to-flake8"
     ),

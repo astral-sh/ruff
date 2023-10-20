@@ -20,7 +20,7 @@ use crate::settings::LinterSettings;
 /// negatively affects code readability.
 ///
 /// In some cases, the implicit concatenation may also be unintentional, as
-/// autoformatters are capable of introducing single-line implicit
+/// code formatters are capable of introducing single-line implicit
 /// concatenations when collapsing long lines.
 ///
 /// ## Example
