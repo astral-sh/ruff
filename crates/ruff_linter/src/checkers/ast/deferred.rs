@@ -12,6 +12,6 @@ pub(crate) struct Deferred<'a> {
     pub(crate) future_type_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) type_param_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) functions: Vec<Snapshot>,
-    pub(crate) lambdas: Vec<(&'a Expr, Snapshot)>,
+    pub(crate) lambdas: Vec<Snapshot>,
     pub(crate) for_loops: Vec<Snapshot>,
 }
