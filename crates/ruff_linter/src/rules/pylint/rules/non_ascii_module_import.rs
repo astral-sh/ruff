@@ -1,5 +1,4 @@
-use ast::Identifier;
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, Alias};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -8,29 +7,87 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for the use of non-ASCII characters in import symbol names.
+/// Checks for the use of non-ASCII characters in import statements.
 ///
 /// ## Why is this bad?
 /// Pylint discourages the use of non-ASCII characters in symbol names as
 /// they can cause confusion and compatibility issues.
 ///
+/// ## Example
+/// ```python
+/// import bár
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import bar
+/// ```
+///
+/// If the module is third-party, use an ASCII-only alias:
+/// ```python
+/// import bár as bar
+/// ```
+///
 /// ## References
 /// - [PEP 672](https://peps.python.org/pep-0672/)
 #[violation]
-pub struct NonAsciiImportName;
+pub struct NonAsciiImportName {
+    name: String,
+    kind: Kind,
+}
 
 impl Violation for NonAsciiImportName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Symbol name contains a non-ASCII character, consider renaming it.")
+        let Self { name, kind } = self;
+        match kind {
+            Kind::Aliased => {
+                format!(
+                    "Module alias `{name}` contains a non-ASCII character, use an ASCII-only alias"
+                )
+            }
+            Kind::Unaliased => {
+                format!(
+                    "Module name `{name}` contains a non-ASCII character, use an ASCII-only alias"
+                )
+            }
+        }
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum Kind {
+    /// The import uses a non-ASCII alias (e.g., `import foo as bár`).
+    Aliased,
+    /// The imported module is non-ASCII, and could be given an ASCII alias (e.g., `import bár`).
+    Unaliased,
+}
+
 /// PLC2403
-pub(crate) fn non_ascii_module_import(checker: &mut Checker, target: &Identifier) {
-    if !target.as_str().is_ascii() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(NonAsciiImportName, target.range()));
-    };
+pub(crate) fn non_ascii_module_import(checker: &mut Checker, alias: &Alias) {
+    if let Some(asname) = &alias.asname {
+        if asname.as_str().is_ascii() {
+            return;
+        }
+
+        checker.diagnostics.push(Diagnostic::new(
+            NonAsciiImportName {
+                name: asname.to_string(),
+                kind: Kind::Aliased,
+            },
+            asname.range(),
+        ));
+    } else {
+        if alias.name.as_str().is_ascii() {
+            return;
+        }
+
+        checker.diagnostics.push(Diagnostic::new(
+            NonAsciiImportName {
+                name: alias.name.to_string(),
+                kind: Kind::Unaliased,
+            },
+            alias.name.range(),
+        ));
+    }
 }

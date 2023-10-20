@@ -547,10 +547,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
 
             for alias in names {
+                if checker.enabled(Rule::NonAsciiImportName) {
+                    pylint::rules::non_ascii_module_import(checker, alias);
+                }
                 if let Some(asname) = &alias.asname {
-                    if checker.enabled(Rule::NonAsciiImportName) {
-                        pylint::rules::non_ascii_module_import(checker, asname);
-                    }
                     if checker.enabled(Rule::BuiltinVariableShadowing) {
                         flake8_builtins::rules::builtin_variable_shadowing(
                             checker,
@@ -701,8 +701,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 range: _,
             },
         ) => {
-            let module = module.as_deref();
             let level = *level;
+            let module = module.as_deref();
             if checker.enabled(Rule::ModuleImportNotAtTopOfFile) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
             }
@@ -715,17 +715,15 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::NonAsciiImportName) {
+                for alias in names {
+                    pylint::rules::non_ascii_module_import(checker, &alias);
+                }
+            }
             if checker.enabled(Rule::UnnecessaryFutureImport) {
                 if checker.settings.target_version >= PythonVersion::Py37 {
                     if let Some("__future__") = module {
                         pyupgrade::rules::unnecessary_future_import(checker, stmt, names);
-                    }
-                }
-            }
-            if checker.enabled(Rule::NonAsciiImportName) {
-                for name in names {
-                    if let Some(asname) = name.asname.as_ref() {
-                        pylint::rules::non_ascii_module_import(checker, asname);
                     }
                 }
             }
