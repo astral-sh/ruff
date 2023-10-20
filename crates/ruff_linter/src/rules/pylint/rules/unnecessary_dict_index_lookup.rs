@@ -103,50 +103,12 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
 
 /// PLR1733
 pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &StmtFor) {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
-    }) = stmt_for.iter.as_ref()
+    let Some((dict_name, index_name, value_name)) = dict_items(&stmt_for.iter, &stmt_for.target)
     else {
         return;
     };
-    if !args.is_empty() {
-        return;
-    }
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
-        return;
-    };
-    if attr != "items" {
-        return;
-    }
 
-    let Expr::Name(ast::ExprName { id: dict_name, .. }) = value.as_ref() else {
-        return;
-    };
-
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
-        return;
-    };
-    let [index, value] = elts.as_slice() else {
-        return;
-    };
-
-    // Grab the variable names
-    let Expr::Name(ast::ExprName { id: index_name, .. }) = index else {
-        return;
-    };
-
-    let Expr::Name(ast::ExprName { id: value_name, .. }) = value else {
-        return;
-    };
-
-    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit
-    if index_name == "_" || value_name == "_" {
-        return;
-    }
-
-    let mut visitor = SubscriptVisitor::new(dict_name, index_name);
+    let mut visitor = SubscriptVisitor::new(&dict_name, &index_name);
 
     visitor.visit_body(&stmt_for.body);
     visitor.visit_body(&stmt_for.orelse);
@@ -161,4 +123,98 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &St
 
         checker.diagnostics.push(diagnostic);
     }
+}
+
+/// PLR1733
+pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
+    match expr {
+        Expr::GeneratorExp(ast::ExprGeneratorExp {
+            elt, generators, ..
+        })
+        | Expr::DictComp(ast::ExprDictComp {
+            value: elt,
+            generators,
+            ..
+        })
+        | Expr::SetComp(ast::ExprSetComp {
+            elt, generators, ..
+        })
+        | Expr::ListComp(ast::ExprListComp {
+            elt, generators, ..
+        }) => {
+            for comp in generators {
+                let Some((dict_name, index_name, value_name)) =
+                    dict_items(&comp.iter, &comp.target)
+                else {
+                    continue;
+                };
+
+                let mut visitor = SubscriptVisitor::new(&dict_name, &index_name);
+
+                visitor.visit_expr(elt.as_ref());
+                for expr in &comp.ifs {
+                    visitor.visit_expr(expr);
+                }
+
+                for range in visitor.diagnostic_ranges {
+                    let mut diagnostic = Diagnostic::new(UnnecessaryDictIndexLookup, range);
+
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        value_name.clone(),
+                        range,
+                    )));
+
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
+        }
+        _ => (),
+    }
+}
+
+fn dict_items(call_expr: &Expr, tuple_expr: &Expr) -> Option<(String, String, String)> {
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: Arguments { args, .. },
+        ..
+    }) = call_expr
+    else {
+        return None;
+    };
+    if !args.is_empty() {
+        return None;
+    }
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+        return None;
+    };
+    if attr != "items" {
+        return None;
+    }
+
+    let Expr::Name(ast::ExprName { id: dict_name, .. }) = value.as_ref() else {
+        return None;
+    };
+
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = tuple_expr else {
+        return None;
+    };
+    let [index, value] = elts.as_slice() else {
+        return None;
+    };
+
+    // Grab the variable names
+    let Expr::Name(ast::ExprName { id: index_name, .. }) = index else {
+        return None;
+    };
+
+    let Expr::Name(ast::ExprName { id: value_name, .. }) = value else {
+        return None;
+    };
+
+    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit
+    if index_name == "_" || value_name == "_" {
+        return None;
+    }
+
+    Some((dict_name.clone(), index_name.clone(), value_name.clone()))
 }

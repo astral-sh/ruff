@@ -1333,6 +1333,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
                 pylint::rules::unnecessary_list_index_lookup_comprehension(checker, expr);
             }
+            if checker.enabled(Rule::UnnecessaryDictIndexLookup) {
+                pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, expr);
+            }
             if checker.enabled(Rule::UnnecessaryComprehension) {
                 flake8_comprehensions::rules::unnecessary_list_set_comprehension(
                     checker, expr, elt, generators,
@@ -1360,6 +1363,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
                 pylint::rules::unnecessary_list_index_lookup_comprehension(checker, expr);
             }
+            if checker.enabled(Rule::UnnecessaryDictIndexLookup) {
+                pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, expr);
+            }
             if checker.enabled(Rule::UnnecessaryComprehension) {
                 flake8_comprehensions::rules::unnecessary_list_set_comprehension(
                     checker, expr, elt, generators,
@@ -1385,6 +1391,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }) => {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
                 pylint::rules::unnecessary_list_index_lookup_comprehension(checker, expr);
+            }
+            if checker.enabled(Rule::UnnecessaryDictIndexLookup) {
+                pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, expr);
             }
             if checker.enabled(Rule::UnnecessaryComprehension) {
                 flake8_comprehensions::rules::unnecessary_dict_comprehension(
@@ -1412,6 +1421,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         ) => {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
                 pylint::rules::unnecessary_list_index_lookup_comprehension(checker, expr);
+            }
+            if checker.enabled(Rule::UnnecessaryDictIndexLookup) {
+                pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, expr);
             }
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
