@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::pylint;
+use crate::rules::{flake8_pie, pylint};
 
 /// Run lint rules over all deferred lambdas in the [`SemanticModel`].
 pub(crate) fn deferred_lambdas(checker: &mut Checker) {
@@ -17,6 +17,9 @@ pub(crate) fn deferred_lambdas(checker: &mut Checker) {
 
             if checker.enabled(Rule::UnnecessaryLambda) {
                 pylint::rules::unnecessary_lambda(checker, lambda);
+            }
+            if checker.enabled(Rule::ReimplementedListBuiltin) {
+                flake8_pie::rules::reimplemented_list_builtin(checker, lambda);
             }
         }
     }
