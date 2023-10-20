@@ -4,7 +4,7 @@
 
 use std::borrow::Cow;
 use std::env::VarError;
-use std::num::NonZeroU16;
+use std::num::{NonZeroU16, NonZeroU8};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
@@ -16,7 +16,7 @@ use shellexpand::LookupError;
 use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
-use ruff_formatter::{IndentStyle, LineWidth};
+use ruff_formatter::{IndentStyle, IndentWidth, LineWidth};
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
@@ -155,7 +155,7 @@ impl Configuration {
 
         let format = self.format;
         let format_defaults = FormatterSettings::default();
-        // TODO(micha): Support changing the tab-width but disallow changing the number of spaces
+
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             preview: match format.preview.unwrap_or(global_preview) {
@@ -169,6 +169,11 @@ impl Configuration {
                 }),
             line_ending: format.line_ending.unwrap_or(format_defaults.line_ending),
             indent_style: format.indent_style.unwrap_or(format_defaults.indent_style),
+            indent_width: self
+                .tab_size
+                .map_or(format_defaults.indent_width, |tab_size| {
+                    IndentWidth::from(NonZeroU8::from(tab_size))
+                }),
             quote_style: format.quote_style.unwrap_or(format_defaults.quote_style),
             magic_trailing_comma: format
                 .magic_trailing_comma
@@ -562,6 +567,22 @@ pub struct LintConfiguration {
 
 impl LintConfiguration {
     fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
+        #[allow(deprecated)]
+        let ignore = options
+            .common
+            .ignore
+            .into_iter()
+            .flatten()
+            .chain(options.common.extend_ignore.into_iter().flatten())
+            .collect();
+        #[allow(deprecated)]
+        let unfixable = options
+            .common
+            .unfixable
+            .into_iter()
+            .flatten()
+            .chain(options.common.extend_unfixable.into_iter().flatten())
+            .collect();
         Ok(LintConfiguration {
             exclude: options.exclude.map(|paths| {
                 paths
@@ -576,22 +597,10 @@ impl LintConfiguration {
 
             rule_selections: vec![RuleSelection {
                 select: options.common.select,
-                ignore: options
-                    .common
-                    .ignore
-                    .into_iter()
-                    .flatten()
-                    .chain(options.common.extend_ignore.into_iter().flatten())
-                    .collect(),
+                ignore,
                 extend_select: options.common.extend_select.unwrap_or_default(),
                 fixable: options.common.fixable,
-                unfixable: options
-                    .common
-                    .unfixable
-                    .into_iter()
-                    .flatten()
-                    .chain(options.common.extend_unfixable.into_iter().flatten())
-                    .collect(),
+                unfixable,
                 extend_fixable: options.common.extend_fixable.unwrap_or_default(),
             }],
             extend_safe_fixes: options.common.extend_safe_fixes.unwrap_or_default(),

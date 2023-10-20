@@ -363,7 +363,11 @@ pub struct Options {
     )]
     pub line_length: Option<LineLength>,
 
-    /// The tabulation size to calculate line length.
+    /// The number of spaces a tab is equal to when enforcing long-line violations (like `E501`)
+    /// or formatting code with the formatter.
+    ///
+    /// This option changes the number of spaces inserted by the formatter when
+    /// using soft-tabs (`indent-style = space`).
     #[option(
         default = "4",
         value_type = "int",
@@ -384,6 +388,10 @@ pub struct Options {
     pub format: Option<FormatOptions>,
 }
 
+/// Experimental section to configure Ruff's linting. This new section will eventually
+/// replace the top-level linting options.
+///
+/// Options specified in the `lint` section take precedence over the top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -429,10 +437,6 @@ pub struct LintOptions {
 // Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
 // is removed.
 
-/// Experimental section to configure Ruff's linting. This new section will eventually
-/// replace the top-level linting options.
-///
-/// Options specified in the `lint` section take precedence over the top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
     Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
@@ -467,9 +471,6 @@ pub struct LintCommonOptions {
 
     /// A list of rule codes or prefixes to ignore, in addition to those
     /// specified by `ignore`.
-    ///
-    /// This option has been **deprecated** in favor of `ignore`
-    /// since its usage is now interchangeable with `ignore`.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -478,7 +479,9 @@ pub struct LintCommonOptions {
             extend-ignore = ["F841"]
         "#
     )]
-    #[cfg_attr(feature = "schemars", schemars(skip))]
+    #[deprecated(
+        note = "The `extend-ignore` option is now interchangeable with `ignore`. Please update your configuration to use the `ignore` option instead."
+    )]
     pub extend_ignore: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes or prefixes to enable, in addition to those
@@ -507,10 +510,9 @@ pub struct LintCommonOptions {
 
     /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
     /// specified by `unfixable`.
-    ///
-    /// This option has been **deprecated** in favor of `unfixable` since its usage is now
-    /// interchangeable with `unfixable`.
-    #[cfg_attr(feature = "schemars", schemars(skip))]
+    #[deprecated(
+        note = "The `extend-unfixable` option is now interchangeable with `unfixable`. Please update your configuration to use the `unfixable` option instead."
+    )]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes that are unsupported by Ruff, but should be
@@ -2390,7 +2392,7 @@ pub struct PylintOptions {
     /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
     #[option(
         default = r#"["str", "bytes"]"#,
-        value_type = r#"list["str" | "bytes" | "complex" | "float" | "int" | "tuple"]"#,
+        value_type = r#"list["str" | "bytes" | "complex" | "float" | "int"]"#,
         example = r#"
             allow-magic-value-types = ["int"]
         "#
@@ -2621,16 +2623,16 @@ pub struct FormatOptions {
 
     /// The character Ruff uses at the end of a line.
     ///
+    /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.
     /// * `lf`: Line endings will be converted to `\n`. The default line ending on Unix.
     /// * `cr-lf`: Line endings will be converted to `\r\n`. The default line ending on Windows.
-    /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.
     /// * `native`: Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     #[option(
-        default = r#"lf"#,
-        value_type = r#""lf" | "cr-lf" | "auto" | "native""#,
+        default = r#"auto"#,
+        value_type = r#""auto" | "lf" | "cr-lf" | "native""#,
         example = r#"
-            # Automatically detect the line ending on a file per file basis.
-            line-ending = "auto"
+            # Use `\n` line endings for all files
+            line-ending = "lf"
         "#
     )]
     pub line_ending: Option<LineEnding>,

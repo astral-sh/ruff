@@ -1,18 +1,18 @@
 use std::cmp::Ordering;
-
-use itertools::Itertools;
+use std::slice;
 
 use ruff_formatter::{
     write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
 use ruff_python_ast as ast;
+use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
+use ruff_python_ast::{AnyNodeRef, Constant, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::CommentRanges;
+use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::leading_comments;
+use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
@@ -102,7 +102,6 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Slice(expr) => expr.format().fmt(f),
             Expr::IpyEscapeCommand(expr) => expr.format().fmt(f),
         });
-
         let parenthesize = match parentheses {
             Parentheses::Preserve => is_expression_parenthesized(
                 expression.into(),
@@ -113,32 +112,13 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             // Fluent style means we already have parentheses
             Parentheses::Never => false,
         };
-
         if parenthesize {
-            // Any comments on the open parenthesis of a `node`.
-            //
-            // For example, `# comment` in:
-            // ```python
-            // (  # comment
-            //    foo.bar
-            // )
-            // ```
-            let comments = f.context().comments().clone();
-            let leading = comments.leading(expression);
-            if let Some((index, open_parenthesis_comment)) = leading
-                .iter()
-                .find_position(|comment| comment.line_position().is_end_of_line())
-            {
-                write!(
-                    f,
-                    [
-                        leading_comments(&leading[..index]),
-                        parenthesized("(", &format_expr, ")")
-                            .with_dangling_comments(std::slice::from_ref(open_parenthesis_comment))
-                    ]
-                )
-            } else {
+            let comment = f.context().comments().clone();
+            let node_comments = comment.leading_dangling_trailing(expression);
+            if !node_comments.has_leading() && !node_comments.has_trailing() {
                 parenthesized("(", &format_expr, ")").fmt(f)
+            } else {
+                format_with_parentheses_comments(expression, &node_comments, f)
             }
         } else {
             let level = match f.context().node_level() {
@@ -153,6 +133,185 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             write!(f, [format_expr])
         }
     }
+}
+
+/// The comments below are trailing on the addition, but it's also outside the
+/// parentheses
+/// ```python
+/// x = [
+///     # comment leading
+///     (1 + 2)  # comment trailing
+/// ]
+/// ```
+/// as opposed to
+/// ```python
+/// x = [(
+///     # comment leading
+///     1 + 2  # comment trailing
+/// )]
+/// ```
+/// , where the comments are inside the parentheses. That is also affects list
+/// formatting, where we want to avoid moving the comments after the comma inside
+/// the parentheses:
+/// ```python
+/// data = [
+///     (
+///         b"\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+///         b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+///     ),  # Point (0 0)
+/// ]
+/// ```
+/// We could mark those comments as trailing in list but it's easier to handle
+/// them here too.
+///
+/// So given
+/// ```python
+/// x = [
+///     # comment leading outer
+///     (
+///         # comment leading inner
+///         1 + 2 # comment trailing inner
+///     ) # comment trailing outer
+/// ]
+/// ```
+/// we want to keep the inner an outer comments outside the parentheses and the inner ones inside.
+/// This is independent of whether they are own line or end-of-line comments, though end-of-line
+/// comments can become own line comments when we discard nested parentheses.
+///
+/// Style decision: When there are multiple nested parentheses around an expression, we consider the
+/// outermost parentheses the relevant ones and discard the others.
+fn format_with_parentheses_comments(
+    expression: &Expr,
+    node_comments: &LeadingDanglingTrailingComments,
+    f: &mut PyFormatter,
+) -> FormatResult<()> {
+    // First part: Split the comments
+
+    // TODO(konstin): We don't have the parent, which is a problem:
+    // ```python
+    // f(
+    //     # a
+    //     (a)
+    // )
+    // ```
+    // gets formatted as
+    // ```python
+    // f(
+    //     (
+    //         # a
+    //         a
+    //     )
+    // )
+    // ```
+    let range_with_parens = parentheses_iterator(
+        expression.into(),
+        None,
+        f.context().comments().ranges(),
+        f.context().source(),
+    )
+    .last();
+
+    let (leading_split, trailing_split) = if let Some(range_with_parens) = range_with_parens {
+        let leading_split = node_comments
+            .leading
+            .partition_point(|comment| comment.start() < range_with_parens.start());
+        let trailing_split = node_comments
+            .trailing
+            .partition_point(|comment| comment.start() < range_with_parens.end());
+        (leading_split, trailing_split)
+    } else {
+        (0, node_comments.trailing.len())
+    };
+
+    let (leading_outer, leading_inner) = node_comments.leading.split_at(leading_split);
+    let (trailing_inner, trailing_outer) = node_comments.trailing.split_at(trailing_split);
+
+    // Preserve an opening parentheses comment
+    // ```python
+    // a = ( # opening parentheses comment
+    //     # leading inner
+    //     1
+    // )
+    // ```
+    let (parentheses_comment, leading_inner) = match leading_inner.split_first() {
+        Some((first, rest)) if first.line_position().is_end_of_line() => {
+            (slice::from_ref(first), rest)
+        }
+        _ => (Default::default(), node_comments.leading),
+    };
+
+    // Second Part: Format
+
+    // The code order is a bit strange here, we format:
+    // * outer leading comment
+    // * opening parenthesis
+    // * opening parenthesis comment
+    // * inner leading comments
+    // * the expression itself
+    // * inner trailing comments
+    // * the closing parenthesis
+    // * outer trailing comments
+
+    let fmt_fields = format_with(|f| match expression {
+        Expr::BoolOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::NamedExpr(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::BinOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::UnaryOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Lambda(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::IfExp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Dict(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Set(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::ListComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::SetComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::DictComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::GeneratorExp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Await(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Yield(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::YieldFrom(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::FormattedValue(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Constant(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Attribute(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Subscript(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Starred(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Name(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::List(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Tuple(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Slice(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::IpyEscapeCommand(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+    });
+
+    leading_comments(leading_outer).fmt(f)?;
+
+    // Custom FormatNodeRule::fmt variant that only formats the inner comments
+    let format_node_rule_fmt = format_with(|f| {
+        // No need to handle suppression comments, those are statement only
+        leading_comments(leading_inner).fmt(f)?;
+
+        let is_source_map_enabled = f.options().source_map_generation().is_enabled();
+
+        if is_source_map_enabled {
+            source_position(expression.start()).fmt(f)?;
+        }
+
+        fmt_fields.fmt(f)?;
+
+        if is_source_map_enabled {
+            source_position(expression.end()).fmt(f)?;
+        }
+
+        trailing_comments(trailing_inner).fmt(f)
+    });
+
+    // The actual parenthesized formatting
+    parenthesized("(", &format_node_rule_fmt, ")")
+        .with_dangling_comments(parentheses_comment)
+        .fmt(f)?;
+    trailing_comments(trailing_outer).fmt(f)?;
+
+    Ok(())
 }
 
 /// Wraps an expression in an optional parentheses except if its [`NeedsParentheses::needs_parentheses`] implementation

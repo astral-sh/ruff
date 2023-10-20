@@ -15,23 +15,23 @@ for aVeryLongNameThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAnd
     pass
 
 else:
-    ...
+    pass
 
 for (
     x,
     y,
     ) in z: # comment
-    ...
+    pass
 
 
 # remove brackets around x,y but keep them around z,w
 for (x, y) in (z, w):
-    ...
+    pass
 
 
 # type comment
 for x in (): # type: int
-    ...
+    pass
 
 # Tuple parentheses for iterable.
 for x in 1, 2, 3:

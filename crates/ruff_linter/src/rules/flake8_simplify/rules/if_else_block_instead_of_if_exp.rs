@@ -1,8 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -51,16 +50,14 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 }
 
 /// SIM108
-pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf {
+pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+    let ast::StmtIf {
         test,
         body,
         elif_else_clauses,
         range: _,
-    }) = stmt
-    else {
-        return;
-    };
+    } = stmt_if;
+
     // `test: None` to only match an `else` clause
     let [ElifElseClause {
         body: else_body,
@@ -99,13 +96,6 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    // Avoid suggesting ternary for `if sys.version_info >= ...`-style and
-    // `if sys.platform.startswith("...")`-style checks.
-    let ignored_call_paths: &[&[&str]] = &[&["sys", "version_info"], &["sys", "platform"]];
-    if contains_call_path(test, ignored_call_paths, checker.semantic()) {
-        return;
-    }
-
     // Avoid suggesting ternary for `if (yield ...)`-style checks.
     // TODO(charlie): Fix precedence handling for yields in generator.
     if matches!(
@@ -121,6 +111,16 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
+    if is_sys_version_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
+    if is_type_checking_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
     let target_var = &body_target;
     let ternary = ternary(target_var, body_value, test, else_value);
     let contents = checker.generator().stmt(&ternary);
@@ -128,7 +128,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     // Don't flag if the resulting expression would exceed the maximum line length.
     if !fits(
         &contents,
-        stmt.into(),
+        stmt_if.into(),
         checker.locator(),
         checker.settings.line_length,
         checker.settings.tab_size,
@@ -140,24 +140,15 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
         },
-        stmt.range(),
+        stmt_if.range(),
     );
-    if !checker.indexer().has_comments(stmt, checker.locator()) {
+    if !checker.indexer().has_comments(stmt_if, checker.locator()) {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
-            stmt.range(),
+            stmt_if.range(),
         )));
     }
     checker.diagnostics.push(diagnostic);
-}
-
-/// Return `true` if the `Expr` contains a reference to any of the given `${module}.${target}`.
-fn contains_call_path(expr: &Expr, targets: &[&[&str]], semantic: &SemanticModel) -> bool {
-    any_over_expr(expr, &|expr| {
-        semantic
-            .resolve_call_path(expr)
-            .is_some_and(|call_path| targets.iter().any(|target| &call_path.as_slice() == target))
-    })
 }
 
 fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {

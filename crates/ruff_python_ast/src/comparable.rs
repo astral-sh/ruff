@@ -333,7 +333,6 @@ pub enum ComparableConstant<'a> {
     Str { value: &'a str, unicode: bool },
     Bytes(&'a [u8]),
     Int(&'a ast::Int),
-    Tuple(Vec<ComparableConstant<'a>>),
     Float(u64),
     Complex { real: u64, imag: u64 },
     Ellipsis,

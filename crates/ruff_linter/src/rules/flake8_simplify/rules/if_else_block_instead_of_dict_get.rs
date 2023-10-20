@@ -5,6 +5,7 @@ use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
 };
+use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -55,7 +56,7 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 }
 
 /// SIM401
-pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test,
         body,
@@ -133,6 +134,16 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
         || ComparableExpr::from(expected_var) != ComparableExpr::from(default_var)
         || ComparableExpr::from(test_dict) != ComparableExpr::from(expected_subscript)
     {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
+    if is_sys_version_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
+    if is_type_checking_block(stmt_if, checker.semantic()) {
         return;
     }
 

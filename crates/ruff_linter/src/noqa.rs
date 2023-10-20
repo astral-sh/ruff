@@ -253,7 +253,7 @@ impl FileExemption {
                         #[allow(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
-                        warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line.");
+                        warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix.");
                         continue;
                     }
 

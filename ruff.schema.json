@@ -1,7 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Options",
-  "description": "Experimental section to configure Ruff's linting. This new section will eventually replace the top-level linting options.\n\nOptions specified in the `lint` section take precedence over the top-level settings.",
   "type": "object",
   "properties": {
     "allowed-confusables": {
@@ -84,6 +83,17 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "extend-ignore": {
+      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
+      "deprecated": true,
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
     "extend-include": {
       "description": "A list of file patterns to include when linting, in addition to those specified by `include`.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
@@ -119,6 +129,17 @@
     },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
+    "extend-unfixable": {
+      "description": "A list of rule codes or prefixes to consider non-auto-fixable, in addition to those specified by `unfixable`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -605,7 +626,7 @@
       }
     },
     "tab-size": {
-      "description": "The tabulation size to calculate line length.",
+      "description": "The number of spaces a tab is equal to when enforcing long-line violations (like `E501`) or formatting code with the formatter.\n\nThis option changes the number of spaces inserted by the formatter when using soft-tabs (`indent-style = space`).",
       "anyOf": [
         {
           "$ref": "#/definitions/TabSize"
@@ -686,8 +707,7 @@
         "complex",
         "float",
         "int",
-        "str",
-        "tuple"
+        "str"
       ]
     },
     "Convention": {
@@ -1231,7 +1251,7 @@
           ]
         },
         "line-ending": {
-          "description": "The character Ruff uses at the end of a line.\n\n* `lf`: Line endings will be converted to `\\n`. The default line ending on Unix. * `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows. * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings. * `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
+          "description": "The character Ruff uses at the end of a line.\n\n* `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings. * `lf`: Line endings will be converted to `\\n`. The default line ending on Unix. * `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows. * `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineEnding"
@@ -1543,6 +1563,13 @@
     "LineEnding": {
       "oneOf": [
         {
+          "description": "The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to [`LineEnding::Lf`] for a files that contain no line endings.",
+          "type": "string",
+          "enum": [
+            "auto"
+          ]
+        },
+        {
           "description": "Line endings will be converted to `\\n` as is common on Unix.",
           "type": "string",
           "enum": [
@@ -1554,13 +1581,6 @@
           "type": "string",
           "enum": [
             "cr-lf"
-          ]
-        },
-        {
-          "description": "The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to [`LineEnding::Lf`] for a files that contain no line endings.",
-          "type": "string",
-          "enum": [
-            "auto"
           ]
         },
         {
@@ -1629,6 +1649,17 @@
             "$ref": "#/definitions/RuleSelector"
           }
         },
+        "extend-ignore": {
+          "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
+          "deprecated": true,
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
         "extend-per-file-ignores": {
           "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by `per-file-ignores`.",
           "type": [
@@ -1654,6 +1685,17 @@
         },
         "extend-select": {
           "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "extend-unfixable": {
+          "description": "A list of rule codes or prefixes to consider non-auto-fixable, in addition to those specified by `unfixable`.",
+          "deprecated": true,
           "type": [
             "array",
             "null"
@@ -2738,6 +2780,7 @@
         "FURB",
         "FURB1",
         "FURB10",
+        "FURB101",
         "FURB105",
         "FURB11",
         "FURB113",
@@ -3018,6 +3061,8 @@
         "PLW",
         "PLW0",
         "PLW01",
+        "PLW010",
+        "PLW0108",
         "PLW012",
         "PLW0120",
         "PLW0127",
@@ -3031,6 +3076,7 @@
         "PLW060",
         "PLW0602",
         "PLW0603",
+        "PLW0604",
         "PLW07",
         "PLW071",
         "PLW0711",

@@ -51,6 +51,9 @@ fn format_options() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
+tab-size = 8
+line-length = 84
+
 [format]
 indent-style = "tab"
 quote-style = "single"
@@ -65,7 +68,7 @@ line-ending = "cr-lf"
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
-    print("Shouldn't change quotes")
+    print("Shouldn't change quotes. It exceeds the line width with the tab size 8")
 
 
 if condition:
@@ -77,7 +80,9 @@ if condition:
     exit_code: 0
     ----- stdout -----
     def foo(arg1, arg2):
-    	print("Shouldn't change quotes")
+    	print(
+    		"Shouldn't change quotes. It exceeds the line width with the tab size 8"
+    	)
 
 
     if condition:
@@ -85,6 +90,35 @@ if condition:
 
     ----- stderr -----
     warning: `ruff format` is not yet stable, and subject to change in future versions.
+    "###);
+    Ok(())
+}
+
+#[test]
+fn mixed_line_endings() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n",
+    )?;
+
+    fs::write(
+        tempdir.path().join("test.py"),
+        "def say_hy(name: str):\r\n    print(f\"Hy {name}\")\r\n",
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--diff", "--isolated"])
+        .arg("."), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    2 files left unchanged
     "###);
     Ok(())
 }

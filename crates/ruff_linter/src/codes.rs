@@ -259,12 +259,14 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R6201") => (RuleGroup::Preview, rules::pylint::rules::LiteralMembership),
         #[allow(deprecated)]
         (Pylint, "R6301") => (RuleGroup::Nursery, rules::pylint::rules::NoSelfUse),
+        (Pylint, "W0108") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryLambda),
         (Pylint, "W0120") => (RuleGroup::Stable, rules::pylint::rules::UselessElseOnLoop),
         (Pylint, "W0127") => (RuleGroup::Stable, rules::pylint::rules::SelfAssigningVariable),
         (Pylint, "W0129") => (RuleGroup::Stable, rules::pylint::rules::AssertOnStringLiteral),
         (Pylint, "W0131") => (RuleGroup::Stable, rules::pylint::rules::NamedExprWithoutContext),
         (Pylint, "W0406") => (RuleGroup::Stable, rules::pylint::rules::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),
+        (Pylint, "W0604") => (RuleGroup::Preview, rules::pylint::rules::GlobalAtModuleLevel),
         (Pylint, "W0603") => (RuleGroup::Stable, rules::pylint::rules::GlobalStatement),
         (Pylint, "W0711") => (RuleGroup::Stable, rules::pylint::rules::BinaryOpException),
         (Pylint, "W1508") => (RuleGroup::Stable, rules::pylint::rules::InvalidEnvvarDefault),
@@ -921,6 +923,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Slots, "002") => (RuleGroup::Stable, rules::flake8_slots::rules::NoSlotsInNamedtupleSubclass),
 
         // refurb
+        (Refurb, "101") => (RuleGroup::Preview, rules::refurb::rules::ReadWholeFile),
         (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
         #[allow(deprecated)]
         (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
