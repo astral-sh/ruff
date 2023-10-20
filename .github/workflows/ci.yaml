@@ -372,7 +372,7 @@ jobs:
           chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
           export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
 
-          ruff --version
+          ruff version
 
       - name: Run ruff-lsp tests
         run: |
