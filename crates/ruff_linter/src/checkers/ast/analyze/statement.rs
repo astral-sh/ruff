@@ -549,7 +549,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             for alias in names {
                 if let Some(asname) = &alias.asname {
                     if checker.enabled(Rule::NonAsciiImportName) {
-                        pylint::rules::non_ascii_import_name(checker, asname);
+                        pylint::rules::non_ascii_module_import(checker, asname);
                     }
                     if checker.enabled(Rule::BuiltinVariableShadowing) {
                         flake8_builtins::rules::builtin_variable_shadowing(
@@ -725,7 +725,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NonAsciiImportName) {
                 for name in names {
                     if let Some(asname) = name.asname.as_ref() {
-                        pylint::rules::non_ascii_import_name(checker, asname);
+                        pylint::rules::non_ascii_module_import(checker, asname);
                     }
                 }
             }

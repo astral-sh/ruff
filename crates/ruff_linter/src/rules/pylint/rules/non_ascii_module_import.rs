@@ -27,12 +27,10 @@ impl Violation for NonAsciiImportName {
 }
 
 /// PLC2403
-pub(crate) fn non_ascii_import_name(checker: &mut Checker, target: &Identifier) {
-    if target.to_string().is_ascii() {
-        return;
+pub(crate) fn non_ascii_module_import(checker: &mut Checker, target: &Identifier) {
+    if !target.as_str().is_ascii() {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(NonAsciiImportName, target.range()));
     };
-
-    checker
-        .diagnostics
-        .push(Diagnostic::new(NonAsciiImportName, target.range()));
 }
