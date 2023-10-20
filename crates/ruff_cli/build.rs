@@ -1,4 +1,4 @@
-use std::{fs, path::Path, path::PathBuf, process::Command};
+use std::{fs, path::Path, process::Command};
 
 fn main() {
     // The workspace root directory is not available without walking up the tree
@@ -7,14 +7,15 @@ fn main() {
         .join("..")
         .join("..");
 
-    commit_info(workspace_root);
+    commit_info(&workspace_root);
 
     #[allow(clippy::disallowed_methods)]
     let target = std::env::var("TARGET").unwrap();
     println!("cargo:rustc-env=RUST_HOST_TARGET={target}");
 }
 
-fn commit_info(workspace_root: PathBuf) {
+fn commit_info(workspace_root: &Path) {
+    // If not in a git repository, do not attempt to retrieve commit information
     let git_dir = workspace_root.join(".git");
     if !git_dir.exists() {
         return;
