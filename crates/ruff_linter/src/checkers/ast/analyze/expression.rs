@@ -1273,6 +1273,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             orelse,
             range: _,
         }) => {
+            if checker.enabled(Rule::IfElseBlockInsteadOfDictGet) {
+                flake8_simplify::rules::if_exp_instead_of_dict_get(
+                    checker, expr, test, body, orelse,
+                );
+            }
             if checker.enabled(Rule::IfExprWithTrueFalse) {
                 flake8_simplify::rules::if_expr_with_true_false(checker, expr, test, body, orelse);
             }
