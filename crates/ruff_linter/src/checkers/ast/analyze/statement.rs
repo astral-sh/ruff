@@ -1325,6 +1325,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
+            checker.enabled(Rule::NonAsciiName);
             if checker.enabled(Rule::LambdaAssignment) {
                 if let [target] = &targets[..] {
                     pycodestyle::rules::lambda_assignment(checker, target, value, None, stmt);
