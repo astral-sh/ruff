@@ -179,7 +179,7 @@ fn format_import_block(
             .into_iter()
             .map(Import)
             .chain(imports.import_from.into_iter().map(ImportFrom));
-        let imports = if settings.force_sort_within_sections {
+        let imports: Vec<EitherImport> = if settings.force_sort_within_sections {
             imports
                 .sorted_by_cached_key(|import| match import {
                     Import((alias, _)) => {
@@ -193,9 +193,9 @@ fn format_import_block(
                         settings,
                     ),
                 })
-                .collect::<Vec<EitherImport>>()
+                .collect()
         } else {
-            imports.collect::<Vec<EitherImport>>()
+            imports.collect()
         };
 
         // Add a blank line between every section.
