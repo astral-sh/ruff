@@ -320,17 +320,6 @@ long_unmergable_string_with_pragma = (
      "formatting"
  )
  
-@@ -221,8 +217,8 @@
- func_with_bad_comma(
-     (
-         "This is a really long string argument to a function that has a trailing comma"
--        " which should NOT be there."
--    ),  # comment after comma
-+        " which should NOT be there."  # comment after comma
-+    ),
- )
- 
- func_with_bad_parens_that_wont_fit_in_one_line(
 ```
 
 ## Ruff Output
@@ -555,8 +544,8 @@ func_with_bad_comma(
 func_with_bad_comma(
     (
         "This is a really long string argument to a function that has a trailing comma"
-        " which should NOT be there."  # comment after comma
-    ),
+        " which should NOT be there."
+    ),  # comment after comma
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(

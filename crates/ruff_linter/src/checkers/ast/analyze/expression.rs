@@ -786,6 +786,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SubprocessRunWithoutCheck) {
                 pylint::rules::subprocess_run_without_check(checker, call);
             }
+            if checker.enabled(Rule::UnspecifiedEncoding) {
+                pylint::rules::unspecified_encoding(checker, call);
+            }
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
                 Rule::PytestRaisesTooBroad,
@@ -1194,6 +1197,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ComparisonWithItself) {
                 pylint::rules::comparison_with_itself(checker, left, ops, comparators);
             }
+            if checker.enabled(Rule::LiteralMembership) {
+                pylint::rules::literal_membership(checker, compare);
+            }
             if checker.enabled(Rule::ComparisonOfConstant) {
                 pylint::rules::comparison_of_constant(checker, left, ops, comparators);
             }
@@ -1411,6 +1417,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::RepeatedEqualityComparison) {
                 pylint::rules::repeated_equality_comparison(checker, bool_op);
+            }
+            if checker.enabled(Rule::AndOrTernary) {
+                pylint::rules::and_or_ternary(checker, bool_op);
+            }
+            if checker.enabled(Rule::UnnecessaryKeyCheck) {
+                ruff::rules::unnecessary_key_check(checker, expr);
             }
         }
         Expr::NamedExpr(..) => {

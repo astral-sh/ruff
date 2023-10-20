@@ -945,7 +945,7 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
     Found 1 error.
-    1 hidden fix can be enabled with the `--unsafe-fixes` option.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
@@ -986,7 +986,7 @@ fn fix_applies_safe_fixes_by_default() {
                 "--output-format",
                 "text",
                 "--isolated",
-                "--no-cache", 
+                "--no-cache",
                 "--select",
                 "F601,UP034",
                 "--fix",
@@ -1002,7 +1002,7 @@ fn fix_applies_safe_fixes_by_default() {
     ----- stderr -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
     Found 2 errors (1 fixed, 1 remaining).
-    1 hidden fix can be enabled with the `--unsafe-fixes` option.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
 }
 
@@ -1015,7 +1015,7 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
                 "--output-format",
                 "text",
                 "--isolated",
-                "--no-cache", 
+                "--no-cache",
                 "--select",
                 "F601,UP034",
                 "--fix",
@@ -1035,6 +1035,59 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
 }
 
 #[test]
+fn fix_does_not_apply_display_only_fixes() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "B006",
+                "--fix",
+            ])
+            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    def add_to_list(item, some_list=[]): ...
+    ----- stderr -----
+    -:1:33: B006 Do not use mutable data structures for argument defaults
+    Found 1 error.
+    "###);
+}
+
+#[test]
+fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "B006",
+                "--fix",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    def add_to_list(item, some_list=[]): ...
+    ----- stderr -----
+    -:1:33: B006 Do not use mutable data structures for argument defaults
+    Found 1 error.
+    "###);
+}
+
+#[test]
 fn fix_only_unsafe_fixes_available() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
@@ -1043,7 +1096,7 @@ fn fix_only_unsafe_fixes_available() {
                 "--output-format",
                 "text",
                 "--isolated",
-                "--no-cache", 
+                "--no-cache",
                 "--select",
                 "F601",
                 "--fix",
@@ -1059,7 +1112,7 @@ fn fix_only_unsafe_fixes_available() {
     ----- stderr -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
     Found 1 error.
-    1 hidden fix can be enabled with the `--unsafe-fixes` option.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
 }
 
@@ -1072,7 +1125,7 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
                 "--output-format",
                 "text",
                 "--isolated",
-                "--no-cache", 
+                "--no-cache",
                 "--select",
                 "F601,UP034",
                 "--fix-only",
@@ -1099,7 +1152,7 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
                 "--output-format",
                 "text",
                 "--isolated",
-                "--no-cache", 
+                "--no-cache",
                 "--select",
                 "F601,UP034",
                 "--fix-only",
@@ -1183,6 +1236,31 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
 }
 
 #[test]
+fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "B006",
+                "--diff",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+            @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 fn diff_only_unsafe_fixes_available() {
     assert_cmd_snapshot!(
     Command::new(get_cargo_bin(BIN_NAME))
@@ -1198,8 +1276,8 @@ fn diff_only_unsafe_fixes_available() {
         ])
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
@@ -1239,7 +1317,7 @@ extend-unsafe-fixes = ["UP034"]
     -:1:14: F601 Dictionary key literal `'a'` repeated
     -:2:7: UP034 Avoid extraneous parentheses
     Found 2 errors.
-    2 hidden fixes can be enabled with the `--unsafe-fixes` option.
+    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
@@ -1319,7 +1397,7 @@ extend-safe-fixes = ["UP034"]
     -:1:14: F601 Dictionary key literal `'a'` repeated
     -:2:7: UP034 Avoid extraneous parentheses
     Found 2 errors.
-    2 hidden fixes can be enabled with the `--unsafe-fixes` option.
+    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);

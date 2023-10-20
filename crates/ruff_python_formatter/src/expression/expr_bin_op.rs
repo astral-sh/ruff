@@ -1,4 +1,4 @@
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprBinOp};
 
 use crate::comments::SourceComment;

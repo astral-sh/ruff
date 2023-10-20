@@ -7,11 +7,9 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
-use rustc_hash::FxHashMap;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
-use ruff_linter::linter::FixTable;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
@@ -22,7 +20,7 @@ use ruff_linter::registry::{AsRule, Rule};
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{SerializationFormat, UnsafeFixes};
 
-use crate::diagnostics::Diagnostics;
+use crate::diagnostics::{Diagnostics, FixMap};
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
@@ -128,17 +126,23 @@ impl Printer {
                     let fix_prefix = format!("[{}]", "*".cyan());
 
                     if self.unsafe_fixes.is_enabled() {
-                        writeln!(
-                            writer,
-                            "{fix_prefix} {} fixable with the --fix option.",
-                            fixables.applicable
-                        )?;
+                        if fixables.applicable > 0 {
+                            writeln!(
+                                writer,
+                                "{fix_prefix} {} fixable with the --fix option.",
+                                fixables.applicable
+                            )?;
+                        }
                     } else {
-                        if fixables.applicable > 0 && fixables.unapplicable > 0 {
-                            let es = if fixables.unapplicable == 1 { "" } else { "es" };
+                        if fixables.applicable > 0 && fixables.unapplicable_unsafe > 0 {
+                            let es = if fixables.unapplicable_unsafe == 1 {
+                                ""
+                            } else {
+                                "es"
+                            };
                             writeln!(writer,
                                 "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
-                                fixables.applicable, fixables.unapplicable
+                                fixables.applicable, fixables.unapplicable_unsafe
                             )?;
                         } else if fixables.applicable > 0 {
                             // Only applicable fixes
@@ -149,10 +153,14 @@ impl Printer {
                             )?;
                         } else {
                             // Only unapplicable fixes
-                            let es = if fixables.unapplicable == 1 { "" } else { "es" };
+                            let es = if fixables.unapplicable_unsafe == 1 {
+                                ""
+                            } else {
+                                "es"
+                            };
                             writeln!(writer,
-                                "{} hidden fix{es} can be enabled with the `--unsafe-fixes` option.",
-                                fixables.unapplicable
+                                "No fixes available ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
+                                fixables.unapplicable_unsafe
                             )?;
                         }
                     }
@@ -161,7 +169,7 @@ impl Printer {
                 // Check if there are unapplied fixes
                 let unapplied = {
                     if let Some(fixables) = fixables {
-                        fixables.unapplicable
+                        fixables.unapplicable_unsafe
                     } else {
                         0
                     }
@@ -452,7 +460,7 @@ fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics
     (!fix_mode.is_apply()) && fixables.is_some_and(FixableStatistics::any_applicable_fixes)
 }
 
-fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
+fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
     let total = fixed
         .values()
         .map(|table| table.values().sum::<usize>())
@@ -497,30 +505,33 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>
 #[derive(Debug)]
 struct FixableStatistics {
     applicable: u32,
-    unapplicable: u32,
+    unapplicable_unsafe: u32,
 }
 
 impl FixableStatistics {
     fn try_from(diagnostics: &Diagnostics, unsafe_fixes: UnsafeFixes) -> Option<Self> {
         let mut applicable = 0;
-        let mut unapplicable = 0;
+        let mut unapplicable_unsafe = 0;
 
         for message in &diagnostics.messages {
             if let Some(fix) = &message.fix {
                 if fix.applies(unsafe_fixes.required_applicability()) {
                     applicable += 1;
                 } else {
-                    unapplicable += 1;
+                    // Do not include unapplicable fixes at other levels that do not provide an opt-in
+                    if fix.applicability().is_unsafe() {
+                        unapplicable_unsafe += 1;
+                    }
                 }
             }
         }
 
-        if applicable == 0 && unapplicable == 0 {
+        if applicable == 0 && unapplicable_unsafe == 0 {
             None
         } else {
             Some(Self {
                 applicable,
-                unapplicable,
+                unapplicable_unsafe,
             })
         }
     }

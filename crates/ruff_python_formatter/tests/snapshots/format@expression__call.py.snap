@@ -458,8 +458,9 @@ func(
 )
 
 func(
-    # outer comment
-    (  # inner comment
+    (
+        # outer comment
+        # inner comment
         []
     )
 )

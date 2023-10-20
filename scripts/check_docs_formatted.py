@@ -68,6 +68,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "surrounding-whitespace",
     "tab-indentation",
     "too-few-spaces-before-inline-comment",
+    "too-many-boolean-expressions",
     "trailing-comma-on-bare-tuple",
     "triple-single-quotes",
     "under-indentation",

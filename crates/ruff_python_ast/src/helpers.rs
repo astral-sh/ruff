@@ -8,9 +8,9 @@ use smallvec::SmallVec;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::call_path::CallPath;
-use crate::node::AnyNodeRef;
 use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use crate::AnyNodeRef;
 use crate::{
     self as ast, Arguments, CmpOp, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt,
     TypeParam,

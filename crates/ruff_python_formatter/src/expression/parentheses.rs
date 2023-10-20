@@ -1,6 +1,6 @@
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExpressionRef;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{

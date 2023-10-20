@@ -1,6 +1,6 @@
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, PySourceType, Stmt, Suite};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
@@ -155,13 +155,65 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         while let Some(following) = iter.next() {
             let following_comments = comments.leading_dangling_trailing(following);
 
+            let needs_empty_lines = if is_class_or_function_definition(following) {
+                // Here we insert empty lines even if the preceding has a trailing own line comment
+                true
+            } else {
+                // Find nested class or function definitions that need an empty line after them.
+                //
+                // ```python
+                // def f():
+                //     if True:
+                //
+                //         def double(s):
+                //             return s + s
+                //
+                //     print("below function")
+                // ```
+                std::iter::successors(
+                    Some(AnyNodeRef::from(preceding)),
+                    AnyNodeRef::last_child_in_body,
+                )
+                .take_while(|last_child|
+                    // If there is a comment between preceding and following the empty lines were
+                    // inserted before the comment by preceding and there are no extra empty lines
+                    // after the comment.
+                    // ```python
+                    // class Test:
+                    //     def a(self):
+                    //         pass
+                    //         # trailing comment
+                    //
+                    //
+                    // # two lines before, one line after
+                    //
+                    // c = 30
+                    // ````
+                    // This also includes nested class/function definitions, so we stop recursing
+                    // once we see a node with a trailing own line comment:
+                    // ```python
+                    // def f():
+                    //     if True:
+                    //
+                    //         def double(s):
+                    //             return s + s
+                    //
+                    //         # nested trailing own line comment
+                    //     print("below function with trailing own line comment")
+                    // ```
+                    !comments.has_trailing_own_line(*last_child))
+                .any(|last_child| {
+                    matches!(
+                        last_child,
+                        AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtClassDef(_)
+                    )
+                })
+            };
+
             // Add empty lines before and after a function or class definition. If the preceding
             // node is a function or class, and contains trailing comments, then the statement
             // itself will add the requisite empty lines when formatting its comments.
-            if (is_class_or_function_definition(preceding)
-                && !preceding_comments.has_trailing_own_line())
-                || is_class_or_function_definition(following)
-            {
+            if needs_empty_lines {
                 if source_type.is_stub() {
                     stub_file_empty_lines(
                         self.kind,

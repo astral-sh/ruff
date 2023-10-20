@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{
     is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before,
 };

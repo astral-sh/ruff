@@ -524,6 +524,7 @@ where
                 );
                 self.semantic.push_definition(definition);
                 self.semantic.push_scope(ScopeKind::Function(function_def));
+                self.semantic.flags -= SemanticModelFlags::EXCEPTION_HANDLER;
 
                 self.deferred.functions.push(self.semantic.snapshot());
 
@@ -562,6 +563,7 @@ where
                 );
                 self.semantic.push_definition(definition);
                 self.semantic.push_scope(ScopeKind::Class(class_def));
+                self.semantic.flags -= SemanticModelFlags::EXCEPTION_HANDLER;
 
                 // Extract any global bindings from the class body.
                 if let Some(globals) = Globals::from_body(body) {
@@ -580,7 +582,9 @@ where
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit_expr(value);
+                self.deferred
+                    .type_param_definitions
+                    .push((value, self.semantic.snapshot()));
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -1385,9 +1389,14 @@ where
             }
         }
         // Step 2: Traversal
-        self.deferred
-            .type_param_definitions
-            .push((type_param, self.semantic.snapshot()));
+        if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+            bound: Some(bound), ..
+        }) = type_param
+        {
+            self.deferred
+                .type_param_definitions
+                .push((bound, self.semantic.snapshot()));
+        }
     }
 }
 
@@ -1762,12 +1771,9 @@ impl<'a> Checker<'a> {
             for (type_param, snapshot) in type_params {
                 self.semantic.restore(snapshot);
 
-                if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                    bound: Some(bound), ..
-                }) = type_param
-                {
-                    self.visit_expr(bound);
-                }
+                self.semantic.flags |=
+                    SemanticModelFlags::TYPE_PARAM_DEFINITION | SemanticModelFlags::TYPE_DEFINITION;
+                self.visit_expr(type_param);
             }
         }
         self.semantic.restore(snapshot);

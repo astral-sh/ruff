@@ -22,7 +22,11 @@ pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
     }
 }
 
-pub(super) fn in_dunder_init(semantic: &SemanticModel, settings: &LinterSettings) -> bool {
+pub(super) fn in_dunder_method(
+    dunder_name: &str,
+    semantic: &SemanticModel,
+    settings: &LinterSettings,
+) -> bool {
     let scope = semantic.current_scope();
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
@@ -32,7 +36,7 @@ pub(super) fn in_dunder_init(semantic: &SemanticModel, settings: &LinterSettings
     else {
         return false;
     };
-    if name != "__init__" {
+    if name != dunder_name {
         return false;
     }
     let Some(parent) = semantic.first_non_type_parent_scope(scope) else {
