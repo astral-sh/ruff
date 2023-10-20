@@ -1,10 +1,9 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for any usage of `__cached__` and `__file__` as an argument to
@@ -44,14 +43,14 @@ use crate::registry::AsRule;
 pub struct InvalidGetLoggerArgument;
 
 impl Violation for InvalidGetLoggerArgument {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `__name__` with `logging.getLogger()`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Replace with `__name__`"))
     }
 }
@@ -80,13 +79,11 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
     }
 
     let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        if checker.semantic().is_builtin("__name__") {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                "__name__".to_string(),
-                expr.range(),
-            )));
-        }
+    if checker.semantic().is_builtin("__name__") {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            "__name__".to_string(),
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

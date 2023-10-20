@@ -180,7 +180,7 @@ mod tests {
     use insta::assert_debug_snapshot;
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::node::AnyNode;
+    use ruff_python_ast::AnyNode;
     use ruff_python_ast::{StmtBreak, StmtContinue};
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};

@@ -259,5 +259,34 @@ annotation_presence.py:159:9: ANN204 [*] Missing return type annotation for spec
 159     |-    def __init__(self: "Foo", foo: int):
     159 |+    def __init__(self: "Foo", foo: int) -> None:
 160 160 |        ...
+161 161 | 
+162 162 | 
+
+annotation_presence.py:165:9: ANN204 [*] Missing return type annotation for special method `__init__`
+    |
+163 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
+164 | class Class:
+165 |     def __init__(self):
+    |         ^^^^^^^^ ANN204
+166 |         print(f"{self.attr=}")
+    |
+    = help: Add `None` return type
+
+ℹ Suggested fix
+162 162 | 
+163 163 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
+164 164 | class Class:
+165     |-    def __init__(self):
+    165 |+    def __init__(self) -> None:
+166 166 |         print(f"{self.attr=}")
+
+annotation_presence.py:165:18: ANN101 Missing type annotation for `self` in method
+    |
+163 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
+164 | class Class:
+165 |     def __init__(self):
+    |                  ^^^^ ANN101
+166 |         print(f"{self.attr=}")
+    |
 
 

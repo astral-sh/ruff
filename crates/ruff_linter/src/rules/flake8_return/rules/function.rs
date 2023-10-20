@@ -3,7 +3,7 @@ use std::ops::Add;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
@@ -14,8 +14,8 @@ use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::is_python_whitespace;
 
-use crate::autofix::edits;
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
 
@@ -51,7 +51,7 @@ use super::super::visitor::{ReturnVisitor, Stack};
 #[violation]
 pub struct UnnecessaryReturnNone;
 
-impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
+impl AlwaysFixableViolation for UnnecessaryReturnNone {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -59,7 +59,7 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove explicit `return None`".to_string()
     }
 }
@@ -93,13 +93,13 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
 #[violation]
 pub struct ImplicitReturnValue;
 
-impl AlwaysAutofixableViolation for ImplicitReturnValue {
+impl AlwaysFixableViolation for ImplicitReturnValue {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not implicitly `return None` in function able to return non-`None` value")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add explicit `None` return value".to_string()
     }
 }
@@ -131,13 +131,13 @@ impl AlwaysAutofixableViolation for ImplicitReturnValue {
 #[violation]
 pub struct ImplicitReturn;
 
-impl AlwaysAutofixableViolation for ImplicitReturn {
+impl AlwaysFixableViolation for ImplicitReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing explicit `return` at the end of function able to return non-`None` value")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add explicit `return` statement".to_string()
     }
 }
@@ -167,14 +167,14 @@ pub struct UnnecessaryAssign {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryAssign {
+impl AlwaysFixableViolation for UnnecessaryAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryAssign { name } = self;
         format!("Unnecessary assignment to `{name}` before `return` statement")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove unnecessary assignment".to_string()
     }
 }
@@ -345,12 +345,10 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range);
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                "return".to_string(),
-                stmt.range(),
-            )));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "return".to_string(),
+            stmt.range(),
+        )));
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -362,12 +360,10 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range);
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                "return None".to_string(),
-                stmt.range,
-            )));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "return None".to_string(),
+            stmt.range,
+        )));
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -409,17 +405,15 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
             ) {
                 let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator(), stmt) {
-                        let mut content = String::new();
-                        content.push_str(checker.stylist().line_ending().as_str());
-                        content.push_str(indent);
-                        content.push_str("return None");
-                        diagnostic.set_fix(Fix::suggested(Edit::insertion(
-                            content,
-                            end_of_last_statement(stmt, checker.locator()),
-                        )));
-                    }
+                if let Some(indent) = indentation(checker.locator(), stmt) {
+                    let mut content = String::new();
+                    content.push_str(checker.stylist().line_ending().as_str());
+                    content.push_str(indent);
+                    content.push_str("return None");
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                        content,
+                        end_of_last_statement(stmt, checker.locator()),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -431,17 +425,15 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 implicit_return(checker, last_stmt);
             } else {
                 let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator(), stmt) {
-                        let mut content = String::new();
-                        content.push_str(checker.stylist().line_ending().as_str());
-                        content.push_str(indent);
-                        content.push_str("return None");
-                        diagnostic.set_fix(Fix::suggested(Edit::insertion(
-                            content,
-                            end_of_last_statement(stmt, checker.locator()),
-                        )));
-                    }
+                if let Some(indent) = indentation(checker.locator(), stmt) {
+                    let mut content = String::new();
+                    content.push_str(checker.stylist().line_ending().as_str());
+                    content.push_str(indent);
+                    content.push_str("return None");
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                        content,
+                        end_of_last_statement(stmt, checker.locator()),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -467,17 +459,15 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                if let Some(indent) = indentation(checker.locator(), stmt) {
-                    let mut content = String::new();
-                    content.push_str(checker.stylist().line_ending().as_str());
-                    content.push_str(indent);
-                    content.push_str("return None");
-                    diagnostic.set_fix(Fix::suggested(Edit::insertion(
-                        content,
-                        end_of_last_statement(stmt, checker.locator()),
-                    )));
-                }
+            if let Some(indent) = indentation(checker.locator(), stmt) {
+                let mut content = String::new();
+                content.push_str(checker.stylist().line_ending().as_str());
+                content.push_str(indent);
+                content.push_str("return None");
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                    content,
+                    end_of_last_statement(stmt, checker.locator()),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -529,47 +519,45 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             },
             value.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                // Delete the `return` statement. There's no need to treat this as an isolated
-                // edit, since we're editing the preceding statement, so no conflicting edit would
-                // be allowed to remove that preceding statement.
-                let delete_return =
-                    edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
+        diagnostic.try_set_fix(|| {
+            // Delete the `return` statement. There's no need to treat this as an isolated
+            // edit, since we're editing the preceding statement, so no conflicting edit would
+            // be allowed to remove that preceding statement.
+            let delete_return =
+                edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
-                // Replace the `x = 1` statement with `return 1`.
-                let content = checker.locator().slice(assign);
-                let equals_index = content
-                    .find('=')
-                    .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;
-                let after_equals = equals_index + 1;
+            // Replace the `x = 1` statement with `return 1`.
+            let content = checker.locator().slice(assign);
+            let equals_index = content
+                .find('=')
+                .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;
+            let after_equals = equals_index + 1;
 
-                let replace_assign = Edit::range_replacement(
-                    // If necessary, add whitespace after the `return` keyword.
-                    // Ex) Convert `x=y` to `return y` (instead of `returny`).
-                    if content[after_equals..]
-                        .chars()
-                        .next()
-                        .is_some_and(is_python_whitespace)
-                    {
-                        "return".to_string()
-                    } else {
-                        "return ".to_string()
-                    },
-                    // Replace from the start of the assignment statement to the end of the equals
-                    // sign.
-                    TextRange::new(
-                        assign.start(),
-                        assign
-                            .range()
-                            .start()
-                            .add(TextSize::try_from(after_equals)?),
-                    ),
-                );
+            let replace_assign = Edit::range_replacement(
+                // If necessary, add whitespace after the `return` keyword.
+                // Ex) Convert `x=y` to `return y` (instead of `returny`).
+                if content[after_equals..]
+                    .chars()
+                    .next()
+                    .is_some_and(is_python_whitespace)
+                {
+                    "return".to_string()
+                } else {
+                    "return ".to_string()
+                },
+                // Replace from the start of the assignment statement to the end of the equals
+                // sign.
+                TextRange::new(
+                    assign.start(),
+                    assign
+                        .range()
+                        .start()
+                        .add(TextSize::try_from(after_equals)?),
+                ),
+            );
 
-                Ok(Fix::suggested_edits(replace_assign, [delete_return]))
-            });
-        }
+            Ok(Fix::unsafe_edits(replace_assign, [delete_return]))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

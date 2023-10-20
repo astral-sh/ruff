@@ -95,7 +95,7 @@ impl std::fmt::Display for IndentStyle {
 ///
 /// Determines the visual width of a tab character (`\t`) and the number of
 /// spaces per indent when using [`IndentStyle::Space`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct IndentWidth(NonZeroU8);
@@ -574,6 +574,10 @@ where
             rule,
             context: PhantomData,
         }
+    }
+
+    pub fn rule(&self) -> &R {
+        &self.rule
     }
 }
 

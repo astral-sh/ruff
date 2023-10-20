@@ -184,6 +184,20 @@ impl LineIndex {
         }
     }
 
+    /// Returns the [byte offset](TextSize) of the `line`'s end.
+    /// The offset is the end of the line, excluding the newline character ending the line (if any).
+    pub fn line_end_exclusive(&self, line: OneIndexed, contents: &str) -> TextSize {
+        let row_index = line.to_zero_indexed();
+        let starts = self.line_starts();
+
+        // If start-of-line position after last line
+        if row_index.saturating_add(1) >= starts.len() {
+            contents.text_len()
+        } else {
+            starts[row_index + 1] - TextSize::new(1)
+        }
+    }
+
     /// Returns the [`TextRange`] of the `line` with the given index.
     /// The start points to the first character's [byte offset](TextSize), the end up to, and including
     /// the newline character ending the line (if any).

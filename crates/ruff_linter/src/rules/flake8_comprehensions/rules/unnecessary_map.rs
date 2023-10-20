@@ -1,7 +1,7 @@
 use std::fmt;
 
-use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Stm
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -47,7 +47,7 @@ pub struct UnnecessaryMap {
 }
 
 impl Violation for UnnecessaryMap {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,7 +55,7 @@ impl Violation for UnnecessaryMap {
         format!("Unnecessary `map` usage (rewrite using a {object_type})")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UnnecessaryMap { object_type } = self;
         Some(format!("Replace `map` with a {object_type}"))
     }
@@ -221,18 +221,16 @@ pub(crate) fn unnecessary_map(
     };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_map(
-                expr,
-                parent,
-                object_type,
-                checker.locator(),
-                checker.stylist(),
-            )
-            .map(Fix::suggested)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_map(
+            expr,
+            parent,
+            object_type,
+            checker.locator(),
+            checker.stylist(),
+        )
+        .map(Fix::unsafe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }
 

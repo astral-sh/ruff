@@ -22,3 +22,10 @@ class C:
 
 class D(C):
     x: UUID
+
+
+import collections
+
+
+class E(BaseModel[int]):
+    x: collections.Awaitable

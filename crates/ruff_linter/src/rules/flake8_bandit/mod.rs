@@ -42,11 +42,13 @@ mod tests {
     #[test_case(Rule::SubprocessWithoutShellEqualsTrue, Path::new("S603.py"))]
     #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"))]
     #[test_case(Rule::SuspiciousEvalUsage, Path::new("S307.py"))]
+    #[test_case(Rule::SuspiciousURLOpenUsage, Path::new("S310.py"))]
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
     #[test_case(Rule::TryExceptContinue, Path::new("S112.py"))]
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"))]
     #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"))]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"))]
+    #[test_case(Rule::WeakCryptographicKey, Path::new("S505.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

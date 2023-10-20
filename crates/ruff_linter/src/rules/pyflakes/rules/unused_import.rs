@@ -3,13 +3,13 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{AnyImport, Exceptions, Imported, NodeId, Scope};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
+use crate::fix;
 use crate::registry::Rule;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -67,7 +67,7 @@ pub struct UnusedImport {
 }
 
 impl Violation for UnusedImport {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -87,7 +87,7 @@ impl Violation for UnusedImport {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UnusedImport { name, multiple, .. } = self;
         Some(if *multiple {
             "Remove unused import".to_string()
@@ -154,7 +154,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = imports.len() > 1;
 
-        let fix = if !in_init && !in_except_handler && checker.patch(Rule::UnusedImport) {
+        let fix = if !in_init && !in_except_handler {
             fix_imports(checker, node_id, &imports).ok()
         } else {
             None
@@ -243,7 +243,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         .map(Imported::member_name)
         .collect();
 
-    let edit = autofix::edits::remove_unused_imports(
+    let edit = fix::edits::remove_unused_imports(
         member_names.iter().map(AsRef::as_ref),
         statement,
         parent,
@@ -251,7 +251,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         checker.stylist(),
         checker.indexer(),
     )?;
-    Ok(Fix::automatic(edit).isolate(Checker::isolation(
+    Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
     )))
 }

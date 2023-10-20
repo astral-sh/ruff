@@ -3,9 +3,9 @@ use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_pyi::helpers::traverse_union;
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_text_size::Ranged;
@@ -34,14 +34,14 @@ pub struct DuplicateUnionMember {
 }
 
 impl Violation for DuplicateUnionMember {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Duplicate union member `{}`", self.duplicate_name)
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!(
             "Remove duplicate union member `{}`",
             self.duplicate_name
@@ -64,19 +64,17 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
                 },
                 expr.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Delete the "|" character as well as the duplicate value by reconstructing the
-                // parent without the duplicate.
+            // Delete the "|" character as well as the duplicate value by reconstructing the
+            // parent without the duplicate.
 
-                // If the parent node is not a `BinOp` we will not perform a fix
-                if let Some(parent @ Expr::BinOp(ast::ExprBinOp { left, right, .. })) = parent {
-                    // Replace the parent with its non-duplicate child.
-                    let child = if expr == left.as_ref() { right } else { left };
-                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        checker.locator().slice(child.as_ref()).to_string(),
-                        parent.range(),
-                    )));
-                }
+            // If the parent node is not a `BinOp` we will not perform a fix
+            if let Some(parent @ Expr::BinOp(ast::ExprBinOp { left, right, .. })) = parent {
+                // Replace the parent with its non-duplicate child.
+                let child = if expr == left.as_ref() { right } else { left };
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    checker.locator().slice(child.as_ref()).to_string(),
+                    parent.range(),
+                )));
             }
             diagnostics.push(diagnostic);
         }

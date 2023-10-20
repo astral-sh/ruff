@@ -10,7 +10,7 @@ use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::linter::{check_path, LinterResult};
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
-use ruff_linter::settings::{flags, DUMMY_VARIABLE_RGX, PREFIXES};
+use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
@@ -22,7 +22,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
-use ruff_workspace::options::{FormatOptions, FormatOrOutputFormat, LintOptions, Options};
+use ruff_workspace::options::{FormatOptions, LintCommonOptions, LintOptions, Options};
 use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -130,21 +130,24 @@ impl Workspace {
             target_version: Some(PythonVersion::default()),
 
             lint: Some(LintOptions {
-                allowed_confusables: Some(Vec::default()),
-                dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
-                ignore: Some(Vec::default()),
-                select: Some(PREFIXES.to_vec()),
-                extend_fixable: Some(Vec::default()),
-                extend_select: Some(Vec::default()),
-                external: Some(Vec::default()),
+                common: LintCommonOptions {
+                    allowed_confusables: Some(Vec::default()),
+                    dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
+                    ignore: Some(Vec::default()),
+                    select: Some(DEFAULT_SELECTORS.to_vec()),
+                    extend_fixable: Some(Vec::default()),
+                    extend_select: Some(Vec::default()),
+                    external: Some(Vec::default()),
+                    ..LintCommonOptions::default()
+                },
 
                 ..LintOptions::default()
             }),
-            format: Some(FormatOrOutputFormat::Format(FormatOptions {
+            format: Some(FormatOptions {
                 indent_style: Some(IndentStyle::Space),
                 quote_style: Some(QuoteStyle::Double),
                 ..FormatOptions::default()
-            })),
+            }),
             ..Options::default()
         })
         .map_err(into_error)
@@ -276,7 +279,7 @@ impl<'a> ParsedModule<'a> {
             comment_ranges.visit_token(token, *range);
         }
         let comment_ranges = comment_ranges.finish();
-        let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
+        let module = parse_tokens(tokens, source, Mode::Module, ".").map_err(into_error)?;
 
         Ok(Self {
             source_code: source,

@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -10,9 +10,8 @@ use ruff_python_semantic::{Binding, Scope};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix::edits::delete_stmt;
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -48,7 +47,7 @@ pub struct UnusedVariable {
 }
 
 impl Violation for UnusedVariable {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -56,7 +55,7 @@ impl Violation for UnusedVariable {
         format!("Local variable `{name}` is assigned to but never used")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UnusedVariable { name } = self;
         Some(format!("Remove assignment to unused variable `{name}`"))
     }
@@ -237,11 +236,11 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     )?
                     .start();
                     let edit = Edit::deletion(start, end);
-                    Some(Fix::suggested(edit))
+                    Some(Fix::unsafe_edit(edit))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                     let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
-                    Some(Fix::suggested(edit).isolate(isolation))
+                    Some(Fix::unsafe_edit(edit).isolate(isolation))
                 };
             }
         }
@@ -265,11 +264,11 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     })?
                     .start();
                 let edit = Edit::deletion(start, end);
-                Some(Fix::suggested(edit))
+                Some(Fix::unsafe_edit(edit))
             } else {
                 // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                 let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
-                Some(Fix::suggested(edit).isolate(isolation))
+                Some(Fix::unsafe_edit(edit).isolate(isolation))
             };
         }
     }
@@ -300,7 +299,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     .start();
 
                     let edit = Edit::deletion(start, end);
-                    return Some(Fix::suggested(edit));
+                    return Some(Fix::unsafe_edit(edit));
                 }
             }
         }
@@ -344,10 +343,8 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
             },
             binding.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            if let Some(fix) = remove_unused_variable(binding, checker) {
-                diagnostic.set_fix(fix);
-            }
+        if let Some(fix) = remove_unused_variable(binding, checker) {
+            diagnostic.set_fix(fix);
         }
         diagnostics.push(diagnostic);
     }

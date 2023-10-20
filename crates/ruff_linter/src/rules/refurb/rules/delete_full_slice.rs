@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::{is_dict, is_list};
@@ -6,7 +6,7 @@ use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::refurb::helpers::generate_method_call;
 
 /// ## What it does
@@ -47,14 +47,14 @@ use crate::rules::refurb::helpers::generate_method_call;
 pub struct DeleteFullSlice;
 
 impl Violation for DeleteFullSlice {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `clear` over deleting a full slice")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Replace with `clear()`".to_string())
     }
 }
@@ -69,9 +69,9 @@ pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete)
         let mut diagnostic = Diagnostic::new(DeleteFullSlice, delete.range);
 
         // Fix is only supported for single-target deletions.
-        if checker.patch(diagnostic.kind.rule()) && delete.targets.len() == 1 {
+        if delete.targets.len() == 1 {
             let replacement = generate_method_call(name, "clear", checker.generator());
-            diagnostic.set_fix(Fix::suggested(Edit::replacement(
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                 replacement,
                 delete.start(),
                 delete.end(),

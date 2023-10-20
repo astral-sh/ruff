@@ -1,16 +1,14 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
-use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::helpers::{generate_comparison, is_const_none};
 use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::registry::AsRule;
-use crate::rules::pycodestyle::helpers::generate_comparison;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum EqCmpOp {
@@ -53,7 +51,7 @@ impl EqCmpOp {
 #[violation]
 pub struct NoneComparison(EqCmpOp);
 
-impl AlwaysAutofixableViolation for NoneComparison {
+impl AlwaysFixableViolation for NoneComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoneComparison(op) = self;
@@ -63,7 +61,7 @@ impl AlwaysAutofixableViolation for NoneComparison {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let NoneComparison(op) = self;
         match op {
             EqCmpOp::Eq => "Replace with `cond is None`".to_string(),
@@ -99,7 +97,7 @@ impl AlwaysAutofixableViolation for NoneComparison {
 #[violation]
 pub struct TrueFalseComparison(bool, EqCmpOp);
 
-impl AlwaysAutofixableViolation for TrueFalseComparison {
+impl AlwaysFixableViolation for TrueFalseComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TrueFalseComparison(value, op) = self;
@@ -119,7 +117,7 @@ impl AlwaysAutofixableViolation for TrueFalseComparison {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let TrueFalseComparison(value, op) = self;
         match (value, op) {
             (true, EqCmpOp::Eq) => "Replace with `cond is True`".to_string(),
@@ -154,16 +152,12 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                 match op {
                     EqCmpOp::Eq => {
                         let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(0, CmpOp::Is);
-                        }
+                        bad_ops.insert(0, CmpOp::Is);
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
                         let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(0, CmpOp::IsNot);
-                        }
+                        bad_ops.insert(0, CmpOp::IsNot);
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -181,9 +175,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                                 TrueFalseComparison(*value, op),
                                 comparator.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                bad_ops.insert(0, CmpOp::Is);
-                            }
+                            bad_ops.insert(0, CmpOp::Is);
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
@@ -191,9 +183,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                                 TrueFalseComparison(*value, op),
                                 comparator.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                bad_ops.insert(0, CmpOp::IsNot);
-                            }
+                            bad_ops.insert(0, CmpOp::IsNot);
                             diagnostics.push(diagnostic);
                         }
                     }
@@ -222,16 +212,12 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             match op {
                 EqCmpOp::Eq => {
                     let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        bad_ops.insert(index, CmpOp::Is);
-                    }
+                    bad_ops.insert(index, CmpOp::Is);
                     diagnostics.push(diagnostic);
                 }
                 EqCmpOp::NotEq => {
                     let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        bad_ops.insert(index, CmpOp::IsNot);
-                    }
+                    bad_ops.insert(index, CmpOp::IsNot);
                     diagnostics.push(diagnostic);
                 }
             }
@@ -247,17 +233,13 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                     EqCmpOp::Eq => {
                         let diagnostic =
                             Diagnostic::new(TrueFalseComparison(*value, op), next.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(index, CmpOp::Is);
-                        }
+                        bad_ops.insert(index, CmpOp::Is);
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
                         let diagnostic =
                             Diagnostic::new(TrueFalseComparison(*value, op), next.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(index, CmpOp::IsNot);
-                        }
+                        bad_ops.insert(index, CmpOp::IsNot);
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -287,7 +269,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             checker.locator(),
         );
         for diagnostic in &mut diagnostics {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 content.to_string(),
                 compare.range(),
             )));

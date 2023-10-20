@@ -1,5 +1,5 @@
 use ast::call_path::{from_qualified_name, CallPath};
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
@@ -11,7 +11,6 @@ use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of mutable objects as function argument defaults.
@@ -64,14 +63,14 @@ use crate::registry::AsRule;
 pub struct MutableArgumentDefault;
 
 impl Violation for MutableArgumentDefault {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not use mutable data structures for argument defaults")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Replace with `None`; initialize within function"))
     }
 }
@@ -110,18 +109,16 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
-            if checker.patch(diagnostic.kind.rule()) {
-                if let Some(fix) = move_initialization(
-                    function_def,
-                    parameter,
-                    default,
-                    checker.locator(),
-                    checker.stylist(),
-                    checker.indexer(),
-                    checker.generator(),
-                ) {
-                    diagnostic.set_fix(fix);
-                }
+            if let Some(fix) = move_initialization(
+                function_def,
+                parameter,
+                default,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
+                checker.generator(),
+            ) {
+                diagnostic.set_fix(fix);
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -200,5 +197,5 @@ fn move_initialization(
     }
 
     let initialization_edit = Edit::insertion(content, pos);
-    Some(Fix::manual_edits(default_edit, [initialization_edit]))
+    Some(Fix::display_edits(default_edit, [initialization_edit]))
 }

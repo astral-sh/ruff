@@ -96,8 +96,8 @@ pub(crate) use format::{
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Mod;
 use ruff_python_trivia::{CommentRanges, PythonWhitespace};
 use ruff_source_file::Locator;
@@ -567,7 +567,7 @@ mod tests {
             let source_code = SourceCode::new(source);
             let (tokens, comment_ranges) =
                 tokens_and_ranges(source).expect("Expect source to be valid Python");
-            let parsed = parse_ok_tokens(tokens, Mode::Module, "test.py")
+            let parsed = parse_ok_tokens(tokens, source, Mode::Module, "test.py")
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {

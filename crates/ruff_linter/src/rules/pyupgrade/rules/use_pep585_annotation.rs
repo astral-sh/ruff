@@ -1,6 +1,6 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::analyze::typing::ModuleMember;
@@ -8,7 +8,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for the use of generics that can be replaced with standard library
@@ -56,7 +55,7 @@ pub struct NonPEP585Annotation {
 }
 
 impl Violation for NonPEP585Annotation {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -64,7 +63,7 @@ impl Violation for NonPEP585Annotation {
         format!("Use `{to}` instead of `{from}` for type annotation")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let NonPEP585Annotation { to, .. } = self;
         Some(format!("Replace with `{to}`"))
     }
@@ -86,30 +85,28 @@ pub(crate) fn use_pep585_annotation(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if !checker.semantic().in_complex_string_type_definition() {
-            match replacement {
-                ModuleMember::BuiltIn(name) => {
-                    // Built-in type, like `list`.
-                    if checker.semantic().is_builtin(name) {
-                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                            (*name).to_string(),
-                            expr.range(),
-                        )));
-                    }
+    if !checker.semantic().in_complex_string_type_definition() {
+        match replacement {
+            ModuleMember::BuiltIn(name) => {
+                // Built-in type, like `list`.
+                if checker.semantic().is_builtin(name) {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        (*name).to_string(),
+                        expr.range(),
+                    )));
                 }
-                ModuleMember::Member(module, member) => {
-                    // Imported type, like `collections.deque`.
-                    diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                            &ImportRequest::import_from(module, member),
-                            expr.start(),
-                            checker.semantic(),
-                        )?;
-                        let reference_edit = Edit::range_replacement(binding, expr.range());
-                        Ok(Fix::suggested_edits(import_edit, [reference_edit]))
-                    });
-                }
+            }
+            ModuleMember::Member(module, member) => {
+                // Imported type, like `collections.deque`.
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                        &ImportRequest::import_from(module, member),
+                        expr.start(),
+                        checker.semantic(),
+                    )?;
+                    let reference_edit = Edit::range_replacement(binding, expr.range());
+                    Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+                });
             }
         }
     }

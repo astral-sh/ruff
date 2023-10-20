@@ -41,7 +41,7 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                if let Some(diagnostic) = doc_line_too_long(&line, settings) {
+                if let Some(diagnostic) = doc_line_too_long(&line, indexer, settings) {
                     diagnostics.push(diagnostic);
                 }
             }
@@ -54,7 +54,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_line_too_long {
-            if let Some(diagnostic) = line_too_long(&line, settings) {
+            if let Some(diagnostic) = line_too_long(&line, indexer, settings) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -71,11 +71,7 @@ pub(crate) fn check_physical_lines(
     }
 
     if enforce_no_newline_at_end_of_file {
-        if let Some(diagnostic) = no_newline_at_end_of_file(
-            locator,
-            stylist,
-            settings.rules.should_fix(Rule::MissingNewlineAtEndOfFile),
-        ) {
+        if let Some(diagnostic) = no_newline_at_end_of_file(locator, stylist) {
             diagnostics.push(diagnostic);
         }
     }

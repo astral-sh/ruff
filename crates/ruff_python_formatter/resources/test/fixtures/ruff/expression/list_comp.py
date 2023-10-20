@@ -95,3 +95,13 @@ aaaaaaaaaaaaaaaaaaaaa = [
     x
     for (x, y,) in z if head_name
 ]
+
+[
+     1 for components in  # pylint: disable=undefined-loop-variable
+     b +  # integer 1 may only have decimal 01-09
+     c  # negative decimal
+]
+
+# Parenthesized targets and iterators.
+[x for (x) in y]
+[x for x in (y)]

@@ -453,7 +453,7 @@ impl UnittestAssert {
                     Ok(assert(&node.into(), msg))
                 }
             }
-            _ => bail!("Cannot autofix `{self}`"),
+            _ => bail!("Cannot fix `{self}`"),
         }
     }
 }

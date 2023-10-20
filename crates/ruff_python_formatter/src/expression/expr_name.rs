@@ -1,5 +1,5 @@
 use ruff_formatter::{write, FormatContext};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprName;
 
 use crate::comments::SourceComment;
@@ -26,10 +26,11 @@ impl FormatNodeRule<ExprName> for FormatExprName {
 
     fn fmt_dangling_comments(
         &self,
-        _dangling_comments: &[SourceComment],
+        dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Node cannot have dangling comments
+        debug_assert!(dangling_comments.is_empty());
         Ok(())
     }
 }

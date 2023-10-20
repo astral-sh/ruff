@@ -1,19 +1,23 @@
-use ruff_cache::{CacheKey, CacheKeyHasher};
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::hash::Hasher;
 use std::num::{NonZeroU16, NonZeroU8, ParseIntError};
 use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
 use unicode_width::UnicodeWidthChar;
 
+use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
+use ruff_text_size::TextSize;
 
 /// The length of a line of text that is considered too long.
 ///
 /// The allowed range of values is 1..=320
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct LineLength(NonZeroU16);
+pub struct LineLength(
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))] NonZeroU16,
+);
 
 impl LineLength {
     /// Maximum allowed value for a valid [`LineLength`]
@@ -22,6 +26,10 @@ impl LineLength {
     /// Return the numeric value for this [`LineLength`]
     pub fn value(&self) -> u16 {
         self.0.get()
+    }
+
+    pub fn text_len(&self) -> TextSize {
+        TextSize::from(u32::from(self.value()))
     }
 }
 
@@ -243,5 +251,11 @@ impl Default for TabSize {
 impl From<NonZeroU8> for TabSize {
     fn from(tab_size: NonZeroU8) -> Self {
         Self(tab_size)
+    }
+}
+
+impl From<TabSize> for NonZeroU8 {
+    fn from(value: TabSize) -> Self {
+        value.0
     }
 }

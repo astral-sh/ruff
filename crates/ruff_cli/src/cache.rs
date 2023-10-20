@@ -338,6 +338,7 @@ pub(crate) fn init(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use filetime::{set_file_mtime, FileTime};
+    use ruff_linter::settings::types::UnsafeFixes;
     use std::env::temp_dir;
     use std::fs;
     use std::io;
@@ -410,6 +411,7 @@ mod tests {
                     Some(&cache),
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
+                    UnsafeFixes::Enabled,
                 )
                 .unwrap();
                 if diagnostics
@@ -455,6 +457,7 @@ mod tests {
                 Some(&cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
+                UnsafeFixes::Enabled,
             )
             .unwrap();
         }
@@ -712,6 +715,7 @@ mod tests {
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
+                UnsafeFixes::Enabled,
             )
         }
     }

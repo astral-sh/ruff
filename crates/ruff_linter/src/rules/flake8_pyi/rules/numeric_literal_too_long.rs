@@ -1,14 +1,10 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
-
-#[violation]
-pub struct NumericLiteralTooLong;
 
 /// ## What it does
 /// Checks for numeric literals with a string representation longer than ten
@@ -23,20 +19,25 @@ pub struct NumericLiteralTooLong;
 ///
 /// ## Example
 /// ```python
-/// def foo(arg: int = 12345678901) -> None: ...
+/// def foo(arg: int = 12345678901) -> None:
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo(arg: int = ...) -> None: ...
+/// def foo(arg: int = ...) -> None:
+///     ...
 /// ```
-impl AlwaysAutofixableViolation for NumericLiteralTooLong {
+#[violation]
+pub struct NumericLiteralTooLong;
+
+impl AlwaysFixableViolation for NumericLiteralTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Numeric literals with a string representation longer than ten characters are not permitted")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `...`".to_string()
     }
 }
@@ -48,11 +49,9 @@ pub(crate) fn numeric_literal_too_long(checker: &mut Checker, expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(NumericLiteralTooLong, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            "...".to_string(),
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "...".to_string(),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

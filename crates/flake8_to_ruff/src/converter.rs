@@ -13,22 +13,18 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::Strictness;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::settings::DEFAULT_SELECTORS;
 use ruff_linter::warn_user;
 use ruff_workspace::options::{
     Flake8AnnotationsOptions, Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ErrMsgOptions,
-    Flake8PytestStyleOptions, Flake8QuotesOptions, Flake8TidyImportsOptions, LintOptions,
-    McCabeOptions, Options, Pep8NamingOptions, PydocstyleOptions,
+    Flake8PytestStyleOptions, Flake8QuotesOptions, Flake8TidyImportsOptions, LintCommonOptions,
+    LintOptions, McCabeOptions, Options, Pep8NamingOptions, PydocstyleOptions,
 };
 use ruff_workspace::pyproject::Pyproject;
 
 use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
 use super::{parser, plugin};
-
-const DEFAULT_SELECTORS: &[RuleSelector] = &[
-    RuleSelector::Linter(Linter::Pyflakes),
-    RuleSelector::Linter(Linter::Pycodestyle),
-];
 
 pub(crate) fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
@@ -103,7 +99,7 @@ pub(crate) fn convert(
 
     // Parse each supported option.
     let mut options = Options::default();
-    let mut lint_options = LintOptions::default();
+    let mut lint_options = LintCommonOptions::default();
     let mut flake8_annotations = Flake8AnnotationsOptions::default();
     let mut flake8_bugbear = Flake8BugbearOptions::default();
     let mut flake8_builtins = Flake8BuiltinsOptions::default();
@@ -437,8 +433,11 @@ pub(crate) fn convert(
         }
     }
 
-    if lint_options != LintOptions::default() {
-        options.lint = Some(lint_options);
+    if lint_options != LintCommonOptions::default() {
+        options.lint = Some(LintOptions {
+            common: lint_options,
+            ..LintOptions::default()
+        });
     }
 
     // Create the pyproject.toml.
@@ -469,7 +468,9 @@ mod tests {
     use ruff_linter::rules::flake8_quotes;
     use ruff_linter::rules::pydocstyle::settings::Convention;
     use ruff_linter::settings::types::PythonVersion;
-    use ruff_workspace::options::{Flake8QuotesOptions, LintOptions, Options, PydocstyleOptions};
+    use ruff_workspace::options::{
+        Flake8QuotesOptions, LintCommonOptions, LintOptions, Options, PydocstyleOptions,
+    };
     use ruff_workspace::pyproject::Pyproject;
 
     use crate::converter::DEFAULT_SELECTORS;
@@ -479,8 +480,8 @@ mod tests {
     use super::super::plugin::Plugin;
     use super::convert;
 
-    fn lint_default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> LintOptions {
-        LintOptions {
+    fn lint_default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> LintCommonOptions {
+        LintCommonOptions {
             ignore: Some(vec![]),
             select: Some(
                 DEFAULT_SELECTORS
@@ -490,7 +491,7 @@ mod tests {
                     .sorted_by_key(RuleSelector::prefix_and_code)
                     .collect(),
             ),
-            ..LintOptions::default()
+            ..LintCommonOptions::default()
         }
     }
 
@@ -502,7 +503,10 @@ mod tests {
             None,
         );
         let expected = Pyproject::new(Options {
-            lint: Some(lint_default_options([])),
+            lint: Some(LintOptions {
+                common: lint_default_options([]),
+                ..LintOptions::default()
+            }),
             ..Options::default()
         });
         assert_eq!(actual, expected);
@@ -520,7 +524,10 @@ mod tests {
         );
         let expected = Pyproject::new(Options {
             line_length: Some(LineLength::try_from(100).unwrap()),
-            lint: Some(lint_default_options([])),
+            lint: Some(LintOptions {
+                common: lint_default_options([]),
+                ..LintOptions::default()
+            }),
             ..Options::default()
         });
         assert_eq!(actual, expected);
@@ -538,7 +545,10 @@ mod tests {
         );
         let expected = Pyproject::new(Options {
             line_length: Some(LineLength::try_from(100).unwrap()),
-            lint: Some(lint_default_options([])),
+            lint: Some(LintOptions {
+                common: lint_default_options([]),
+                ..LintOptions::default()
+            }),
             ..Options::default()
         });
         assert_eq!(actual, expected);
@@ -555,7 +565,10 @@ mod tests {
             Some(vec![]),
         );
         let expected = Pyproject::new(Options {
-            lint: Some(lint_default_options([])),
+            lint: Some(LintOptions {
+                common: lint_default_options([]),
+                ..LintOptions::default()
+            }),
             ..Options::default()
         });
         assert_eq!(actual, expected);
@@ -573,13 +586,16 @@ mod tests {
         );
         let expected = Pyproject::new(Options {
             lint: Some(LintOptions {
-                flake8_quotes: Some(Flake8QuotesOptions {
-                    inline_quotes: Some(flake8_quotes::settings::Quote::Single),
-                    multiline_quotes: None,
-                    docstring_quotes: None,
-                    avoid_escape: None,
-                }),
-                ..lint_default_options([])
+                common: LintCommonOptions {
+                    flake8_quotes: Some(Flake8QuotesOptions {
+                        inline_quotes: Some(flake8_quotes::settings::Quote::Single),
+                        multiline_quotes: None,
+                        docstring_quotes: None,
+                        avoid_escape: None,
+                    }),
+                    ..lint_default_options([])
+                },
+                ..LintOptions::default()
             }),
             ..Options::default()
         });
@@ -601,12 +617,15 @@ mod tests {
         );
         let expected = Pyproject::new(Options {
             lint: Some(LintOptions {
-                pydocstyle: Some(PydocstyleOptions {
-                    convention: Some(Convention::Numpy),
-                    ignore_decorators: None,
-                    property_decorators: None,
-                }),
-                ..lint_default_options([Linter::Pydocstyle.into()])
+                common: LintCommonOptions {
+                    pydocstyle: Some(PydocstyleOptions {
+                        convention: Some(Convention::Numpy),
+                        ignore_decorators: None,
+                        property_decorators: None,
+                    }),
+                    ..lint_default_options([Linter::Pydocstyle.into()])
+                },
+                ..LintOptions::default()
             }),
             ..Options::default()
         });
@@ -625,13 +644,16 @@ mod tests {
         );
         let expected = Pyproject::new(Options {
             lint: Some(LintOptions {
-                flake8_quotes: Some(Flake8QuotesOptions {
-                    inline_quotes: Some(flake8_quotes::settings::Quote::Single),
-                    multiline_quotes: None,
-                    docstring_quotes: None,
-                    avoid_escape: None,
-                }),
-                ..lint_default_options([Linter::Flake8Quotes.into()])
+                common: LintCommonOptions {
+                    flake8_quotes: Some(Flake8QuotesOptions {
+                        inline_quotes: Some(flake8_quotes::settings::Quote::Single),
+                        multiline_quotes: None,
+                        docstring_quotes: None,
+                        avoid_escape: None,
+                    }),
+                    ..lint_default_options([Linter::Flake8Quotes.into()])
+                },
+                ..LintOptions::default()
             }),
             ..Options::default()
         });
@@ -652,7 +674,10 @@ mod tests {
         );
         let expected = Pyproject::new(Options {
             target_version: Some(PythonVersion::Py38),
-            lint: Some(lint_default_options([])),
+            lint: Some(LintOptions {
+                common: lint_default_options([]),
+                ..LintOptions::default()
+            }),
             ..Options::default()
         });
         assert_eq!(actual, expected);

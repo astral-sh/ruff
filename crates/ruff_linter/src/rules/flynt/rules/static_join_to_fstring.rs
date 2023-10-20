@@ -1,14 +1,14 @@
 use itertools::Itertools;
 
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix::snippet::SourceCodeSnippet;
+
 use crate::rules::flynt::helpers;
 
 /// ## What it does
@@ -34,7 +34,7 @@ pub struct StaticJoinToFString {
     expression: SourceCodeSnippet,
 }
 
-impl AlwaysAutofixableViolation for StaticJoinToFString {
+impl AlwaysFixableViolation for StaticJoinToFString {
     #[derive_message_formats]
     fn message(&self) -> String {
         let StaticJoinToFString { expression } = self;
@@ -45,7 +45,7 @@ impl AlwaysAutofixableViolation for StaticJoinToFString {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let StaticJoinToFString { expression } = self;
         if let Some(expression) = expression.full_display() {
             format!("Replace with `{expression}`")
@@ -154,11 +154,9 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            pad(contents, expr.range(), checker.locator()),
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        pad(contents, expr.range(), checker.locator()),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

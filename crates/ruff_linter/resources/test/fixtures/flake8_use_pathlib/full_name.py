@@ -33,6 +33,8 @@ with open(p) as fp:
     fp.read()
 open(p).close()
 os.getcwdb(p)
+os.path.join(p, *q)
+os.sep.join(p, *q)
 
 # https://github.com/astral-sh/ruff/issues/7620
 def opener(path, flags):

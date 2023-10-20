@@ -1,11 +1,12 @@
 use ruff_formatter::write;
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::AstNode;
 use ruff_python_ast::StmtImportFrom;
 use ruff_text_size::Ranged;
 
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::parentheses::parenthesized;
+use crate::other::identifier::DotDelimitedIdentifier;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -20,17 +21,18 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
             range: _,
         } = item;
 
-        let level_str = level
-            .map(|level| ".".repeat(level as usize))
-            .unwrap_or(String::default());
-
         write!(
             f,
             [
                 token("from"),
                 space(),
-                text(&level_str, None),
-                module.as_ref().map(AsFormat::format),
+                format_with(|f| {
+                    for _ in 0..level.unwrap_or(0) {
+                        token(".").fmt(f)?;
+                    }
+                    Ok(())
+                }),
+                module.as_ref().map(DotDelimitedIdentifier::new),
                 space(),
                 token("import"),
                 space(),

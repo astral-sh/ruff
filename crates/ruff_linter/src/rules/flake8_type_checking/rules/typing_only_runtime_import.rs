@@ -3,14 +3,14 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{AnyImport, Binding, Imported, NodeId, ResolvedReferenceId, Scope};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
+use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 
@@ -67,7 +67,7 @@ pub struct TypingOnlyFirstPartyImport {
 }
 
 impl Violation for TypingOnlyFirstPartyImport {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -77,7 +77,7 @@ impl Violation for TypingOnlyFirstPartyImport {
         )
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Move into type-checking block".to_string())
     }
 }
@@ -135,7 +135,7 @@ pub struct TypingOnlyThirdPartyImport {
 }
 
 impl Violation for TypingOnlyThirdPartyImport {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -145,7 +145,7 @@ impl Violation for TypingOnlyThirdPartyImport {
         )
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Move into type-checking block".to_string())
     }
 }
@@ -203,7 +203,7 @@ pub struct TypingOnlyStandardLibraryImport {
 }
 
 impl Violation for TypingOnlyStandardLibraryImport {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -213,7 +213,7 @@ impl Violation for TypingOnlyStandardLibraryImport {
         )
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Move into type-checking block".to_string())
     }
 }
@@ -334,11 +334,7 @@ pub(crate) fn typing_only_runtime_import(
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
     for ((node_id, import_type), imports) in errors_by_statement {
-        let fix = if checker.patch(rule_for(import_type)) {
-            fix_imports(checker, node_id, &imports).ok()
-        } else {
-            None
-        };
+        let fix = fix_imports(checker, node_id, &imports).ok();
 
         for ImportBinding {
             import,
@@ -465,7 +461,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         .expect("Expected at least one import");
 
     // Step 1) Remove the import.
-    let remove_import_edit = autofix::edits::remove_unused_imports(
+    let remove_import_edit = fix::edits::remove_unused_imports(
         member_names.iter().map(AsRef::as_ref),
         statement,
         parent,
@@ -486,7 +482,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
     )?;
 
     Ok(
-        Fix::suggested_edits(remove_import_edit, add_import_edit.into_edits()).isolate(
+        Fix::unsafe_edits(remove_import_edit, add_import_edit.into_edits()).isolate(
             Checker::isolation(checker.semantic().parent_statement_id(node_id)),
         ),
     )

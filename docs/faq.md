@@ -6,7 +6,7 @@ Yes. Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-bo
 the `line-length` setting is consistent between the two.
 
 As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
-stylistic lint rules that are obviated by autoformatting.
+stylistic lint rules that are obviated by automated formatting.
 
 Note that Ruff and Black treat line-length enforcement a little differently. Black makes a
 best-effort attempt to adhere to the `line-length`, but avoids automatic line-wrapping in some cases
@@ -191,7 +191,7 @@ If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel fr
 
 ## What versions of Python does Ruff support?
 
-Ruff can lint code for any Python version from 3.7 onwards, including Python 3.10 and 3.11.
+Ruff can lint code for any Python version from 3.7 onwards, including Python 3.12.
 
 Ruff does not support Python 2. Ruff _may_ run on pre-Python 3.7 code, although such versions
 are not officially supported (e.g., Ruff does _not_ respect type comments).
@@ -436,22 +436,13 @@ For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) c
 
 ## Ruff tried to fix something — but it broke my code?
 
-Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
-have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.
+Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
+fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
+setting, or passing the `--unsafe-fixes` flag to `ruff check`. For more, see [the fix documentation](configuration.md#fixes).
 
-In the future, Ruff will support enabling autofix behavior based on the safety of the patch.
-
-In the meantime, if you find that the autofix is too aggressive, you can disable it on a per-rule or
-per-category basis using the [`unfixable`](settings.md#unfixable) mechanic.
-For example, to disable autofix for some possibly-unsafe rules, you could add the following to your
-`pyproject.toml`:
-
-```toml
-[tool.ruff]
-unfixable = ["B", "SIM", "TRY", "RUF"]
-```
-
-If you find a case where Ruff's autofix breaks your code, please file an Issue!
+Even still, given the dynamic nature of Python, it's difficult to have _complete_ certainty when
+making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks your code, please
+[file an Issue](https://github.com/astral-sh/ruff/issues/new).
 
 ## How can I disable Ruff's color output?
 

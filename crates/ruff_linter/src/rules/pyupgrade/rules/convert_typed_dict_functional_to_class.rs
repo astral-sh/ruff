@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{
@@ -10,7 +10,6 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `TypedDict` declarations that use functional syntax.
@@ -47,7 +46,7 @@ pub struct ConvertTypedDictFunctionalToClass {
 }
 
 impl Violation for ConvertTypedDictFunctionalToClass {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,7 +54,7 @@ impl Violation for ConvertTypedDictFunctionalToClass {
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let ConvertTypedDictFunctionalToClass { name } = self;
         Some(format!("Convert `{name}` to class syntax"))
     }
@@ -84,18 +83,16 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         },
         stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-        if checker.locator().is_at_start_of_line(stmt.start()) {
-            diagnostic.set_fix(convert_to_class(
-                stmt,
-                class_name,
-                body,
-                total_keyword,
-                base_class,
-                checker.generator(),
-            ));
-        }
+    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+    if checker.locator().is_at_start_of_line(stmt.start()) {
+        diagnostic.set_fix(convert_to_class(
+            stmt,
+            class_name,
+            body,
+            total_keyword,
+            base_class,
+            checker.generator(),
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -275,7 +272,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    Fix::suggested(Edit::range_replacement(
+    Fix::safe_edit(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(
             class_name,
             body,

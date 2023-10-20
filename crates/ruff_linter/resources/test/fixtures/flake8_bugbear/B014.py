@@ -76,8 +76,15 @@ except (ValueError, binascii.Error):
     pass
 
 
-# https://github.com/astral-sh/ruff/issues/6412
+# Regression test for: https://github.com/astral-sh/ruff/issues/6412
 try:
     pass
 except (ValueError, ValueError, TypeError):
     pass
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739801758
+try:
+    pas
+except(re.error, re.error):
+    p

@@ -3,7 +3,7 @@ use libcst_native::{
     ConcatenatedString, Expression, FormattedStringContent, FormattedStringExpression,
 };
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_codegen::Stylist;
@@ -12,7 +12,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call_mut, match_name, transform_expression};
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `str()`, `repr()`, and `ascii()` as explicit type
@@ -41,13 +40,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct ExplicitFStringTypeConversion;
 
-impl AlwaysAutofixableViolation for ExplicitFStringTypeConversion {
+impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use explicit conversion flag")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with conversion flag".to_string()
     }
 }
@@ -123,11 +122,9 @@ pub(crate) fn explicit_f_string_type_conversion(
         }
 
         let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, value.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                convert_call_to_conversion_flag(expr, index, checker.locator(), checker.stylist())
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            convert_call_to_conversion_flag(expr, index, checker.locator(), checker.stylist())
+        });
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -160,7 +157,7 @@ fn convert_call_to_conversion_flag(
         formatted_string_expression.expression = call.args[0].value.clone();
         Ok(expression)
     })
-    .map(|output| Fix::automatic(Edit::range_replacement(output, expr.range())))
+    .map(|output| Fix::safe_edit(Edit::range_replacement(output, expr.range())))
 }
 
 /// Return the [`FormattedStringContent`] at the given index in an f-string or implicit

@@ -25,3 +25,7 @@ not ''}
 
 {2 is
  not ''}
+
+# Regression test for
+if values[1is not None ] is not '-':
+    pass

@@ -1,13 +1,12 @@
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `functools.lru_cache` that set `maxsize=None`.
@@ -45,13 +44,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct LRUCacheWithMaxsizeNone;
 
-impl AlwaysAutofixableViolation for LRUCacheWithMaxsizeNone {
+impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Rewrite with `@functools.cache".to_string()
     }
 }
@@ -91,18 +90,16 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                            &ImportRequest::import("functools", "cache"),
-                            decorator.start(),
-                            checker.semantic(),
-                        )?;
-                        let reference_edit =
-                            Edit::range_replacement(binding, decorator.expression.range());
-                        Ok(Fix::automatic_edits(import_edit, [reference_edit]))
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                        &ImportRequest::import("functools", "cache"),
+                        decorator.start(),
+                        checker.semantic(),
+                    )?;
+                    let reference_edit =
+                        Edit::range_replacement(binding, decorator.expression.range());
+                    Ok(Fix::safe_edits(import_edit, [reference_edit]))
+                });
                 checker.diagnostics.push(diagnostic);
             }
         }

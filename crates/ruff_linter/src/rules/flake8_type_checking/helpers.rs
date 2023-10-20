@@ -1,5 +1,5 @@
 use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind, SemanticModel};
 
 pub(crate) fn is_valid_runtime_import(binding: &Binding, semantic: &SemanticModel) -> bool {
@@ -40,11 +40,13 @@ fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticMode
     };
 
     class_def.bases().iter().any(|base| {
-        semantic.resolve_call_path(base).is_some_and(|call_path| {
-            base_classes
-                .iter()
-                .any(|base_class| from_qualified_name(base_class) == call_path)
-        })
+        semantic
+            .resolve_call_path(map_subscript(base))
+            .is_some_and(|call_path| {
+                base_classes
+                    .iter()
+                    .any(|base_class| from_qualified_name(base_class) == call_path)
+            })
     })
 }
 

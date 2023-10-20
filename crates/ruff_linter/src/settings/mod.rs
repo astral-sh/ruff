@@ -23,13 +23,14 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion};
 use crate::{codes, RuleSelector};
 
 use super::line_width::{LineLength, TabSize};
 
 use self::rule_table::RuleTable;
 use self::types::PreviewMode;
+use crate::rule_selector::PreviewOptions;
 
 pub mod flags;
 pub mod rule_table;
@@ -37,13 +38,17 @@ pub mod types;
 
 #[derive(Debug, CacheKey)]
 pub struct LinterSettings {
+    pub exclude: FilePatternSet,
     pub project_root: PathBuf,
 
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
+    pub extend_unsafe_fixes: RuleSet,
+    pub extend_safe_fixes: RuleSet,
 
     pub target_version: PythonVersion,
     pub preview: PreviewMode,
+    pub explicit_preview_rules: bool,
 
     // Rule-specific settings
     pub allowed_confusables: FxHashSet<char>,
@@ -58,6 +63,7 @@ pub struct LinterSettings {
     pub tab_size: TabSize,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
+
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bandit: flake8_bandit::settings::Settings,
@@ -85,12 +91,21 @@ pub struct LinterSettings {
     pub pyupgrade: pyupgrade::settings::Settings,
 }
 
-pub const PREFIXES: &[RuleSelector] = &[
+pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
+    RuleSelector::Linter(Linter::Pyflakes),
+    // Only include pycodestyle rules that do not overlap with the formatter
     RuleSelector::Prefix {
-        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E),
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E4),
         redirected_from: None,
     },
-    RuleSelector::Linter(Linter::Pyflakes),
+    RuleSelector::Prefix {
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E7),
+        redirected_from: None,
+    },
+    RuleSelector::Prefix {
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E9),
+        redirected_from: None,
+    },
 ];
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
@@ -117,11 +132,12 @@ impl LinterSettings {
 
     pub fn new(project_root: &Path) -> Self {
         Self {
+            exclude: FilePatternSet::default(),
             target_version: PythonVersion::default(),
             project_root: project_root.to_path_buf(),
-            rules: PREFIXES
+            rules: DEFAULT_SELECTORS
                 .iter()
-                .flat_map(|selector| selector.rules(PreviewMode::default()))
+                .flat_map(|selector| selector.rules(&PreviewOptions::default()))
                 .collect(),
             allowed_confusables: FxHashSet::from_iter([]),
 
@@ -136,6 +152,8 @@ impl LinterSettings {
             namespace_packages: vec![],
 
             per_file_ignores: vec![],
+            extend_safe_fixes: RuleSet::empty(),
+            extend_unsafe_fixes: RuleSet::empty(),
 
             src: vec![path_dedot::CWD.clone()],
             // Needs duplicating
@@ -168,6 +186,7 @@ impl LinterSettings {
             pylint: pylint::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
             preview: PreviewMode::default(),
+            explicit_preview_rules: false,
         }
     }
 

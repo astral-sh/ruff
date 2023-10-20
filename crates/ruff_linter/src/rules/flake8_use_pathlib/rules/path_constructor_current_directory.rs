@@ -1,10 +1,9 @@
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprCall, ExprConstant};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `pathlib.Path` objects that are initialized with the current
@@ -33,13 +32,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct PathConstructorCurrentDirectory;
 
-impl AlwaysAutofixableViolation for PathConstructorCurrentDirectory {
+impl AlwaysFixableViolation for PathConstructorCurrentDirectory {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not pass the current directory explicitly to `Path`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove the current directory argument".to_string()
     }
 }
@@ -76,9 +75,7 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
 
     if matches!(value.as_str(), "" | ".") {
         let mut diagnostic = Diagnostic::new(PathConstructorCurrentDirectory, *range);
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::automatic(Edit::range_deletion(*range)));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(*range)));
         checker.diagnostics.push(diagnostic);
     }
 }

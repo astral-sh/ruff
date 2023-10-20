@@ -2,12 +2,11 @@ use once_cell::sync::Lazy;
 use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of deprecated methods from the `unittest` module.
@@ -45,14 +44,14 @@ pub struct DeprecatedUnittestAlias {
     target: String,
 }
 
-impl AlwaysAutofixableViolation for DeprecatedUnittestAlias {
+impl AlwaysFixableViolation for DeprecatedUnittestAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DeprecatedUnittestAlias { alias, target } = self;
         format!("`{alias}` is deprecated, use `{target}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let DeprecatedUnittestAlias { alias, target } = self;
         format!("Replace `{target}` with `{alias}`")
     }
@@ -99,11 +98,9 @@ pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            format!("self.{target}"),
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        format!("self.{target}"),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

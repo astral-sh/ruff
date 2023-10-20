@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::is_list;
@@ -6,7 +6,7 @@ use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::refurb::helpers::generate_method_call;
 
 /// ## What it does
@@ -39,14 +39,14 @@ use crate::rules::refurb::helpers::generate_method_call;
 pub struct SliceCopy;
 
 impl Violation for SliceCopy {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `copy` method over slicing")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Replace with `copy()`".to_string())
     }
 }
@@ -61,14 +61,12 @@ pub(crate) fn slice_copy(checker: &mut Checker, subscript: &ast::ExprSubscript) 
         return;
     };
     let mut diagnostic = Diagnostic::new(SliceCopy, subscript.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let replacement = generate_method_call(name, "copy", checker.generator());
-        diagnostic.set_fix(Fix::suggested(Edit::replacement(
-            replacement,
-            subscript.start(),
-            subscript.end(),
-        )));
-    }
+    let replacement = generate_method_call(name, "copy", checker.generator());
+    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+        replacement,
+        subscript.start(),
+        subscript.end(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

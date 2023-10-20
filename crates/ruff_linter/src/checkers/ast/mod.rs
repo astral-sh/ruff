@@ -29,7 +29,7 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use log::error;
+use log::debug;
 use ruff_python_ast::{
     self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
     ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
@@ -143,11 +143,6 @@ impl<'a> Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
-    /// Return `true` if a patch should be generated for a given [`Rule`].
-    pub(crate) fn patch(&self, code: Rule) -> bool {
-        self.settings.rules.should_fix(code)
-    }
-
     /// Return `true` if a [`Rule`] is disabled by a `noqa` directive.
     pub(crate) fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
@@ -183,7 +178,7 @@ impl<'a> Checker<'a> {
 
         // Find the quote character used to start the containing f-string.
         let expr = self.semantic.current_expression()?;
-        let string_range = self.indexer.f_string_range(expr.start())?;
+        let string_range = self.indexer.fstring_ranges().innermost(expr.start())?;
         let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
 
         // Invert the quote character, if it's a single quote.
@@ -529,6 +524,7 @@ where
                 );
                 self.semantic.push_definition(definition);
                 self.semantic.push_scope(ScopeKind::Function(function_def));
+                self.semantic.flags -= SemanticModelFlags::EXCEPTION_HANDLER;
 
                 self.deferred.functions.push(self.semantic.snapshot());
 
@@ -567,6 +563,7 @@ where
                 );
                 self.semantic.push_definition(definition);
                 self.semantic.push_scope(ScopeKind::Class(class_def));
+                self.semantic.flags -= SemanticModelFlags::EXCEPTION_HANDLER;
 
                 // Extract any global bindings from the class body.
                 if let Some(globals) = Globals::from_body(body) {
@@ -585,7 +582,9 @@ where
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit_expr(value);
+                self.deferred
+                    .type_param_definitions
+                    .push((value, self.semantic.snapshot()));
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -1168,15 +1167,16 @@ where
                                 range: _,
                             }) = slice.as_ref()
                             {
-                                if let Some(expr) = elts.first() {
+                                let mut iter = elts.iter();
+                                if let Some(expr) = iter.next() {
                                     self.visit_expr(expr);
-                                    for expr in elts.iter().skip(1) {
-                                        self.visit_non_type_definition(expr);
-                                    }
-                                    self.visit_expr_context(ctx);
                                 }
+                                for expr in iter {
+                                    self.visit_non_type_definition(expr);
+                                }
+                                self.visit_expr_context(ctx);
                             } else {
-                                error!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
                         }
                         None => {
@@ -1366,7 +1366,7 @@ where
     fn visit_match_case(&mut self, match_case: &'b MatchCase) {
         self.visit_pattern(&match_case.pattern);
         if let Some(expr) = &match_case.guard {
-            self.visit_expr(expr);
+            self.visit_boolean_test(expr);
         }
 
         self.semantic.push_branch();
@@ -1389,9 +1389,14 @@ where
             }
         }
         // Step 2: Traversal
-        self.deferred
-            .type_param_definitions
-            .push((type_param, self.semantic.snapshot()));
+        if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+            bound: Some(bound), ..
+        }) = type_param
+        {
+            self.deferred
+                .type_param_definitions
+                .push((bound, self.semantic.snapshot()));
+        }
     }
 }
 
@@ -1618,10 +1623,12 @@ impl<'a> Checker<'a> {
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
         let parent = self.semantic.current_statement();
 
+        // Match the left-hand side of an annotated assignment, like `x` in `x: int`.
         if matches!(
             parent,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) {
+        ) && !self.semantic.in_annotation()
+        {
             self.add_binding(
                 id,
                 expr.range(),
@@ -1764,12 +1771,9 @@ impl<'a> Checker<'a> {
             for (type_param, snapshot) in type_params {
                 self.semantic.restore(snapshot);
 
-                if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                    bound: Some(bound), ..
-                }) = type_param
-                {
-                    self.visit_expr(bound);
-                }
+                self.semantic.flags |=
+                    SemanticModelFlags::TYPE_PARAM_DEFINITION | SemanticModelFlags::TYPE_DEFINITION;
+                self.visit_expr(type_param);
             }
         }
         self.semantic.restore(snapshot);

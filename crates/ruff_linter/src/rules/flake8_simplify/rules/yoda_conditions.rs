@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libcst_native::CompOp;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
 use ruff_python_codegen::Stylist;
@@ -9,12 +9,11 @@ use ruff_python_stdlib::str::{self};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::pad;
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
-use crate::registry::AsRule;
+use crate::fix::edits::pad;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for conditions that position a constant on the left-hand side of the
@@ -52,7 +51,7 @@ pub struct YodaConditions {
 }
 
 impl Violation for YodaConditions {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -67,7 +66,7 @@ impl Violation for YodaConditions {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let YodaConditions { suggestion } = self;
         suggestion.as_ref().map(|suggestion| {
             if let Some(suggestion) = suggestion.full_display() {
@@ -193,12 +192,10 @@ pub(crate) fn yoda_conditions(
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                pad(suggestion, expr.range(), checker.locator()),
-                expr.range(),
-            )));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(suggestion, expr.range(), checker.locator()),
+            expr.range(),
+        )));
         checker.diagnostics.push(diagnostic);
     } else {
         checker.diagnostics.push(Diagnostic::new(

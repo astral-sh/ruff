@@ -1,13 +1,12 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::parenthesize::parenthesized_range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `if` expressions that can be replaced with `bool()` calls.
@@ -35,7 +34,7 @@ pub struct IfExprWithTrueFalse {
 }
 
 impl Violation for IfExprWithTrueFalse {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,7 +46,7 @@ impl Violation for IfExprWithTrueFalse {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let IfExprWithTrueFalse { is_compare } = self;
         if *is_compare {
             Some(format!("Remove unnecessary `True if ... else False`"))
@@ -81,13 +80,13 @@ impl Violation for IfExprWithTrueFalse {
 #[violation]
 pub struct IfExprWithFalseTrue;
 
-impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
+impl AlwaysFixableViolation for IfExprWithFalseTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `not ...` instead of `False if ... else True`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Replace with `not ...`")
     }
 }
@@ -117,7 +116,7 @@ pub struct IfExprWithTwistedArms {
     expr_else: String,
 }
 
-impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
+impl AlwaysFixableViolation for IfExprWithTwistedArms {
     #[derive_message_formats]
     fn message(&self) -> String {
         let IfExprWithTwistedArms {
@@ -130,7 +129,7 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let IfExprWithTwistedArms {
             expr_body,
             expr_else,
@@ -157,48 +156,46 @@ pub(crate) fn if_expr_with_true_false(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if test.is_compare_expr() {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker
-                    .locator()
-                    .slice(
-                        parenthesized_range(
-                            test.into(),
-                            expr.into(),
-                            checker.indexer().comment_ranges(),
-                            checker.locator().contents(),
-                        )
-                        .unwrap_or(test.range()),
+    if test.is_compare_expr() {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker
+                .locator()
+                .slice(
+                    parenthesized_range(
+                        test.into(),
+                        expr.into(),
+                        checker.indexer().comment_ranges(),
+                        checker.locator().contents(),
                     )
-                    .to_string(),
-                expr.range(),
-            )));
-        } else if checker.semantic().is_builtin("bool") {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.generator().expr(
-                    &ast::ExprCall {
-                        func: Box::new(
-                            ast::ExprName {
-                                id: "bool".into(),
-                                ctx: ExprContext::Load,
-                                range: TextRange::default(),
-                            }
-                            .into(),
-                        ),
-                        arguments: Arguments {
-                            args: vec![test.clone()],
-                            keywords: vec![],
+                    .unwrap_or(test.range()),
+                )
+                .to_string(),
+            expr.range(),
+        )));
+    } else if checker.semantic().is_builtin("bool") {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker.generator().expr(
+                &ast::ExprCall {
+                    func: Box::new(
+                        ast::ExprName {
+                            id: "bool".into(),
+                            ctx: ExprContext::Load,
                             range: TextRange::default(),
-                        },
+                        }
+                        .into(),
+                    ),
+                    arguments: Arguments {
+                        args: vec![test.clone()],
+                        keywords: vec![],
                         range: TextRange::default(),
-                    }
-                    .into(),
-                ),
-                expr.range(),
-            )));
-        };
-    }
+                    },
+                    range: TextRange::default(),
+                }
+                .into(),
+            ),
+            expr.range(),
+        )));
+    };
     checker.diagnostics.push(diagnostic);
 }
 
@@ -215,19 +212,17 @@ pub(crate) fn if_expr_with_false_true(
     }
 
     let mut diagnostic = Diagnostic::new(IfExprWithFalseTrue, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            checker.generator().expr(
-                &ast::ExprUnaryOp {
-                    op: UnaryOp::Not,
-                    operand: Box::new(test.clone()),
-                    range: TextRange::default(),
-                }
-                .into(),
-            ),
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().expr(
+            &ast::ExprUnaryOp {
+                op: UnaryOp::Not,
+                operand: Box::new(test.clone()),
+                range: TextRange::default(),
+            }
+            .into(),
+        ),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -269,20 +264,18 @@ pub(crate) fn twisted_arms_in_ifexpr(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let node = body.clone();
-        let node1 = orelse.clone();
-        let node2 = orelse.clone();
-        let node3 = ast::ExprIfExp {
-            test: Box::new(node2),
-            body: Box::new(node1),
-            orelse: Box::new(node),
-            range: TextRange::default(),
-        };
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            checker.generator().expr(&node3.into()),
-            expr.range(),
-        )));
-    }
+    let node = body.clone();
+    let node1 = orelse.clone();
+    let node2 = orelse.clone();
+    let node3 = ast::ExprIfExp {
+        test: Box::new(node2),
+        body: Box::new(node1),
+        orelse: Box::new(node),
+        range: TextRange::default(),
+    };
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().expr(&node3.into()),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Quote;
 use ruff_text_size::Ranged;
@@ -37,6 +37,8 @@ pub struct TripleSingleQuotes {
 }
 
 impl Violation for TripleSingleQuotes {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let TripleSingleQuotes { expected_quote } = self;
@@ -45,11 +47,24 @@ impl Violation for TripleSingleQuotes {
             Quote::Single => format!(r#"Use triple single quotes `'''`"#),
         }
     }
+
+    fn fix_title(&self) -> Option<String> {
+        let TripleSingleQuotes { expected_quote } = self;
+        Some(match expected_quote {
+            Quote::Double => format!("Convert to triple double quotes"),
+            Quote::Single => format!("Convert to triple single quotes"),
+        })
+    }
 }
 
 /// D300
 pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     let leading_quote = docstring.leading_quote();
+
+    let prefixes = docstring
+        .leading_quote()
+        .trim_end_matches(|c| c == '\'' || c == '"')
+        .to_owned();
 
     let expected_quote = if docstring.body().contains("\"\"\"") {
         Quote::Single
@@ -60,18 +75,38 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     match expected_quote {
         Quote::Single => {
             if !leading_quote.ends_with("'''") {
-                checker.diagnostics.push(Diagnostic::new(
-                    TripleSingleQuotes { expected_quote },
-                    docstring.range(),
-                ));
+                let mut diagnostic =
+                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+
+                if checker.settings.preview.is_enabled() {
+                    let body = docstring.body().as_str();
+                    if !body.ends_with('\'') {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            format!("{prefixes}'''{body}'''"),
+                            docstring.range(),
+                        )));
+                    }
+                }
+
+                checker.diagnostics.push(diagnostic);
             }
         }
         Quote::Double => {
             if !leading_quote.ends_with("\"\"\"") {
-                checker.diagnostics.push(Diagnostic::new(
-                    TripleSingleQuotes { expected_quote },
-                    docstring.range(),
-                ));
+                let mut diagnostic =
+                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+
+                if checker.settings.preview.is_enabled() {
+                    let body = docstring.body().as_str();
+                    if !body.ends_with('"') {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            format!("{prefixes}\"\"\"{body}\"\"\""),
+                            docstring.range(),
+                        )));
+                    }
+                }
+
+                checker.diagnostics.push(diagnostic);
             }
         }
     }

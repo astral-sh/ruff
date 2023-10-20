@@ -5,12 +5,12 @@ use ruff_python_ast as ast;
 use ruff_python_parser::lexer::lex;
 use ruff_python_parser::{parse_tokens, Mode};
 
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::{
     walk_alias, walk_comprehension, walk_except_handler, walk_expr, walk_keyword, walk_match_case,
     walk_parameter, walk_parameters, walk_pattern, walk_stmt, walk_type_param, walk_with_item,
     Visitor,
 };
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
     Alias, BoolOp, CmpOp, Comprehension, ExceptHandler, Expr, Keyword, MatchCase, Operator,
     Parameter, Parameters, Pattern, Stmt, TypeParam, UnaryOp, WithItem,
@@ -131,7 +131,7 @@ fn function_type_parameters() {
 
 fn trace_visitation(source: &str) -> String {
     let tokens = lex(source, Mode::Module);
-    let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
+    let parsed = parse_tokens(tokens, source, Mode::Module, "test.py").unwrap();
 
     let mut visitor = RecordVisitor::default();
     walk_module(&mut visitor, &parsed);

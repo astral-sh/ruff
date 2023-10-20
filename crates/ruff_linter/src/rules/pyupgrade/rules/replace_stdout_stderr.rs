@@ -1,13 +1,12 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Keyword};
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix::edits::{remove_argument, Parentheses};
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` that send `stdout` and `stderr` to a
@@ -40,14 +39,14 @@ use crate::registry::AsRule;
 pub struct ReplaceStdoutStderr;
 
 impl Violation for ReplaceStdoutStderr {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Replace with `capture_output` keyword argument".to_string())
     }
 }
@@ -81,12 +80,9 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
         }
 
         let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, call.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if call.arguments.find_keyword("capture_output").is_none() {
-                diagnostic.try_set_fix(|| {
-                    generate_fix(stdout, stderr, call, checker.locator().contents())
-                });
-            }
+        if call.arguments.find_keyword("capture_output").is_none() {
+            diagnostic
+                .try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator().contents()));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -105,7 +101,7 @@ fn generate_fix(
         (stderr, stdout)
     };
     // Replace one argument with `capture_output=True`, and remove the other.
-    Ok(Fix::suggested_edits(
+    Ok(Fix::unsafe_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
         [remove_argument(
             second,

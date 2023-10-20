@@ -1,12 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for negated `==` operators.
@@ -33,14 +32,14 @@ pub struct NegateEqualOp {
     right: String,
 }
 
-impl AlwaysAutofixableViolation for NegateEqualOp {
+impl AlwaysFixableViolation for NegateEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NegateEqualOp { left, right } = self;
         format!("Use `{left} != {right}` instead of `not {left} == {right}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `!=` operator".to_string()
     }
 }
@@ -70,14 +69,14 @@ pub struct NegateNotEqualOp {
     right: String,
 }
 
-impl AlwaysAutofixableViolation for NegateNotEqualOp {
+impl AlwaysFixableViolation for NegateNotEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NegateNotEqualOp { left, right } = self;
         format!("Use `{left} == {right}` instead of `not {left} != {right}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `==` operator".to_string()
     }
 }
@@ -106,14 +105,14 @@ pub struct DoubleNegation {
     expr: String,
 }
 
-impl AlwaysAutofixableViolation for DoubleNegation {
+impl AlwaysFixableViolation for DoubleNegation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DoubleNegation { expr } = self;
         format!("Use `{expr}` instead of `not (not {expr})`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let DoubleNegation { expr } = self;
         format!("Replace with `{expr}`")
     }
@@ -175,18 +174,16 @@ pub(crate) fn negation_with_equal_op(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let node = ast::ExprCompare {
-            left: left.clone(),
-            ops: vec![CmpOp::NotEq],
-            comparators: comparators.clone(),
-            range: TextRange::default(),
-        };
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-            checker.generator().expr(&node.into()),
-            expr.range(),
-        )));
-    }
+    let node = ast::ExprCompare {
+        left: left.clone(),
+        ops: vec![CmpOp::NotEq],
+        comparators: comparators.clone(),
+        range: TextRange::default(),
+    };
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        checker.generator().expr(&node.into()),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -232,18 +229,16 @@ pub(crate) fn negation_with_not_equal_op(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let node = ast::ExprCompare {
-            left: left.clone(),
-            ops: vec![CmpOp::Eq],
-            comparators: comparators.clone(),
-            range: TextRange::default(),
-        };
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            checker.generator().expr(&node.into()),
-            expr.range(),
-        )));
-    }
+    let node = ast::ExprCompare {
+        left: left.clone(),
+        ops: vec![CmpOp::Eq],
+        comparators: comparators.clone(),
+        range: TextRange::default(),
+    };
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        checker.generator().expr(&node.into()),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -270,32 +265,30 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if checker.semantic().in_boolean_test() {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.locator().slice(operand.as_ref()).to_string(),
-                expr.range(),
-            )));
-        } else if checker.semantic().is_builtin("bool") {
-            let node = ast::ExprName {
-                id: "bool".into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-            };
-            let node1 = ast::ExprCall {
-                func: Box::new(node.into()),
-                arguments: Arguments {
-                    args: vec![*operand.clone()],
-                    keywords: vec![],
-                    range: TextRange::default(),
-                },
-                range: TextRange::default(),
-            };
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.generator().expr(&node1.into()),
-                expr.range(),
-            )));
+    if checker.semantic().in_boolean_test() {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            checker.locator().slice(operand.as_ref()).to_string(),
+            expr.range(),
+        )));
+    } else if checker.semantic().is_builtin("bool") {
+        let node = ast::ExprName {
+            id: "bool".into(),
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
         };
-    }
+        let node1 = ast::ExprCall {
+            func: Box::new(node.into()),
+            arguments: Arguments {
+                args: vec![*operand.clone()],
+                keywords: vec![],
+                range: TextRange::default(),
+            },
+            range: TextRange::default(),
+        };
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            checker.generator().expr(&node1.into()),
+            expr.range(),
+        )));
+    };
     checker.diagnostics.push(diagnostic);
 }

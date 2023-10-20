@@ -1,12 +1,11 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 use super::super::types::Primitive;
 
@@ -37,7 +36,7 @@ pub struct TypeOfPrimitive {
 }
 
 impl Violation for TypeOfPrimitive {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -45,7 +44,7 @@ impl Violation for TypeOfPrimitive {
         format!("Use `{}` instead of `type(...)`", primitive.builtin())
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let TypeOfPrimitive { primitive } = self;
         Some(format!(
             "Replace `type(...)` with `{}`",
@@ -73,14 +72,12 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
         return;
     };
     let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let builtin = primitive.builtin();
-        if checker.semantic().is_builtin(&builtin) {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                pad(primitive.builtin(), expr.range(), checker.locator()),
-                expr.range(),
-            )));
-        }
+    let builtin = primitive.builtin();
+    if checker.semantic().is_builtin(&builtin) {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(primitive.builtin(), expr.range(), checker.locator()),
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
@@ -11,7 +11,7 @@ use ruff_python_stdlib::typing::simple_magic_return_type;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::ruff::typing::type_hint_resolves_to_any;
 
 /// ## What it does
@@ -287,14 +287,14 @@ pub struct MissingReturnTypeSpecialMethod {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
+impl AlwaysFixableViolation for MissingReturnTypeSpecialMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MissingReturnTypeSpecialMethod { name } = self;
         format!("Missing return type annotation for special method `{name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add `None` return type".to_string()
     }
 }
@@ -412,7 +412,7 @@ impl Violation for MissingReturnTypeClassMethod {
 /// ## References
 /// - [PEP 484](https://www.python.org/dev/peps/pep-0484/#the-any-type)
 /// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
-/// - [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
+/// - [Mypy documentation: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[violation]
 pub struct AnyType {
     name: String,
@@ -702,12 +702,10 @@ pub(crate) fn definition(
                         },
                         function.identifier(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.set_fix(Fix::suggested(Edit::insertion(
-                            " -> None".to_string(),
-                            function.parameters.range().end(),
-                        )));
-                    }
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                        " -> None".to_string(),
+                        function.parameters.range().end(),
+                    )));
                     diagnostics.push(diagnostic);
                 }
             }
@@ -719,13 +717,11 @@ pub(crate) fn definition(
                     },
                     function.identifier(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(return_type) = simple_magic_return_type(name) {
-                        diagnostic.set_fix(Fix::suggested(Edit::insertion(
-                            format!(" -> {return_type}"),
-                            function.parameters.range().end(),
-                        )));
-                    }
+                if let Some(return_type) = simple_magic_return_type(name) {
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                        format!(" -> {return_type}"),
+                        function.parameters.range().end(),
+                    )));
                 }
                 diagnostics.push(diagnostic);
             }

@@ -3,7 +3,7 @@ use tracing::Level;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::tokens_and_ranges;
 use ruff_python_parser::lexer::LexicalError;
@@ -60,7 +60,6 @@ where
             }
 
             self.fmt_fields(node, f)?;
-            self.fmt_dangling_comments(node_comments.dangling, f)?;
 
             if is_source_map_enabled {
                 source_position(node.end()).fmt(f)?;
@@ -85,6 +84,11 @@ where
         dangling_node_comments: &[SourceComment],
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
+        debug_assert!(
+            dangling_node_comments.is_empty(),
+            "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields` and override `fmt_dangling_comments` with an empty implementation that returns `Ok(())`."
+        );
+
         dangling_comments(dangling_node_comments).fmt(f)
     }
 
@@ -127,7 +131,7 @@ pub fn format_module_source(
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
     let (tokens, comment_ranges) = tokens_and_ranges(source)?;
-    let module = parse_ok_tokens(tokens, Mode::Module, "<filename>")?;
+    let module = parse_ok_tokens(tokens, source, Mode::Module, "<filename>")?;
     let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
@@ -213,7 +217,7 @@ def main() -> None:
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let module = parse_ok_tokens(tokens, Mode::Module, source_path).unwrap();
+        let module = parse_ok_tokens(tokens, source, Mode::Module, source_path).unwrap();
         let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&module, &comment_ranges, source, options).unwrap();
 

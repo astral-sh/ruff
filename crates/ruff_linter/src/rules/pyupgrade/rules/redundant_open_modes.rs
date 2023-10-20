@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr, PySourceType};
 use ruff_python_parser::{lexer, AsMode};
@@ -11,7 +11,6 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for redundant `open` mode parameters.
@@ -39,7 +38,7 @@ pub struct RedundantOpenModes {
     replacement: Option<String>,
 }
 
-impl AlwaysAutofixableViolation for RedundantOpenModes {
+impl AlwaysFixableViolation for RedundantOpenModes {
     #[derive_message_formats]
     fn message(&self) -> String {
         let RedundantOpenModes { replacement } = self;
@@ -51,7 +50,7 @@ impl AlwaysAutofixableViolation for RedundantOpenModes {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let RedundantOpenModes { replacement } = self;
         match replacement {
             None => "Remove open mode parameters".to_string(),
@@ -87,7 +86,6 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                                 &keyword.value,
                                 mode.replacement_value(),
                                 checker.locator(),
-                                checker.patch(Rule::RedundantOpenModes),
                                 checker.source_type,
                             ));
                         }
@@ -107,7 +105,6 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                         mode_param,
                         mode.replacement_value(),
                         checker.locator(),
-                        checker.patch(Rule::RedundantOpenModes),
                         checker.source_type,
                     ));
                 }
@@ -174,7 +171,6 @@ fn create_check<T: Ranged>(
     mode_param: &Expr,
     replacement_value: Option<&str>,
     locator: &Locator,
-    patch: bool,
     source_type: PySourceType,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
@@ -183,18 +179,18 @@ fn create_check<T: Ranged>(
         },
         expr.range(),
     );
-    if patch {
-        if let Some(content) = replacement_value {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                content.to_string(),
-                mode_param.range(),
-            )));
-        } else {
-            diagnostic.try_set_fix(|| {
-                create_remove_param_fix(locator, expr, mode_param, source_type).map(Fix::automatic)
-            });
-        }
+
+    if let Some(content) = replacement_value {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            content.to_string(),
+            mode_param.range(),
+        )));
+    } else {
+        diagnostic.try_set_fix(|| {
+            create_remove_param_fix(locator, expr, mode_param, source_type).map(Fix::safe_edit)
+        });
     }
+
     diagnostic
 }
 

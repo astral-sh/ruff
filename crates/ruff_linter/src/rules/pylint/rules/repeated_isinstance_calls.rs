@@ -2,15 +2,15 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::autofix::edits::pad;
-use crate::autofix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use crate::fix::snippet::SourceCodeSnippet;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
@@ -49,7 +49,7 @@ pub struct RepeatedIsinstanceCalls {
     expression: SourceCodeSnippet,
 }
 
-impl AlwaysAutofixableViolation for RepeatedIsinstanceCalls {
+impl AlwaysFixableViolation for RepeatedIsinstanceCalls {
     #[derive_message_formats]
     fn message(&self) -> String {
         let RepeatedIsinstanceCalls { expression } = self;
@@ -60,7 +60,7 @@ impl AlwaysAutofixableViolation for RepeatedIsinstanceCalls {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let RepeatedIsinstanceCalls { expression } = self;
         if let Some(expression) = expression.full_display() {
             format!("Replace with `{expression}`")
@@ -133,12 +133,10 @@ pub(crate) fn repeated_isinstance_calls(
                 },
                 expr.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    pad(call, expr.range(), checker.locator()),
-                    expr.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                pad(call, expr.range(), checker.locator()),
+                expr.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

@@ -1,11 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for non-empty function stub bodies.
@@ -31,13 +30,13 @@ use crate::registry::Rule;
 #[violation]
 pub struct NonEmptyStubBody;
 
-impl AlwaysAutofixableViolation for NonEmptyStubBody {
+impl AlwaysFixableViolation for NonEmptyStubBody {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Function body must contain only `...`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Replace function body with `...`")
     }
 }
@@ -69,11 +68,9 @@ pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
     }
 
     let mut diagnostic = Diagnostic::new(NonEmptyStubBody, stmt.range());
-    if checker.patch(Rule::NonEmptyStubBody) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            format!("..."),
-            stmt.range(),
-        )));
-    };
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        format!("..."),
+        stmt.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

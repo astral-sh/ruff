@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Comprehension, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
@@ -34,14 +34,14 @@ pub struct UnnecessaryComprehension {
     obj_type: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryComprehension {
+impl AlwaysFixableViolation for UnnecessaryComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryComprehension { obj_type } = self;
         format!("Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let UnnecessaryComprehension { obj_type } = self;
         format!("Rewrite using `{obj_type}()`")
     }
@@ -64,12 +64,10 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
-                .map(Fix::suggested)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
+            .map(Fix::unsafe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }
 

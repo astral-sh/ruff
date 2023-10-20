@@ -45,23 +45,25 @@ pub(crate) fn check_tokens(
         let mut state_machine = StateMachine::default();
         for &(ref tok, range) in tokens.iter().flatten() {
             let is_docstring = state_machine.consume(tok);
-            if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
-                ruff::rules::ambiguous_unicode_character(
-                    &mut diagnostics,
-                    locator,
-                    range,
-                    if tok.is_string() {
-                        if is_docstring {
-                            Context::Docstring
-                        } else {
-                            Context::String
-                        }
+            let context = match tok {
+                Tok::String { .. } => {
+                    if is_docstring {
+                        Context::Docstring
                     } else {
-                        Context::Comment
-                    },
-                    settings,
-                );
-            }
+                        Context::String
+                    }
+                }
+                Tok::FStringMiddle { .. } => Context::String,
+                Tok::Comment(_) => Context::Comment,
+                _ => continue,
+            };
+            ruff::rules::ambiguous_unicode_character(
+                &mut diagnostics,
+                locator,
+                range,
+                context,
+                settings,
+            );
         }
     }
 
@@ -70,19 +72,18 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
-        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer, settings);
+        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer);
     }
 
     if settings.rules.enabled(Rule::InvalidEscapeSequence) {
         for (tok, range) in tokens.iter().flatten() {
-            if tok.is_string() {
-                pycodestyle::rules::invalid_escape_sequence(
-                    &mut diagnostics,
-                    locator,
-                    *range,
-                    settings.rules.should_fix(Rule::InvalidEscapeSequence),
-                );
-            }
+            pycodestyle::rules::invalid_escape_sequence(
+                &mut diagnostics,
+                locator,
+                indexer,
+                tok,
+                *range,
+            );
         }
     }
 
@@ -98,9 +99,7 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
         for (tok, range) in tokens.iter().flatten() {
-            if tok.is_string() {
-                pylint::rules::invalid_string_characters(&mut diagnostics, *range, locator);
-            }
+            pylint::rules::invalid_string_characters(&mut diagnostics, tok, *range, locator);
         }
     }
 
@@ -109,22 +108,19 @@ pub(crate) fn check_tokens(
         Rule::MultipleStatementsOnOneLineSemicolon,
         Rule::UselessSemicolon,
     ]) {
-        pycodestyle::rules::compound_statements(
-            &mut diagnostics,
-            tokens,
-            locator,
-            indexer,
-            settings,
-        );
+        pycodestyle::rules::compound_statements(&mut diagnostics, tokens, locator, indexer);
+    }
+
+    if settings.rules.enabled(Rule::AvoidableEscapedQuote) && settings.flake8_quotes.avoid_escape {
+        flake8_quotes::rules::avoidable_escaped_quote(&mut diagnostics, tokens, locator, settings);
     }
 
     if settings.rules.any_enabled(&[
         Rule::BadQuotesInlineString,
         Rule::BadQuotesMultilineString,
         Rule::BadQuotesDocstring,
-        Rule::AvoidableEscapedQuote,
     ]) {
-        flake8_quotes::rules::from_tokens(&mut diagnostics, tokens, locator, settings);
+        flake8_quotes::rules::check_string_quotes(&mut diagnostics, tokens, locator, settings);
     }
 
     if settings.rules.any_enabled(&[
@@ -134,8 +130,9 @@ pub(crate) fn check_tokens(
         flake8_implicit_str_concat::rules::implicit(
             &mut diagnostics,
             tokens,
-            &settings.flake8_implicit_str_concat,
+            settings,
             locator,
+            indexer,
         );
     }
 
@@ -144,11 +141,11 @@ pub(crate) fn check_tokens(
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
     ]) {
-        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator, settings);
+        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator);
     }
 
     if settings.rules.enabled(Rule::ExtraneousParentheses) {
-        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator, settings);
+        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator);
     }
 
     if is_stub && settings.rules.enabled(Rule::TypeCommentInStub) {
@@ -162,7 +159,7 @@ pub(crate) fn check_tokens(
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(tokens, path, locator, settings, &mut diagnostics);
+        flake8_executable::rules::from_tokens(tokens, path, locator, &mut diagnostics);
     }
 
     if settings.rules.any_enabled(&[
@@ -187,7 +184,7 @@ pub(crate) fn check_tokens(
                 TodoComment::from_comment(comment, *comment_range, i)
             })
             .collect();
-        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer, settings);
+        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer);
         flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
     }
 

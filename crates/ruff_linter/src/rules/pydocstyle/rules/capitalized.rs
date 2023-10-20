@@ -1,11 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for docstrings that do not start with a capital letter.
@@ -36,7 +35,7 @@ pub struct FirstLineCapitalized {
     capitalized_word: String,
 }
 
-impl AlwaysAutofixableViolation for FirstLineCapitalized {
+impl AlwaysFixableViolation for FirstLineCapitalized {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -45,7 +44,7 @@ impl AlwaysAutofixableViolation for FirstLineCapitalized {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!(
             "Capitalize `{}` to `{}`",
             self.first_word, self.capitalized_word
@@ -90,12 +89,10 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
         docstring.expr.range(),
     );
 
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-            capitalized_word,
-            TextRange::at(body.start(), first_word.text_len()),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        capitalized_word,
+        TextRange::at(body.start(), first_word.text_len()),
+    )));
 
     checker.diagnostics.push(diagnostic);
 }

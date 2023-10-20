@@ -414,13 +414,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.enabled(Rule::FString) {
-                                        pyupgrade::rules::f_strings(
-                                            checker,
-                                            call,
-                                            &summary,
-                                            value,
-                                            checker.settings.line_length,
-                                        );
+                                        pyupgrade::rules::f_strings(checker, call, &summary, value);
                                     }
                                 }
                             }
@@ -592,6 +586,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FlaskDebugTrue) {
                 flake8_bandit::rules::flask_debug_true(checker, call);
             }
+            if checker.enabled(Rule::WeakCryptographicKey) {
+                flake8_bandit::rules::weak_cryptographic_key(checker, call);
+            }
             if checker.any_enabled(&[
                 Rule::SubprocessWithoutShellEqualsTrue,
                 Rule::SubprocessPopenWithShellEqualsTrue,
@@ -677,9 +674,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::UnnecessarySubscriptReversal) {
-                flake8_comprehensions::rules::unnecessary_subscript_reversal(
-                    checker, expr, func, args,
-                );
+                flake8_comprehensions::rules::unnecessary_subscript_reversal(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryMap) {
                 flake8_comprehensions::rules::unnecessary_map(
@@ -790,6 +785,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SubprocessRunWithoutCheck) {
                 pylint::rules::subprocess_run_without_check(checker, call);
+            }
+            if checker.enabled(Rule::UnspecifiedEncoding) {
+                pylint::rules::unspecified_encoding(checker, call);
             }
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
@@ -910,6 +908,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ExceptionWithoutExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
+            if checker.enabled(Rule::ImplicitCwd) {
+                refurb::rules::no_implicit_cwd(checker, call);
+            }
         }
         Expr::Dict(
             dict @ ast::ExprDict {
@@ -960,9 +961,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::await_outside_async(checker, expr);
             }
         }
-        Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::FString(fstring @ ast::ExprFString { values, .. }) => {
             if checker.enabled(Rule::FStringMissingPlaceholders) {
-                pyflakes::rules::f_string_missing_placeholders(expr, values, checker);
+                pyflakes::rules::f_string_missing_placeholders(fstring, checker);
             }
             if checker.enabled(Rule::HardcodedSQLExpression) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
@@ -1196,6 +1197,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ComparisonWithItself) {
                 pylint::rules::comparison_with_itself(checker, left, ops, comparators);
             }
+            if checker.enabled(Rule::LiteralMembership) {
+                pylint::rules::literal_membership(checker, compare);
+            }
             if checker.enabled(Rule::ComparisonOfConstant) {
                 pylint::rules::comparison_of_constant(checker, left, ops, comparators);
             }
@@ -1219,6 +1223,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     ops,
                     comparators,
                 );
+            }
+            if checker.enabled(Rule::SingleItemMembershipTest) {
+                refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
             }
         }
         Expr::Constant(ast::ExprConstant {
@@ -1410,6 +1417,17 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::RepeatedEqualityComparison) {
                 pylint::rules::repeated_equality_comparison(checker, bool_op);
+            }
+            if checker.enabled(Rule::AndOrTernary) {
+                pylint::rules::and_or_ternary(checker, bool_op);
+            }
+            if checker.enabled(Rule::UnnecessaryKeyCheck) {
+                ruff::rules::unnecessary_key_check(checker, expr);
+            }
+        }
+        Expr::NamedExpr(..) => {
+            if checker.enabled(Rule::AssignmentInAssert) {
+                ruff::rules::assignment_in_assert(checker, expr);
             }
         }
         _ => {}

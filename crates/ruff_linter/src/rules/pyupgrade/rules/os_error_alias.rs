@@ -1,14 +1,13 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of exceptions that alias `OSError`.
@@ -40,13 +39,13 @@ pub struct OSErrorAlias {
     name: Option<String>,
 }
 
-impl AlwaysAutofixableViolation for OSErrorAlias {
+impl AlwaysFixableViolation for OSErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Replace aliased errors with `OSError`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let OSErrorAlias { name } = self;
         match name {
             None => "Replace with builtin `OSError`".to_string(),
@@ -81,13 +80,11 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         },
         target.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if checker.semantic().is_builtin("OSError") {
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                "OSError".to_string(),
-                target.range(),
-            )));
-        }
+    if checker.semantic().is_builtin("OSError") {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "OSError".to_string(),
+            target.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -95,51 +92,49 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, tuple.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        if checker.semantic().is_builtin("OSError") {
-            // Filter out any `OSErrors` aliases.
-            let mut remaining: Vec<Expr> = tuple
-                .elts
-                .iter()
-                .filter_map(|elt| {
-                    if aliases.contains(&elt) {
-                        None
-                    } else {
-                        Some(elt.clone())
-                    }
-                })
-                .collect();
+    if checker.semantic().is_builtin("OSError") {
+        // Filter out any `OSErrors` aliases.
+        let mut remaining: Vec<Expr> = tuple
+            .elts
+            .iter()
+            .filter_map(|elt| {
+                if aliases.contains(&elt) {
+                    None
+                } else {
+                    Some(elt.clone())
+                }
+            })
+            .collect();
 
-            // If `OSError` itself isn't already in the tuple, add it.
-            if tuple
-                .elts
-                .iter()
-                .all(|elt| !is_os_error(elt, checker.semantic()))
-            {
-                let node = ast::ExprName {
-                    id: "OSError".into(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                };
-                remaining.insert(0, node.into());
-            }
-
-            let content = if remaining.len() == 1 {
-                "OSError".to_string()
-            } else {
-                let node = ast::ExprTuple {
-                    elts: remaining,
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                };
-                format!("({})", checker.generator().expr(&node.into()))
+        // If `OSError` itself isn't already in the tuple, add it.
+        if tuple
+            .elts
+            .iter()
+            .all(|elt| !is_os_error(elt, checker.semantic()))
+        {
+            let node = ast::ExprName {
+                id: "OSError".into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
             };
-
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                pad(content, tuple.range(), checker.locator()),
-                tuple.range(),
-            )));
+            remaining.insert(0, node.into());
         }
+
+        let content = if remaining.len() == 1 {
+            "OSError".to_string()
+        } else {
+            let node = ast::ExprTuple {
+                elts: remaining,
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            };
+            format!("({})", checker.generator().expr(&node.into()))
+        };
+
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(content, tuple.range(), checker.locator()),
+            tuple.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

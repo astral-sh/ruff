@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Int};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_stdlib::builtins::is_iterator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for uses of `list(...)[0]` that can be replaced with
@@ -48,7 +48,7 @@ pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     iterable: SourceCodeSnippet,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement {
+impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
@@ -56,7 +56,7 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
         format!("Prefer `next({iterable})` over single element slice")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
         let iterable = iterable.truncated_display();
         format!("Replace with `next({iterable})`")
@@ -96,12 +96,10 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         *range,
     );
 
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            format!("next({iterable})"),
-            *range,
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        format!("next({iterable})"),
+        *range,
+    )));
 
     checker.diagnostics.push(diagnostic);
 }
@@ -185,6 +183,10 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                         iterable: true,
                     },
                 },
+                Expr::Call(ast::ExprCall { func, .. }) => IterationTarget {
+                    range: arg.range(),
+                    iterable: is_func_builtin_iterator(func, semantic),
+                },
                 _ => IterationTarget {
                     range: arg.range(),
                     iterable: false,
@@ -209,7 +211,24 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                 iterable: true,
             },
         },
+        Expr::List(ast::ExprList { elts, .. }) => {
+            let [elt] = elts.as_slice() else {
+                return None;
+            };
+            let Expr::Starred(ast::ExprStarred { value, .. }) = elt else {
+                return None;
+            };
 
+            let iterable = if value.is_call_expr() {
+                is_func_builtin_iterator(&value.as_call_expr()?.func, semantic)
+            } else {
+                false
+            };
+            IterationTarget {
+                range: value.range(),
+                iterable,
+            }
+        }
         _ => return None,
     };
 
@@ -239,4 +258,11 @@ fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Optio
     }
 
     Some(generator.iter.range())
+}
+
+/// Returns `true` if the function is a builtin iterator.
+fn is_func_builtin_iterator(func: &Expr, semantic: &SemanticModel) -> bool {
+    func.as_name_expr().map_or(false, |func_name| {
+        is_iterator(func_name.id.as_str()) && semantic.is_builtin(func_name.id.as_str())
+    })
 }

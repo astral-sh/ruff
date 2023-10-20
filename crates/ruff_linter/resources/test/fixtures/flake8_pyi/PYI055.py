@@ -28,4 +28,12 @@ item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
 
 def func():
     # PYI055
-    item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
+    x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+    y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+
+
+def func():
+    from typing import Union as U
+
+    # PYI055
+    x: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker

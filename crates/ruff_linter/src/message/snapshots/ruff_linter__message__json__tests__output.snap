@@ -4,6 +4,7 @@ expression: content
 ---
 [
   {
+    "cell": null,
     "code": "F401",
     "end_location": {
       "column": 10,
@@ -11,7 +12,7 @@ expression: content
     },
     "filename": "fib.py",
     "fix": {
-      "applicability": "Suggested",
+      "applicability": "unsafe",
       "edits": [
         {
           "content": "",
@@ -36,6 +37,7 @@ expression: content
     "url": "https://docs.astral.sh/ruff/rules/unused-import"
   },
   {
+    "cell": null,
     "code": "F841",
     "end_location": {
       "column": 6,
@@ -43,7 +45,7 @@ expression: content
     },
     "filename": "fib.py",
     "fix": {
-      "applicability": "Suggested",
+      "applicability": "unsafe",
       "edits": [
         {
           "content": "",
@@ -68,6 +70,7 @@ expression: content
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   },
   {
+    "cell": null,
     "code": "F821",
     "end_location": {
       "column": 5,

@@ -11,7 +11,7 @@ UP020.py:3:6: UP020 [*] Use builtin `open`
   |
   = help: Replace with builtin `open`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | import io
 2 2 | 
 3   |-with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:

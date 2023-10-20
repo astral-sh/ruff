@@ -2,13 +2,12 @@ use std::string::ToString;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 use super::super::cformat::CFormatSummary;
 use super::super::fixes::{
@@ -145,7 +144,7 @@ pub struct PercentFormatExtraNamedArguments {
     missing: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
+impl AlwaysFixableViolation for PercentFormatExtraNamedArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PercentFormatExtraNamedArguments { missing } = self;
@@ -153,7 +152,7 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
         format!("`%`-format string has unused named argument(s): {message}")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let PercentFormatExtraNamedArguments { missing } = self;
         let message = missing.join(", ");
         format!("Remove extra named arguments: {message}")
@@ -387,7 +386,7 @@ pub struct StringDotFormatExtraNamedArguments {
 }
 
 impl Violation for StringDotFormatExtraNamedArguments {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -396,7 +395,7 @@ impl Violation for StringDotFormatExtraNamedArguments {
         format!("`.format` call has unused named argument(s): {message}")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let StringDotFormatExtraNamedArguments { missing } = self;
         let message = missing.join(", ");
         Some(format!("Remove extra named arguments: {message}"))
@@ -428,7 +427,7 @@ pub struct StringDotFormatExtraPositionalArguments {
 }
 
 impl Violation for StringDotFormatExtraPositionalArguments {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -437,7 +436,7 @@ impl Violation for StringDotFormatExtraPositionalArguments {
         format!("`.format` call has unused arguments at position(s): {message}")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let StringDotFormatExtraPositionalArguments { missing } = self;
         let message = missing.join(", ");
         Some(format!(
@@ -609,18 +608,16 @@ pub(crate) fn percent_format_extra_named_arguments(
         PercentFormatExtraNamedArguments { missing: names },
         location,
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
-        diagnostic.try_set_fix(|| {
-            let edit = remove_unused_format_arguments_from_dict(
-                &indexes,
-                dict,
-                checker.locator(),
-                checker.stylist(),
-            )?;
-            Ok(Fix::automatic(edit))
-        });
-    }
+    let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
+    diagnostic.try_set_fix(|| {
+        let edit = remove_unused_format_arguments_from_dict(
+            &indexes,
+            dict,
+            checker.locator(),
+            checker.stylist(),
+        )?;
+        Ok(Fix::safe_edit(edit))
+    });
     checker.diagnostics.push(diagnostic);
 }
 
@@ -776,18 +773,16 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         StringDotFormatExtraNamedArguments { missing: names },
         call.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
-        diagnostic.try_set_fix(|| {
-            let edit = remove_unused_keyword_arguments_from_format_call(
-                &indexes,
-                call,
-                checker.locator(),
-                checker.stylist(),
-            )?;
-            Ok(Fix::automatic(edit))
-        });
-    }
+    let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
+    diagnostic.try_set_fix(|| {
+        let edit = remove_unused_keyword_arguments_from_format_call(
+            &indexes,
+            call,
+            checker.locator(),
+            checker.stylist(),
+        )?;
+        Ok(Fix::safe_edit(edit))
+    });
     checker.diagnostics.push(diagnostic);
 }
 
@@ -798,6 +793,31 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     summary: &FormatSummary,
     args: &[Expr],
 ) {
+    // We can only fix if the positional arguments we're removing don't require re-indexing
+    // the format string itself. For example, we can't fix `"{1}{2}".format(0, 1, 2)"`, since
+    // this requires changing the format string to `"{0}{1}"`. But we can fix
+    // `"{0}{1}".format(0, 1, 2)`, since this only requires modifying the call arguments.
+    fn is_contiguous_from_end<T>(indexes: &[usize], target: &[T]) -> bool {
+        if indexes.is_empty() {
+            return true;
+        }
+
+        let mut expected_index = target.len() - 1;
+        for &index in indexes.iter().rev() {
+            if index != expected_index {
+                return false;
+            }
+
+            if expected_index == 0 {
+                break;
+            }
+
+            expected_index -= 1;
+        }
+
+        true
+    }
+
     let missing: Vec<usize> = args
         .iter()
         .enumerate()
@@ -820,44 +840,19 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         },
         call.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // We can only fix if the positional arguments we're removing don't require re-indexing
-        // the format string itself. For example, we can't fix `"{1}{2}".format(0, 1, 2)"`, since
-        // this requires changing the format string to `"{0}{1}"`. But we can fix
-        // `"{0}{1}".format(0, 1, 2)`, since this only requires modifying the call arguments.
-        fn is_contiguous_from_end<T>(indexes: &[usize], target: &[T]) -> bool {
-            if indexes.is_empty() {
-                return true;
-            }
 
-            let mut expected_index = target.len() - 1;
-            for &index in indexes.iter().rev() {
-                if index != expected_index {
-                    return false;
-                }
-
-                if expected_index == 0 {
-                    break;
-                }
-
-                expected_index -= 1;
-            }
-
-            true
-        }
-
-        if is_contiguous_from_end(&missing, args) {
-            diagnostic.try_set_fix(|| {
-                let edit = remove_unused_positional_arguments_from_format_call(
-                    &missing,
-                    call,
-                    checker.locator(),
-                    checker.stylist(),
-                )?;
-                Ok(Fix::automatic(edit))
-            });
-        }
+    if is_contiguous_from_end(&missing, args) {
+        diagnostic.try_set_fix(|| {
+            let edit = remove_unused_positional_arguments_from_format_call(
+                &missing,
+                call,
+                checker.locator(),
+                checker.stylist(),
+            )?;
+            Ok(Fix::safe_edit(edit))
+        });
     }
+
     checker.diagnostics.push(diagnostic);
 }
 

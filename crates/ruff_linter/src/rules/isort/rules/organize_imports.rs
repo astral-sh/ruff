@@ -2,7 +2,7 @@ use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{PySourceType, Stmt};
@@ -13,7 +13,7 @@ use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::line_width::LineWidthBuilder;
-use crate::registry::AsRule;
+
 use crate::settings::LinterSettings;
 
 use super::super::block::Block;
@@ -41,14 +41,14 @@ use super::super::{comments, format_imports};
 pub struct UnsortedImports;
 
 impl Violation for UnsortedImports {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Import block is un-sorted or un-formatted")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Organize imports".to_string())
     }
 }
@@ -138,11 +138,9 @@ pub(crate) fn organize_imports(
     }
 
     let mut diagnostic = Diagnostic::new(UnsortedImports, range);
-    if settings.rules.should_fix(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-            indent(&expected, indentation).to_string(),
-            range,
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        indent(&expected, indentation).to_string(),
+        range,
+    )));
     Some(diagnostic)
 }

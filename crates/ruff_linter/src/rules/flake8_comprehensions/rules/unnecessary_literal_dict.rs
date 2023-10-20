@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -34,14 +34,14 @@ pub struct UnnecessaryLiteralDict {
     obj_type: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryLiteralDict {
+impl AlwaysFixableViolation for UnnecessaryLiteralDict {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryLiteralDict { obj_type } = self;
         format!("Unnecessary `{obj_type}` literal (rewrite as a `dict` literal)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Rewrite as a `dict` literal".to_string()
     }
 }
@@ -80,9 +80,7 @@ pub(crate) fn unnecessary_literal_dict(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic
-            .try_set_fix(|| fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::suggested));
-    }
+    diagnostic
+        .try_set_fix(|| fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::unsafe_edit));
     checker.diagnostics.push(diagnostic);
 }

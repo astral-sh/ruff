@@ -7,12 +7,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
 
-use ruff_diagnostics::AlwaysAutofixableViolation;
+use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `startswith` or `endswith` calls on the same value with
@@ -45,14 +44,14 @@ pub struct MultipleStartsEndsWith {
     attr: String,
 }
 
-impl AlwaysAutofixableViolation for MultipleStartsEndsWith {
+impl AlwaysFixableViolation for MultipleStartsEndsWith {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MultipleStartsEndsWith { attr } = self;
         format!("Call `{attr}` once with a `tuple`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let MultipleStartsEndsWith { attr } = self;
         format!("Merge into a single `{attr}` call")
     }
@@ -115,92 +114,90 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 },
                 expr.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                let words: Vec<&Expr> = indices
+            let words: Vec<&Expr> = indices
+                .iter()
+                .map(|index| &values[*index])
+                .map(|expr| {
+                    let Expr::Call(ast::ExprCall {
+                        func: _,
+                        arguments:
+                            Arguments {
+                                args,
+                                keywords: _,
+                                range: _,
+                            },
+                        range: _,
+                    }) = expr
+                    else {
+                        unreachable!(
+                            "{}",
+                            format!("Indices should only contain `{attr_name}` calls")
+                        )
+                    };
+                    args.get(0)
+                        .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
+                })
+                .collect();
+
+            let node = Expr::Tuple(ast::ExprTuple {
+                elts: words
                     .iter()
-                    .map(|index| &values[*index])
-                    .map(|expr| {
-                        let Expr::Call(ast::ExprCall {
-                            func: _,
-                            arguments:
-                                Arguments {
-                                    args,
-                                    keywords: _,
-                                    range: _,
-                                },
-                            range: _,
-                        }) = expr
-                        else {
-                            unreachable!(
-                                "{}",
-                                format!("Indices should only contain `{attr_name}` calls")
-                            )
-                        };
-                        args.get(0)
-                            .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
+                    .flat_map(|value| {
+                        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
+                            Left(elts.iter())
+                        } else {
+                            Right(iter::once(*value))
+                        }
                     })
-                    .collect();
+                    .map(Clone::clone)
+                    .collect(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            });
+            let node1 = Expr::Name(ast::ExprName {
+                id: arg_name.into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            });
+            let node2 = Expr::Attribute(ast::ExprAttribute {
+                value: Box::new(node1),
+                attr: Identifier::new(attr_name.to_string(), TextRange::default()),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            });
+            let node3 = Expr::Call(ast::ExprCall {
+                func: Box::new(node2),
+                arguments: Arguments {
+                    args: vec![node],
+                    keywords: vec![],
+                    range: TextRange::default(),
+                },
+                range: TextRange::default(),
+            });
+            let call = node3;
 
-                let node = Expr::Tuple(ast::ExprTuple {
-                    elts: words
-                        .iter()
-                        .flat_map(|value| {
-                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
-                                Left(elts.iter())
-                            } else {
-                                Right(iter::once(*value))
-                            }
-                        })
-                        .map(Clone::clone)
-                        .collect(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                });
-                let node1 = Expr::Name(ast::ExprName {
-                    id: arg_name.into(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                });
-                let node2 = Expr::Attribute(ast::ExprAttribute {
-                    value: Box::new(node1),
-                    attr: Identifier::new(attr_name.to_string(), TextRange::default()),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                });
-                let node3 = Expr::Call(ast::ExprCall {
-                    func: Box::new(node2),
-                    arguments: Arguments {
-                        args: vec![node],
-                        keywords: vec![],
-                        range: TextRange::default(),
-                    },
-                    range: TextRange::default(),
-                });
-                let call = node3;
-
-                // Generate the combined `BoolOp`.
-                let mut call = Some(call);
-                let node = Expr::BoolOp(ast::ExprBoolOp {
-                    op: BoolOp::Or,
-                    values: values
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(index, elt)| {
-                            if indices.contains(&index) {
-                                std::mem::take(&mut call)
-                            } else {
-                                Some(elt.clone())
-                            }
-                        })
-                        .collect(),
-                    range: TextRange::default(),
-                });
-                let bool_op = node;
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    checker.generator().expr(&bool_op),
-                    expr.range(),
-                )));
-            }
+            // Generate the combined `BoolOp`.
+            let mut call = Some(call);
+            let node = Expr::BoolOp(ast::ExprBoolOp {
+                op: BoolOp::Or,
+                values: values
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, elt)| {
+                        if indices.contains(&index) {
+                            std::mem::take(&mut call)
+                        } else {
+                            Some(elt.clone())
+                        }
+                    })
+                    .collect(),
+                range: TextRange::default(),
+            });
+            let bool_op = node;
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().expr(&bool_op),
+                expr.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }
