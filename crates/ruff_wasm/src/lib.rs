@@ -1,29 +1,29 @@
-use std::num::NonZeroU16;
 use std::path::Path;
 
 use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use ruff::directives;
-use ruff::line_width::{LineLength, TabSize};
-use ruff::linter::{check_path, LinterResult};
-use ruff::registry::AsRule;
-use ruff::settings::types::{PreviewMode, PythonVersion};
-use ruff::settings::{defaults, flags, Settings};
-use ruff::source_kind::SourceKind;
-use ruff_formatter::{FormatResult, Formatted, LineWidth};
+use ruff_formatter::{FormatResult, Formatted, IndentStyle};
+use ruff_linter::directives;
+use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_linter::linter::{check_path, LinterResult};
+use ruff_linter::registry::AsRule;
+use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
+use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_node, pretty_comments, PyFormatContext, PyFormatOptions};
-use ruff_python_index::{CommentRanges, CommentRangesBuilder, Indexer};
+use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
+use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::AsMode;
-use ruff_python_parser::{parse_tokens, Mode};
+use ruff_python_parser::{parse_tokens, AsMode, Mode};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
-use ruff_workspace::options::Options;
+use ruff_workspace::options::{FormatOptions, LintCommonOptions, LintOptions, Options};
+use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -101,7 +101,7 @@ pub struct Workspace {
 #[wasm_bindgen]
 impl Workspace {
     pub fn version() -> String {
-        ruff::VERSION.to_string()
+        ruff_linter::VERSION.to_string()
     }
 
     #[wasm_bindgen(constructor)]
@@ -116,49 +116,38 @@ impl Workspace {
         Ok(Workspace { settings })
     }
 
-    #[wasm_bindgen(js_name=defaultSettings)]
+    #[wasm_bindgen(js_name = defaultSettings)]
     pub fn default_settings() -> Result<JsValue, Error> {
         serde_wasm_bindgen::to_value(&Options {
-            // Propagate defaults.
-            allowed_confusables: Some(Vec::default()),
-            builtins: Some(Vec::default()),
-            dummy_variable_rgx: Some(defaults::DUMMY_VARIABLE_RGX.as_str().to_string()),
-            extend_fixable: Some(Vec::default()),
-            extend_ignore: Some(Vec::default()),
-            extend_select: Some(Vec::default()),
-            extend_unfixable: Some(Vec::default()),
-            external: Some(Vec::default()),
-            ignore: Some(Vec::default()),
-            line_length: Some(LineLength::default()),
             preview: Some(false),
-            select: Some(defaults::PREFIXES.to_vec()),
+
+            // Propagate defaults.
+            builtins: Some(Vec::default()),
+
+            line_length: Some(LineLength::default()),
+
             tab_size: Some(TabSize::default()),
             target_version: Some(PythonVersion::default()),
-            // Ignore a bunch of options that don't make sense in a single-file editor.
-            cache_dir: None,
-            exclude: None,
-            extend: None,
-            extend_exclude: None,
-            extend_include: None,
-            extend_per_file_ignores: None,
-            fix: None,
-            fix_only: None,
-            fixable: None,
-            force_exclude: None,
-            format: None,
-            ignore_init_module_imports: None,
-            include: None,
-            logger_objects: None,
-            namespace_packages: None,
-            per_file_ignores: None,
-            required_version: None,
-            respect_gitignore: None,
-            show_fixes: None,
-            show_source: None,
-            src: None,
-            task_tags: None,
-            typing_modules: None,
-            unfixable: None,
+
+            lint: Some(LintOptions {
+                common: LintCommonOptions {
+                    allowed_confusables: Some(Vec::default()),
+                    dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
+                    ignore: Some(Vec::default()),
+                    select: Some(DEFAULT_SELECTORS.to_vec()),
+                    extend_fixable: Some(Vec::default()),
+                    extend_select: Some(Vec::default()),
+                    external: Some(Vec::default()),
+                    ..LintCommonOptions::default()
+                },
+
+                ..LintOptions::default()
+            }),
+            format: Some(FormatOptions {
+                indent_style: Some(IndentStyle::Space),
+                quote_style: Some(QuoteStyle::Double),
+                ..FormatOptions::default()
+            }),
             ..Options::default()
         })
         .map_err(into_error)
@@ -198,7 +187,7 @@ impl Workspace {
             &stylist,
             &indexer,
             &directives,
-            &self.settings,
+            &self.settings.linter,
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
@@ -290,7 +279,7 @@ impl<'a> ParsedModule<'a> {
             comment_ranges.visit_token(token, *range);
         }
         let comment_ranges = comment_ranges.finish();
-        let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
+        let module = parse_tokens(tokens, source, Mode::Module, ".").map_err(into_error)?;
 
         Ok(Self {
             source_code: source,
@@ -301,14 +290,11 @@ impl<'a> ParsedModule<'a> {
 
     fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext>> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
-        let options = PyFormatOptions::from_source_type(PySourceType::default())
-            .with_preview(match settings.preview {
-                PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
-                PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
-            })
-            .with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
+        let options = settings
+            .formatter
+            .to_format_options(PySourceType::default(), self.source_code);
 
-        format_node(
+        format_module_ast(
             &self.module,
             &self.comment_ranges,
             self.source_code,

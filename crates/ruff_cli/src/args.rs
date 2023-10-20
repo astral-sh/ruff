@@ -4,15 +4,16 @@ use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
-use ruff::line_width::LineLength;
-use ruff::logging::LogLevel;
-use ruff::registry::Rule;
-use ruff::settings::types::{
+use ruff_linter::line_width::LineLength;
+use ruff_linter::logging::LogLevel;
+use ruff_linter::registry::Rule;
+use ruff_linter::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
+    UnsafeFixes,
 };
-use ruff::{RuleSelector, RuleSelectorParser};
+use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
-use ruff_workspace::resolver::ConfigProcessor;
+use ruff_workspace::resolver::ConfigurationTransformer;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -39,7 +40,7 @@ pub enum Command {
     #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
     Rule {
         /// Rule to explain
-        #[arg(value_parser=Rule::from_code, group = "selector")]
+        #[arg(value_parser=RuleParser, group = "selector", hide_possible_values = true)]
         rule: Option<Rule>,
 
         /// Explain all rules
@@ -76,17 +77,26 @@ pub enum Command {
 pub struct CheckCommand {
     /// List of files or directories to check.
     pub files: Vec<PathBuf>,
-    /// Attempt to automatically fix lint violations.
+    /// Apply fixes to resolve lint violations.
+    /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
     #[clap(long, overrides_with("fix"), hide = true)]
     no_fix: bool,
+    /// Include fixes that may not retain the original intent of the code.
+    /// Use `--no-unsafe-fixes` to disable.
+    #[arg(long, overrides_with("no_unsafe_fixes"))]
+    unsafe_fixes: bool,
+    #[arg(long, overrides_with("unsafe_fixes"), hide = true)]
+    no_unsafe_fixes: bool,
     /// Show violations with source code.
+    /// Use `--no-show-source` to disable.
     #[arg(long, overrides_with("no_show_source"))]
     show_source: bool,
     #[clap(long, overrides_with("show_source"), hide = true)]
     no_show_source: bool,
-    /// Show an enumeration of all autofixed lint violations.
+    /// Show an enumeration of all fixed lint violations.
+    /// Use `--no-show-fixes` to disable.
     #[arg(long, overrides_with("no_show_fixes"))]
     show_fixes: bool,
     #[clap(long, overrides_with("show_fixes"), hide = true)]
@@ -97,7 +107,8 @@ pub struct CheckCommand {
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
     pub watch: bool,
-    /// Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`.
+    /// Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`.
+    /// Use `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
@@ -105,9 +116,11 @@ pub struct CheckCommand {
     /// Ignore any `# noqa` comments.
     #[arg(long)]
     ignore_noqa: bool,
+
     /// Output serialization format for violations.
-    #[arg(long, value_enum, env = "RUFF_FORMAT")]
-    pub format: Option<SerializationFormat>,
+    #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
+    pub output_format: Option<SerializationFormat>,
+
     /// Specify file to write the linter output to (default: stdout).
     #[arg(short, long)]
     pub output_file: Option<PathBuf>,
@@ -115,6 +128,7 @@ pub struct CheckCommand {
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
     /// Enable preview mode; checks will include unstable rules and fixes.
+    /// Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
@@ -185,7 +199,7 @@ pub struct CheckCommand {
         help_heading = "File selection"
     )]
     pub extend_exclude: Option<Vec<FilePattern>>,
-    /// List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`).
+    /// List of rule codes to treat as eligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
@@ -195,7 +209,7 @@ pub struct CheckCommand {
         hide_possible_values = true
     )]
     pub fixable: Option<Vec<RuleSelector>>,
-    /// List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`).
+    /// List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
@@ -226,6 +240,7 @@ pub struct CheckCommand {
     )]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
+    /// Use `--no-respect-gitignore` to disable.
     #[arg(
         long,
         overrides_with("no_respect_gitignore"),
@@ -235,6 +250,7 @@ pub struct CheckCommand {
     #[clap(long, overrides_with("respect_gitignore"), hide = true)]
     no_respect_gitignore: bool,
     /// Enforce exclusions, even for paths passed to Ruff directly on the command-line.
+    /// Use `--no-force-exclude` to disable.
     #[arg(
         long,
         overrides_with("no_force_exclude"),
@@ -269,7 +285,7 @@ pub struct CheckCommand {
         conflicts_with = "exit_non_zero_on_fix"
     )]
     pub exit_zero: bool,
-    /// Exit with a non-zero status code if any files were modified via autofix, even if no lint violations remain.
+    /// Exit with a non-zero status code if any files were modified via fix, even if no lint violations remain.
     #[arg(long, help_heading = "Miscellaneous", conflicts_with = "exit_zero")]
     pub exit_non_zero_on_fix: bool,
     /// Show counts for every rule with at least one violation.
@@ -337,10 +353,15 @@ pub struct FormatCommand {
     /// files would have been modified, and zero otherwise.
     #[arg(long)]
     pub check: bool,
+    /// Avoid writing any formatted files back; instead, exit with a non-zero status code and the
+    /// difference between the current file and how the formatted file would look like.
+    #[arg(long)]
+    pub diff: bool,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
+    /// Use `--no-respect-gitignore` to disable.
     #[arg(
         long,
         overrides_with("no_respect_gitignore"),
@@ -349,7 +370,17 @@ pub struct FormatCommand {
     respect_gitignore: bool,
     #[clap(long, overrides_with("respect_gitignore"), hide = true)]
     no_respect_gitignore: bool,
+    /// List of paths, used to omit files and/or directories from analysis.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "FILE_PATTERN",
+        help_heading = "File selection"
+    )]
+    pub exclude: Option<Vec<FilePattern>>,
+
     /// Enforce exclusions, even for paths passed to Ruff directly on the command-line.
+    /// Use `--no-force-exclude` to disable.
     #[arg(
         long,
         overrides_with("no_force_exclude"),
@@ -367,9 +398,12 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
-
-    /// Enable preview mode; checks will include unstable rules and fixes.
-    #[arg(long, overrides_with("no_preview"), hide = true)]
+    /// The minimum Python version that should be supported.
+    #[arg(long, value_enum)]
+    pub target_version: Option<PythonVersion>,
+    /// Enable preview mode; enables unstable formatting.
+    /// Use `--no-preview` to disable.
+    #[arg(long, overrides_with("no_preview"))]
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
@@ -430,7 +464,7 @@ impl From<&LogLevelArgs> for LogLevel {
 impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (CheckArguments, Overrides) {
+    pub fn partition(self) -> (CheckArguments, CliOverrides) {
         (
             CheckArguments {
                 add_noqa: self.add_noqa,
@@ -450,7 +484,7 @@ impl CheckCommand {
                 stdin_filename: self.stdin_filename,
                 watch: self.watch,
             },
-            Overrides {
+            CliOverrides {
                 dummy_variable_rgx: self.dummy_variable_rgx,
                 exclude: self.exclude,
                 extend_exclude: self.extend_exclude,
@@ -475,8 +509,10 @@ impl CheckCommand {
                 cache_dir: self.cache_dir,
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
+                unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
+                    .map(UnsafeFixes::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                format: self.format,
+                output_format: self.output_format,
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             },
         )
@@ -486,25 +522,28 @@ impl CheckCommand {
 impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (FormatArguments, Overrides) {
+    pub fn partition(self) -> (FormatArguments, CliOverrides) {
         (
             FormatArguments {
                 check: self.check,
+                diff: self.diff,
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
                 stdin_filename: self.stdin_filename,
             },
-            Overrides {
+            CliOverrides {
                 line_length: self.line_length,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,
                 ),
+                exclude: self.exclude,
                 preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
+                target_version: self.target_version,
                 // Unsupported on the formatter CLI, but required on `Overrides`.
-                ..Overrides::default()
+                ..CliOverrides::default()
             },
         )
     }
@@ -546,6 +585,7 @@ pub struct CheckArguments {
 #[allow(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
+    pub diff: bool,
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
@@ -555,7 +595,7 @@ pub struct FormatArguments {
 /// CLI settings that function as configuration overrides.
 #[derive(Clone, Default)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct Overrides {
+pub struct CliOverrides {
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend_exclude: Option<Vec<FilePattern>>,
@@ -577,18 +617,19 @@ pub struct Overrides {
     pub cache_dir: Option<PathBuf>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
+    pub unsafe_fixes: Option<UnsafeFixes>,
     pub force_exclude: Option<bool>,
-    pub format: Option<SerializationFormat>,
+    pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
 }
 
-impl ConfigProcessor for Overrides {
-    fn process_config(&self, config: &mut Configuration) {
+impl ConfigurationTransformer for CliOverrides {
+    fn transform(&self, mut config: Configuration) -> Configuration {
         if let Some(cache_dir) = &self.cache_dir {
             config.cache_dir = Some(cache_dir.clone());
         }
         if let Some(dummy_variable_rgx) = &self.dummy_variable_rgx {
-            config.dummy_variable_rgx = Some(dummy_variable_rgx.clone());
+            config.lint.dummy_variable_rgx = Some(dummy_variable_rgx.clone());
         }
         if let Some(exclude) = &self.exclude {
             config.exclude = Some(exclude.clone());
@@ -602,7 +643,10 @@ impl ConfigProcessor for Overrides {
         if let Some(fix_only) = &self.fix_only {
             config.fix_only = Some(*fix_only);
         }
-        config.rule_selections.push(RuleSelection {
+        if self.unsafe_fixes.is_some() {
+            config.unsafe_fixes = self.unsafe_fixes;
+        }
+        config.lint.rule_selections.push(RuleSelection {
             select: self.select.clone(),
             ignore: self
                 .ignore
@@ -622,8 +666,8 @@ impl ConfigProcessor for Overrides {
                 .collect(),
             extend_fixable: self.extend_fixable.clone().unwrap_or_default(),
         });
-        if let Some(format) = &self.format {
-            config.format = Some(*format);
+        if let Some(output_format) = &self.output_format {
+            config.output_format = Some(*output_format);
         }
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
@@ -633,9 +677,11 @@ impl ConfigProcessor for Overrides {
         }
         if let Some(preview) = &self.preview {
             config.preview = Some(*preview);
+            config.lint.preview = Some(*preview);
+            config.format.preview = Some(*preview);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
-            config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
+            config.lint.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
         }
         if let Some(respect_gitignore) = &self.respect_gitignore {
             config.respect_gitignore = Some(*respect_gitignore);
@@ -649,6 +695,8 @@ impl ConfigProcessor for Overrides {
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);
         }
+
+        config
     }
 }
 

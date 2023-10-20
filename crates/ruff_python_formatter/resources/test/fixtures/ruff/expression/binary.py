@@ -75,7 +75,7 @@ if [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ] & aaaaaaaaaaaaaaaaaaaaaaaaaa:
-    ...
+    pass
 
 if [
     aaaaaaaaaaaaa,
@@ -84,7 +84,7 @@ if [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ] & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
-    ...
+    pass
 
 # Right only can break
 if aaaaaaaaaaaaaaaaaaaaaaaaaa & [
@@ -94,7 +94,7 @@ if aaaaaaaaaaaaaaaaaaaaaaaaaa & [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ]:
-    ...
+    pass
 
 if aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa & [
     aaaaaaaaaaaaa,
@@ -103,7 +103,7 @@ if aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     dddddddddddddddddddd,
     eeeeeeeeee,
 ]:
-    ...
+    pass
 
 
 # Left or right can break
@@ -114,7 +114,7 @@ if [2222, 333] & [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ]:
-    ...
+    pass
 
 if [
     aaaaaaaaaaaaa,
@@ -123,7 +123,7 @@ if [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ] & [2222, 333]:
-    ...
+    pass
 
 if [
     aaaaaaaaaaaaa,
@@ -132,7 +132,7 @@ if [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ] & [fffffffffffffffff, gggggggggggggggggggg, hhhhhhhhhhhhhhhhhhhhh, iiiiiiiiiiiiiiii, jjjjjjjjjjjjj]:
-    ...
+    pass
 
 if (
     # comment
@@ -152,7 +152,7 @@ if (
 ]:
     pass
 
-    ...
+    pass
 
 # Nesting
 if (aaaa + b) & [
@@ -162,7 +162,7 @@ if (aaaa + b) & [
     iiiiiiiiiiiiiiii,
     jjjjjjjjjjjjj,
 ]:
-    ...
+    pass
 
 if [
     fffffffffffffffff,
@@ -171,7 +171,7 @@ if [
     iiiiiiiiiiiiiiii,
     jjjjjjjjjjjjj,
 ] & (a + b):
-    ...
+    pass
 
 
 if [
@@ -185,7 +185,7 @@ if [
     a
     + b
 ):
-    ...
+    pass
 
 if (
     [
@@ -199,7 +199,7 @@ if (
     # comment
     a + b
 ):
-    ...
+    pass
 
 
 # Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
@@ -366,7 +366,7 @@ if (
 ):
     pass
 
- z = (
+z = (
                  a
                  +
                  # a: extracts this comment
@@ -377,7 +377,7 @@ if (
                          x and y
                      )
              )
- )
+)
 
 z = (
     (
@@ -394,3 +394,15 @@ z = (
     # c: and this comment
     + a
 )
+
+# Test for https://github.com/astral-sh/ruff/issues/7431
+if True:
+    if True:
+        if True:
+            if True:
+                msg += " " + _(
+                    "Since the role is not mentionable, it will be momentarily made mentionable "
+                    "when announcing a streamalert. Please make sure I have the correct "
+                    "permissions to manage this role, or else members of this role won't receive "
+                    "a notification."
+                )

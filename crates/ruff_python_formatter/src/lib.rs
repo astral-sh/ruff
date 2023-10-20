@@ -3,11 +3,12 @@ use tracing::Level;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
-use ruff_python_index::{CommentRanges, CommentRangesBuilder};
-use ruff_python_parser::lexer::{lex, LexicalError};
-use ruff_python_parser::{parse_tokens, Mode, ParseError};
+use ruff_python_index::tokens_and_ranges;
+use ruff_python_parser::lexer::LexicalError;
+use ruff_python_parser::{parse_ok_tokens, Mode, ParseError};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::comments::{
@@ -59,7 +60,6 @@ where
             }
 
             self.fmt_fields(node, f)?;
-            self.fmt_dangling_comments(node_comments.dangling, f)?;
 
             if is_source_map_enabled {
                 source_position(node.end()).fmt(f)?;
@@ -84,6 +84,11 @@ where
         dangling_node_comments: &[SourceComment],
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
+        debug_assert!(
+            dangling_node_comments.is_empty(),
+            "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields` and override `fmt_dangling_comments` with an empty implementation that returns `Ok(())`."
+        );
+
         dangling_comments(dangling_node_comments).fmt(f)
     }
 
@@ -120,61 +125,44 @@ impl From<ParseError> for FormatModuleError {
     }
 }
 
-#[tracing::instrument(level=Level::TRACE, skip_all)]
-pub fn format_module(
-    contents: &str,
+#[tracing::instrument(name = "format", level = Level::TRACE, skip_all)]
+pub fn format_module_source(
+    source: &str,
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
-    // Tokenize once
-    let mut tokens = Vec::new();
-    let mut comment_ranges = CommentRangesBuilder::default();
-
-    for result in lex(contents, Mode::Module) {
-        let (token, range) = result?;
-
-        comment_ranges.visit_token(&token, range);
-        tokens.push(Ok((token, range)));
-    }
-
-    let comment_ranges = comment_ranges.finish();
-
-    // Parse the AST.
-    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")?;
-
-    let formatted = format_node(&python_ast, &comment_ranges, contents, options)?;
-
+    let (tokens, comment_ranges) = tokens_and_ranges(source)?;
+    let module = parse_ok_tokens(tokens, source, Mode::Module, "<filename>")?;
+    let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
 
-pub fn format_node<'a>(
-    root: &'a Mod,
+pub fn format_module_ast<'a>(
+    module: &'a Mod,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
-    let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
-
+    let source_code = SourceCode::new(source);
+    let comments = Comments::from_ast(module, source_code, comment_ranges);
     let locator = Locator::new(source);
 
     let formatted = format!(
         PyFormatContext::new(options, locator.contents(), comments),
-        [root.format()]
+        [module.format()]
     )?;
     formatted
         .context()
         .comments()
-        .assert_all_formatted(SourceCode::new(source));
+        .assert_all_formatted(source_code);
     Ok(formatted)
 }
 
 /// Public function for generating a printable string of the debug comments.
-pub fn pretty_comments(root: &Mod, comment_ranges: &CommentRanges, source: &str) -> String {
-    let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
+pub fn pretty_comments(module: &Mod, comment_ranges: &CommentRanges, source: &str) -> String {
+    let source_code = SourceCode::new(source);
+    let comments = Comments::from_ast(module, source_code, comment_ranges);
 
-    std::format!(
-        "{comments:#?}",
-        comments = comments.debug(SourceCode::new(source))
-    )
+    std::format!("{comments:#?}", comments = comments.debug(source_code))
 }
 
 #[cfg(test)]
@@ -184,11 +172,11 @@ mod tests {
     use anyhow::Result;
     use insta::assert_snapshot;
 
-    use ruff_python_index::CommentRangesBuilder;
-    use ruff_python_parser::lexer::lex;
-    use ruff_python_parser::{parse_tokens, Mode};
+    use ruff_python_index::tokens_and_ranges;
 
-    use crate::{format_module, format_node, PyFormatOptions};
+    use ruff_python_parser::{parse_ok_tokens, Mode};
+
+    use crate::{format_module_ast, format_module_source, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -204,7 +192,7 @@ if True:
     pass
 # trailing
 "#;
-        let actual = format_module(input, PyFormatOptions::default())?
+        let actual = format_module_source(input, PyFormatOptions::default())?
             .as_code()
             .to_string();
         assert_eq!(expected, actual);
@@ -215,31 +203,23 @@ if True:
     #[ignore]
     #[test]
     fn quick_test() {
-        let src = r#"
-(header.timecnt * 5  # Transition times and types
-  + header.typecnt * 6  # Local time type records
-  + header.charcnt  # Time zone designations
-  + header.leapcnt * 8  # Leap second records
-  + header.isstdcnt  # Standard/wall indicators
-  + header.isutcnt)  # UT/local indicators
+        let source = r#"
+def main() -> None:
+    if True:
+        some_very_long_variable_name_abcdefghijk = Foo()
+        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
+            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
+            == "This is a very long string abcdefghijk"
+        ]
+
 "#;
-        // Tokenize once
-        let mut tokens = Vec::new();
-        let mut comment_ranges = CommentRangesBuilder::default();
-
-        for result in lex(src, Mode::Module) {
-            let (token, range) = result.unwrap();
-            comment_ranges.visit_token(&token, range);
-            tokens.push(Ok((token, range)));
-        }
-
-        let comment_ranges = comment_ranges.finish();
+        let (tokens, comment_ranges) = tokens_and_ranges(source).unwrap();
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let python_ast = parse_tokens(tokens, Mode::Module, source_path).unwrap();
+        let module = parse_ok_tokens(tokens, source, Mode::Module, source_path).unwrap();
         let options = PyFormatOptions::from_extension(Path::new(source_path));
-        let formatted = format_node(&python_ast, &comment_ranges, src, options).unwrap();
+        let formatted = format_module_ast(&module, &comment_ranges, source, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

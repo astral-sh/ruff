@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.289"
+version = "0.1.1"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -14,14 +14,8 @@ readme = "../../README.md"
 [[bin]]
 name = "ruff"
 
-# Since the name of the binary is the same as the name of the `ruff` crate
-# running `cargo doc --no-deps --all` results in an `output filename collision`
-# See also https://github.com/rust-lang/cargo/issues/6313.
-# We therefore disable the documentation generation for the binary.
-doc = false
-
 [dependencies]
-ruff = { path = "../ruff", features = ["clap"] }
+ruff_linter = { path = "../ruff_linter", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_formatter = { path = "../ruff_formatter" }
@@ -54,7 +48,7 @@ itoa = { version = "1.0.6" }
 log = { workspace = true }
 notify = { version = "6.1.1" }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
-rayon = { version = "1.7.0" }
+rayon = { version = "1.8.0" }
 regex = { workspace = true }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 rustc-hash = { workspace = true }
@@ -76,10 +70,10 @@ insta = { workspace = true, features = ["filters"] }
 insta-cmd = { version = "0.4.0" }
 tempfile = "3.6.0"
 test-case = { workspace = true }
-ureq = { version = "2.6.2", features = [] }
+ureq = { version = "2.8.0", features = [] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-mimalloc = "0.1.34"
+mimalloc = "0.1.39"
 
 [target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
 tikv-jemallocator = "0.5.0"

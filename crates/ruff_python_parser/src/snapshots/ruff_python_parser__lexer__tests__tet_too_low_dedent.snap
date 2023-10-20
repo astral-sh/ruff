@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: tokens
+---
+[
+    Ok(
+        (
+            If,
+            0..2,
+        ),
+    ),
+    Ok(
+        (
+            True,
+            3..7,
+        ),
+    ),
+    Ok(
+        (
+            Colon,
+            7..8,
+        ),
+    ),
+    Ok(
+        (
+            Newline,
+            8..9,
+        ),
+    ),
+    Ok(
+        (
+            Indent,
+            9..13,
+        ),
+    ),
+    Ok(
+        (
+            Pass,
+            13..17,
+        ),
+    ),
+    Ok(
+        (
+            Newline,
+            17..18,
+        ),
+    ),
+    Err(
+        LexicalError {
+            error: IndentationError,
+            location: 20,
+        },
+    ),
+    Ok(
+        (
+            Pass,
+            20..24,
+        ),
+    ),
+    Ok(
+        (
+            Newline,
+            24..24,
+        ),
+    ),
+]

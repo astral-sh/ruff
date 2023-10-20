@@ -1,0 +1,180 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S501.py:5:47: S501 Probable use of `requests` call with `verify=False` disabling SSL certificate checks
+  |
+4 | requests.get('https://gmail.com', timeout=30, verify=True)
+5 | requests.get('https://gmail.com', timeout=30, verify=False)
+  |                                               ^^^^^^^^^^^^ S501
+6 | requests.post('https://gmail.com', timeout=30, verify=True)
+7 | requests.post('https://gmail.com', timeout=30, verify=False)
+  |
+
+S501.py:7:48: S501 Probable use of `requests` call with `verify=False` disabling SSL certificate checks
+  |
+5 | requests.get('https://gmail.com', timeout=30, verify=False)
+6 | requests.post('https://gmail.com', timeout=30, verify=True)
+7 | requests.post('https://gmail.com', timeout=30, verify=False)
+  |                                                ^^^^^^^^^^^^ S501
+8 | requests.put('https://gmail.com', timeout=30, verify=True)
+9 | requests.put('https://gmail.com', timeout=30, verify=False)
+  |
+
+S501.py:9:47: S501 Probable use of `requests` call with `verify=False` disabling SSL certificate checks
+   |
+ 7 | requests.post('https://gmail.com', timeout=30, verify=False)
+ 8 | requests.put('https://gmail.com', timeout=30, verify=True)
+ 9 | requests.put('https://gmail.com', timeout=30, verify=False)
+   |                                               ^^^^^^^^^^^^ S501
+10 | requests.delete('https://gmail.com', timeout=30, verify=True)
+11 | requests.delete('https://gmail.com', timeout=30, verify=False)
+   |
+
+S501.py:11:50: S501 Probable use of `requests` call with `verify=False` disabling SSL certificate checks
+   |
+ 9 | requests.put('https://gmail.com', timeout=30, verify=False)
+10 | requests.delete('https://gmail.com', timeout=30, verify=True)
+11 | requests.delete('https://gmail.com', timeout=30, verify=False)
+   |                                                  ^^^^^^^^^^^^ S501
+12 | requests.patch('https://gmail.com', timeout=30, verify=True)
+13 | requests.patch('https://gmail.com', timeout=30, verify=False)
+   |
+
+S501.py:13:49: S501 Probable use of `requests` call with `verify=False` disabling SSL certificate checks
+   |
+11 | requests.delete('https://gmail.com', timeout=30, verify=False)
+12 | requests.patch('https://gmail.com', timeout=30, verify=True)
+13 | requests.patch('https://gmail.com', timeout=30, verify=False)
+   |                                                 ^^^^^^^^^^^^ S501
+14 | requests.options('https://gmail.com', timeout=30, verify=True)
+15 | requests.options('https://gmail.com', timeout=30, verify=False)
+   |
+
+S501.py:15:51: S501 Probable use of `requests` call with `verify=False` disabling SSL certificate checks
+   |
+13 | requests.patch('https://gmail.com', timeout=30, verify=False)
+14 | requests.options('https://gmail.com', timeout=30, verify=True)
+15 | requests.options('https://gmail.com', timeout=30, verify=False)
+   |                                                   ^^^^^^^^^^^^ S501
+16 | requests.head('https://gmail.com', timeout=30, verify=True)
+17 | requests.head('https://gmail.com', timeout=30, verify=False)
+   |
+
+S501.py:17:48: S501 Probable use of `requests` call with `verify=False` disabling SSL certificate checks
+   |
+15 | requests.options('https://gmail.com', timeout=30, verify=False)
+16 | requests.head('https://gmail.com', timeout=30, verify=True)
+17 | requests.head('https://gmail.com', timeout=30, verify=False)
+   |                                                ^^^^^^^^^^^^ S501
+18 | 
+19 | httpx.request('GET', 'https://gmail.com', verify=True)
+   |
+
+S501.py:20:43: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+19 | httpx.request('GET', 'https://gmail.com', verify=True)
+20 | httpx.request('GET', 'https://gmail.com', verify=False)
+   |                                           ^^^^^^^^^^^^ S501
+21 | httpx.get('https://gmail.com', verify=True)
+22 | httpx.get('https://gmail.com', verify=False)
+   |
+
+S501.py:22:32: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+20 | httpx.request('GET', 'https://gmail.com', verify=False)
+21 | httpx.get('https://gmail.com', verify=True)
+22 | httpx.get('https://gmail.com', verify=False)
+   |                                ^^^^^^^^^^^^ S501
+23 | httpx.options('https://gmail.com', verify=True)
+24 | httpx.options('https://gmail.com', verify=False)
+   |
+
+S501.py:24:36: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+22 | httpx.get('https://gmail.com', verify=False)
+23 | httpx.options('https://gmail.com', verify=True)
+24 | httpx.options('https://gmail.com', verify=False)
+   |                                    ^^^^^^^^^^^^ S501
+25 | httpx.head('https://gmail.com', verify=True)
+26 | httpx.head('https://gmail.com', verify=False)
+   |
+
+S501.py:26:33: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+24 | httpx.options('https://gmail.com', verify=False)
+25 | httpx.head('https://gmail.com', verify=True)
+26 | httpx.head('https://gmail.com', verify=False)
+   |                                 ^^^^^^^^^^^^ S501
+27 | httpx.post('https://gmail.com', verify=True)
+28 | httpx.post('https://gmail.com', verify=False)
+   |
+
+S501.py:28:33: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+26 | httpx.head('https://gmail.com', verify=False)
+27 | httpx.post('https://gmail.com', verify=True)
+28 | httpx.post('https://gmail.com', verify=False)
+   |                                 ^^^^^^^^^^^^ S501
+29 | httpx.put('https://gmail.com', verify=True)
+30 | httpx.put('https://gmail.com', verify=False)
+   |
+
+S501.py:30:32: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+28 | httpx.post('https://gmail.com', verify=False)
+29 | httpx.put('https://gmail.com', verify=True)
+30 | httpx.put('https://gmail.com', verify=False)
+   |                                ^^^^^^^^^^^^ S501
+31 | httpx.patch('https://gmail.com', verify=True)
+32 | httpx.patch('https://gmail.com', verify=False)
+   |
+
+S501.py:32:34: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+30 | httpx.put('https://gmail.com', verify=False)
+31 | httpx.patch('https://gmail.com', verify=True)
+32 | httpx.patch('https://gmail.com', verify=False)
+   |                                  ^^^^^^^^^^^^ S501
+33 | httpx.delete('https://gmail.com', verify=True)
+34 | httpx.delete('https://gmail.com', verify=False)
+   |
+
+S501.py:34:35: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+32 | httpx.patch('https://gmail.com', verify=False)
+33 | httpx.delete('https://gmail.com', verify=True)
+34 | httpx.delete('https://gmail.com', verify=False)
+   |                                   ^^^^^^^^^^^^ S501
+35 | httpx.stream('https://gmail.com', verify=True)
+36 | httpx.stream('https://gmail.com', verify=False)
+   |
+
+S501.py:36:35: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+34 | httpx.delete('https://gmail.com', verify=False)
+35 | httpx.stream('https://gmail.com', verify=True)
+36 | httpx.stream('https://gmail.com', verify=False)
+   |                                   ^^^^^^^^^^^^ S501
+37 | httpx.Client()
+38 | httpx.Client(verify=False)
+   |
+
+S501.py:38:14: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+36 | httpx.stream('https://gmail.com', verify=False)
+37 | httpx.Client()
+38 | httpx.Client(verify=False)
+   |              ^^^^^^^^^^^^ S501
+39 | httpx.AsyncClient()
+40 | httpx.AsyncClient(verify=False)
+   |
+
+S501.py:40:19: S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate checks
+   |
+38 | httpx.Client(verify=False)
+39 | httpx.AsyncClient()
+40 | httpx.AsyncClient(verify=False)
+   |                   ^^^^^^^^^^^^ S501
+   |
+
+

@@ -1,0 +1,77 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP017.py:7:7: UP017 [*] Use `datetime.UTC` alias
+  |
+6 | print(datetime.timezone(-1))
+7 | print(timezone.utc)
+  |       ^^^^^^^^^^^^ UP017
+8 | print(tz.utc)
+  |
+  = help: Convert to `datetime.UTC` alias
+
+ℹ Fix
+4 4 | from datetime import timezone as tz
+5 5 | 
+6 6 | print(datetime.timezone(-1))
+7   |-print(timezone.utc)
+  7 |+print(datetime.UTC)
+8 8 | print(tz.utc)
+9 9 | 
+10 10 | print(datetime.timezone.utc)
+
+UP017.py:8:7: UP017 [*] Use `datetime.UTC` alias
+   |
+ 6 | print(datetime.timezone(-1))
+ 7 | print(timezone.utc)
+ 8 | print(tz.utc)
+   |       ^^^^^^ UP017
+ 9 | 
+10 | print(datetime.timezone.utc)
+   |
+   = help: Convert to `datetime.UTC` alias
+
+ℹ Fix
+5 5 | 
+6 6 | print(datetime.timezone(-1))
+7 7 | print(timezone.utc)
+8   |-print(tz.utc)
+  8 |+print(datetime.UTC)
+9 9 | 
+10 10 | print(datetime.timezone.utc)
+11 11 | print(dt.timezone.utc)
+
+UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
+   |
+ 8 | print(tz.utc)
+ 9 | 
+10 | print(datetime.timezone.utc)
+   |       ^^^^^^^^^^^^^^^^^^^^^ UP017
+11 | print(dt.timezone.utc)
+   |
+   = help: Convert to `datetime.UTC` alias
+
+ℹ Fix
+7  7  | print(timezone.utc)
+8  8  | print(tz.utc)
+9  9  | 
+10    |-print(datetime.timezone.utc)
+   10 |+print(datetime.UTC)
+11 11 | print(dt.timezone.utc)
+
+UP017.py:11:7: UP017 [*] Use `datetime.UTC` alias
+   |
+10 | print(datetime.timezone.utc)
+11 | print(dt.timezone.utc)
+   |       ^^^^^^^^^^^^^^^ UP017
+   |
+   = help: Convert to `datetime.UTC` alias
+
+ℹ Fix
+8  8  | print(tz.utc)
+9  9  | 
+10 10 | print(datetime.timezone.utc)
+11    |-print(dt.timezone.utc)
+   11 |+print(datetime.UTC)
+
+

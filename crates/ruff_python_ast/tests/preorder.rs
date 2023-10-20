@@ -2,12 +2,12 @@ use std::fmt::{Debug, Write};
 
 use insta::assert_snapshot;
 
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{
     walk_alias, walk_comprehension, walk_except_handler, walk_expr, walk_keyword, walk_match_case,
     walk_module, walk_parameter, walk_parameters, walk_pattern, walk_stmt, walk_type_param,
     walk_with_item, PreorderVisitor,
 };
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
     Alias, BoolOp, CmpOp, Comprehension, Constant, ExceptHandler, Expr, Keyword, MatchCase, Mod,
     Operator, Parameter, Parameters, Pattern, Stmt, TypeParam, UnaryOp, WithItem,
@@ -130,7 +130,7 @@ fn function_type_parameters() {
 
 fn trace_preorder_visitation(source: &str) -> String {
     let tokens = lex(source, Mode::Module);
-    let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
+    let parsed = parse_tokens(tokens, source, Mode::Module, "test.py").unwrap();
 
     let mut visitor = RecordVisitor::default();
     visitor.visit_mod(&parsed);

@@ -3,7 +3,7 @@
 ## VS Code (Official)
 
 Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff),
-which supports autofix actions, import sorting, and more.
+which supports fix actions, import sorting, and more.
 
 ![Ruff VS Code extension](https://user-images.githubusercontent.com/1309177/205175763-cf34871d-5c05-4abf-9916-440afc82dbf8.gif)
 
@@ -292,7 +292,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff
-      # Include `--format=github` to enable automatic inline annotations.
+      # Update output format to enable automatic inline annotations.
       - name: Run Ruff
-        run: ruff check --format=github .
+        run: ruff check --output-format=github .
 ```

@@ -51,7 +51,7 @@ aaaaaaaa = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbb
 for converter in connection.ops.get_db_converters(
     expression
 ) + expression.get_db_converters(connection):
-    ...
+    pass
 
 
 aaa = (
@@ -70,3 +70,27 @@ def test():
     if True:
         VLM_m2m = VLM.m2m_also_quite_long_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz.through
         allows_group_by_select_index = self.connection.features.allows_group_by_select_index
+
+
+# This is a deviation from Black:
+# Black keeps the comment inside of the parentheses, making it more likely to exceed the line width.
+# Ruff renders the comment after the parentheses, giving it more space to fit.
+if True:
+    if True:
+        if True:
+            # Black layout
+            model.config.use_cache = (
+                False  # FSTM still requires this hack -> FSTM should probably be refactored s
+            )
+            # Ruff layout
+            model.config.use_cache = False  # FSTM still requires this hack -> FSTM should probably be refactored s
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/7463
+mp3fmt="<span style=\"color: grey\"><a href=\"{}\" id=\"audiolink\">listen</a></span></br>\n"
+
+# Regression test for https://github.com/astral-sh/ruff/issues/7067
+def f():
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = (
+        True
+    )

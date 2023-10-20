@@ -1,4 +1,4 @@
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprBinOp};
 
 use crate::comments::SourceComment;
@@ -33,7 +33,7 @@ impl NeedsParentheses for ExprBinOp {
         parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if parent.is_expr_await() && !self.op.is_pow() {
+        if parent.is_expr_await() {
             OptionalParentheses::Always
         } else if let Expr::Constant(constant) = self.left.as_ref() {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses

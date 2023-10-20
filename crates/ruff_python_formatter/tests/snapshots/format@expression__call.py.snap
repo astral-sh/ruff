@@ -276,6 +276,9 @@ result = (
     f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
     + 1
 )()
+
+
+result = (object[complicate_caller])("argument").a["b"].test(argument)
 ```
 
 ## Output
@@ -455,8 +458,9 @@ func(
 )
 
 func(
-    # outer comment
-    (  # inner comment
+    (
+        # outer comment
+        # inner comment
         []
     )
 )
@@ -548,6 +552,9 @@ result = (
     f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
     + 1
 )()
+
+
+result = (object[complicate_caller])("argument").a["b"].test(argument)
 ```
 
 

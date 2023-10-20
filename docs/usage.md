@@ -23,17 +23,17 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.289
+  rev: v0.1.1
   hooks:
     - id: ruff
 ```
 
-Or, to enable autofix:
+Or, to enable fixes:
 
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.289
+  rev: v0.1.1
   hooks:
     - id: ruff
       args: [ --fix, --exit-non-zero-on-fix ]
@@ -44,15 +44,15 @@ Or, to run the hook on Jupyter Notebooks too:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.289
+  rev: v0.1.1
   hooks:
     - id: ruff
       types_or: [python, pyi, jupyter]
 ```
 
 Ruff's pre-commit hook should be placed after other formatting tools, such as Black and isort,
-_unless_ you enable autofix, in which case, Ruff's pre-commit hook should run _before_ Black, isort,
-and other formatting tools, as Ruff's autofix behavior can output code changes that require
+_unless_ you enable fixes, in which case, Ruff's pre-commit hook should run _before_ Black, isort,
+and other formatting tools, as Ruff's fix behavior can output code changes that require
 reformatting.
 
 ## VS Code

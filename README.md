@@ -8,7 +8,7 @@
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
 
-[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
+[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
 An extremely fast Python linter, written in Rust.
 
@@ -27,16 +27,16 @@ An extremely fast Python linter, written in Rust.
 - ⚡️ 10-100x faster than existing linters
 - 🐍 Installable via `pip`
 - 🛠️ `pyproject.toml` support
-- 🤝 Python 3.11 compatibility
+- 🤝 Python 3.12 compatibility
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
-- 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [600 built-in rules](https://beta.ruff.rs/docs/rules/)
-- ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
+- 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
+- 📏 Over [700 built-in rules](https://docs.astral.sh/ruff/rules/)
+- ⚖️ [Near-parity](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8) with the
     built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party [editor integrations](https://beta.ruff.rs/docs/editor-integrations/) for
+- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/editor-integrations/) for
     [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
-- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
+- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
@@ -98,7 +98,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
 
 ## Table of Contents
 
-For more, see the [documentation](https://beta.ruff.rs/docs/).
+For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 1. [Getting Started](#getting-started)
 1. [Configuration](#configuration)
@@ -111,7 +111,7 @@ For more, see the [documentation](https://beta.ruff.rs/docs/).
 
 ## Getting Started
 
-For more, see the [documentation](https://beta.ruff.rs/docs/).
+For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 ### Installation
 
@@ -122,7 +122,7 @@ pip install ruff
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
-and with [a variety of other package managers](https://beta.ruff.rs/docs/installation/).
+and with [a variety of other package managers](https://docs.astral.sh/ruff/installation/).
 
 ### Usage
 
@@ -140,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.289
+  rev: v0.1.1
   hooks:
     - id: ruff
 ```
@@ -165,18 +165,18 @@ jobs:
 ### Configuration
 
 Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (see:
-[_Configuration_](https://beta.ruff.rs/docs/configuration/), or [_Settings_](https://beta.ruff.rs/docs/settings/)
+[_Configuration_](https://docs.astral.sh/ruff/configuration/), or [_Settings_](https://docs.astral.sh/ruff/settings/)
 for a complete list of all configuration options).
 
 If left unspecified, the default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
-# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
-select = ["E", "F"]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+select = ["E4", "E7", "E9", "F"]
 ignore = []
 
-# Allow autofix for all enabled rules (when `--fix`) is provided.
+# Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["A", "B", "C", "D", "E", "F", "G", "I", "N", "Q", "S", "T", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "EM", "ERA", "EXE", "FBT", "ICN", "INP", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
 unfixable = []
 
@@ -233,13 +233,12 @@ linting command.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 600 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 700 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
-By default, Ruff enables Flake8's `E` and `F` rules. Ruff supports all rules from the `F` category,
-and a [subset](https://beta.ruff.rs/docs/rules/#error-e) of the `E` category, omitting those
-stylistic rules made obsolete by the use of an autoformatter, like
+By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
+stylistic rules that overlap with the use of a formatter, like
 [Black](https://github.com/psf/black).
 
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
@@ -274,6 +273,7 @@ quality tools, including:
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
 - [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-logging](https://pypi.org/project/flake8-logging/)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
 - [flake8-pie](https://pypi.org/project/flake8-pie/)
@@ -303,12 +303,12 @@ quality tools, including:
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)
 
-For a complete enumeration of the supported rules, see [_Rules_](https://beta.ruff.rs/docs/rules/).
+For a complete enumeration of the supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
 
 ## Contributing
 
 Contributions are welcome and highly appreciated. To get started, check out the
-[**contributing guidelines**](https://beta.ruff.rs/docs/contributing/).
+[**contributing guidelines**](https://docs.astral.sh/ruff/contributing/).
 
 You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
 

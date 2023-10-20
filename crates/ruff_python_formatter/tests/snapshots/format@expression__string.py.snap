@@ -136,6 +136,9 @@ test_particular = [
 x = ("""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
 x = (f"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" f"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
 x = (b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
+
+# https://github.com/astral-sh/ruff/issues/7460
+trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
 ```
 
 ## Outputs
@@ -146,6 +149,7 @@ line-width              = 88
 indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
 ```py
@@ -305,6 +309,9 @@ x = (
     b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
     b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
 )
+
+# https://github.com/astral-sh/ruff/issues/7460
+trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
 ```
 
 
@@ -315,6 +322,7 @@ line-width              = 88
 indent-width            = 4
 quote-style             = Single
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
 ```py
@@ -357,17 +365,17 @@ if True:
     'This string will not include \
         backslashes or newline characters.'
 
-'''Multiline
+"""Multiline
 String \"
-'''
+"""
 
-'''Multiline
+"""Multiline
 String \'
-'''
+"""
 
-'''Multiline
+"""Multiline
 String ""
-'''
+"""
 
 '''Multiline
 String """
@@ -383,9 +391,9 @@ String '''
 """Multiline
 String '"""
 
-'''Multiline
+"""Multiline
 String \"\"\"
-'''
+"""
 
 # String continuation
 
@@ -463,17 +471,20 @@ test_particular = [
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5893
 x = (
-    '''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
-    '''bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'''
+    """aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    """bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
 )
 x = (
-    f'''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
-    f'''bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'''
+    f"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    f"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
 )
 x = (
-    b'''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
-    b'''bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'''
+    b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
 )
+
+# https://github.com/astral-sh/ruff/issues/7460
+trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
 ```
 
 

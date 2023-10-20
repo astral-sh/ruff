@@ -18,12 +18,12 @@ from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
 def main(*, plugin: str, url: str, prefix_code: str) -> None:
     """Generate boilerplate for a new plugin."""
     # Create the test fixture folder.
-    (ROOT_DIR / "crates/ruff/resources/test/fixtures" / dir_name(plugin)).mkdir(
+    (ROOT_DIR / "crates/ruff_linter/resources/test/fixtures" / dir_name(plugin)).mkdir(
         exist_ok=True,
     )
 
     # Create the Plugin rules module.
-    plugin_dir = ROOT_DIR / "crates/ruff/src/rules" / dir_name(plugin)
+    plugin_dir = ROOT_DIR / "crates/ruff_linter/src/rules" / dir_name(plugin)
     plugin_dir.mkdir(exist_ok=True)
 
     with (plugin_dir / "mod.rs").open("w+") as fp:
@@ -67,16 +67,16 @@ mod tests {
     (plugin_dir / "snapshots").mkdir(exist_ok=True)
 
     # Add the plugin to `rules/mod.rs`.
-    rules_mod_path = ROOT_DIR / "crates/ruff/src/rules/mod.rs"
+    rules_mod_path = ROOT_DIR / "crates/ruff_linter/src/rules/mod.rs"
     lines = rules_mod_path.read_text().strip().splitlines()
     lines.append(f"pub mod {dir_name(plugin)};")
     lines.sort()
     rules_mod_path.write_text("\n".join(lines) + "\n")
 
     # Add the relevant sections to `src/registry.rs`.
-    content = (ROOT_DIR / "crates/ruff/src/registry.rs").read_text()
+    content = (ROOT_DIR / "crates/ruff_linter/src/registry.rs").read_text()
 
-    with (ROOT_DIR / "crates/ruff/src/registry.rs").open("w") as fp:
+    with (ROOT_DIR / "crates/ruff_linter/src/registry.rs").open("w") as fp:
         for line in content.splitlines():
             indent = get_indent(line)
 
@@ -94,14 +94,14 @@ mod tests {
             fp.write("\n")
 
     text = ""
-    with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
+    with (ROOT_DIR / "crates/ruff_linter/src/codes.rs").open("r") as fp:
         while (line := next(fp)).strip() != "// ruff":
             text += line
         text += " " * 8 + f"// {plugin}\n\n"
         text += line
         text += fp.read()
 
-    with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
+    with (ROOT_DIR / "crates/ruff_linter/src/codes.rs").open("w") as fp:
         fp.write(text)
 
 

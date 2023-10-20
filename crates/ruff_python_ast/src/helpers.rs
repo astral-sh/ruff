@@ -1,15 +1,19 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use num_traits::Zero;
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::Locator;
 use smallvec::SmallVec;
 
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::call_path::CallPath;
+use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use crate::AnyNodeRef;
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
+    self as ast, Arguments, CmpOp, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt,
+    TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -1073,7 +1077,7 @@ impl Truthiness {
                 Constant::None => Some(false),
                 Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
                 Constant::Bytes(bytes) => Some(!bytes.is_empty()),
-                Constant::Int(int) => Some(!int.is_zero()),
+                Constant::Int(int) => Some(*int != 0),
                 Constant::Float(float) => Some(*float != 0.0),
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
@@ -1130,6 +1134,58 @@ impl Truthiness {
     }
 }
 
+pub fn generate_comparison(
+    left: &Expr,
+    ops: &[CmpOp],
+    comparators: &[Expr],
+    parent: AnyNodeRef,
+    comment_ranges: &CommentRanges,
+    locator: &Locator,
+) -> String {
+    let start = left.start();
+    let end = comparators.last().map_or_else(|| left.end(), Ranged::end);
+    let mut contents = String::with_capacity(usize::from(end - start));
+
+    // Add the left side of the comparison.
+    contents.push_str(
+        locator.slice(
+            parenthesized_range(left.into(), parent, comment_ranges, locator.contents())
+                .unwrap_or(left.range()),
+        ),
+    );
+
+    for (op, comparator) in ops.iter().zip(comparators) {
+        // Add the operator.
+        contents.push_str(match op {
+            CmpOp::Eq => " == ",
+            CmpOp::NotEq => " != ",
+            CmpOp::Lt => " < ",
+            CmpOp::LtE => " <= ",
+            CmpOp::Gt => " > ",
+            CmpOp::GtE => " >= ",
+            CmpOp::In => " in ",
+            CmpOp::NotIn => " not in ",
+            CmpOp::Is => " is ",
+            CmpOp::IsNot => " is not ",
+        });
+
+        // Add the right side of the comparison.
+        contents.push_str(
+            locator.slice(
+                parenthesized_range(
+                    comparator.into(),
+                    parent,
+                    comment_ranges,
+                    locator.contents(),
+                )
+                .unwrap_or(comparator.range()),
+            ),
+        );
+    }
+
+    contents
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -1140,7 +1196,7 @@ mod tests {
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
     use crate::{
-        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
+        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Int, Stmt, StmtTypeAlias,
         TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
     };
 
@@ -1240,7 +1296,7 @@ mod tests {
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
         let bound = Expr::Constant(ExprConstant {
-            value: Constant::Int(1.into()),
+            value: Constant::Int(Int::ONE),
             range: TextRange::default(),
         });
 

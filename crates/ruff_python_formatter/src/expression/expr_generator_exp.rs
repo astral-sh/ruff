@@ -1,5 +1,5 @@
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprGeneratorExp;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -91,15 +91,20 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
 impl NeedsParentheses for ExprGeneratorExp {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Never
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Never
+        }
     }
 }
 
-fn is_generator_parenthesized(generator: &ExprGeneratorExp, source: &str) -> bool {
-    // / Count the number of open parentheses between the start of the tuple and the first element.
+/// Return `true` if a generator is parenthesized in the source code.
+pub(crate) fn is_generator_parenthesized(generator: &ExprGeneratorExp, source: &str) -> bool {
+    // Count the number of open parentheses between the start of the generator and the first element.
     let open_parentheses_count = SimpleTokenizer::new(
         source,
         TextRange::new(generator.start(), generator.elt.start()),
@@ -111,7 +116,7 @@ fn is_generator_parenthesized(generator: &ExprGeneratorExp, source: &str) -> boo
         return false;
     }
 
-    // Count the number of parentheses between the end of the first element and its trailing comma.
+    // Count the number of parentheses between the end of the generator and its trailing comma.
     let close_parentheses_count = SimpleTokenizer::new(
         source,
         TextRange::new(
@@ -126,7 +131,7 @@ fn is_generator_parenthesized(generator: &ExprGeneratorExp, source: &str) -> boo
     .filter(|token| token.kind() == SimpleTokenKind::RParen)
     .count();
 
-    // If the number of open parentheses is greater than the number of close parentheses, the generator
-    // is parenthesized.
+    // If the number of open parentheses is greater than the number of close parentheses, the
+    // generator is parenthesized.
     open_parentheses_count > close_parentheses_count
 }

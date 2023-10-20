@@ -2,12 +2,14 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::options::Options;
 use anyhow::Result;
 use log::debug;
 use pep440_rs::VersionSpecifiers;
-use ruff::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
+
+use ruff_linter::settings::types::PythonVersion;
+
+use crate::options::Options;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Tools {
@@ -152,14 +154,16 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
 mod tests {
     use std::str::FromStr;
 
-    use crate::options::Options;
+    use anyhow::Result;
+    use rustc_hash::FxHashMap;
+
+    use ruff_linter::codes;
+    use ruff_linter::line_width::LineLength;
+    use ruff_linter::settings::types::PatternPrefixPair;
+
+    use crate::options::{LintCommonOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
     use crate::tests::test_resource_path;
-    use anyhow::Result;
-    use ruff::codes;
-    use ruff::line_width::LineLength;
-    use ruff::settings::types::PatternPrefixPair;
-    use rustc_hash::FxHashMap;
 
     #[test]
 
@@ -232,7 +236,10 @@ select = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    select: Some(vec![codes::Pycodestyle::E501.into()]),
+                    lint_top_level: LintCommonOptions {
+                        select: Some(vec![codes::Pycodestyle::E501.into()]),
+                        ..LintCommonOptions::default()
+                    },
                     ..Options::default()
                 })
             })
@@ -250,8 +257,11 @@ ignore = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    extend_select: Some(vec![codes::Ruff::_100.into()]),
-                    ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                    lint_top_level: LintCommonOptions {
+                        extend_select: Some(vec![codes::Ruff::_100.into()]),
+                        ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                        ..LintCommonOptions::default()
+                    },
                     ..Options::default()
                 })
             })
@@ -304,10 +314,14 @@ other-attribute = 1
                     "migrations".to_string(),
                     "with_excluded_file/other_excluded_file.py".to_string(),
                 ]),
-                per_file_ignores: Some(FxHashMap::from_iter([(
-                    "__init__.py".to_string(),
-                    vec![codes::Pyflakes::_401.into()]
-                )])),
+
+                lint_top_level: LintCommonOptions {
+                    per_file_ignores: Some(FxHashMap::from_iter([(
+                        "__init__.py".to_string(),
+                        vec![codes::Pyflakes::_401.into()]
+                    )])),
+                    ..LintCommonOptions::default()
+                },
                 ..Options::default()
             }
         );

@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:20:9: D419 Docstring is empty
+   |
+19 |     class meta:
+20 |         """"""
+   |         ^^^^^^ D419
+21 | 
+22 |     @expect('D102: Missing docstring in public method')
+   |
+
+D.py:74:5: D419 Docstring is empty
+   |
+72 | @expect('D419: Docstring is empty')
+73 | def function():
+74 |     """ """
+   |     ^^^^^^^ D419
+75 |     def ok_since_nested():
+76 |         pass
+   |
+
+D.py:80:9: D419 Docstring is empty
+   |
+78 |     @expect('D419: Docstring is empty')
+79 |     def nested():
+80 |         ''
+   |         ^^ D419
+   |
+
+

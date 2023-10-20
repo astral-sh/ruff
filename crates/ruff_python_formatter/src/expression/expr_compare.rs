@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{CmpOp, Expr, ExprCompare};
 
 use crate::comments::SourceComment;
@@ -20,10 +20,11 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 
     fn fmt_dangling_comments(
         &self,
-        _dangling_comments: &[SourceComment],
+        dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Node can not have dangling comments
+        debug_assert!(dangling_comments.is_empty());
         Ok(())
     }
 }
@@ -31,10 +32,12 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 impl NeedsParentheses for ExprCompare {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if let Expr::Constant(constant) = self.left.as_ref() {
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else if let Expr::Constant(constant) = self.left.as_ref() {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
             if !constant.value.is_implicit_concatenated()
                 && is_multiline_string(constant, context.source())

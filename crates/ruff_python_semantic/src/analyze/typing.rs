@@ -1,14 +1,10 @@
 //! Analysis rules for the `typing` module.
 
-use num_traits::identities::Zero;
-use ruff_python_ast::{
-    self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters, Stmt,
-};
-
-use crate::analyze::type_inference::{PythonType, ResolvedPythonType};
-use crate::{Binding, BindingKind};
 use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
-use ruff_python_ast::helpers::{is_const_false, map_subscript};
+use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
+use ruff_python_ast::{
+    self as ast, Constant, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt,
+};
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
@@ -17,7 +13,9 @@ use ruff_python_stdlib::typing::{
 };
 use ruff_text_size::Ranged;
 
+use crate::analyze::type_inference::{PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
+use crate::{Binding, BindingKind};
 
 #[derive(Copy, Clone)]
 pub enum Callable {
@@ -143,7 +141,7 @@ pub fn to_pep604_operator(
     slice: &Expr,
     semantic: &SemanticModel,
 ) -> Option<Pep604Operator> {
-    /// Returns `true` if any argument in the slice is a quoted annotation).
+    /// Returns `true` if any argument in the slice is a quoted annotation.
     fn quoted_annotation(slice: &Expr) -> bool {
         match slice {
             Expr::Constant(ast::ExprConstant {
@@ -151,6 +149,15 @@ pub fn to_pep604_operator(
                 ..
             }) => true,
             Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(quoted_annotation),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if any argument in the slice is a starred expression.
+    fn starred_annotation(slice: &Expr) -> bool {
+        match slice {
+            Expr::Starred(_) => true,
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(starred_annotation),
             _ => false,
         }
     }
@@ -173,6 +180,14 @@ pub fn to_pep604_operator(
         if semantic.execution_context().is_runtime() {
             return None;
         }
+    }
+
+    // If any of the elements are starred expressions, we can't rewrite the subscript:
+    // ```python
+    // def f(x: Union[*int, str]): ...
+    // ```
+    if starred_annotation(slice) {
+        return None;
     }
 
     semantic
@@ -287,7 +302,7 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     }
 }
 
-/// Return `true` if [`Expr`] is a guard for a type-checking block.
+/// Return `true` if [`ast::StmtIf`] is a guard for a type-checking block.
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
@@ -297,14 +312,14 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     }
 
     // Ex) `if 0:`
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
-        ..
-    }) = test.as_ref()
-    {
-        if value.is_zero() {
-            return true;
-        }
+    if matches!(
+        test.as_ref(),
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(Int::ZERO),
+            ..
+        })
+    ) {
+        return true;
     }
 
     // Ex) `if typing.TYPE_CHECKING:`
@@ -316,6 +331,17 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     }
 
     false
+}
+
+/// Returns `true` if the [`ast::StmtIf`] is a version-checking block (e.g., `if sys.version_info >= ...:`).
+pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
+    let ast::StmtIf { test, .. } = stmt;
+
+    any_over_expr(test, &|expr| {
+        semantic.resolve_call_path(expr).is_some_and(|call_path| {
+            matches!(call_path.as_slice(), ["sys", "version_info" | "platform"])
+        })
+    })
 }
 
 /// Abstraction for a type checker, conservatively checks for the intended type(s).
@@ -470,6 +496,14 @@ impl BuiltinTypeChecker for SetChecker {
     const EXPR_TYPE: PythonType = PythonType::Set;
 }
 
+struct TupleChecker;
+
+impl BuiltinTypeChecker for TupleChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "tuple";
+    const TYPING_NAME: &'static str = "Tuple";
+    const EXPR_TYPE: PythonType = PythonType::Tuple;
+}
+
 /// Test whether the given binding (and the given name) can be considered a list.
 /// For this, we check what value might be associated with it through it's initialization and
 /// what annotation it has (we consider `list` and `typing.List`).
@@ -491,6 +525,14 @@ pub fn is_set(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<SetChecker>(binding, semantic)
 }
 
+/// Test whether the given binding (and the given name) can be considered a
+/// tuple. For this, we check what value might be associated with it through
+/// it's initialization and what annotation it has (we consider `tuple` and
+/// `typing.Tuple`).
+pub fn is_tuple(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<TupleChecker>(binding, semantic)
+}
+
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
 #[inline]
 fn find_parameter<'a>(
@@ -503,4 +545,37 @@ fn find_parameter<'a>(
         .chain(parameters.posonlyargs.iter())
         .chain(parameters.kwonlyargs.iter())
         .find(|arg| arg.parameter.name.range() == binding.range())
+}
+
+/// Return the [`CallPath`] of the value to which the given [`Expr`] is assigned, if any.
+///
+/// For example, given:
+/// ```python
+/// import asyncio
+///
+/// loop = asyncio.get_running_loop()
+/// loop.create_task(...)
+/// ```
+///
+/// This function will return `["asyncio", "get_running_loop"]` for the `loop` binding.
+pub fn resolve_assignment<'a>(
+    expr: &'a Expr,
+    semantic: &'a SemanticModel<'a>,
+) -> Option<CallPath<'a>> {
+    let name = expr.as_name_expr()?;
+    let binding_id = semantic.resolve_name(name)?;
+    let statement = semantic.binding(binding_id).statement(semantic)?;
+    match statement {
+        Stmt::Assign(ast::StmtAssign { value, .. }) => {
+            let ast::ExprCall { func, .. } = value.as_call_expr()?;
+            semantic.resolve_call_path(func)
+        }
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        }) => {
+            let ast::ExprCall { func, .. } = value.as_call_expr()?;
+            semantic.resolve_call_path(func)
+        }
+        _ => None,
+    }
 }

@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 
 use crate::expression::binary_like::BinaryLike;
@@ -19,10 +19,14 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
 impl NeedsParentheses for ExprBoolOp {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }
 

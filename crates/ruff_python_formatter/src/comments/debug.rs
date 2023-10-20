@@ -180,8 +180,9 @@ mod tests {
     use insta::assert_debug_snapshot;
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::node::AnyNode;
+    use ruff_python_ast::AnyNode;
     use ruff_python_ast::{StmtBreak, StmtContinue};
+    use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::comments::map::MultiMap;
@@ -231,7 +232,8 @@ break;
             ),
         );
 
-        let comments = Comments::new(comments_map);
+        let comment_ranges = CommentRanges::default();
+        let comments = Comments::new(comments_map, &comment_ranges);
 
         assert_debug_snapshot!(comments.debug(source_code));
     }

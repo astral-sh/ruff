@@ -2,8 +2,8 @@ fail_fast: true
 
 exclude: |
   (?x)^(
-    crates/ruff/resources/.*|
-    crates/ruff/src/rules/.*/snapshots/.*|
+    crates/ruff_linter/resources/.*|
+    crates/ruff_linter/src/rules/.*/snapshots/.*|
     crates/ruff_cli/resources/.*|
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/tests/snapshots/.*|
@@ -23,6 +23,7 @@ repos:
       - id: mdformat
         additional_dependencies:
           - mdformat-mkdocs
+          - mdformat-admon
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.33.0
@@ -50,7 +51,7 @@ repos:
         require_serial: true
         exclude: |
           (?x)^(
-            crates/ruff/resources/.*|
+            crates/ruff_linter/resources/.*|
             crates/ruff_python_formatter/resources/.*
           )$
 

@@ -11,6 +11,8 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ruff_cache = { path = "../ruff_cache" }
+ruff_macros = { path = "../ruff_macros" }
 ruff_text_size = { path = "../ruff_text_size" }
 
 drop_bomb = { version = "0.1.5" }
@@ -18,7 +20,7 @@ rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 static_assertions = { workspace = true }
-tracing = { version = "0.1.37", default-features = false, features = ["std"] }
+tracing = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]

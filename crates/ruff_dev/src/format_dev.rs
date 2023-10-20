@@ -11,14 +11,12 @@ use std::{fmt, fs, io, iter};
 
 use anyhow::{bail, format_err, Context, Error};
 use clap::{CommandFactory, FromArgMatches};
-use ignore::DirEntry;
 use imara_diff::intern::InternedInput;
 use imara_diff::sink::Counter;
 use imara_diff::{diff, Algorithm};
 use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use ruff::line_width::LineLength;
 use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
@@ -29,22 +27,22 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use ruff::logging::LogLevel;
-use ruff::settings::types::{FilePattern, FilePatternSet};
 use ruff_cli::args::{FormatCommand, LogLevelArgs};
 use ruff_cli::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
+use ruff_linter::logging::LogLevel;
+use ruff_linter::settings::types::{FilePattern, FilePatternSet};
 use ruff_python_formatter::{
-    format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
+    format_module_source, FormatModuleError, MagicTrailingComma, PyFormatOptions,
 };
-use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, Resolver};
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile, Resolver};
 
 /// Find files that ruff would check so we can format them. Adapted from `ruff_cli`.
 #[allow(clippy::type_complexity)]
 fn ruff_check_paths(
     dirs: &[PathBuf],
 ) -> anyhow::Result<(
-    Vec<Result<DirEntry, ignore::Error>>,
+    Vec<Result<ResolvedFile, ignore::Error>>,
     Resolver,
     PyprojectConfig,
 )> {
@@ -60,7 +58,7 @@ fn ruff_check_paths(
         cli.stdin_filename.as_deref(),
     )?;
     // We don't want to format pyproject.toml
-    pyproject_config.settings.lib.include = FilePatternSet::try_from_vec(vec![
+    pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
     ])
@@ -468,9 +466,9 @@ fn format_dev_project(
         let iter = { paths.into_par_iter() };
         #[cfg(feature = "singlethreaded")]
         let iter = { paths.into_iter() };
-        iter.map(|dir_entry| {
+        iter.map(|path| {
             let result = format_dir_entry(
-                dir_entry,
+                path,
                 stability_check,
                 write,
                 &black_options,
@@ -528,30 +526,26 @@ fn format_dev_project(
 
 /// Error handling in between walkdir and `format_dev_file`
 fn format_dir_entry(
-    dir_entry: Result<DirEntry, ignore::Error>,
+    resolved_file: Result<ResolvedFile, ignore::Error>,
     stability_check: bool,
     write: bool,
     options: &BlackOptions,
     resolver: &Resolver,
     pyproject_config: &PyprojectConfig,
 ) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
-    let dir_entry = match dir_entry.context("Iterating the files in the repository failed") {
-        Ok(dir_entry) => dir_entry,
-        Err(err) => return Err(err),
-    };
-    let file = dir_entry.path().to_path_buf();
+    let resolved_file = resolved_file.context("Iterating the files in the repository failed")?;
     // For some reason it does not filter in the beginning
-    if dir_entry.file_name() == "pyproject.toml" {
-        return Ok((Ok(Statistics::default()), file));
+    if resolved_file.file_name() == "pyproject.toml" {
+        return Ok((Ok(Statistics::default()), resolved_file.into_path()));
     }
 
-    let path = dir_entry.path().to_path_buf();
+    let path = resolved_file.into_path();
     let mut options = options.to_py_format_options(&path);
 
     let settings = resolver.resolve(&path, pyproject_config);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
-    if settings.line_length != LineLength::default() {
-        options = options.with_line_width(LineWidth::from(NonZeroU16::from(settings.line_length)));
+    if settings.formatter.line_width != LineWidth::default() {
+        options = options.with_line_width(settings.formatter.line_width);
     }
 
     // Handle panics (mostly in `debug_assert!`)
@@ -800,7 +794,7 @@ fn format_dev_file(
     let content = fs::read_to_string(input_path)?;
     #[cfg(not(debug_assertions))]
     let start = Instant::now();
-    let printed = match format_module(&content, options.clone()) {
+    let printed = match format_module_source(&content, options.clone()) {
         Ok(printed) => printed,
         Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
             return Err(CheckFileError::SyntaxErrorInInput(err));
@@ -827,7 +821,7 @@ fn format_dev_file(
     }
 
     if stability_check {
-        let reformatted = match format_module(formatted, options) {
+        let reformatted = match format_module_source(formatted, options) {
             Ok(reformatted) => reformatted,
             Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
                 return Err(CheckFileError::SyntaxErrorInOutput {

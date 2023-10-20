@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+---
+G101_1.py:6:9: G101 Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
+  |
+4 |     "Hello world!",
+5 |     extra={
+6 |         "name": "foobar",
+  |         ^^^^^^ G101
+7 |     },
+8 | )
+  |
+
+G101_1.py:15:9: G101 Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
+   |
+13 |     "Hello world!",
+14 |     extra={
+15 |         "name": "foobar",
+   |         ^^^^^^ G101
+16 |     },
+17 | )
+   |
+
+

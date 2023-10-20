@@ -1,7 +1,0 @@
----
-source: crates/ruff/src/noqa.rs
-expression: "Directive::try_extract(source, TextSize::default())"
----
-Err(
-    MissingCodes,
-)

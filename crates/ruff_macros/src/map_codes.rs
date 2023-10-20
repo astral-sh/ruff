@@ -58,7 +58,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     };
 
     // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
-    // `(Rule::UnaryPrefixIncrement, RuleGroup::Unspecified, vec![])`).
+    // `(Rule::UnaryPrefixIncrement, RuleGroup::Stable, vec![])`).
     let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
     for arm in arms {
@@ -388,7 +388,7 @@ fn generate_iter_impl(
 fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
-    let mut rule_autofixable_match_arms = quote!();
+    let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
 
     let mut from_impls_for_diagnostic_kind = quote!();
@@ -404,8 +404,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
         rule_message_formats_match_arms
             .extend(quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::message_formats(),});
-        rule_autofixable_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::AUTOFIX,},
+        rule_fixable_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms
             .extend(quote! {#(#attrs)* Self::#name => #path::explanation(),});
@@ -416,6 +416,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     }
 
     quote! {
+        use ruff_diagnostics::Violation;
+
         #[derive(
             EnumIter,
             Debug,
@@ -445,9 +447,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_explanation_match_arms }
             }
 
-            /// Returns the autofix status of this rule.
-            pub const fn autofixable(&self) -> ruff_diagnostics::AutofixKind {
-                match self { #rule_autofixable_match_arms }
+            /// Returns the fix status of this rule.
+            pub const fn fixable(&self) -> ruff_diagnostics::FixAvailability {
+                match self { #rule_fixable_match_arms }
             }
         }
 

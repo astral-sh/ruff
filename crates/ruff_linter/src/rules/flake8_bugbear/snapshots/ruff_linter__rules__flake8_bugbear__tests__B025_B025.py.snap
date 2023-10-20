@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B025.py:19:8: B025 try-except block with duplicate exception `ValueError`
+   |
+17 | except ValueError:
+18 |     a = 2
+19 | except ValueError:
+   |        ^^^^^^^^^^ B025
+20 |     a = 2
+   |
+
+B025.py:28:8: B025 try-except block with duplicate exception `pickle.PickleError`
+   |
+26 | except ValueError:
+27 |     a = 2
+28 | except pickle.PickleError:
+   |        ^^^^^^^^^^^^^^^^^^ B025
+29 |     a = 2
+   |
+
+B025.py:35:8: B025 try-except block with duplicate exception `ValueError`
+   |
+33 | except (ValueError, TypeError):
+34 |     a = 2
+35 | except ValueError:
+   |        ^^^^^^^^^^ B025
+36 |     a = 2
+37 | except (OSError, TypeError):
+   |
+
+B025.py:37:18: B025 try-except block with duplicate exception `TypeError`
+   |
+35 | except ValueError:
+36 |     a = 2
+37 | except (OSError, TypeError):
+   |                  ^^^^^^^^^ B025
+38 |     a = 2
+   |
+
+

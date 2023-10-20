@@ -1,14 +1,12 @@
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
-
 build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.289"
+version = "0.1.1"
 description = "An extremely fast Python linter, written in Rust."
-authors = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
-maintainers = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
+authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
 license = { file = "LICENSE" }
@@ -32,6 +30,7 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Rust",
   "Topic :: Software Development :: Libraries :: Python Modules",
@@ -40,7 +39,7 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/astral-sh/ruff"
-Documentation = "https://beta.ruff.rs/docs/"
+Documentation = "https://docs.astral.sh/ruff/"
 Changelog = "https://github.com/astral-sh/ruff/releases"
 
 [tool.maturin]
@@ -50,20 +49,20 @@ module-name = "ruff"
 python-source = "python"
 strip = true
 exclude = [
-  "crates/ruff/resources/test/fixtures/**/*",
-  "crates/ruff/src/rules/*/snapshots/**/*"
+  "crates/ruff_linter/resources/test/fixtures/**/*",
+  "crates/ruff_linter/src/rules/*/snapshots/**/*"
 ]
 
 [tool.ruff]
 extend-exclude = [
-  "crates/ruff/resources/",
+  "crates/ruff_linter/resources/",
   "crates/ruff_python_formatter/resources/"
 ]
 
 [tool.black]
 force-exclude = '''
 /(
-  | crates/ruff/resources
+  | crates/ruff_linter/resources
   | crates/ruff_python_formatter/resources
 )/
 '''

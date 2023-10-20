@@ -102,19 +102,28 @@ on-save by adding `"editor.formatOnSave": true` to your `settings.json`:
 
 ### Configuration
 
-The Ruff formatter respects Ruff's [`line-length`](https://beta.ruff.rs/docs/settings/#line-length)
-setting, which can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as in:
+The Ruff formatter allows configuration of [indent style](https://docs.astral.sh/ruff/settings/#format-indent-style),
+[line ending](https://docs.astral.sh/ruff/settings/#format-line-ending), [quote style](https://docs.astral.sh/ruff/settings/#format-quote-style),
+and [magic trailing comma behavior](https://docs.astral.sh/ruff/settings/#format-skip-magic-trailing-comma).
+Like the linter, the Ruff formatter reads configuration via `pyproject.toml` or `ruff.toml` files,
+as in:
+
+```toml
+[tool.ruff.format]
+# Use tabs instead of 4 space indentation
+indent-style = "tab"
+
+# Prefer single quotes over double quotes
+quote-style = "single"
+```
+
+The Ruff formatter also respects Ruff's [`line-length`](https://docs.astral.sh/ruff/settings/#line-length)
+setting, which also can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as
+in:
 
 ```console
 ruff format --line-length 100 /path/to/file.py
 ```
-
-In future releases, the Ruff formatter will likely support configuration of:
-
-- Quote style (single vs. double).
-- Line endings (LF vs. CRLF).
-- Indentation (tabs vs. spaces).
-- Tab width.
 
 ### Excluding code from formatting
 
@@ -305,3 +314,359 @@ import os
 
 import sys
 ```
+
+### Parentheses around awaited collections are not preserved
+
+Black preserves parentheses around awaited collections:
+
+```python
+await ([1, 2, 3])
+```
+
+Ruff will instead remove them:
+
+```python
+await [1, 2, 3]
+```
+
+This is more consistent to the formatting of other awaited expressions: Ruff and Black both
+remove parentheses around, e.g., `await (1)`, only retaining them when syntactically required,
+as in, e.g., `await (x := 1)`.
+
+### Implicit string concatenations in attribute accesses ([#7052](https://github.com/astral-sh/ruff/issues/7052))
+
+Given the following unformatted code:
+
+```python
+print("aaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaa".format(bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb))
+```
+
+Internally, Black's logic will first expand the outermost `print` call:
+
+```python
+print(
+    "aaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaa".format(bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb)
+)
+```
+
+Since the argument is _still_ too long, Black will then split on the operator with the highest split
+precedence. In this case, Black splits on the implicit string concatenation, to produce the
+following Black-formatted code:
+
+```python
+print(
+    "aaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaa".format(bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb)
+)
+```
+
+Ruff gives implicit concatenations a "lower" priority when breaking lines. As a result, Ruff
+would instead format the above as:
+
+```python
+print(
+    "aaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaa".format(
+        bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb
+    )
+)
+```
+
+In general, Black splits implicit string concatenations over multiple lines more often than Ruff,
+even if those concatenations _can_ fit on a single line. Ruff instead avoids splitting such
+concatenations unless doing so is necessary to fit within the configured line width.
+
+### Own-line comments on expressions don't cause the expression to expand ([#7314](https://github.com/astral-sh/ruff/issues/7314))
+
+Given an expression like:
+
+```python
+(
+    # A comment in the middle
+    some_example_var and some_example_var not in some_example_var
+)
+```
+
+Black associates the comment with `some_example_var`, thus splitting it over two lines:
+
+```python
+(
+    # A comment in the middle
+    some_example_var
+    and some_example_var not in some_example_var
+)
+```
+
+Ruff will instead associate the comment with the entire boolean expression, thus preserving the
+initial formatting:
+
+```python
+(
+    # A comment in the middle
+    some_example_var and some_example_var not in some_example_var
+)
+```
+
+### Tuples are parenthesized when expanded ([#7317](https://github.com/astral-sh/ruff/issues/7317))
+
+Ruff tends towards parenthesizing tuples (with a few exceptions), while Black tends to remove tuple
+parentheses more often.
+
+In particular, Ruff will always insert parentheses around tuples that expand over multiple lines:
+
+```python
+# Input
+(a, b), (c, d,)
+
+# Black
+(a, b), (
+    c,
+    d,
+)
+
+# Ruff
+(
+    (a, b),
+    (
+        c,
+        d,
+    ),
+)
+```
+
+There's one exception here. In `for` loops, both Ruff and Black will avoid inserting unnecessary
+parentheses:
+
+```python
+# Input
+for a, f(b,) in c:
+    pass
+
+# Black
+for a, f(
+    b,
+) in c:
+    pass
+
+# Ruff
+for a, f(
+    b,
+) in c:
+    pass
+```
+
+### Single-element tuples are always parenthesized
+
+Ruff always inserts parentheses around single-element tuples, while Black will omit them in some
+cases:
+
+```python
+# Input
+(a, b),
+
+# Black
+(a, b),
+
+# Ruff
+((a, b),)
+```
+
+Adding parentheses around single-element tuples adds visual distinction and helps avoid "accidental"
+tuples created by extraneous trailing commas (see, e.g., [#17181](https://github.com/django/django/pull/17181)).
+
+### Trailing commas are inserted when expanding a function definition with a single argument ([#7323](https://github.com/astral-sh/ruff/issues/7323))
+
+When a function definition with a single argument is expanded over multiple lines, Black
+will add a trailing comma in some cases, depending on whether the argument includes a type
+annotation and/or a default value.
+
+For example, Black will add a trailing comma to the first and second function definitions below,
+but not the third:
+
+```python
+def func(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+) -> None:
+    ...
+
+
+def func(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=1,
+) -> None:
+    ...
+
+
+def func(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: Argument(
+        "network_messages.pickle",
+        help="The path of the pickle file that will contain the network messages",
+    ) = 1
+) -> None:
+    ...
+```
+
+Ruff will instead insert a trailing comma in all such cases for consistency.
+
+### Parentheses around call-chain assignment values are not preserved ([#7320](https://github.com/astral-sh/ruff/issues/7320))
+
+Given:
+
+```python
+def update_emission_strength():
+    (
+        get_rgbw_emission_node_tree(self)
+        .nodes["Emission"]
+        .inputs["Strength"]
+        .default_value
+    ) = (self.emission_strength * 2)
+```
+
+Black will preserve the parentheses in `(self.emission_strength * 2)`, whereas Ruff will remove
+them.
+
+Both Black and Ruff remove such parentheses in simpler assignments, like:
+
+```python
+# Input
+def update_emission_strength():
+    value = (self.emission_strength * 2)
+
+# Black
+def update_emission_strength():
+    value = self.emission_strength * 2
+
+# Ruff
+def update_emission_strength():
+    value = self.emission_strength * 2
+```
+
+### Type annotations may be parenthesized when expanded ([#7315](https://github.com/astral-sh/ruff/issues/7315))
+
+Black will avoid parenthesizing type annotations in an annotated assignment, while Ruff will insert
+parentheses in some cases.
+
+For example:
+
+```python
+# Black
+StartElementHandler: Callable[[str, dict[str, str]], Any] | Callable[[str, list[str]], Any] | Callable[
+    [str, dict[str, str], list[str]], Any
+] | None
+
+# Ruff
+StartElementHandler: (
+    Callable[[str, dict[str, str]], Any]
+    | Callable[[str, list[str]], Any]
+    | Callable[[str, dict[str, str], list[str]], Any]
+    | None
+)
+```
+
+### Call chain calls break differently ([#7051](https://github.com/astral-sh/ruff/issues/7051))
+
+Black occasionally breaks call chains differently than Ruff; in particular, Black occasionally
+expands the arguments for the last call in the chain, as in:
+
+```python
+# Input
+df.drop(
+    columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+).drop_duplicates().rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(path / "aaaaaa.csv", index=False)
+
+# Black
+df.drop(
+    columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+).drop_duplicates().rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(
+    path / "aaaaaa.csv", index=False
+)
+
+# Ruff
+df.drop(
+    columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+).drop_duplicates().rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(path / "aaaaaa.csv", index=False)
+```
+
+Ruff will only expand the arguments if doing so is necessary to fit within the configured line
+width.
+
+Note that Black does not apply this last-call argument breaking universally. For example, both
+Black and Ruff will format the following identically:
+
+```python
+# Input
+df.drop(
+    columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+).drop_duplicates(a).rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(
+    path / "aaaaaa.csv", index=False
+).other(a)
+
+# Black
+df.drop(columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]).drop_duplicates(a).rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(path / "aaaaaa.csv", index=False).other(a)
+
+# Ruff
+df.drop(columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]).drop_duplicates(a).rename(
+    columns={
+        "a": "a",
+    }
+).to_csv(path / "aaaaaa.csv", index=False).other(a)
+```
+
+### Expressions with (non-pragma) trailing comments are split more often  ([#7823](https://github.com/astral-sh/ruff/issues/7823))
+
+Both Ruff and Black will break the following expression over multiple lines, since it then allows
+the expression to fit within the configured line width:
+
+```python
+# Input
+some_long_variable_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+# Black
+some_long_variable_name = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+)
+
+# Ruff
+some_long_variable_name = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+)
+```
+
+However, if the expression ends in a trailing comment, Black will avoid wrapping the expression
+in some cases, while Ruff will wrap as long as it allows the expanded lines to fit within the line
+length limit:
+
+```python
+# Input
+some_long_variable_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  # a trailing comment
+
+# Black
+some_long_variable_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  # a trailing comment
+
+# Ruff
+some_long_variable_name = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+)  # a trailing comment
+```
+
+Doing so leads to fewer overlong lines while retaining the comment's intent. As pragma comments
+(like `# noqa` and `# type: ignore`) are ignored when computing line width, this behavior only
+applies to non-pragma comments.

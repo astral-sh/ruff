@@ -1,9 +1,9 @@
 use ruff_formatter::{write, FormatContext};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprName;
 
 use crate::comments::SourceComment;
-use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -26,10 +26,11 @@ impl FormatNodeRule<ExprName> for FormatExprName {
 
     fn fmt_dangling_comments(
         &self,
-        _dangling_comments: &[SourceComment],
+        dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Node cannot have dangling comments
+        debug_assert!(dangling_comments.is_empty());
         Ok(())
     }
 }
@@ -38,13 +39,9 @@ impl NeedsParentheses for ExprName {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
-        context: &PyFormatContext,
+        _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if should_use_best_fit(self, context) {
-            OptionalParentheses::BestFit
-        } else {
-            OptionalParentheses::Never
-        }
+        OptionalParentheses::BestFit
     }
 }
 

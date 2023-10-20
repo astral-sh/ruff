@@ -382,6 +382,40 @@ def f(  # first
 def this_is_unusual() -> (please := no): ...
 
 def this_is_unusual(x) -> (please := no): ...
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7465
+try:
+    def test():
+        pass
+    #comment
+except ImportError:
+    pass
+
+# https://github.com/astral-sh/ruff/issues/7603
+def default_arg_comments(
+    a: str = #a
+    "a",
+    b: str =
+    #b
+    "b",
+    c: str =( #c
+        "c"
+    ),
+    d: str =(
+        #d
+        "d"
+    )
+):
+    print(a, b, c, d)
+
+def default_arg_comments2(#
+        x: int#=
+        = #
+        #
+        123#
+        #
+):
+    print(x)
 ```
 
 ## Output
@@ -921,6 +955,44 @@ def this_is_unusual() -> (please := no):
 
 def this_is_unusual(x) -> (please := no):
     ...
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7465
+try:
+
+    def test():
+        pass
+
+    # comment
+except ImportError:
+    pass
+
+
+# https://github.com/astral-sh/ruff/issues/7603
+def default_arg_comments(
+    a: str =  # a
+    "a",
+    b: str =
+    # b
+    "b",
+    c: str = (  # c
+        "c"
+    ),
+    d: str = (
+        # d
+        "d"
+    ),
+):
+    print(a, b, c, d)
+
+
+def default_arg_comments2(  #
+    x: int =  # =  #
+    #
+    123,  #
+    #
+):
+    print(x)
 ```
 
 

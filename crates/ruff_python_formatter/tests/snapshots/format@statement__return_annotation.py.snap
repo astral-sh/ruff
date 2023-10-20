@@ -81,6 +81,12 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
 ]:
     ...
 
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     Set[
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
@@ -185,6 +191,12 @@ def double(a: int) -> (
 def double(a: int) -> (
     int | list[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]  # Hello
 ):
+    pass
+
+
+def process_board_action(
+    payload: WildValue, action_type: Optional[str]
+) -> Optional[Tuple[str, str]]:
     pass
 ```
 
@@ -335,6 +347,14 @@ def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
 
 # Breaking return type annotations. Black adds parentheses if the parameters are
 # empty; otherwise, it leverages the expressions own parentheses if possible.
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ]
+):
+    ...
+
+
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     Set[
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -514,6 +534,12 @@ def double(
         int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int
     ]  # Hello
 ):
+    pass
+
+
+def process_board_action(
+    payload: WildValue, action_type: Optional[str]
+) -> Optional[Tuple[str, str]]:
     pass
 ```
 

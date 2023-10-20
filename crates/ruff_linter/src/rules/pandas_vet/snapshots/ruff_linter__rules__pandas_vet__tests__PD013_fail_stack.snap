@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+---
+<filename>:4:5: PD013 `.melt` is preferred to `.stack`; provides same functionality
+  |
+2 | import pandas as pd
+3 | x = pd.DataFrame()
+4 | y = x.stack(level=-1, dropna=True)
+  |     ^^^^^^^ PD013
+  |
+
+

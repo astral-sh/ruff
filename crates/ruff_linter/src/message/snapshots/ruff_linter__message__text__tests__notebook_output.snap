@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/message/text.rs
+expression: content
+---
+notebook.ipynb:cell 1:2:8: F401 [*] `os` imported but unused
+  |
+1 | # cell 1
+2 | import os
+  |        ^^ F401
+  |
+  = help: Remove unused import: `os`
+
+notebook.ipynb:cell 2:2:8: F401 [*] `math` imported but unused
+  |
+1 | # cell 2
+2 | import math
+  |        ^^^^ F401
+3 | 
+4 | print('hello world')
+  |
+  = help: Remove unused import: `math`
+
+notebook.ipynb:cell 3:4:5: F841 [*] Local variable `x` is assigned to but never used
+  |
+2 | def foo():
+3 |     print()
+4 |     x = 1
+  |     ^ F841
+  |
+  = help: Remove assignment to unused variable `x`
+
+

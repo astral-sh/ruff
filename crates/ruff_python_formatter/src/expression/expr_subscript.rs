@@ -1,11 +1,11 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::{AnyNodeRef, AstNode};
 use ruff_python_ast::{Expr, ExprSubscript};
 
 use crate::comments::SourceComment;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+    is_expression_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
@@ -42,13 +42,21 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             "A subscript expression can only have a single dangling comment, the one after the bracket"
         );
 
-        let format_inner = format_with(|f| {
-            match value.as_ref() {
-                Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-                Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-                Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-                _ => value.format().fmt(f)?,
-            }
+        let format_inner = format_with(|f: &mut PyFormatter| {
+            if is_expression_parenthesized(
+                value.into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            ) {
+                value.format().with_options(Parentheses::Always).fmt(f)
+            } else {
+                match value.as_ref() {
+                    Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    _ => value.format().with_options(Parentheses::Never).fmt(f),
+                }
+            }?;
 
             let format_slice = format_with(|f: &mut PyFormatter| {
                 if let Expr::Tuple(tuple) = slice.as_ref() {
@@ -85,19 +93,40 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
 impl NeedsParentheses for ExprSubscript {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         {
-            if CallChainLayout::from_expression(self.into(), context.source())
-                == CallChainLayout::Fluent
+            if CallChainLayout::from_expression(
+                self.into(),
+                context.comments().ranges(),
+                context.source(),
+            ) == CallChainLayout::Fluent
             {
                 OptionalParentheses::Multiline
-            } else if is_expression_parenthesized(self.value.as_ref().into(), context.source()) {
+            } else if is_expression_parenthesized(
+                self.value.as_ref().into(),
+                context.comments().ranges(),
+                context.source(),
+            ) {
                 OptionalParentheses::Never
             } else {
                 match self.value.needs_parentheses(self.into(), context) {
-                    OptionalParentheses::BestFit => OptionalParentheses::Never,
+                    OptionalParentheses::BestFit => {
+                        if parent.as_stmt_function_def().is_some_and(|function_def| {
+                            function_def
+                                .returns
+                                .as_deref()
+                                .and_then(Expr::as_subscript_expr)
+                                == Some(self)
+                        }) {
+                            // Don't use the best fitting layout for return type annotation because it results in the
+                            // return type expanding before the parameters.
+                            OptionalParentheses::Never
+                        } else {
+                            OptionalParentheses::BestFit
+                        }
+                    }
                     parentheses => parentheses,
                 }
             }

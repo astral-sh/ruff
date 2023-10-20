@@ -25,11 +25,11 @@ fn main() -> Result<()> {
                 cli.emit
             );
         }
-        let input = read_from_stdin()?;
+        let source = read_from_stdin()?;
         // It seems reasonable to give this a dummy name
-        let formatted = format_and_debug_print(&input, &cli, Path::new("stdin.py"))?;
+        let formatted = format_and_debug_print(&source, &cli, Path::new("stdin.py"))?;
         if cli.check {
-            if formatted == input {
+            if formatted == source {
                 return Ok(());
             }
             bail!("Content not correctly formatted")
@@ -37,9 +37,9 @@ fn main() -> Result<()> {
         stdout().lock().write_all(formatted.as_bytes())?;
     } else {
         for file in &cli.files {
-            let input = fs::read_to_string(file)
+            let source = fs::read_to_string(file)
                 .with_context(|| format!("Could not read {}: ", file.display()))?;
-            let formatted = format_and_debug_print(&input, &cli, file)?;
+            let formatted = format_and_debug_print(&source, &cli, file)?;
             match cli.emit {
                 Some(Emit::Stdout) => stdout().lock().write_all(formatted.as_bytes())?,
                 None | Some(Emit::Files) => {

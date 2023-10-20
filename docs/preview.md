@@ -10,6 +10,20 @@ Preview mode enables a collection of newer rules and fixes that are considered e
 Preview mode can be enabled with the `--preview` flag on the CLI or by setting `preview = true` in your Ruff
 configuration file (e.g. `pyproject.toml`).
 
+Preview mode can be configured separately for linting and formatting (requires Ruff v0.1.1+). To enable preview lint rules without preview style formatting:
+
+```toml
+[lint]
+preview = true
+```
+
+To enable preview style formatting without enabling any preview lint rules:
+
+```toml
+[format]
+preview = true
+```
+
 ## Using rules that are in preview
 
 If a rule is marked as preview, it can only be selected if preview mode is enabled. For example, consider a
@@ -45,4 +59,30 @@ preview = true
 
 Or, if you provided the `--preview` CLI flag.
 
-To see which rules are currently in preview, visit the [rules reference](https://beta.ruff.rs/docs/rules/).
+To see which rules are currently in preview, visit the [rules reference](rules.md).
+
+## Selecting single preview rules
+
+When preview mode is enabled, selecting rule categories or prefixes will include all preview rules that match.
+If you would prefer to opt-in to each preview rule individually, you can toggle the `explicit-preview-rules`
+setting in your `pyproject.toml`:
+
+```toml
+[tool.ruff]
+preview = true
+explicit-preview-rules = true
+```
+
+In our previous example, `--select` with `ALL` `HYP`, `HYP0`, or `HYP00` would not enable `HYP001`. Each preview
+rule will need to be selected with its exact code, e.g. `--select ALL,HYP001`.
+
+If preview mode is not enabled, this setting has no effect.
+
+## Legacy behavior
+
+Before the preview mode was introduced, new rules were added in a "nursery" category that required selection of
+rules with their exact codes — similar to if `explicit-preview-rules` is enabled.
+
+The nursery category has been deprecated and all rules in the nursery are now considered to be in preview.
+For backwards compatibility, nursery rules are selectable with their exact codes without enabling preview mode.
+However, this behavior will display a warning and support will be removed in a future release.

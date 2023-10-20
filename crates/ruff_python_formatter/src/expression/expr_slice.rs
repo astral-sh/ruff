@@ -1,5 +1,5 @@
 use ruff_formatter::{write, FormatError};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::{AnyNodeRef, AstNode};
 use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -144,6 +144,15 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         } else {
             debug_assert!(step.is_none(), "step can't exist without a second colon");
         }
+        Ok(())
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_node_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
         Ok(())
     }
 }

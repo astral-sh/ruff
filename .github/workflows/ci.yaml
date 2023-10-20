@@ -96,7 +96,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-insta
-      - run: pip install black[d]==23.1.0
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -106,10 +105,6 @@ jobs:
         shell: bash
         # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
         run: cargo insta test --all --all-features
-      - run: cargo test --package ruff_cli --test black_compatibility_test -- --ignored
-        # TODO: Skipped as it's currently broken. The resource were moved from the
-        # ruff_cli to ruff crate, but this test was not updated.
-        if: false
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:

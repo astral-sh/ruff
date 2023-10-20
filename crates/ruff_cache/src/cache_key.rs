@@ -1,41 +1,16 @@
 use std::borrow::Cow;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::num::NonZeroU8;
-use std::ops::{Deref, DerefMut};
+use std::num::{
+    NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU128, NonZeroU16,
+    NonZeroU32, NonZeroU64, NonZeroU8,
+};
 use std::path::{Path, PathBuf};
 
 use glob::Pattern;
 use itertools::Itertools;
 use regex::Regex;
-
-#[derive(Clone, Debug, Default)]
-pub struct CacheKeyHasher {
-    inner: DefaultHasher,
-}
-
-impl CacheKeyHasher {
-    pub fn new() -> Self {
-        Self {
-            inner: DefaultHasher::new(),
-        }
-    }
-}
-
-impl Deref for CacheKeyHasher {
-    type Target = DefaultHasher;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for CacheKeyHasher {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
+use seahash::SeaHasher;
 
 /// A type that be used as part of a cache key.
 ///
@@ -205,13 +180,28 @@ impl CacheKey for i8 {
         state.write_i8(*self);
     }
 }
-
-impl CacheKey for NonZeroU8 {
-    #[inline]
-    fn cache_key(&self, state: &mut CacheKeyHasher) {
-        state.write_u8(self.get());
-    }
+macro_rules! impl_cache_key_non_zero {
+    ($name:ident) => {
+        impl CacheKey for $name {
+            #[inline]
+            fn cache_key(&self, state: &mut CacheKeyHasher) {
+                self.get().cache_key(state)
+            }
+        }
+    };
 }
+
+impl_cache_key_non_zero!(NonZeroU8);
+impl_cache_key_non_zero!(NonZeroU16);
+impl_cache_key_non_zero!(NonZeroU32);
+impl_cache_key_non_zero!(NonZeroU64);
+impl_cache_key_non_zero!(NonZeroU128);
+
+impl_cache_key_non_zero!(NonZeroI8);
+impl_cache_key_non_zero!(NonZeroI16);
+impl_cache_key_non_zero!(NonZeroI32);
+impl_cache_key_non_zero!(NonZeroI64);
+impl_cache_key_non_zero!(NonZeroI128);
 
 macro_rules! impl_cache_key_tuple {
     () => (
@@ -255,14 +245,14 @@ impl_cache_key_tuple! { T B C D E F G H I J K L }
 impl CacheKey for str {
     #[inline]
     fn cache_key(&self, state: &mut CacheKeyHasher) {
-        self.hash(&mut **state);
+        self.hash(&mut *state);
     }
 }
 
 impl CacheKey for String {
     #[inline]
     fn cache_key(&self, state: &mut CacheKeyHasher) {
-        self.hash(&mut **state);
+        self.hash(&mut *state);
     }
 }
 
@@ -360,14 +350,14 @@ impl<K: CacheKey + Ord, V: CacheKey> CacheKey for BTreeMap<K, V> {
 impl CacheKey for Path {
     #[inline]
     fn cache_key(&self, state: &mut CacheKeyHasher) {
-        self.hash(&mut **state);
+        self.hash(&mut *state);
     }
 }
 
 impl CacheKey for PathBuf {
     #[inline]
     fn cache_key(&self, state: &mut CacheKeyHasher) {
-        self.hash(&mut **state);
+        self.as_path().cache_key(state);
     }
 }
 
@@ -389,5 +379,90 @@ impl CacheKey for Regex {
 impl CacheKey for Pattern {
     fn cache_key(&self, state: &mut CacheKeyHasher) {
         self.as_str().cache_key(state);
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct CacheKeyHasher {
+    inner: SeaHasher,
+}
+
+impl CacheKeyHasher {
+    pub fn new() -> Self {
+        Self {
+            inner: SeaHasher::new(),
+        }
+    }
+}
+
+impl Hasher for CacheKeyHasher {
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.inner.finish()
+    }
+
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        self.inner.write(bytes);
+    }
+
+    #[inline]
+    fn write_u8(&mut self, i: u8) {
+        self.inner.write_u8(i);
+    }
+
+    #[inline]
+    fn write_u16(&mut self, i: u16) {
+        self.inner.write_u16(i);
+    }
+
+    #[inline]
+    fn write_u32(&mut self, i: u32) {
+        self.inner.write_u32(i);
+    }
+
+    #[inline]
+    fn write_u64(&mut self, i: u64) {
+        self.inner.write_u64(i);
+    }
+
+    #[inline]
+    fn write_u128(&mut self, i: u128) {
+        self.inner.write_u128(i);
+    }
+
+    #[inline]
+    fn write_usize(&mut self, i: usize) {
+        self.inner.write_usize(i);
+    }
+
+    #[inline]
+    fn write_i8(&mut self, i: i8) {
+        self.inner.write_i8(i);
+    }
+
+    #[inline]
+    fn write_i16(&mut self, i: i16) {
+        self.inner.write_i16(i);
+    }
+
+    #[inline]
+    fn write_i32(&mut self, i: i32) {
+        self.inner.write_i32(i);
+    }
+
+    #[inline]
+    fn write_i64(&mut self, i: i64) {
+        self.inner.write_i64(i);
+    }
+
+    #[inline]
+    fn write_i128(&mut self, i: i128) {
+        self.inner.write_i128(i);
+    }
+
+    #[inline]
+    fn write_isize(&mut self, i: isize) {
+        self.inner.write_isize(i);
     }
 }

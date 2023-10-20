@@ -4,16 +4,16 @@ use std::path::PathBuf;
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff::warn_user_once;
-use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
+use ruff_linter::warn_user_once;
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile};
 
-use crate::args::Overrides;
+use crate::args::CliOverrides;
 
 /// Show the list of files to be checked based on current settings.
 pub(crate) fn show_files(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &Overrides,
+    overrides: &CliOverrides,
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
@@ -25,12 +25,13 @@ pub(crate) fn show_files(
     }
 
     // Print the list of files.
-    for entry in paths
-        .iter()
+    for path in paths
+        .into_iter()
         .flatten()
-        .sorted_by(|a, b| a.path().cmp(b.path()))
+        .map(ResolvedFile::into_path)
+        .sorted_unstable()
     {
-        writeln!(writer, "{}", entry.path().to_string_lossy())?;
+        writeln!(writer, "{}", path.to_string_lossy())?;
     }
 
     Ok(())

@@ -887,11 +887,9 @@ impl<'a> SemanticModel<'a> {
             .filter(|id| self.nodes[*id].is_statement())
     }
 
-    /// Return the [`NodeId`] of the current [`Stmt`].
-    pub fn current_statement_id(&self) -> NodeId {
-        self.current_statement_ids()
-            .next()
-            .expect("No current statement")
+    /// Return the [`NodeId`] of the current [`Stmt`], if any.
+    pub fn current_statement_id(&self) -> Option<NodeId> {
+        self.current_statement_ids().next()
     }
 
     /// Return the [`NodeId`] of the current [`Stmt`] parent, if any.
@@ -1107,9 +1105,38 @@ impl<'a> SemanticModel<'a> {
             .all(|(left, right)| left == right)
     }
 
-    /// Returns `true` if the given [`BindingId`] is used.
-    pub fn is_used(&self, binding_id: BindingId) -> bool {
-        self.bindings[binding_id].is_used()
+    /// Returns `true` if the given expression is an unused variable, or consists solely of
+    /// references to other unused variables. This method is conservative in that it considers a
+    /// variable to be "used" if it's shadowed by another variable with usages.
+    pub fn is_unused(&self, expr: &Expr) -> bool {
+        match expr {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                elts.iter().all(|expr| self.is_unused(expr))
+            }
+            Expr::Name(ast::ExprName { id, .. }) => {
+                // Treat a variable as used if it has any usages, _or_ it's shadowed by another variable
+                // with usages.
+                //
+                // If we don't respect shadowing, we'll incorrectly flag `bar` as unused in:
+                // ```python
+                // from random import random
+                //
+                // for bar in range(10):
+                //     if random() > 0.5:
+                //         break
+                // else:
+                //     bar = 1
+                //
+                // print(bar)
+                // ```
+                self.current_scope()
+                    .get_all(id)
+                    .map(|binding_id| self.binding(binding_id))
+                    .filter(|binding| binding.start() >= expr.start())
+                    .all(|binding| !binding.is_used())
+            }
+            _ => false,
+        }
     }
 
     /// Add a reference to the given [`BindingId`] in the local scope.
@@ -1573,6 +1600,16 @@ bitflags! {
         /// ```
         const FUTURE_ANNOTATIONS = 1 << 14;
 
+        /// The model is in a type parameter definition.
+        ///
+        /// For example, the model could be visiting `Record` in:
+        /// ```python
+        /// from typing import TypeVar
+        ///
+        /// Record = TypeVar("Record")
+        ///
+        const TYPE_PARAM_DEFINITION = 1 << 15;
+
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_ANNOTATION.bits();
 
@@ -1583,11 +1620,12 @@ bitflags! {
         /// The context is in any deferred type definition.
         const DEFERRED_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()
             | Self::COMPLEX_STRING_TYPE_DEFINITION.bits()
-            | Self::FUTURE_TYPE_DEFINITION.bits();
+            | Self::FUTURE_TYPE_DEFINITION.bits()
+            | Self::TYPE_PARAM_DEFINITION.bits();
 
         /// The context is in a typing-only context.
         const TYPING_CONTEXT = Self::TYPE_CHECKING_BLOCK.bits() | Self::TYPING_ONLY_ANNOTATION.bits() |
-            Self::STRING_TYPE_DEFINITION.bits();
+            Self::STRING_TYPE_DEFINITION.bits() | Self::TYPE_PARAM_DEFINITION.bits();
     }
 }
 

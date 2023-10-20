@@ -51,10 +51,15 @@ pub use source_code::{SourceCode, SourceCodeSlice};
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
 pub use group_id::GroupId;
+use ruff_macros::CacheKey;
 use ruff_text_size::{TextRange, TextSize};
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, CacheKey)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Default)]
 pub enum IndentStyle {
@@ -90,7 +95,7 @@ impl std::fmt::Display for IndentStyle {
 ///
 /// Determines the visual width of a tab character (`\t`) and the number of
 /// spaces per indent when using [`IndentStyle::Space`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct IndentWidth(NonZeroU8);
@@ -116,8 +121,14 @@ impl TryFrom<u8> for IndentWidth {
     }
 }
 
+impl From<NonZeroU8> for IndentWidth {
+    fn from(value: NonZeroU8) -> Self {
+        Self(value)
+    }
+}
+
 /// The maximum visual width to which the formatter should try to limit a line.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineWidth(NonZeroU16);
@@ -429,7 +440,6 @@ pub type FormatResult<F> = Result<F, FormatError>;
 /// impl Format<SimpleFormatContext> for Paragraph {
 ///     fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
 ///         write!(f, [
-///             hard_line_break(),
 ///             text(&self.0, None),
 ///             hard_line_break(),
 ///         ])
@@ -564,6 +574,10 @@ where
             rule,
             context: PhantomData,
         }
+    }
+
+    pub fn rule(&self) -> &R {
+        &self.rule
     }
 }
 

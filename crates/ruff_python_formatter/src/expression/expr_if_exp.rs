@@ -1,5 +1,5 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprIfExp};
 
 use crate::comments::leading_comments;
@@ -85,10 +85,14 @@ impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
 impl NeedsParentheses for ExprIfExp {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }
 
@@ -101,7 +105,11 @@ impl Format<PyFormatContext<'_>> for FormatOrElse<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self.orelse {
             Expr::IfExp(expr)
-                if !is_expression_parenthesized(expr.into(), f.context().source()) =>
+                if !is_expression_parenthesized(
+                    expr.into(),
+                    f.context().comments().ranges(),
+                    f.context().source(),
+                ) =>
             {
                 write!(f, [expr.format().with_options(ExprIfExpLayout::Nested)])
             }
