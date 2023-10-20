@@ -102,51 +102,13 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
 
 /// PLR1736
 pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &StmtFor) {
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = stmt_for.iter.as_ref()
+    let Some((sequence, index_name, value_name)) =
+        enumerate_items(checker, &stmt_for.iter, &stmt_for.target)
     else {
         return;
     };
 
-    // Check that the function is the `enumerate` builtin.
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-        return;
-    };
-    if id != "enumerate" {
-        return;
-    };
-    if !checker.semantic().is_builtin("enumerate") {
-        return;
-    };
-
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
-        return;
-    };
-    let [index, value] = elts.as_slice() else {
-        return;
-    };
-
-    // Grab the variable names
-    let Expr::Name(ast::ExprName { id: index_name, .. }) = index else {
-        return;
-    };
-
-    let Expr::Name(ast::ExprName { id: value_name, .. }) = value else {
-        return;
-    };
-
-    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit
-    if index_name == "_" || value_name == "_" {
-        return;
-    }
-
-    // Get the first argument of the enumerate call
-    let Some(Expr::Name(ast::ExprName { id: sequence, .. })) = arguments.args.first() else {
-        return;
-    };
-
-    let mut visitor = SubscriptVisitor::new(sequence, index_name);
+    let mut visitor = SubscriptVisitor::new(&sequence, &index_name);
 
     visitor.visit_body(&stmt_for.body);
     visitor.visit_body(&stmt_for.orelse);
@@ -161,4 +123,98 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &St
 
         checker.diagnostics.push(diagnostic);
     }
+}
+
+/// PLR1736
+pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
+    match expr {
+        Expr::GeneratorExp(ast::ExprGeneratorExp {
+            elt, generators, ..
+        })
+        | Expr::DictComp(ast::ExprDictComp {
+            value: elt,
+            generators,
+            ..
+        })
+        | Expr::SetComp(ast::ExprSetComp {
+            elt, generators, ..
+        })
+        | Expr::ListComp(ast::ExprListComp {
+            elt, generators, ..
+        }) => {
+            for comp in generators {
+                if let Some((sequence, index_name, value_name)) =
+                    enumerate_items(checker, &comp.iter, &comp.target)
+                {
+                    let mut visitor = SubscriptVisitor::new(&sequence, &index_name);
+
+                    visitor.visit_expr(elt.as_ref());
+
+                    for range in visitor.diagnostic_ranges {
+                        let mut diagnostic = Diagnostic::new(UnnecessaryListIndexLookup, range);
+
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            value_name.clone(),
+                            range,
+                        )));
+
+                        checker.diagnostics.push(diagnostic);
+                    }
+                }
+            }
+        }
+        _ => (),
+    }
+}
+
+fn enumerate_items(
+    checker: &mut Checker,
+    call_expr: &Expr,
+    tuple_expr: &Expr,
+) -> Option<(String, String, String)> {
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = call_expr
+    else {
+        return None;
+    };
+
+    // Check that the function is the `enumerate` builtin.
+    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+        return None;
+    };
+    if id != "enumerate" {
+        return None;
+    };
+    if !checker.semantic().is_builtin("enumerate") {
+        return None;
+    };
+
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = tuple_expr else {
+        return None;
+    };
+    let [index, value] = elts.as_slice() else {
+        return None;
+    };
+
+    // Grab the variable names
+    let Expr::Name(ast::ExprName { id: index_name, .. }) = index else {
+        return None;
+    };
+
+    let Expr::Name(ast::ExprName { id: value_name, .. }) = value else {
+        return None;
+    };
+
+    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit
+    if index_name == "_" || value_name == "_" {
+        return None;
+    }
+
+    // Get the first argument of the enumerate call
+    let Some(Expr::Name(ast::ExprName { id: sequence, .. })) = arguments.args.first() else {
+        return None;
+    };
+
+    Some((sequence.clone(), index_name.clone(), value_name.clone()))
 }
