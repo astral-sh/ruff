@@ -717,7 +717,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::NonAsciiImportName) {
                 for alias in names {
-                    pylint::rules::non_ascii_module_import(checker, &alias);
+                    pylint::rules::non_ascii_module_import(checker, alias);
                 }
             }
             if checker.enabled(Rule::UnnecessaryFutureImport) {
