@@ -139,6 +139,8 @@ mod tests {
     #[test_case(Rule::MisplacedBareRaise, Path::new("misplaced_bare_raise.py"))]
     #[test_case(Rule::LiteralMembership, Path::new("literal_membership.py"))]
     #[test_case(Rule::GlobalAtModuleLevel, Path::new("global_at_module_level.py"))]
+    #[test_case(Rule::UnnecessaryLambda, Path::new("unnecessary_lambda.py"))]
+    #[test_case(Rule::NonAsciiImportName, Path::new("non_ascii_module_import.py"))]
     #[test_case(Rule::NonAsciiName, Path::new("non_ascii_name.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

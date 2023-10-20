@@ -1,7 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Options",
-  "description": "Experimental section to configure Ruff's linting. This new section will eventually replace the top-level linting options.\n\nOptions specified in the `lint` section take precedence over the top-level settings.",
   "type": "object",
   "properties": {
     "allowed-confusables": {
@@ -2781,6 +2780,7 @@
         "FURB",
         "FURB1",
         "FURB10",
+        "FURB101",
         "FURB105",
         "FURB11",
         "FURB113",
@@ -2953,6 +2953,7 @@
         "PLC24",
         "PLC240",
         "PLC2401",
+        "PLC2403",
         "PLC3",
         "PLC30",
         "PLC300",
@@ -3061,6 +3062,8 @@
         "PLW",
         "PLW0",
         "PLW01",
+        "PLW010",
+        "PLW0108",
         "PLW012",
         "PLW0120",
         "PLW0127",

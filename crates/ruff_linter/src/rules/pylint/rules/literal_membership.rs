@@ -59,7 +59,10 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
 
     let literal = checker.locator().slice(right);
     let set = format!("{{{}}}", &literal[1..literal.len() - 1]);
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(set, right.range())));
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        set,
+        right.range(),
+    )));
 
     checker.diagnostics.push(diagnostic);
 }

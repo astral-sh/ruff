@@ -52,8 +52,8 @@ use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_semantic::analyze::{typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport,
-    SubmoduleImport,
+    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, Snapshot,
+    StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_source_file::Locator;
@@ -902,7 +902,7 @@ where
                 }
 
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
-                self.deferred.lambdas.push((expr, self.semantic.snapshot()));
+                self.deferred.lambdas.push(self.semantic.snapshot());
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -1834,15 +1834,15 @@ impl<'a> Checker<'a> {
             for snapshot in deferred_functions {
                 self.semantic.restore(snapshot);
 
-                if let Stmt::FunctionDef(ast::StmtFunctionDef {
+                let Stmt::FunctionDef(ast::StmtFunctionDef {
                     body, parameters, ..
                 }) = self.semantic.current_statement()
-                {
-                    self.visit_parameters(parameters);
-                    self.visit_body(body);
-                } else {
+                else {
                     unreachable!("Expected Stmt::FunctionDef")
-                }
+                };
+
+                self.visit_parameters(parameters);
+                self.visit_body(body);
             }
         }
         self.semantic.restore(snapshot);
@@ -1850,26 +1850,31 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
+        let mut deferred: Vec<Snapshot> = Vec::with_capacity(self.deferred.lambdas.len());
         while !self.deferred.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.deferred.lambdas);
-            for (expr, snapshot) in lambdas {
+            for snapshot in lambdas {
                 self.semantic.restore(snapshot);
 
-                if let Expr::Lambda(ast::ExprLambda {
+                let Some(Expr::Lambda(ast::ExprLambda {
                     parameters,
                     body,
                     range: _,
-                }) = expr
-                {
-                    if let Some(parameters) = parameters {
-                        self.visit_parameters(parameters);
-                    }
-                    self.visit_expr(body);
-                } else {
+                })) = self.semantic.current_expression()
+                else {
                     unreachable!("Expected Expr::Lambda");
+                };
+
+                if let Some(parameters) = parameters {
+                    self.visit_parameters(parameters);
                 }
+                self.visit_expr(body);
+
+                deferred.push(snapshot);
             }
         }
+        // Reset the deferred lambdas, so we can analyze them later on.
+        self.deferred.lambdas = deferred;
         self.semantic.restore(snapshot);
     }
 
@@ -1989,6 +1994,7 @@ pub(crate) fn check_ast(
     checker.visit_exports();
 
     // Check docstrings, bindings, and unresolved references.
+    analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
     analyze::definitions(&mut checker);
     analyze::bindings(&mut checker);
