@@ -99,7 +99,28 @@ with open("file.txt") as f:
     f.seek(0)
     x += f.read(100)
 
-open = bar
-# Not a real `open`.
-with open("file.txt") as f:
+# This shouldn't error, since it could contain unsupported arguments, like `buffering`.
+with open(*filename) as f:
+    x = f.read()
+
+# This shouldn't error, since it could contain unsupported arguments, like `buffering`.
+with open(**kwargs) as f:
+    x = f.read()
+
+# This shouldn't error, since it could contain unsupported arguments, like `buffering`.
+with open("file.txt", **kwargs) as f:
+    x = f.read()
+
+# This shouldn't error, since it could contain unsupported arguments, like `buffering`.
+with open("file.txt", mode="r", **kwargs) as f:
+    x = f.read()
+
+# This could error (but doesn't), since it can't contain unsupported arguments, like
+# `buffering`.
+with open(*filename, mode="r") as f:
+    x = f.read()
+
+# This could error (but doesn't), since it can't contain unsupported arguments, like
+# `buffering`.
+with open(*filename, file="file.txt", mode="r") as f:
     x = f.read()

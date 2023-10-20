@@ -10,12 +10,13 @@ use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
-/// Checks for uses of `open` and `read` that can be replaced by `pathlib`.
+/// Checks for uses of `open` and `read` that can be replaced by `pathlib`
+/// methods, like `Path.read_text` and `Path.read_bytes`.
 ///
 /// ## Why is this bad?
-/// When you just want to read the contents of a whole file, using a `with` block
-/// is a bit of an overkill. A simpler alternative is to use pathlib's `read_text`
-/// and `read_bytes` functions:
+/// When reading the entire contents of a file into a variable, it's simpler
+/// and more concise to use `pathlib` methods like `Path.read_text` and
+/// `Path.read_bytes` instead of `open` and `read` calls via `with` statements.
 ///
 /// ## Example
 /// ```python
@@ -25,12 +26,14 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// contents = Path(filename).read_text()
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `Path.read_bytes()`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_bytes)
-/// - [Python documentation: `Path.read_text()`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_text)
+/// - [Python documentation: `Path.read_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_bytes)
+/// - [Python documentation: `Path.read_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_text)
 #[violation]
 pub struct ReadWholeFile {
     filename: SourceCodeSnippet,
@@ -42,33 +45,33 @@ impl Violation for ReadWholeFile {
     fn message(&self) -> String {
         let filename = self.filename.truncated_display();
         let suggestion = self.suggestion.truncated_display();
-
         format!("`open` and `read` should be replaced by `Path({filename}).{suggestion}`")
     }
 }
 
 /// FURB101
 pub(crate) fn read_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
-    // async check here is more of a precaution.
+    // `async` check here is more of a precaution.
     if with.is_async || !checker.semantic().is_builtin("open") {
         return;
     }
 
     // First we go through all the items in the statement and find all `open` operations.
-    let opens = find_file_opens(checker.semantic(), with);
-    if opens.is_empty() {
+    let candidates = find_file_opens(with, checker.semantic());
+    if candidates.is_empty() {
         return;
     }
 
     // Then we need to match each `open` operation with exactly one `read` call.
-    let mut matcher = ReadMatcher { candidates: opens };
-    visitor::walk_body(&mut matcher, &with.body);
+    let matches = {
+        let mut matcher = ReadMatcher::new(candidates);
+        visitor::walk_body(&mut matcher, &with.body);
+        matcher.into_matches()
+    };
 
     // All the matched operations should be reported.
-    let diagnostics: Vec<Diagnostic> = matcher
-        .candidates
+    let diagnostics: Vec<Diagnostic> = matches
         .iter()
-        .filter(|open| open.matched)
         .map(|open| {
             Diagnostic::new(
                 ReadWholeFile {
@@ -92,6 +95,7 @@ enum ReadMode {
 
 /// A grab bag struct that joins together every piece of information we need to track
 /// about a file open operation.
+#[derive(Debug)]
 struct FileOpen<'a> {
     /// With item where the open happens, we use it for the reporting range.
     item: &'a ast::WithItem,
@@ -101,33 +105,34 @@ struct FileOpen<'a> {
     mode: ReadMode,
     /// Keywords that can be used in the new read call.
     keywords: Vec<&'a ast::Keyword>,
-    /// We only check `open` operations which file handles are used exactly once.
-    /// The easiest way to figure out if something IS that reference we knew all along
-    /// is to compare text ranges.
-    ref_range: TextRange,
-    /// A flag signifying that there is a matching `read` in the body.
-    matched: bool,
+    /// We only check `open` operations whose file handles are used exactly once.
+    reference: &'a ResolvedReference,
 }
 
 impl<'a> FileOpen<'a> {
+    /// Determine whether an expression is a reference to the file handle, by comparing
+    /// their ranges. If two expressions have the same range, they must be the same expression.
     fn is_ref(&self, expr: &Expr) -> bool {
-        expr.range() == self.ref_range
+        expr.range() == self.reference.range()
     }
 }
 
 /// Find and return all `open` operations in the given `with` statement.
-fn find_file_opens<'a>(semantic: &SemanticModel, with: &'a ast::StmtWith) -> Vec<FileOpen<'a>> {
+fn find_file_opens<'a>(
+    with: &'a ast::StmtWith,
+    semantic: &'a SemanticModel<'a>,
+) -> Vec<FileOpen<'a>> {
     with.items
         .iter()
-        .filter_map(|item| find_file_open(semantic, item, with.range()))
+        .filter_map(|item| find_file_open(item, with, semantic))
         .collect()
 }
 
 /// Find `open` operation in the given `with` item.
 fn find_file_open<'a>(
-    semantic: &SemanticModel,
     item: &'a ast::WithItem,
-    body_range: TextRange,
+    with: &'a ast::StmtWith,
+    semantic: &'a SemanticModel<'a>,
 ) -> Option<FileOpen<'a>> {
     // We want to match `open(...) as var`.
     let ast::ExprCall {
@@ -142,8 +147,18 @@ fn find_file_open<'a>(
 
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
 
+    // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="r")`,
+    // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
+    // arguments, like `buffering`.
+    if args.iter().any(Expr::is_starred_expr)
+        || keywords.iter().any(|keyword| keyword.arg.is_none())
+    {
+        return None;
+    }
+
     // Match positional arguments, get filename and read mode.
     let (filename, pos_mode) = match_open_args(args)?;
+
     // Match keyword arguments, get keyword arguments to forward and possibly read mode.
     let (keywords, kw_mode) = match_open_keywords(keywords)?;
 
@@ -168,7 +183,7 @@ fn find_file_open<'a>(
         .references
         .iter()
         .map(|id| semantic.reference(*id))
-        .filter(|reference| body_range.contains_range(reference.range()))
+        .filter(|reference| with.range().contains_range(reference.range()))
         .collect();
 
     // And even with all these restrictions, if the file handle gets used not exactly once,
@@ -177,18 +192,12 @@ fn find_file_open<'a>(
         return None;
     };
 
-    // Range seems to be the easiest way to understand that this is the right
-    // reference when we'll be looking at it.
-    let ref_range = reference.range();
-
     Some(FileOpen {
         item,
         filename,
         mode,
         keywords,
-        ref_range,
-        // matcher will set this later
-        matched: false,
+        reference,
     })
 }
 
@@ -197,12 +206,12 @@ fn match_open_args(args: &[Expr]) -> Option<(&Expr, ReadMode)> {
     match args {
         [filename] => Some((filename, ReadMode::Text)),
         [filename, mode_literal] => match_open_mode(mode_literal).map(|mode| (filename, mode)),
-        // The third positional argument is buffering and `read_text` doesn't support it.
+        // The third positional argument is `buffering` and `read_text` doesn't support it.
         _ => None,
     }
 }
 
-/// Match keyword arguments. Return keywrod arguments to forward and read mode.
+/// Match keyword arguments. Return keyword arguments to forward and read mode.
 fn match_open_keywords(
     keywords: &[ast::Keyword],
 ) -> Option<(Vec<&ast::Keyword>, Option<ReadMode>)> {
@@ -251,8 +260,23 @@ fn match_open_mode(mode: &Expr) -> Option<ReadMode> {
 }
 
 /// AST visitor that matches `open` operations with the corresponding `read` calls.
+#[derive(Debug)]
 struct ReadMatcher<'a> {
     candidates: Vec<FileOpen<'a>>,
+    matches: Vec<FileOpen<'a>>,
+}
+
+impl<'a> ReadMatcher<'a> {
+    fn new(candidates: Vec<FileOpen<'a>>) -> Self {
+        Self {
+            candidates,
+            matches: vec![],
+        }
+    }
+
+    fn into_matches(self) -> Vec<FileOpen<'a>> {
+        self.matches
+    }
 }
 
 impl<'a> Visitor<'a> for ReadMatcher<'a> {
@@ -260,10 +284,10 @@ impl<'a> Visitor<'a> for ReadMatcher<'a> {
         if let Some(read_from) = match_read_call(expr) {
             if let Some(open) = self
                 .candidates
-                .iter_mut()
-                .find(|open| open.is_ref(read_from))
+                .iter()
+                .position(|open| open.is_ref(read_from))
             {
-                open.matched = true;
+                self.matches.push(self.candidates.remove(open));
             }
             return;
         }
