@@ -921,6 +921,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Slots, "002") => (RuleGroup::Stable, rules::flake8_slots::rules::NoSlotsInNamedtupleSubclass),
 
         // refurb
+        (Refurb, "101") => (RuleGroup::Preview, rules::refurb::rules::ReadWholeFile),
         (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
         #[allow(deprecated)]
         (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
