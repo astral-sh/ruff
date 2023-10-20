@@ -902,7 +902,7 @@ where
                 }
 
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
-                self.deferred.lambdas.push((expr, self.semantic.snapshot()));
+                self.deferred.lambdas.push(self.semantic.snapshot());
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -1850,37 +1850,31 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
-        let mut visited_lambdas: Vec<(&Expr, Snapshot)> = vec![];
+        let mut deferred: Vec<Snapshot> = Vec::with_capacity(self.deferred.lambdas.len());
         while !self.deferred.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.deferred.lambdas);
-            for (expr, snapshot) in lambdas {
+            for snapshot in lambdas {
                 self.semantic.restore(snapshot);
 
-                if let Expr::Lambda(ast::ExprLambda {
+                if let Some(Expr::Lambda(ast::ExprLambda {
                     parameters,
                     body,
                     range: _,
-                }) = expr
+                })) = self.semantic.current_expression()
                 {
                     if let Some(parameters) = parameters {
                         self.visit_parameters(parameters);
                     }
                     self.visit_expr(body);
-
-                    visited_lambdas.push((expr, snapshot));
                 } else {
                     unreachable!("Expected Expr::Lambda");
                 }
+
+                deferred.push(snapshot);
             }
         }
-
-        // all deferred lambdas must be visited before we can analyze them, because they might
-        // be nested
-        for (expr, snapshot) in visited_lambdas {
-            self.semantic.restore(snapshot);
-            analyze::lambda(expr, self);
-        }
-
+        // Reset the deferred lambdas, so we can analyze them later on.
+        self.deferred.lambdas = deferred;
         self.semantic.restore(snapshot);
     }
 
@@ -1997,9 +1991,10 @@ pub(crate) fn check_ast(
     checker.visit_deferred_type_param_definitions();
     let allocator = typed_arena::Arena::new();
     checker.visit_deferred_string_type_definitions(&allocator);
-
     checker.visit_exports();
+
     // Check docstrings, bindings, and unresolved references.
+    analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
     analyze::definitions(&mut checker);
     analyze::bindings(&mut checker);
