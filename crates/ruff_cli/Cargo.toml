@@ -66,7 +66,7 @@ wild = { version = "2" }
 assert_cmd = { version = "2.0.8" }
 # Avoid writing colored snapshots when running tests from the terminal
 colored = { workspace = true, features = ["no-color"]}
-insta = { workspace = true, features = ["filters"] }
+insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { version = "0.4.0" }
 tempfile = "3.6.0"
 test-case = { workspace = true }

@@ -69,6 +69,11 @@ pub enum Command {
     #[doc(hidden)]
     #[clap(hide = true)]
     Format(FormatCommand),
+    /// Display Ruff's version
+    Version {
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
 }
 
 // The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
