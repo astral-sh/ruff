@@ -6,8 +6,8 @@ use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for uses of `open` and `read` that can be replaced by `pathlib`.
