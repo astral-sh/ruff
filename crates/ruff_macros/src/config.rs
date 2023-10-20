@@ -87,6 +87,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
             };
 
             Ok(quote! {
+                #[automatically_derived]
                 impl crate::options_base::OptionsMetadata for #ident {
                     fn record(visit: &mut dyn crate::options_base::Visit) {
                         #(#output);*
