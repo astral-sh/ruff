@@ -20,12 +20,25 @@ use crate::fix::edits::fits;
 /// the key is not found. When possible, using `dict.get` is more concise and
 /// more idiomatic.
 ///
+/// Under [preview mode](https://docs.astral.sh/ruff/preview), this rule will
+/// also suggest replacing `if`-`else` _expressions_ with `dict.get` calls.
+///
 /// ## Example
 /// ```python
 /// if "bar" in foo:
 ///     value = foo["bar"]
 /// else:
 ///     value = 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// value = foo.get("bar", 0)
+/// ```
+///
+/// If preview mode is enabled:
+/// ```python
+/// value = foo["bar"] if "bar" in foo else 0
 /// ```
 ///
 /// Use instead:
@@ -211,6 +224,10 @@ pub(crate) fn if_exp_instead_of_dict_get(
     body: &Expr,
     orelse: &Expr,
 ) {
+    if checker.settings.preview.is_disabled() {
+        return;
+    }
+
     let Expr::Compare(ast::ExprCompare {
         left: test_key,
         ops,
@@ -224,9 +241,13 @@ pub(crate) fn if_exp_instead_of_dict_get(
         return;
     };
 
-    if let [CmpOp::NotIn] = ops[..] {
-        return;
-    }
+    let (body, default_value) = match ops.as_slice() {
+        [CmpOp::In] => (body, orelse),
+        [CmpOp::NotIn] => (orelse, body),
+        _ => {
+            return;
+        }
+    };
 
     let Expr::Subscript(ast::ExprSubscript {
         value: expected_subscript,
@@ -243,7 +264,12 @@ pub(crate) fn if_exp_instead_of_dict_get(
         return;
     }
 
-    let default_value_node = orelse.clone();
+    // Check that the default value is not "complex".
+    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
+        return;
+    }
+
+    let default_value_node = default_value.clone();
     let dict_key_node = *test_key.clone();
     let dict_get_node = ast::ExprAttribute {
         value: expected_subscript.clone(),
@@ -269,14 +295,11 @@ pub(crate) fn if_exp_instead_of_dict_get(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if !checker.indexer().has_comments(expr, checker.locator()) {
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                contents,
-                expr.range(),
-            )));
-        }
+    if !checker.indexer().has_comments(expr, checker.locator()) {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            contents,
+            expr.range(),
+        )));
     }
-
     checker.diagnostics.push(diagnostic);
 }

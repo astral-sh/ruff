@@ -115,5 +115,15 @@ elif key in a_dict:
 else:
     vars[idx] = "default"
 
-# SIM401 (pattern-3)
+###
+# Positive cases (preview)
+###
+
+# SIM401
 var = a_dict[key] if key in a_dict else "default3"
+
+# SIM401
+var = "default-1" if key not in a_dict else a_dict[key]
+
+# OK (default contains effect)
+var = a_dict[key] if key in a_dict else val1 + val2
