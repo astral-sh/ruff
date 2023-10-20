@@ -388,6 +388,10 @@ pub struct Options {
     pub format: Option<FormatOptions>,
 }
 
+/// Experimental section to configure Ruff's linting. This new section will eventually
+/// replace the top-level linting options.
+///
+/// Options specified in the `lint` section take precedence over the top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -433,10 +437,6 @@ pub struct LintOptions {
 // Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
 // is removed.
 
-/// Experimental section to configure Ruff's linting. This new section will eventually
-/// replace the top-level linting options.
-///
-/// Options specified in the `lint` section take precedence over the top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
     Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
