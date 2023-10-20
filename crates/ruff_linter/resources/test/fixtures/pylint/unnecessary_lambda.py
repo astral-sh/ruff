@@ -53,3 +53,7 @@ _ = lambda x: f(y)
 _ = lambda x: x(x)
 _ = lambda x, y: x(x, y)
 _ = lambda x: z(lambda y: x + y)(x)
+
+# lambda uses an additional keyword
+_ = lambda *args: f(*args, y=1)
+_ = lambda *args: f(*args, y=x)

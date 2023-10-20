@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-unnecessary_lambda.py:1:5: PLW0108 Lambda may not be necessary
+unnecessary_lambda.py:1:5: PLW0108 Lambda may be unnecessary; consider inlining inner function
   |
 1 | _ = lambda: print()  # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^ PLW0108
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
   |
 
-unnecessary_lambda.py:2:5: PLW0108 Lambda may not be necessary
+unnecessary_lambda.py:2:5: PLW0108 Lambda may be unnecessary; consider inlining inner function
   |
 1 | _ = lambda: print()  # [unnecessary-lambda]
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
@@ -17,7 +17,7 @@ unnecessary_lambda.py:2:5: PLW0108 Lambda may not be necessary
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
   |
 
-unnecessary_lambda.py:4:5: PLW0108 Lambda may not be necessary
+unnecessary_lambda.py:4:5: PLW0108 Lambda may be unnecessary; consider inlining inner function
   |
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
 3 | 
@@ -27,7 +27,7 @@ unnecessary_lambda.py:4:5: PLW0108 Lambda may not be necessary
 6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
   |
 
-unnecessary_lambda.py:5:5: PLW0108 Lambda may not be necessary
+unnecessary_lambda.py:5:5: PLW0108 Lambda may be unnecessary; consider inlining inner function
   |
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
@@ -36,7 +36,7 @@ unnecessary_lambda.py:5:5: PLW0108 Lambda may not be necessary
 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
   |
 
-unnecessary_lambda.py:6:5: PLW0108 Lambda may not be necessary
+unnecessary_lambda.py:6:5: PLW0108 Lambda may be unnecessary; consider inlining inner function
   |
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
@@ -45,7 +45,7 @@ unnecessary_lambda.py:6:5: PLW0108 Lambda may not be necessary
 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
   |
 
-unnecessary_lambda.py:7:5: PLW0108 Lambda may not be necessary
+unnecessary_lambda.py:7:5: PLW0108 Lambda may be unnecessary; consider inlining inner function
   |
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
 6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
@@ -55,7 +55,7 @@ unnecessary_lambda.py:7:5: PLW0108 Lambda may not be necessary
 9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
   |
 
-unnecessary_lambda.py:9:5: PLW0108 Lambda may not be necessary
+unnecessary_lambda.py:9:5: PLW0108 Lambda may be unnecessary; consider inlining inner function
    |
  7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
  8 | 
@@ -64,7 +64,7 @@ unnecessary_lambda.py:9:5: PLW0108 Lambda may not be necessary
 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
    |
 
-unnecessary_lambda.py:10:5: PLW0108 Lambda may not be necessary
+unnecessary_lambda.py:10:5: PLW0108 Lambda may be unnecessary; consider inlining inner function
    |
  9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
