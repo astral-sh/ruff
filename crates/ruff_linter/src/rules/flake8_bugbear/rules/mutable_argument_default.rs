@@ -197,5 +197,5 @@ fn move_initialization(
     }
 
     let initialization_edit = Edit::insertion(content, pos);
-    Some(Fix::display_edits(default_edit, [initialization_edit]))
+    Some(Fix::unsafe_edits(default_edit, [initialization_edit]))
 }
