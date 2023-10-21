@@ -30,6 +30,12 @@ use crate::checkers::ast::Checker;
 /// Types outside of the standard library can be marked as immutable with the
 /// [`flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
+/// ## Known problems
+/// Mutable argument defaults can be used intentionally to cache computation
+/// results. Replacing the default with `None` or an immutable data structure
+/// does not work for such usages. Instead, prefer the `@functools.lru_cache`
+/// decorator from the standard library.
+///
 /// ## Example
 /// ```python
 /// def add_to_list(item, some_list=[]):
