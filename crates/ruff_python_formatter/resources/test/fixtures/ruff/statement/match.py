@@ -564,3 +564,17 @@ match pattern:
         # comment
         a, b,):
         pass
+
+# Tuple subject.
+match n % 3, n % 5:
+    case 0, 0:
+        # n is divisible by both 3 and 5
+        print("FizzBuzz")
+    case 0, _:
+        # n is divisible by 3, but not 5
+        print("Fizz")
+    case _, 0:
+        # n is divisible by 5, but not 3
+        print("Buzz")
+    case _:
+        print(n)
