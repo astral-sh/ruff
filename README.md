@@ -153,12 +153,9 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
   # Ruff version.
   rev: v0.1.1
   hooks:
+    # Run the Ruff linter.
     - id: ruff
-# Run the Ruff formatter.
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.0.291
-  hooks:
+    # Run the Ruff formatter.
     - id: ruff-format
 ```
 
