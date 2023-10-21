@@ -100,7 +100,13 @@ impl Violation for DeprecatedImport {
 fn is_relevant_module(module: &str) -> bool {
     matches!(
         module,
-        "collections" | "pipes" | "mypy_extensions" | "typing_extensions" | "typing" | "typing.re"
+        "collections"
+            | "pipes"
+            | "mypy_extensions"
+            | "typing_extensions"
+            | "typing"
+            | "typing.re"
+            | "backports.strenum"
     )
 }
 
@@ -320,6 +326,8 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "reveal_type",
 ];
 
+const BACKPORTS_STR_ENUM_TO_ENUM_311: &[&str] = &["StrEnum"];
+
 // Python 3.12+
 
 // Members of `typing_extensions` that were moved to `typing`.
@@ -479,6 +487,11 @@ impl<'a> ImportReplacer<'a> {
             }
             "typing.re" if self.version >= PythonVersion::Py39 => {
                 if let Some(operation) = self.try_replace(TYPING_RE_TO_RE_39, "re") {
+                    operations.push(operation);
+                }
+            }
+            "backports.strenum" if self.version >= PythonVersion::Py311 => {
+                if let Some(operation) = self.try_replace(BACKPORTS_STR_ENUM_TO_ENUM_311, "enum") {
                     operations.push(operation);
                 }
             }
