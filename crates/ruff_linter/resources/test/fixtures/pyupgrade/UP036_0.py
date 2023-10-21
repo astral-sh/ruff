@@ -202,3 +202,16 @@ if sys.version_info > (3,12):
 
 if sys.version_info >= (3,12):
     print("py3")
+
+# Slices on `sys.version_info` should be treated equivalently.
+if sys.version_info[:2] >= (3,0):
+    print("py3")
+
+if sys.version_info[:3] >= (3,0):
+    print("py3")
+
+if sys.version_info[:2] > (3,13):
+    print("py3")
+
+if sys.version_info[:3] > (3,13):
+    print("py3")
