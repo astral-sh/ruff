@@ -3449,10 +3449,18 @@ expression: parse_ast
     Match(
         StmtMatch {
             range: 2661..2697,
-            subject: Name(
-                ExprName {
-                    range: 2667..2668,
-                    id: "x",
+            subject: Tuple(
+                ExprTuple {
+                    range: 2667..2669,
+                    elts: [
+                        Name(
+                            ExprName {
+                                range: 2667..2668,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
                     ctx: Load,
                 },
             ),
@@ -3512,7 +3520,7 @@ expression: parse_ast
             range: 2720..2760,
             subject: Tuple(
                 ExprTuple {
-                    range: 2720..2760,
+                    range: 2726..2730,
                     elts: [
                         Name(
                             ExprName {
@@ -3598,23 +3606,31 @@ expression: parse_ast
     Match(
         StmtMatch {
             range: 2783..2829,
-            subject: NamedExpr(
-                ExprNamedExpr {
-                    range: 2789..2795,
-                    target: Name(
-                        ExprName {
-                            range: 2789..2790,
-                            id: "w",
-                            ctx: Store,
-                        },
-                    ),
-                    value: Name(
-                        ExprName {
-                            range: 2794..2795,
-                            id: "x",
-                            ctx: Load,
-                        },
-                    ),
+            subject: Tuple(
+                ExprTuple {
+                    range: 2789..2796,
+                    elts: [
+                        NamedExpr(
+                            ExprNamedExpr {
+                                range: 2789..2795,
+                                target: Name(
+                                    ExprName {
+                                        range: 2789..2790,
+                                        id: "w",
+                                        ctx: Store,
+                                    },
+                                ),
+                                value: Name(
+                                    ExprName {
+                                        range: 2794..2795,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    ctx: Load,
                 },
             ),
             cases: [

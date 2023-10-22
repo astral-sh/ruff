@@ -1136,6 +1136,15 @@ match x:
 match x:
     case (0,):
         y = 0
+match x,:
+    case z:
+        pass
+match x, y:
+    case z:
+        pass
+match x, y,:
+    case z:
+        pass
 "#,
             "<test>",
         )
