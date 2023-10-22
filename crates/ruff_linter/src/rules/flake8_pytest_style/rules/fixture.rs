@@ -28,7 +28,7 @@ use super::helpers::{
 /// setting.
 ///
 /// ## Why is this bad?
-/// If a `@pytext.fixture()` doesn't take any arguments, the parentheses are
+/// If a `@pytest.fixture()` doesn't take any arguments, the parentheses are
 /// optional.
 ///
 /// Either removing those unnecessary parentheses _or_ requiring them for all
