@@ -12,10 +12,10 @@ pub(super) fn get_mark_decorators(
         let Some(call_path) = collect_call_path(map_callable(&decorator.expression)) else {
             return None;
         };
-        match call_path.as_slice() {
-            ["pytest", "mark", marker, ..] => Some((decorator, *marker)),
-            _ => None,
-        }
+        let ["pytest", "mark", marker, ..] = call_path.as_slice() else {
+            return None;
+        };
+        Some((decorator, *marker))
     })
 }
 
