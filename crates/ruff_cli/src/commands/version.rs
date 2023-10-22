@@ -10,7 +10,7 @@ pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
     let version_info = crate::version::version();
 
     match output_format {
-        HelpFormat::Text => {
+        HelpFormat::Text | HelpFormat::Pretty => {
             writeln!(stdout, "ruff {}", &version_info)?;
         }
         HelpFormat::Json => {

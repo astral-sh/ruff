@@ -9,53 +9,61 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-# unused-import (F401)
+┄unused-import (F401)
 
-Derived from the **Pyflakes** linter.
+Derived from the Pyflakes linter.
 
 Fix is sometimes available.
 
-## What it does
+┄┄What it does
+
 Checks for unused imports.
 
-## Why is this bad?
-Unused imports add a performance overhead at runtime, and risk creating
-import cycles. They also increase the cognitive load of reading the code.
+┄┄Why is this bad?
 
-If an import statement is used to check for the availability or existence
-of a module, consider using `importlib.util.find_spec` instead.
+Unused imports add a performance overhead at runtime, and risk creating import cycles. They also increase the cognitive load of reading the code.
 
-## Example
-```python
+If an import statement is used to check for the availability or existence of a module, consider using importlib.util.find_spec instead.
+
+┄┄Example
+
+────────────────────
 import numpy as np  # unused import
 
 
 def area(radius):
     return 3.14 * radius**2
-```
+────────────────────
 
 Use instead:
-```python
+
+────────────────────
 def area(radius):
     return 3.14 * radius**2
-```
+────────────────────
 
-To check the availability of a module, use `importlib.util.find_spec`:
-```python
+To check the availability of a module, use importlib.util.find_spec:
+
+────────────────────
 from importlib.util import find_spec
 
 if find_spec("numpy") is not None:
     print("numpy is installed")
 else:
     print("numpy is not installed")
-```
+────────────────────
 
-## Options
-- `pyflakes.extend-generics`
+┄┄Options
 
-## References
-- [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
-- [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
+• pyflakes.extend-generics
+
+┄┄References
+
+• Python documentation: import[1]
+• Python documentation: importlib.util.find_spec[2]
+
+[1]: https://docs.python.org/3/reference/simple_stmts.html#the-import-statement
+[2]: https://docs.python.org/3/library/importlib.html#importlib.util.find_spec
 
 ----- stderr -----
 

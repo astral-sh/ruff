@@ -48,6 +48,8 @@ itoa = { version = "1.0.6" }
 log = { workspace = true }
 notify = { version = "6.1.1" }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
+pulldown-cmark = { version = "0.9.3", default-features = false, features = ['simd'] }
+pulldown-cmark-mdcat = { version = "2.1.0", default-features = false, features = ["regex-fancy"] }
 rayon = { version = "1.8.0" }
 regex = { workspace = true }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
@@ -57,6 +59,7 @@ serde_json = { workspace = true }
 shellexpand = { workspace = true }
 similar = { workspace = true }
 strum = { workspace = true, features = [] }
+syntect = { version = "5.1.0", default-features = false, features = ["parsing", "regex-fancy", "default-themes", "default-syntaxes"] }
 thiserror = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 walkdir = { version = "2.3.2" }

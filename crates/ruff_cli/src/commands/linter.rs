@@ -30,7 +30,7 @@ pub(crate) fn linter(format: HelpFormat) -> Result<()> {
     let mut output = String::new();
 
     match format {
-        HelpFormat::Text => {
+        HelpFormat::Text | HelpFormat::Pretty => {
             for linter in Linter::iter() {
                 let prefix = match linter.common_prefix() {
                     "" => linter

@@ -1,9 +1,15 @@
 use std::io::{self, BufWriter, Write};
 
 use anyhow::Result;
+use colored::control::SHOULD_COLORIZE;
+use pulldown_cmark::{Options, Parser};
+use pulldown_cmark_mdcat::resources::NoopResourceHandler;
+use pulldown_cmark_mdcat::terminal::{TerminalProgram, TerminalSize};
+use pulldown_cmark_mdcat::{push_tty, Environment, Settings, Theme};
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
+use syntect::parsing::SyntaxSet;
 
 use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
@@ -81,10 +87,41 @@ fn format_rule_text(rule: Rule) -> String {
     output
 }
 
+fn print_rule_text<W: Write>(writer: &mut W, rule: Rule) -> Result<()> {
+    let output = format_rule_text(rule);
+
+    let parser = Parser::new_ext(
+        &output,
+        Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH,
+    );
+
+    let cwd = std::env::current_dir()?;
+    let env = &Environment::for_local_directory(&cwd)?;
+
+    let terminal = if SHOULD_COLORIZE.should_colorize() {
+        TerminalProgram::detect()
+    } else {
+        TerminalProgram::Dumb
+    };
+
+    let settings = &Settings {
+        terminal_capabilities: terminal.capabilities(),
+        terminal_size: TerminalSize::detect().unwrap_or_default(),
+        syntax_set: &SyntaxSet::load_defaults_newlines(),
+        theme: Theme::default(),
+    };
+
+    push_tty(settings, env, &NoopResourceHandler {}, writer, parser)?;
+    Ok(())
+}
+
 /// Explain a `Rule` to the user.
 pub(crate) fn rule(rule: Rule, format: HelpFormat) -> Result<()> {
     let mut stdout = BufWriter::new(io::stdout().lock());
     match format {
+        HelpFormat::Pretty => {
+            print_rule_text(&mut stdout, rule)?;
+        }
         HelpFormat::Text => {
             writeln!(stdout, "{}", format_rule_text(rule))?;
         }
@@ -99,6 +136,12 @@ pub(crate) fn rule(rule: Rule, format: HelpFormat) -> Result<()> {
 pub(crate) fn rules(format: HelpFormat) -> Result<()> {
     let mut stdout = BufWriter::new(io::stdout().lock());
     match format {
+        HelpFormat::Pretty => {
+            for rule in Rule::iter() {
+                print_rule_text(&mut stdout, rule)?;
+                writeln!(stdout)?;
+            }
+        }
         HelpFormat::Text => {
             for rule in Rule::iter() {
                 writeln!(stdout, "{}", format_rule_text(rule))?;
