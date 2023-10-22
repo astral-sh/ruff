@@ -1,4 +1,4 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
@@ -30,10 +30,14 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 #[violation]
 pub struct TooFewSpacesBeforeInlineComment;
 
-impl Violation for TooFewSpacesBeforeInlineComment {
+impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Insert at least two spaces before an inline comment")
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Insert spaces")
     }
 }
 
@@ -155,10 +159,15 @@ pub(crate) fn whitespace_before_comment(
             let is_inline_comment = !line_text.trim_whitespace().is_empty();
             if is_inline_comment {
                 if range.start() - prev_end < "  ".text_len() {
-                    context.push(
+                    let mut diagnostic = Diagnostic::new(
                         TooFewSpacesBeforeInlineComment,
                         TextRange::new(prev_end, range.start()),
                     );
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        "  ".to_string(),
+                        TextRange::new(prev_end, range.start()),
+                    )));
+                    context.push_diagnostic(diagnostic);
                 }
             }
 
