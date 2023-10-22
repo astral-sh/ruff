@@ -5,6 +5,8 @@ info:
   args:
     - "--explain"
     - F401
+  env:
+    TERM: dumb
 ---
 success: true
 exit_code: 0
@@ -21,9 +23,11 @@ Checks for unused imports.
 
 ┄┄Why is this bad?
 
-Unused imports add a performance overhead at runtime, and risk creating import cycles. They also increase the cognitive load of reading the code.
+Unused imports add a performance overhead at runtime, and risk creating import
+cycles. They also increase the cognitive load of reading the code.
 
-If an import statement is used to check for the availability or existence of a module, consider using importlib.util.find_spec instead.
+If an import statement is used to check for the availability or existence of a
+module, consider using importlib.util.find_spec instead.
 
 ┄┄Example
 

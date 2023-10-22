@@ -1,3 +1,4 @@
+use std::env;
 use std::io::{self, BufWriter, Write};
 
 use anyhow::Result;
@@ -104,9 +105,14 @@ fn print_rule_text<W: Write>(writer: &mut W, rule: Rule) -> Result<()> {
         TerminalProgram::Dumb
     };
 
+    let terminal_size = match env::var("TERM") {
+        Ok(term) if term == "dumb" => TerminalSize::default(),
+        _ => TerminalSize::detect().unwrap_or_default(),
+    };
+
     let settings = &Settings {
         terminal_capabilities: terminal.capabilities(),
-        terminal_size: TerminalSize::detect().unwrap_or_default(),
+        terminal_size,
         syntax_set: &SyntaxSet::load_defaults_newlines(),
         theme: Theme::default(),
     };

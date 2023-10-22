@@ -513,7 +513,9 @@ fn show_source() {
 
 #[test]
 fn explain_status_codes_f401() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME)).args(["--explain", "F401"]));
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["--explain", "F401"])
+        .env("TERM", "dumb"));
 }
 #[test]
 fn explain_status_codes_ruf404() {
