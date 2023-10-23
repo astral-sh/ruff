@@ -366,19 +366,13 @@ jobs:
         run: |
           just install
 
-      - name: Setup development ruff version
+      - name:  Run ruff-lsp tests
         run: |
-          # Make executable and prepend to path
+          # Setup development binary
           chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
           export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
-
           ruff version
 
-          # Set the environment for subsequent jobs
-          echo "PATH=$PATH" >> "$GITHUB_ENV"
-
-      - name: Run ruff-lsp tests
-        run: |
           just test
 
   benchmarks:
