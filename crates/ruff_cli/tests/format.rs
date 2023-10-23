@@ -200,6 +200,7 @@ fn exclude_stdin() -> Result<()> {
         &ruff_toml,
         r#"
 extend-select = ["B", "Q"]
+ignore = ["Q000", "Q001", "Q002", "Q003"]
 
 [format]
 exclude = ["generated.py"]
@@ -234,6 +235,7 @@ fn format_option_inheritance() -> Result<()> {
         &ruff_toml,
         r#"
 extend = "base.toml"
+extend-select = ["Q000"]
 
 [format]
 quote-style = "single"
@@ -277,6 +279,7 @@ if condition:
 
     ----- stderr -----
     warning: `ruff format` is not yet stable, and subject to change in future versions.
+    warning: The following rules may cause conflicts when used with the formatter: 'Q000'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     "###);
     Ok(())
 }
@@ -320,6 +323,89 @@ format = "json"
     Ok(())
 }
 
+#[test]
+fn conflicting_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+select = ["ALL"]
+ignore = ["D203", "D212"]
+
+[isort]
+force-single-line = true
+force-wrap-aliases = true
+lines-after-imports = 0
+lines-between-types = 2
+split-on-trailing-comma = true
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("test.py");
+    fs::write(
+        &test_path,
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--no-cache", "--config"])
+        .arg(&ruff_toml)
+        .arg(test_path), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'COM819', 'D206', 'E501', 'ISC001', 'Q000', 'Q001', 'Q002', 'Q003', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The following isort options may cause conflicts when used with the formatter: 'isort.force-single-line', 'isort.force-wrap-aliases', 'isort.lines-after-imports', 'isort.lines_between_types'. To avoid unexpected behavior, we recommend disabling these options by removing them from the configuration.
+    "###);
+    Ok(())
+}
+
+#[test]
+fn conflicting_options_stdin() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+select = ["ALL"]
+ignore = ["D203", "D212"]
+
+[isort]
+force-single-line = true
+force-wrap-aliases = true
+lines-after-imports = 0
+lines-between-types = 2
+split-on-trailing-comma = true
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def say_hy(name: str):
+        print(f"Hy {name}")
+
+    ----- stderr -----
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'COM819', 'D206', 'E501', 'ISC001', 'Q000', 'Q001', 'Q002', 'Q003', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The following isort options may cause conflicts when used with the formatter: 'isort.force-single-line', 'isort.force-wrap-aliases', 'isort.lines-after-imports', 'isort.lines_between_types'. To avoid unexpected behavior, we recommend disabling these options by removing them from the configuration.
+    "###);
+    Ok(())
+}
 #[test]
 fn test_diff() {
     let args = ["format", "--no-cache", "--isolated", "--diff"];
