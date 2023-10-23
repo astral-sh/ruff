@@ -81,7 +81,7 @@ impl AlwaysFixableViolation for TabAfterKeyword {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replaced tab after keyword by whitespace")
+        format!("Replace with single space")
     }
 }
 
@@ -110,7 +110,7 @@ impl AlwaysFixableViolation for TabBeforeKeyword {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replaced tab before keyword by whitespace")
+        format!("Replace with single space")
     }
 }
 

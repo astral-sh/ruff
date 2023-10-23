@@ -10,7 +10,7 @@ E27.py:10:9: E273 [*] Tab after keyword
 11 | #: E273 E274
 12 | True        and False
    |
-   = help: Replaced tab after keyword by whitespace
+   = help: Replace with single space
 
 ℹ Fix
 7  7  | #: E271
@@ -31,7 +31,7 @@ E27.py:12:5: E273 [*] Tab after keyword
 13 | #: E271
 14 | a and  b
    |
-   = help: Replaced tab after keyword by whitespace
+   = help: Replace with single space
 
 ℹ Fix
 9  9  | #: E273
@@ -52,7 +52,7 @@ E27.py:12:10: E273 [*] Tab after keyword
 13 | #: E271
 14 | a and  b
    |
-   = help: Replaced tab after keyword by whitespace
+   = help: Replace with single space
 
 ℹ Fix
 9  9  | #: E273
@@ -73,7 +73,7 @@ E27.py:26:6: E273 [*] Tab after keyword
 27 | #: E274
 28 | a       and b
    |
-   = help: Replaced tab after keyword by whitespace
+   = help: Replace with single space
 
 ℹ Fix
 23 23 | #: E272
@@ -94,7 +94,7 @@ E27.py:30:10: E273 [*] Tab after keyword
 31 | #: Okay
 32 | from u import (a, b)
    |
-   = help: Replaced tab after keyword by whitespace
+   = help: Replace with single space
 
 ℹ Fix
 27 27 | #: E274

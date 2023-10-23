@@ -10,7 +10,7 @@ E27.py:28:2: E274 [*] Tab before keyword
 29 | #: E273 E274
 30 | this        and False
    |
-   = help: Replaced tab before keyword by whitespace
+   = help: Replace with single space
 
 ℹ Fix
 25 25 | #: E273
@@ -31,7 +31,7 @@ E27.py:30:5: E274 [*] Tab before keyword
 31 | #: Okay
 32 | from u import (a, b)
    |
-   = help: Replaced tab before keyword by whitespace
+   = help: Replace with single space
 
 ℹ Fix
 27 27 | #: E274
