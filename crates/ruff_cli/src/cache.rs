@@ -571,7 +571,6 @@ mod tests {
     use ruff_cache::CACHE_DIR_NAME;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
-    use ruff_linter::source_kind::SourceKind;
     use ruff_python_ast::PySourceType;
     use ruff_workspace::Settings;
 
@@ -1061,7 +1060,6 @@ mod tests {
             format_path(
                 &file_path,
                 &self.settings.formatter,
-                &SourceKind::Python(std::fs::read_to_string(&file_path).unwrap()),
                 PySourceType::Python,
                 FormatMode::Write,
                 Some(cache),

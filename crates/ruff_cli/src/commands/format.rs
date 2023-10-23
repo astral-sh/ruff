@@ -8,7 +8,7 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use itertools::Itertools;
-use log::error;
+use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use similar::TextDiff;
@@ -18,12 +18,17 @@ use tracing::debug;
 use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
+use ruff_linter::registry::Rule;
+use ruff_linter::rules::isort;
+use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile};
+use ruff_workspace::resolver::{
+    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile, Resolver,
+};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
@@ -73,6 +78,8 @@ pub(crate) fn format(
         warn_user_once!("No Python files found under the given path(s)");
         return Ok(ExitStatus::Success);
     }
+
+    warn_incompatible_formatter_settings(&pyproject_config, Some(&resolver));
 
     // Discover the package root for each Python file.
     let package_roots = resolver.package_roots(
@@ -124,18 +131,6 @@ pub(crate) fn format(
                         return None;
                     }
 
-                    // Extract the sources from the file.
-                    let unformatted = match SourceKind::from_path(path, source_type) {
-                        Ok(Some(source_kind)) => source_kind,
-                        Ok(None) => return None,
-                        Err(err) => {
-                            return Some(Err(FormatCommandError::Read(
-                                Some(path.to_path_buf()),
-                                err,
-                            )));
-                        }
-                    };
-
                     let package = path
                         .parent()
                         .and_then(|parent| package_roots.get(parent).copied())
@@ -148,7 +143,6 @@ pub(crate) fn format(
                             format_path(
                                 path,
                                 &resolved_settings.formatter,
-                                &unformatted,
                                 source_type,
                                 mode,
                                 cache,
@@ -156,7 +150,6 @@ pub(crate) fn format(
                         }) {
                             Ok(inner) => inner.map(|result| FormatPathResult {
                                 path: resolved_file.path().to_path_buf(),
-                                unformatted,
                                 result,
                             }),
                             Err(error) => Err(FormatCommandError::Panic(
@@ -253,7 +246,6 @@ pub(crate) fn format(
 pub(crate) fn format_path(
     path: &Path,
     settings: &FormatterSettings,
-    unformatted: &SourceKind,
     source_type: PySourceType,
     mode: FormatMode,
     cache: Option<&Cache>,
@@ -270,8 +262,18 @@ pub(crate) fn format_path(
         }
     }
 
+    // Extract the sources from the file.
+    let unformatted = match SourceKind::from_path(path, source_type) {
+        Ok(Some(source_kind)) => source_kind,
+        // Non Python Jupyter notebook
+        Ok(None) => return Ok(FormatResult::Skipped),
+        Err(err) => {
+            return Err(FormatCommandError::Read(Some(path.to_path_buf()), err));
+        }
+    };
+
     // Format the source.
-    let format_result = match format_source(unformatted, source_type, Some(path), settings)? {
+    let format_result = match format_source(&unformatted, source_type, Some(path), settings)? {
         FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
@@ -293,7 +295,10 @@ pub(crate) fn format_path(
                 FormatResult::Formatted
             }
             FormatMode::Check => FormatResult::Formatted,
-            FormatMode::Diff => FormatResult::Diff(formatted),
+            FormatMode::Diff => FormatResult::Diff {
+                unformatted,
+                formatted,
+            },
         },
         FormattedSource::Unchanged => {
             if let Some(cache) = cache {
@@ -425,16 +430,21 @@ pub(crate) enum FormatResult {
     /// The file was formatted.
     Formatted,
     /// The file was formatted, [`SourceKind`] contains the formatted code
-    Diff(SourceKind),
+    Diff {
+        unformatted: SourceKind,
+        formatted: SourceKind,
+    },
     /// The file was unchanged, as the formatted contents matched the existing contents.
     Unchanged,
+
+    /// Skipped formatting because its an unformatted file format
+    Skipped,
 }
 
 /// The coupling of a [`FormatResult`] with the path of the file that was analyzed.
 #[derive(Debug)]
 struct FormatPathResult {
     path: PathBuf,
-    unformatted: SourceKind,
     result: FormatResult,
 }
 
@@ -456,15 +466,19 @@ impl<'a> FormatResults<'a> {
     fn any_formatted(&self) -> bool {
         self.results.iter().any(|result| match result.result {
             FormatResult::Formatted | FormatResult::Diff { .. } => true,
-            FormatResult::Unchanged => false,
+            FormatResult::Unchanged | FormatResult::Skipped => false,
         })
     }
 
     fn write_diff(&self, f: &mut impl Write) -> io::Result<()> {
         for result in self.results {
-            if let FormatResult::Diff(formatted) = &result.result {
+            if let FormatResult::Diff {
+                unformatted,
+                formatted,
+            } = &result.result
+            {
                 let text_diff =
-                    TextDiff::from_lines(result.unformatted.source_code(), formatted.source_code());
+                    TextDiff::from_lines(unformatted.source_code(), formatted.source_code());
                 let mut unified_diff = text_diff.unified_diff();
                 unified_diff.header(
                     &fs::relativize_path(&result.path),
@@ -495,9 +509,10 @@ impl<'a> FormatResults<'a> {
                     changed += 1;
                 }
                 FormatResult::Unchanged => unchanged += 1,
-                FormatResult::Diff(_) => {
+                FormatResult::Diff { .. } => {
                     changed += 1;
                 }
+                FormatResult::Skipped => {}
             }
         }
 
@@ -635,6 +650,72 @@ impl Display for FormatCommandError {
                     )
                 }
             }
+        }
+    }
+}
+
+pub(super) fn warn_incompatible_formatter_settings(
+    pyproject_config: &PyprojectConfig,
+    resolver: Option<&Resolver>,
+) {
+    for setting in std::iter::once(&pyproject_config.settings)
+        .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
+    {
+        let mut incompatible_rules = Vec::new();
+
+        for incompatible_rule in RuleTable::from_iter([
+            Rule::LineTooLong,
+            Rule::TabIndentation,
+            Rule::IndentationWithInvalidMultiple,
+            Rule::IndentationWithInvalidMultipleComment,
+            Rule::OverIndented,
+            Rule::IndentWithSpaces,
+            Rule::SingleLineImplicitStringConcatenation,
+            Rule::MissingTrailingComma,
+            Rule::ProhibitedTrailingComma,
+            Rule::BadQuotesInlineString,
+            Rule::BadQuotesMultilineString,
+            Rule::BadQuotesDocstring,
+            Rule::AvoidableEscapedQuote,
+        ])
+        .iter_enabled()
+        {
+            if setting.linter.rules.enabled(incompatible_rule) {
+                incompatible_rules.push(format!("'{}'", incompatible_rule.noqa_code()));
+            }
+        }
+
+        if !incompatible_rules.is_empty() {
+            incompatible_rules.sort();
+            warn!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.", incompatible_rules.join(", "));
+        }
+
+        let mut incompatible_options = Vec::new();
+
+        let isort_defaults = isort::settings::Settings::default();
+
+        if setting.linter.isort.force_single_line != isort_defaults.force_single_line {
+            incompatible_options.push("'isort.force-single-line'");
+        }
+
+        if setting.linter.isort.force_wrap_aliases != isort_defaults.force_wrap_aliases {
+            incompatible_options.push("'isort.force-wrap-aliases'");
+        }
+
+        if setting.linter.isort.lines_after_imports != isort_defaults.lines_after_imports {
+            incompatible_options.push("'isort.lines-after-imports'");
+        }
+
+        if setting.linter.isort.lines_between_types != isort_defaults.lines_between_types {
+            incompatible_options.push("'isort.lines_between_types'");
+        }
+
+        if setting.linter.isort.split_on_trailing_comma != isort_defaults.split_on_trailing_comma {
+            incompatible_options.push("'isort.split_on_trailing_comma'");
+        }
+
+        if !incompatible_options.is_empty() {
+            warn!("The following isort options may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these options by removing them from the configuration.", incompatible_options.join(", "));
         }
     }
 }

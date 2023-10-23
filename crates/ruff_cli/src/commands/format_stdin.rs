@@ -13,7 +13,8 @@ use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
 use crate::commands::format::{
-    format_source, FormatCommandError, FormatMode, FormatResult, FormattedSource,
+    format_source, warn_incompatible_formatter_settings, FormatCommandError, FormatMode,
+    FormatResult, FormattedSource,
 };
 use crate::resolve::resolve;
 use crate::stdin::read_from_stdin;
@@ -27,6 +28,9 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
         overrides,
         cli.stdin_filename.as_deref(),
     )?;
+
+    warn_incompatible_formatter_settings(&pyproject_config, None);
+
     let mode = FormatMode::from_cli(cli);
 
     if let Some(filename) = cli.stdin_filename.as_deref() {
