@@ -369,6 +369,7 @@ jobs:
       - name:  Run ruff-lsp tests
         run: |
           # Setup development binary
+          pip uninstall ruff
           chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
           export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
           ruff version
