@@ -167,23 +167,18 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, marke
         return;
     }
 
-    let mut has_parameters = false;
-
-    if let Expr::Call(ast::ExprCall {
+    let Expr::Call(ast::ExprCall {
         arguments: Arguments { args, keywords, .. },
         ..
-    }) = &decorator.expression
-    {
-        if !args.is_empty() || !keywords.is_empty() {
-            has_parameters = true;
-        }
+    }) = &decorator.expression;
+
+    if !args.is_empty() || !keywords.is_empty() {
+        return;
     }
 
-    if !has_parameters {
-        let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
-        checker.diagnostics.push(diagnostic);
-    }
+    let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
+    checker.diagnostics.push(diagnostic);
 }
 
 pub(crate) fn marks(checker: &mut Checker, decorators: &[Decorator]) {
