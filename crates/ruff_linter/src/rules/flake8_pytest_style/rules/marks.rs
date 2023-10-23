@@ -167,16 +167,19 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, marke
         return;
     }
 
-    let Expr::Call(ast::ExprCall {
-        arguments: Arguments { args, keywords, .. },
-        ..
-    }) = &decorator.expression
-    else {
-        return;
-    };
-
-    if !args.is_empty() || !keywords.is_empty() {
-        return;
+    match &decorator.expression {
+        // @pytest.mark.usefixtures
+        Expr::Attribute(..) => {}
+        // @pytest.mark.usefixtures(...)
+        Expr::Call(ast::ExprCall {
+            arguments: Arguments { args, keywords, .. },
+            ..
+        }) => {
+            if !args.is_empty() || !keywords.is_empty() {
+                return;
+            }
+        }
+        _ => return,
     }
 
     let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
