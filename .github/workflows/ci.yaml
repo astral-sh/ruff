@@ -366,7 +366,7 @@ jobs:
         run: |
           just install
 
-      - name:  Run ruff-lsp tests
+      - name: Run ruff-lsp tests
         run: |
           # Setup development binary
           pip uninstall ruff
