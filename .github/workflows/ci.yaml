@@ -338,7 +338,7 @@ jobs:
         run: rm -r target/progress_projects
 
   check-ruff-lsp:
-    name: "Check compatibility with ruff-lsp"
+    name: "test ruff-lsp"
     runs-on: ubuntu-latest
     needs: cargo-test
     steps:
