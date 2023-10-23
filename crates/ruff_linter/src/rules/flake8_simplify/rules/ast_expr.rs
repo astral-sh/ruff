@@ -110,7 +110,7 @@ impl AlwaysFixableViolation for DictGetWithNoneDefault {
     }
 }
 
-fn lowercase_allowed(env_var: &str) -> bool {
+fn is_lowercase_allowed(env_var: &str) -> bool {
     matches!(env_var, "https_proxy" | "http_proxy" | "no_proxy")
 }
 
@@ -154,7 +154,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     }
 
-    if lowercase_allowed(env_var) {
+    if is_lowercase_allowed(env_var) {
         return;
     }
 
@@ -203,7 +203,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    if lowercase_allowed(env_var) {
+    if is_lowercase_allowed(env_var) {
         return;
     }
 
