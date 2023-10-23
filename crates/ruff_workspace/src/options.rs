@@ -566,7 +566,7 @@ pub struct LintCommonOptions {
         value_type = "list[RuleSelector]",
         example = r#"
             # Allow applying all unsafe fixes in the `E` rules and `F401` without the `--unsafe-fixes` flag
-            extend_safe_fixes = ["E", "F401"]
+            extend-safe-fixes = ["E", "F401"]
         "#
     )]
     pub extend_safe_fixes: Option<Vec<RuleSelector>>,
@@ -578,7 +578,7 @@ pub struct LintCommonOptions {
         value_type = "list[RuleSelector]",
         example = r#"
             # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
-            extend_unsafe_fixes = ["E", "F401"]
+            extend-unsafe-fixes = ["E", "F401"]
         "#
     )]
     pub extend_unsafe_fixes: Option<Vec<RuleSelector>>,
