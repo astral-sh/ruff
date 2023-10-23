@@ -356,7 +356,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: actions/download-artifact@v3
-        name: Download ruff binary
+        name: Download development ruff binary
         id: ruff-target
         with:
           name: ruff
@@ -373,6 +373,9 @@ jobs:
           export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
 
           ruff version
+
+          # Set the environment for subsequent jobs
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
 
       - name: Run ruff-lsp tests
         run: |
