@@ -1,6 +1,5 @@
 #![cfg(not(target_family = "wasm"))]
 
-#[cfg(unix)]
 use std::fs;
 #[cfg(unix)]
 use std::fs::Permissions;
@@ -12,13 +11,13 @@ use std::process::Command;
 use std::str;
 
 #[cfg(unix)]
-use anyhow::{Context, Result};
+use anyhow::Context;
+use anyhow::Result;
 #[cfg(unix)]
 use clap::Parser;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 #[cfg(unix)]
 use path_absolutize::path_dedot;
-#[cfg(unix)]
 use tempfile::TempDir;
 
 #[cfg(unix)]
@@ -150,6 +149,7 @@ fn stdin_fix_py() {
     print(sys.version)
 
     ----- stderr -----
+    Found 1 error (1 fixed, 0 remaining).
     "###);
 }
 
@@ -317,6 +317,7 @@ fn stdin_fix_jupyter() {
      "nbformat_minor": 5
     }
     ----- stderr -----
+    Found 2 errors (2 fixed, 0 remaining).
     "###);
 }
 
@@ -450,6 +451,8 @@ fn stdin_fix_when_not_fixable_should_still_print_contents() {
          print(sys.version)
 
     ----- stderr -----
+    -:3:4: F634 If test is a tuple, which is always `True`
+    Found 2 errors (1 fixed, 1 remaining).
     "###);
 }
 
@@ -596,7 +599,7 @@ fn stdin_format_jupyter() {
     }
 
     ----- stderr -----
-    warning: `ruff format` is a work-in-progress, subject to change at any time, and intended only for experimentation.
+    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
 }
 
@@ -848,6 +851,42 @@ fn preview_disabled_prefix_empty() {
 }
 
 #[test]
+fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
+    // Does not warn that the selection is empty since the user is not trying to enable the rule
+    let args = ["--ignore", "CPY"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
+    // Does not warn that the selection is empty since the user is not trying to enable the rule
+    let args = ["--fixable", "CPY"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 fn preview_group_selector() {
     // `--select PREVIEW` should error (selector was removed)
     let args = ["--select", "PREVIEW", "--preview"];
@@ -1020,7 +1059,7 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
     Found 1 error.
-    1 hidden fix can be enabled with the `--unsafe-fixes` option.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
@@ -1061,7 +1100,7 @@ fn fix_applies_safe_fixes_by_default() {
                 "--output-format",
                 "text",
                 "--isolated",
-                "--no-cache", 
+                "--no-cache",
                 "--select",
                 "F601,UP034",
                 "--fix",
@@ -1075,6 +1114,9 @@ fn fix_applies_safe_fixes_by_default() {
     print('foo')
 
     ----- stderr -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    Found 2 errors (1 fixed, 1 remaining).
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
 }
 
@@ -1087,7 +1129,7 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
                 "--output-format",
                 "text",
                 "--isolated",
-                "--no-cache", 
+                "--no-cache",
                 "--select",
                 "F601,UP034",
                 "--fix",
@@ -1102,6 +1144,89 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
     print('foo')
 
     ----- stderr -----
+    Found 2 errors (2 fixed, 0 remaining).
+    "###);
+}
+
+#[test]
+fn fix_does_not_apply_display_only_fixes() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "B006",
+                "--fix",
+            ])
+            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    def add_to_list(item, some_list=[]): ...
+    ----- stderr -----
+    -:1:33: B006 Do not use mutable data structures for argument defaults
+    Found 1 error.
+    "###);
+}
+
+#[test]
+fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "B006",
+                "--fix",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    def add_to_list(item, some_list=[]): ...
+    ----- stderr -----
+    -:1:33: B006 Do not use mutable data structures for argument defaults
+    Found 1 error.
+    "###);
+}
+
+#[test]
+fn fix_only_unsafe_fixes_available() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "F601",
+                "--fix",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}
+    print(('foo'))
+
+    ----- stderr -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
 }
 
@@ -1114,7 +1239,7 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
                 "--output-format",
                 "text",
                 "--isolated",
-                "--no-cache", 
+                "--no-cache",
                 "--select",
                 "F601,UP034",
                 "--fix-only",
@@ -1128,6 +1253,7 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
     print('foo')
 
     ----- stderr -----
+    Fixed 1 error (1 additional fix available with `--unsafe-fixes`).
     "###);
 }
 
@@ -1140,7 +1266,7 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
                 "--output-format",
                 "text",
                 "--isolated",
-                "--no-cache", 
+                "--no-cache",
                 "--select",
                 "F601,UP034",
                 "--fix-only",
@@ -1155,6 +1281,7 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
     print('foo')
 
     ----- stderr -----
+    Fixed 2 errors.
     "###);
 }
 
@@ -1179,11 +1306,12 @@ fn diff_shows_safe_fixes_by_default() {
     ----- stdout -----
     @@ -1,2 +1,2 @@
      x = {'a': 1, 'a': 1}
-    -print('foo')
-    +print(('foo'))
+    -print(('foo'))
+    +print('foo')
 
 
     ----- stderr -----
+    Would fix 1 error (1 additional fix available with `--unsafe-fixes`).
     "###
     );
 }
@@ -1209,13 +1337,184 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
     exit_code: 1
     ----- stdout -----
     @@ -1,2 +1,2 @@
-    -x = {'a': 1}
-    -print('foo')
-    +x = {'a': 1, 'a': 1}
-    +print(('foo'))
+    -x = {'a': 1, 'a': 1}
+    -print(('foo'))
+    +x = {'a': 1}
+    +print('foo')
 
 
     ----- stderr -----
+    Would fix 2 errors.
     "###
     );
+}
+
+#[test]
+fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "B006",
+                "--diff",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+            @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn diff_only_unsafe_fixes_available() {
+    assert_cmd_snapshot!(
+    Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format",
+            "text",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "F601",
+            "--diff",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    No errors would be fixed (1 fix available with `--unsafe-fixes`).
+    "###
+    );
+}
+
+#[test]
+fn check_extend_unsafe_fixes() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-unsafe-fixes = ["UP034"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 Avoid extraneous parentheses
+    Found 2 errors.
+    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn check_extend_safe_fixes() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-safe-fixes = ["F601"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn check_extend_unsafe_fixes_conflict_with_extend_safe_fixes() -> Result<()> {
+    // Adding a rule to both options should result in it being treated as unsafe
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-unsafe-fixes = ["UP034"]
+extend-safe-fixes = ["UP034"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 Avoid extraneous parentheses
+    Found 2 errors.
+    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
 }

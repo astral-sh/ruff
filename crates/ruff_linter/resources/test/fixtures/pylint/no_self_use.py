@@ -1,5 +1,7 @@
 import abc
 
+from typing_extensions import override
+
 
 class Person:
     def developer_greeting(self, name):  # [no-self-use]
@@ -60,3 +62,24 @@ class Prop:
     @property
     def count(self):
         return 24
+
+
+class A:
+    def foo(self):
+        ...
+
+
+class B(A):
+    @override
+    def foo(self):
+        ...
+
+    def foobar(self):
+        super()
+
+    def bar(self):
+        super().foo()
+
+    def baz(self):
+        if super().foo():
+            ...

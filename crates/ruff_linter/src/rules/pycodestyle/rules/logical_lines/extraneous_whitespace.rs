@@ -126,13 +126,7 @@ impl AlwaysFixableViolation for WhitespaceBeforePunctuation {
 }
 
 /// E201, E202, E203
-pub(crate) fn extraneous_whitespace(
-    line: &LogicalLine,
-    context: &mut LogicalLinesContext,
-    fix_after_open_bracket: bool,
-    fix_before_close_bracket: bool,
-    fix_before_punctuation: bool,
-) {
+pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut prev_token = None;
     let mut fstrings = 0u32;
 
@@ -161,11 +155,8 @@ pub(crate) fn extraneous_whitespace(
                             WhitespaceAfterOpenBracket { symbol },
                             TextRange::at(token.end(), trailing_len),
                         );
-                        if fix_after_open_bracket {
-                            diagnostic.set_fix(Fix::always_applies(Edit::range_deletion(
-                                diagnostic.range(),
-                            )));
-                        }
+                        diagnostic
+                            .set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
                         context.push_diagnostic(diagnostic);
                     }
                 }
@@ -178,11 +169,8 @@ pub(crate) fn extraneous_whitespace(
                                 WhitespaceBeforeCloseBracket { symbol },
                                 TextRange::at(token.start() - offset, offset),
                             );
-                            if fix_before_close_bracket {
-                                diagnostic.set_fix(Fix::always_applies(Edit::range_deletion(
-                                    diagnostic.range(),
-                                )));
-                            }
+                            diagnostic
+                                .set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
                             context.push_diagnostic(diagnostic);
                         }
                     }
@@ -196,11 +184,8 @@ pub(crate) fn extraneous_whitespace(
                                 WhitespaceBeforePunctuation { symbol },
                                 TextRange::at(token.start() - offset, offset),
                             );
-                            if fix_before_punctuation {
-                                diagnostic.set_fix(Fix::always_applies(Edit::range_deletion(
-                                    diagnostic.range(),
-                                )));
-                            }
+                            diagnostic
+                                .set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic.range())));
                             context.push_diagnostic(diagnostic);
                         }
                     }

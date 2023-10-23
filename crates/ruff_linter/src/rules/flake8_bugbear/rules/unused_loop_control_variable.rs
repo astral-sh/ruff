@@ -8,7 +8,6 @@ use ruff_python_ast::{helpers, visitor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, result_like::BoolLike)]
 enum Certainty {
@@ -156,23 +155,21 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            if let Some(rename) = rename {
-                if certainty.into() {
-                    // Avoid fixing if the variable, or any future bindings to the variable, are
-                    // used _after_ the loop.
-                    let scope = checker.semantic().current_scope();
-                    if scope
-                        .get_all(name)
-                        .map(|binding_id| checker.semantic().binding(binding_id))
-                        .filter(|binding| binding.start() >= expr.start())
-                        .all(|binding| !binding.is_used())
-                    {
-                        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
-                            rename,
-                            expr.range(),
-                        )));
-                    }
+        if let Some(rename) = rename {
+            if certainty.into() {
+                // Avoid fixing if the variable, or any future bindings to the variable, are
+                // used _after_ the loop.
+                let scope = checker.semantic().current_scope();
+                if scope
+                    .get_all(name)
+                    .map(|binding_id| checker.semantic().binding(binding_id))
+                    .filter(|binding| binding.start() >= expr.start())
+                    .all(|binding| !binding.is_used())
+                {
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                        rename,
+                        expr.range(),
+                    )));
                 }
             }
         }

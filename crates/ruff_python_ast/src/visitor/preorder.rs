@@ -1,10 +1,10 @@
-use crate::node::{AnyNodeRef, AstNode};
 use crate::{
     Alias, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ElifElseClause,
     ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault,
     Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParams, UnaryOp,
     WithItem,
 };
+use crate::{AnyNodeRef, AstNode};
 
 /// Visitor that traverses all nodes recursively in pre-order.
 pub trait PreorderVisitor<'a> {

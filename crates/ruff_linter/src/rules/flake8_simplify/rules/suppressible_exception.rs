@@ -8,7 +8,6 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `try`-`except`-`pass` blocks that can be replaced with the
@@ -132,28 +131,25 @@ pub(crate) fn suppressible_exception(
         },
         stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if !checker.indexer().has_comments(stmt, checker.locator()) {
-            diagnostic.try_set_fix(|| {
-                // let range = statement_range(stmt, checker.locator(), checker.indexer());
+    if !checker.indexer().has_comments(stmt, checker.locator()) {
+        diagnostic.try_set_fix(|| {
+            // let range = statement_range(stmt, checker.locator(), checker.indexer());
 
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import("contextlib", "suppress"),
-                    stmt.start(),
-                    checker.semantic(),
-                )?;
-                let replace_try = Edit::range_replacement(
-                    format!("with {binding}({exception})"),
-                    TextRange::at(stmt.start(), "try".text_len()),
-                );
-                let remove_handler =
-                    Edit::range_deletion(checker.locator().full_lines_range(*range));
-                Ok(Fix::sometimes_applies_edits(
-                    import_edit,
-                    [replace_try, remove_handler],
-                ))
-            });
-        }
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("contextlib", "suppress"),
+                stmt.start(),
+                checker.semantic(),
+            )?;
+            let replace_try = Edit::range_replacement(
+                format!("with {binding}({exception})"),
+                TextRange::at(stmt.start(), "try".text_len()),
+            );
+            let remove_handler = Edit::range_deletion(checker.locator().full_lines_range(*range));
+            Ok(Fix::unsafe_edits(
+                import_edit,
+                [replace_try, remove_handler],
+            ))
+        });
     }
     checker.diagnostics.push(diagnostic);
 }

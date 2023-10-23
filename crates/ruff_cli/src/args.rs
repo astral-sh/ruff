@@ -69,6 +69,11 @@ pub enum Command {
     #[doc(hidden)]
     #[clap(hide = true)]
     Format(FormatCommand),
+    /// Display Ruff's version
+    Version {
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
 }
 
 // The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
@@ -116,16 +121,6 @@ pub struct CheckCommand {
     /// Ignore any `# noqa` comments.
     #[arg(long)]
     ignore_noqa: bool,
-
-    /// Output serialization format for violations. (Deprecated: Use `--output-format` instead).
-    #[arg(
-        long,
-        value_enum,
-        env = "RUFF_FORMAT",
-        conflicts_with = "output_format",
-        hide = true
-    )]
-    pub format: Option<SerializationFormat>,
 
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
@@ -367,9 +362,21 @@ pub struct FormatCommand {
     /// files would have been modified, and zero otherwise.
     #[arg(long)]
     pub check: bool,
+    /// Avoid writing any formatted files back; instead, exit with a non-zero status code and the
+    /// difference between the current file and how the formatted file would look like.
+    #[arg(long)]
+    pub diff: bool,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
+
+    /// Disable cache reads.
+    #[arg(short, long, help_heading = "Miscellaneous")]
+    pub no_cache: bool,
+    /// Path to the cache directory.
+    #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
+    pub cache_dir: Option<PathBuf>,
+
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -380,6 +387,15 @@ pub struct FormatCommand {
     respect_gitignore: bool,
     #[clap(long, overrides_with("respect_gitignore"), hide = true)]
     no_respect_gitignore: bool,
+    /// List of paths, used to omit files and/or directories from analysis.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "FILE_PATTERN",
+        help_heading = "File selection"
+    )]
+    pub exclude: Option<Vec<FilePattern>>,
+
     /// Enforce exclusions, even for paths passed to Ruff directly on the command-line.
     /// Use `--no-force-exclude` to disable.
     #[arg(
@@ -399,10 +415,12 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
-
-    /// Enable preview mode; checks will include unstable rules and fixes.
+    /// The minimum Python version that should be supported.
+    #[arg(long, value_enum)]
+    pub target_version: Option<PythonVersion>,
+    /// Enable preview mode; enables unstable formatting.
     /// Use `--no-preview` to disable.
-    #[arg(long, overrides_with("no_preview"), hide = true)]
+    #[arg(long, overrides_with("no_preview"))]
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
@@ -512,7 +530,7 @@ impl CheckCommand {
                 unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                     .map(UnsafeFixes::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                output_format: self.output_format.or(self.format),
+                output_format: self.output_format,
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             },
         )
@@ -526,9 +544,11 @@ impl FormatCommand {
         (
             FormatArguments {
                 check: self.check,
+                diff: self.diff,
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
+                no_cache: self.no_cache,
                 stdin_filename: self.stdin_filename,
             },
             CliOverrides {
@@ -537,8 +557,12 @@ impl FormatCommand {
                     self.respect_gitignore,
                     self.no_respect_gitignore,
                 ),
+                exclude: self.exclude,
                 preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
+                target_version: self.target_version,
+                cache_dir: self.cache_dir,
+
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..CliOverrides::default()
             },
@@ -583,6 +607,8 @@ pub struct CheckArguments {
 #[allow(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
+    pub no_cache: bool,
+    pub diff: bool,
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
@@ -674,6 +700,8 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(preview) = &self.preview {
             config.preview = Some(*preview);
+            config.lint.preview = Some(*preview);
+            config.format.preview = Some(*preview);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.lint.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
@@ -701,7 +729,7 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pair.prefix);
     }
     per_file_ignores

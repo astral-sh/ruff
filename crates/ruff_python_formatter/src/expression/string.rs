@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use bitflags::bitflags;
 
 use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Constant, ExprConstant, ExprFString, ExpressionRef};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
@@ -48,10 +48,19 @@ impl<'a> AnyString<'a> {
         match self {
             Self::Constant(_) => Quoting::CanChange,
             Self::FString(f_string) => {
+                let unprefixed = locator
+                    .slice(f_string.range)
+                    .trim_start_matches(|c| c != '"' && c != '\'');
+                let triple_quoted =
+                    unprefixed.starts_with(r#"""""#) || unprefixed.starts_with(r#"'''"#);
                 if f_string.values.iter().any(|value| match value {
                     Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
                         let string_content = locator.slice(*range);
-                        string_content.contains(['"', '\''])
+                        if triple_quoted {
+                            string_content.contains(r#"""""#) || string_content.contains("'''")
+                        } else {
+                            string_content.contains(['"', '\''])
+                        }
                     }
                     _ => false,
                 }) {

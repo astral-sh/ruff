@@ -225,12 +225,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Install nightly Rust toolchain"
         # Only pinned to make caching work, update freely
-        run: rustup toolchain install nightly-2023-06-08
+        run: rustup toolchain install nightly-2023-10-15
       - uses: Swatinem/rust-cache@v2
       - name: "Install cargo-udeps"
         uses: taiki-e/install-action@cargo-udeps
       - name: "Run cargo-udeps"
-        run: cargo +nightly-2023-06-08 udeps
+        run: cargo +nightly-2023-10-15 udeps
 
   python-package:
     name: "python package"

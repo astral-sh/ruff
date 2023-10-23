@@ -15,7 +15,9 @@ use ruff_text_size::TextSize;
 /// The allowed range of values is 1..=320
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct LineLength(NonZeroU16);
+pub struct LineLength(
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))] NonZeroU16,
+);
 
 impl LineLength {
     /// Maximum allowed value for a valid [`LineLength`]
@@ -249,5 +251,11 @@ impl Default for TabSize {
 impl From<NonZeroU8> for TabSize {
     fn from(tab_size: NonZeroU8) -> Self {
         Self(tab_size)
+    }
+}
+
+impl From<TabSize> for NonZeroU8 {
+    fn from(value: TabSize) -> Self {
+        value.0
     }
 }

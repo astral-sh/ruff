@@ -1,14 +1,19 @@
 use std::borrow::Cow;
 use std::path::Path;
 
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::Locator;
 use smallvec::SmallVec;
 
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::call_path::CallPath;
+use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use crate::AnyNodeRef;
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
+    self as ast, Arguments, CmpOp, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt,
+    TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -1127,6 +1132,58 @@ impl Truthiness {
         }
         .into()
     }
+}
+
+pub fn generate_comparison(
+    left: &Expr,
+    ops: &[CmpOp],
+    comparators: &[Expr],
+    parent: AnyNodeRef,
+    comment_ranges: &CommentRanges,
+    locator: &Locator,
+) -> String {
+    let start = left.start();
+    let end = comparators.last().map_or_else(|| left.end(), Ranged::end);
+    let mut contents = String::with_capacity(usize::from(end - start));
+
+    // Add the left side of the comparison.
+    contents.push_str(
+        locator.slice(
+            parenthesized_range(left.into(), parent, comment_ranges, locator.contents())
+                .unwrap_or(left.range()),
+        ),
+    );
+
+    for (op, comparator) in ops.iter().zip(comparators) {
+        // Add the operator.
+        contents.push_str(match op {
+            CmpOp::Eq => " == ",
+            CmpOp::NotEq => " != ",
+            CmpOp::Lt => " < ",
+            CmpOp::LtE => " <= ",
+            CmpOp::Gt => " > ",
+            CmpOp::GtE => " >= ",
+            CmpOp::In => " in ",
+            CmpOp::NotIn => " not in ",
+            CmpOp::Is => " is ",
+            CmpOp::IsNot => " is not ",
+        });
+
+        // Add the right side of the comparison.
+        contents.push_str(
+            locator.slice(
+                parenthesized_range(
+                    comparator.into(),
+                    parent,
+                    comment_ranges,
+                    locator.contents(),
+                )
+                .unwrap_or(comparator.range()),
+            ),
+        );
+    }
+
+    contents
 }
 
 #[cfg(test)]

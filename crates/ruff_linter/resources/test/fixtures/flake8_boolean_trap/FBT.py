@@ -70,6 +70,8 @@ settings.set_enable_developer_extras(True)
 foo.is_(True)
 bar.is_not(False)
 next(iter([]), False)
+sa.func.coalesce(tbl.c.valid, False)
+
 
 class Registry:
     def __init__(self) -> None:

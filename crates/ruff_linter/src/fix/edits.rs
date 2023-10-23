@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;

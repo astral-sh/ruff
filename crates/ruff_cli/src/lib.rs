@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)]
+
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -6,6 +8,7 @@ use std::sync::mpsc::channel;
 
 use anyhow::Result;
 use clap::CommandFactory;
+use colored::Colorize;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
@@ -26,6 +29,7 @@ mod panic;
 mod printer;
 pub mod resolve;
 mod stdin;
+mod version;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -104,8 +108,6 @@ pub fn run(
     }: Args,
 ) -> Result<ExitStatus> {
     {
-        use colored::Colorize;
-
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             #[allow(clippy::print_stderr)]
@@ -135,6 +137,10 @@ pub fn run(
     set_up_logging(&log_level)?;
 
     match command {
+        Command::Version { output_format } => {
+            commands::version::version(output_format)?;
+            Ok(ExitStatus::Success)
+        }
         Command::Rule { rule, all, format } => {
             if all {
                 commands::rule::rules(format)?;
@@ -166,10 +172,7 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    warn_user_once!(
-        "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
-        experimentation."
-    );
+    warn_user_once!("`ruff format` is not yet stable, and subject to change in future versions.");
 
     let (cli, overrides) = args.partition();
 
@@ -181,14 +184,6 @@ fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
 }
 
 pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    if args.format.is_some() {
-        if std::env::var("RUFF_FORMAT").is_ok() {
-            warn_user!("The environment variable `RUFF_FORMAT` is deprecated. Use `RUFF_OUTPUT_FORMAT` instead.");
-        } else {
-            warn_user!("The argument `--format=<FORMAT>` is deprecated. Use `--output-format=<FORMAT>` instead.");
-        }
-    }
-
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -208,6 +203,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         }
         _ => Box::new(BufWriter::new(io::stdout())),
     };
+    let stderr_writer = Box::new(BufWriter::new(io::stderr()));
 
     if cli.show_settings {
         commands::show_settings::show_settings(
@@ -310,7 +306,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     if cli.watch {
         if output_format != SerializationFormat::Text {
-            warn_user!("--format 'text' is used in watch mode.");
+            warn_user!("`--output-format text` is always used in watch mode.");
         }
 
         // Configure the file watcher.
@@ -402,15 +398,18 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             )?
         };
 
-        // Always try to print violations (the printer itself may suppress output),
-        // unless we're writing fixes via stdin (in which case, the transformed
-        // source code goes to stdout).
-        if !(is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff)) {
-            if cli.statistics {
-                printer.write_statistics(&diagnostics, &mut writer)?;
-            } else {
-                printer.write_once(&diagnostics, &mut writer)?;
-            }
+        // Always try to print violations (though the printer itself may suppress output)
+        // If we're writing fixes via stdin, the transformed source code goes to the writer
+        // so send the summary to stderr instead
+        let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
+            stderr_writer
+        } else {
+            writer
+        };
+        if cli.statistics {
+            printer.write_statistics(&diagnostics, &mut summary_writer)?;
+        } else {
+            printer.write_once(&diagnostics, &mut summary_writer)?;
         }
 
         if !cli.exit_zero {

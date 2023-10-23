@@ -11,7 +11,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for dictionary literals that associate multiple values with the
@@ -157,27 +157,25 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                         },
                         key.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        if !seen_values.insert(comparable_value) {
-                            diagnostic.set_fix(Fix::sometimes_applies(Edit::deletion(
-                                parenthesized_range(
-                                    (&dict.values[i - 1]).into(),
-                                    dict.into(),
-                                    checker.indexer().comment_ranges(),
-                                    checker.locator().contents(),
-                                )
-                                .unwrap_or(dict.values[i - 1].range())
-                                .end(),
-                                parenthesized_range(
-                                    (&dict.values[i]).into(),
-                                    dict.into(),
-                                    checker.indexer().comment_ranges(),
-                                    checker.locator().contents(),
-                                )
-                                .unwrap_or(dict.values[i].range())
-                                .end(),
-                            )));
-                        }
+                    if !seen_values.insert(comparable_value) {
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+                            parenthesized_range(
+                                (&dict.values[i - 1]).into(),
+                                dict.into(),
+                                checker.indexer().comment_ranges(),
+                                checker.locator().contents(),
+                            )
+                            .unwrap_or(dict.values[i - 1].range())
+                            .end(),
+                            parenthesized_range(
+                                (&dict.values[i]).into(),
+                                dict.into(),
+                                checker.indexer().comment_ranges(),
+                                checker.locator().contents(),
+                            )
+                            .unwrap_or(dict.values[i].range())
+                            .end(),
+                        )));
                     }
                     checker.diagnostics.push(diagnostic);
                 }
@@ -190,28 +188,26 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                         },
                         key.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        let comparable_value: ComparableExpr = (&dict.values[i]).into();
-                        if !seen_values.insert(comparable_value) {
-                            diagnostic.set_fix(Fix::sometimes_applies(Edit::deletion(
-                                parenthesized_range(
-                                    (&dict.values[i - 1]).into(),
-                                    dict.into(),
-                                    checker.indexer().comment_ranges(),
-                                    checker.locator().contents(),
-                                )
-                                .unwrap_or(dict.values[i - 1].range())
-                                .end(),
-                                parenthesized_range(
-                                    (&dict.values[i]).into(),
-                                    dict.into(),
-                                    checker.indexer().comment_ranges(),
-                                    checker.locator().contents(),
-                                )
-                                .unwrap_or(dict.values[i].range())
-                                .end(),
-                            )));
-                        }
+                    let comparable_value: ComparableExpr = (&dict.values[i]).into();
+                    if !seen_values.insert(comparable_value) {
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+                            parenthesized_range(
+                                (&dict.values[i - 1]).into(),
+                                dict.into(),
+                                checker.indexer().comment_ranges(),
+                                checker.locator().contents(),
+                            )
+                            .unwrap_or(dict.values[i - 1].range())
+                            .end(),
+                            parenthesized_range(
+                                (&dict.values[i]).into(),
+                                dict.into(),
+                                checker.indexer().comment_ranges(),
+                                checker.locator().contents(),
+                            )
+                            .unwrap_or(dict.values[i].range())
+                            .end(),
+                        )));
                     }
                     checker.diagnostics.push(diagnostic);
                 }

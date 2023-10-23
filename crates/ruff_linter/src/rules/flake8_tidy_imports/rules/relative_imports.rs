@@ -8,7 +8,7 @@ use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_tidy_imports::settings::Strictness;
 
 /// ## What it does
@@ -103,7 +103,7 @@ fn fix_banned_relative_import(
         range: TextRange::default(),
     };
     let content = generator.stmt(&node.into());
-    Some(Fix::sometimes_applies(Edit::range_replacement(
+    Some(Fix::unsafe_edit(Edit::range_replacement(
         content,
         stmt.range(),
     )))
@@ -124,13 +124,11 @@ pub(crate) fn banned_relative_import(
     };
     if level? > strictness_level {
         let mut diagnostic = Diagnostic::new(RelativeImports { strictness }, stmt.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if let Some(fix) =
-                fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
-            {
-                diagnostic.set_fix(fix);
-            };
-        }
+        if let Some(fix) =
+            fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
+        {
+            diagnostic.set_fix(fix);
+        };
         Some(diagnostic)
     } else {
         None

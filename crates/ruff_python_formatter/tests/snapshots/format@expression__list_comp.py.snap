@@ -108,6 +108,9 @@ aaaaaaaaaaaaaaaaaaaaa = [
      c  # negative decimal
 ]
 
+# Parenthesized targets and iterators.
+[x for (x) in y]
+[x for x in (y)]
 ```
 
 ## Output
@@ -247,6 +250,10 @@ aaaaaaaaaaaaaaaaaaaaa = [
     for components in b  # pylint: disable=undefined-loop-variable  # integer 1 may only have decimal 01-09
     + c  # negative decimal
 ]
+
+# Parenthesized targets and iterators.
+[x for (x) in y]
+[x for x in (y)]
 ```
 
 

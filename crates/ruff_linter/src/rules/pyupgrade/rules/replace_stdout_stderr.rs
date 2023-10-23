@@ -7,7 +7,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` that send `stdout` and `stderr` to a
@@ -81,12 +80,9 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
         }
 
         let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, call.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if call.arguments.find_keyword("capture_output").is_none() {
-                diagnostic.try_set_fix(|| {
-                    generate_fix(stdout, stderr, call, checker.locator().contents())
-                });
-            }
+        if call.arguments.find_keyword("capture_output").is_none() {
+            diagnostic
+                .try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator().contents()));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -105,7 +101,7 @@ fn generate_fix(
         (stderr, stdout)
     };
     // Replace one argument with `capture_output=True`, and remove the other.
-    Ok(Fix::sometimes_applies_edits(
+    Ok(Fix::unsafe_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
         [remove_argument(
             second,

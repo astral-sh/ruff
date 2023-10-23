@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
+
 use crate::rules::flynt::helpers;
 
 /// ## What it does
@@ -154,11 +154,9 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
-            pad(contents, expr.range(), checker.locator()),
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        pad(contents, expr.range(), checker.locator()),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

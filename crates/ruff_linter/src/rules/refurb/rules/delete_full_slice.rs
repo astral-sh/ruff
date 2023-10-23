@@ -6,7 +6,7 @@ use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::refurb::helpers::generate_method_call;
 
 /// ## What it does
@@ -69,9 +69,9 @@ pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete)
         let mut diagnostic = Diagnostic::new(DeleteFullSlice, delete.range);
 
         // Fix is only supported for single-target deletions.
-        if checker.patch(diagnostic.kind.rule()) && delete.targets.len() == 1 {
+        if delete.targets.len() == 1 {
             let replacement = generate_method_call(name, "clear", checker.generator());
-            diagnostic.set_fix(Fix::sometimes_applies(Edit::replacement(
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                 replacement,
                 delete.start(),
                 delete.end(),

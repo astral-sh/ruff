@@ -137,8 +137,8 @@ impl From<bool> for UnsafeFixes {
 impl UnsafeFixes {
     pub fn required_applicability(&self) -> Applicability {
         match self {
-            Self::Enabled => Applicability::Sometimes,
-            Self::Disabled => Applicability::Always,
+            Self::Enabled => Applicability::Unsafe,
+            Self::Disabled => Applicability::Safe,
         }
     }
 }

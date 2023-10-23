@@ -4,7 +4,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `pathlib.Path` objects that are initialized with the current
@@ -76,9 +75,7 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
 
     if matches!(value.as_str(), "" | ".") {
         let mut diagnostic = Diagnostic::new(PathConstructorCurrentDirectory, *range);
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::always_applies(Edit::range_deletion(*range)));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(*range)));
         checker.diagnostics.push(diagnostic);
     }
 }

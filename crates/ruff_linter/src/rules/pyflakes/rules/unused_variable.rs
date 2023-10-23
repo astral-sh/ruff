@@ -12,7 +12,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -237,11 +236,11 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     )?
                     .start();
                     let edit = Edit::deletion(start, end);
-                    Some(Fix::sometimes_applies(edit))
+                    Some(Fix::unsafe_edit(edit))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                     let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
-                    Some(Fix::sometimes_applies(edit).isolate(isolation))
+                    Some(Fix::unsafe_edit(edit).isolate(isolation))
                 };
             }
         }
@@ -265,11 +264,11 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     })?
                     .start();
                 let edit = Edit::deletion(start, end);
-                Some(Fix::sometimes_applies(edit))
+                Some(Fix::unsafe_edit(edit))
             } else {
                 // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                 let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
-                Some(Fix::sometimes_applies(edit).isolate(isolation))
+                Some(Fix::unsafe_edit(edit).isolate(isolation))
             };
         }
     }
@@ -300,7 +299,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     .start();
 
                     let edit = Edit::deletion(start, end);
-                    return Some(Fix::sometimes_applies(edit));
+                    return Some(Fix::unsafe_edit(edit));
                 }
             }
         }
@@ -344,10 +343,8 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
             },
             binding.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            if let Some(fix) = remove_unused_variable(binding, checker) {
-                diagnostic.set_fix(fix);
-            }
+        if let Some(fix) = remove_unused_variable(binding, checker) {
+            diagnostic.set_fix(fix);
         }
         diagnostics.push(diagnostic);
     }

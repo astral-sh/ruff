@@ -10,7 +10,6 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `TypedDict` declarations that use functional syntax.
@@ -84,18 +83,16 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         },
         stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-        if checker.locator().is_at_start_of_line(stmt.start()) {
-            diagnostic.set_fix(convert_to_class(
-                stmt,
-                class_name,
-                body,
-                total_keyword,
-                base_class,
-                checker.generator(),
-            ));
-        }
+    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+    if checker.locator().is_at_start_of_line(stmt.start()) {
+        diagnostic.set_fix(convert_to_class(
+            stmt,
+            class_name,
+            body,
+            total_keyword,
+            base_class,
+            checker.generator(),
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -275,7 +272,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    Fix::sometimes_applies(Edit::range_replacement(
+    Fix::safe_edit(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(
             class_name,
             body,

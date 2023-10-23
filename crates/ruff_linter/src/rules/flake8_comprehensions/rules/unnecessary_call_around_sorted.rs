@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
@@ -82,19 +82,14 @@ pub(crate) fn unnecessary_call_around_sorted(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let edit = fixes::fix_unnecessary_call_around_sorted(
-                expr,
-                checker.locator(),
-                checker.stylist(),
-            )?;
-            if outer.id == "reversed" {
-                Ok(Fix::sometimes_applies(edit))
-            } else {
-                Ok(Fix::always_applies(edit))
-            }
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let edit =
+            fixes::fix_unnecessary_call_around_sorted(expr, checker.locator(), checker.stylist())?;
+        if outer.id == "reversed" {
+            Ok(Fix::unsafe_edit(edit))
+        } else {
+            Ok(Fix::safe_edit(edit))
+        }
+    });
     checker.diagnostics.push(diagnostic);
 }

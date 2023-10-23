@@ -6,7 +6,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Check for type annotations that can be rewritten based on [PEP 604] syntax.
@@ -73,13 +72,13 @@ pub(crate) fn use_pep604_annotation(
     match operator {
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
-            if fixable && checker.patch(diagnostic.kind.rule()) {
+            if fixable {
                 match slice {
                     Expr::Tuple(_) => {
                         // Invalid type annotation.
                     }
                     _ => {
-                        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             pad(
                                 checker.generator().expr(&optional(slice)),
                                 expr.range(),
@@ -94,13 +93,13 @@ pub(crate) fn use_pep604_annotation(
         }
         Pep604Operator::Union => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
-            if fixable && checker.patch(diagnostic.kind.rule()) {
+            if fixable {
                 match slice {
                     Expr::Slice(_) => {
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             pad(
                                 checker.generator().expr(&union(elts)),
                                 expr.range(),
@@ -111,7 +110,7 @@ pub(crate) fn use_pep604_annotation(
                     }
                     _ => {
                         // Single argument.
-                        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             pad(
                                 checker.locator().slice(slice).to_string(),
                                 expr.range(),

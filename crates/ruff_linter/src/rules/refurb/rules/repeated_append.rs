@@ -11,7 +11,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for consecutive calls to `append`.
@@ -107,8 +106,8 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
 
             // We only suggest a fix when all appends in a group are clumped together. If they're
             // non-consecutive, fixing them is much more difficult.
-            if checker.patch(diagnostic.kind.rule()) && group.is_consecutive {
-                diagnostic.set_fix(Fix::sometimes_applies(Edit::replacement(
+            if group.is_consecutive {
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     replacement,
                     group.start(),
                     group.end(),

@@ -125,18 +125,18 @@ impl Display for DisplayGroupedMessage<'_> {
                 f,
                 "cell {cell}{sep}",
                 cell = jupyter_index
-                    .cell(start_location.row.get())
-                    .unwrap_or_default(),
+                    .cell(start_location.row)
+                    .unwrap_or(OneIndexed::MIN),
                 sep = ":".cyan()
             )?;
             (
                 jupyter_index
-                    .cell_row(start_location.row.get())
-                    .unwrap_or(1) as usize,
-                start_location.column.get(),
+                    .cell_row(start_location.row)
+                    .unwrap_or(OneIndexed::MIN),
+                start_location.column,
             )
         } else {
-            (start_location.row.get(), start_location.column.get())
+            (start_location.row, start_location.column)
         };
 
         writeln!(

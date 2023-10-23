@@ -6,7 +6,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `range` calls with an unnecessary `start` argument.
@@ -78,16 +77,14 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart, start.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            remove_argument(
-                &start,
-                &call.arguments,
-                Parentheses::Preserve,
-                checker.locator().contents(),
-            )
-            .map(Fix::always_applies)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        remove_argument(
+            &start,
+            &call.arguments,
+            Parentheses::Preserve,
+            checker.locator().contents(),
+        )
+        .map(Fix::safe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }

@@ -10,7 +10,7 @@ UP017.py:7:7: UP017 [*] Use `datetime.UTC` alias
   |
   = help: Convert to `datetime.UTC` alias
 
-ℹ Suggested fix
+ℹ Fix
 4 4 | from datetime import timezone as tz
 5 5 | 
 6 6 | print(datetime.timezone(-1))
@@ -31,7 +31,7 @@ UP017.py:8:7: UP017 [*] Use `datetime.UTC` alias
    |
    = help: Convert to `datetime.UTC` alias
 
-ℹ Suggested fix
+ℹ Fix
 5 5 | 
 6 6 | print(datetime.timezone(-1))
 7 7 | print(timezone.utc)
@@ -51,7 +51,7 @@ UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
    |
    = help: Convert to `datetime.UTC` alias
 
-ℹ Suggested fix
+ℹ Fix
 7  7  | print(timezone.utc)
 8  8  | print(tz.utc)
 9  9  | 
@@ -67,7 +67,7 @@ UP017.py:11:7: UP017 [*] Use `datetime.UTC` alias
    |
    = help: Convert to `datetime.UTC` alias
 
-ℹ Suggested fix
+ℹ Fix
 8  8  | print(tz.utc)
 9  9  | 
 10 10 | print(datetime.timezone.utc)

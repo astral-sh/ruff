@@ -28,6 +28,7 @@ mod tests {
     #[test_case(Rule::FString, Path::new("UP032_0.py"))]
     #[test_case(Rule::FString, Path::new("UP032_1.py"))]
     #[test_case(Rule::FString, Path::new("UP032_2.py"))]
+    #[test_case(Rule::FString, Path::new("UP032_3.py"))]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_0.py"))]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_1.py"))]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_0.py"))]
@@ -83,6 +84,7 @@ mod tests {
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_0.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_1.py"))]
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
+    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(

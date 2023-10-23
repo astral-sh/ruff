@@ -11,7 +11,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::settings::types::PythonVersion;
 
@@ -534,12 +534,10 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
             ) {
                 let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
-                        "...".to_string(),
-                        default.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "...".to_string(),
+                    default.range(),
+                )));
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -571,12 +569,10 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Param
             ) {
                 let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
 
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
-                        "...".to_string(),
-                        default.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "...".to_string(),
+                    default.range(),
+                )));
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -606,12 +602,10 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
     }
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
-            "...".to_string(),
-            value.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "...".to_string(),
+        value.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -642,12 +636,10 @@ pub(crate) fn annotated_assignment_default_in_stub(
     }
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::sometimes_applies(Edit::range_replacement(
-            "...".to_string(),
-            value.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "...".to_string(),
+        value.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -741,18 +733,16 @@ pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr,
         },
         target.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import(module.as_str(), "TypeAlias"),
-                target.start(),
-                checker.semantic(),
-            )?;
-            Ok(Fix::sometimes_applies_edits(
-                Edit::range_replacement(format!("{id}: {binding}"), target.range()),
-                [import_edit],
-            ))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import(module.as_str(), "TypeAlias"),
+            target.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::safe_edits(
+            Edit::range_replacement(format!("{id}: {binding}"), target.range()),
+            [import_edit],
+        ))
+    });
     checker.diagnostics.push(diagnostic);
 }

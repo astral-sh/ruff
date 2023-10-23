@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -67,10 +67,7 @@ pub(crate) fn unnecessary_generator_dict(
         return;
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::sometimes_applies)
-        });
-    }
+    diagnostic
+        .try_set_fix(|| fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::unsafe_edit));
     checker.diagnostics.push(diagnostic);
 }

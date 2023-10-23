@@ -18,6 +18,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
+    #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(
@@ -132,8 +133,15 @@ mod tests {
         Rule::SubprocessRunWithoutCheck,
         Path::new("subprocess_run_without_check.py")
     )]
+    #[test_case(Rule::UnspecifiedEncoding, Path::new("unspecified_encoding.py"))]
     #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
     #[test_case(Rule::NoSelfUse, Path::new("no_self_use.py"))]
+    #[test_case(Rule::MisplacedBareRaise, Path::new("misplaced_bare_raise.py"))]
+    #[test_case(Rule::LiteralMembership, Path::new("literal_membership.py"))]
+    #[test_case(Rule::GlobalAtModuleLevel, Path::new("global_at_module_level.py"))]
+    #[test_case(Rule::UnnecessaryLambda, Path::new("unnecessary_lambda.py"))]
+    #[test_case(Rule::NonAsciiImportName, Path::new("non_ascii_module_import.py"))]
+    #[test_case(Rule::NonAsciiName, Path::new("non_ascii_name.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -221,6 +229,22 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::TooManyBranches)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn max_boolean_expressions() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_boolean_expressions.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_bool_expr: 5,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::TooManyBooleanExpressions)
             },
         )?;
         assert_messages!(diagnostics);

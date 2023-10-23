@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -58,12 +58,9 @@ pub(crate) fn unnecessary_list_comprehension_set(
     }
     if argument.is_list_comp_expr() {
         let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_list_comprehension_set(expr, checker)
-                    .map(Fix::sometimes_applies)
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_list_comprehension_set(expr, checker).map(Fix::unsafe_edit)
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

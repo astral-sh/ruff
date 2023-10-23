@@ -8,7 +8,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for the use of generics that can be replaced with standard library
@@ -86,30 +85,28 @@ pub(crate) fn use_pep585_annotation(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if !checker.semantic().in_complex_string_type_definition() {
-            match replacement {
-                ModuleMember::BuiltIn(name) => {
-                    // Built-in type, like `list`.
-                    if checker.semantic().is_builtin(name) {
-                        diagnostic.set_fix(Fix::always_applies(Edit::range_replacement(
-                            (*name).to_string(),
-                            expr.range(),
-                        )));
-                    }
+    if !checker.semantic().in_complex_string_type_definition() {
+        match replacement {
+            ModuleMember::BuiltIn(name) => {
+                // Built-in type, like `list`.
+                if checker.semantic().is_builtin(name) {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        (*name).to_string(),
+                        expr.range(),
+                    )));
                 }
-                ModuleMember::Member(module, member) => {
-                    // Imported type, like `collections.deque`.
-                    diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                            &ImportRequest::import_from(module, member),
-                            expr.start(),
-                            checker.semantic(),
-                        )?;
-                        let reference_edit = Edit::range_replacement(binding, expr.range());
-                        Ok(Fix::sometimes_applies_edits(import_edit, [reference_edit]))
-                    });
-                }
+            }
+            ModuleMember::Member(module, member) => {
+                // Imported type, like `collections.deque`.
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                        &ImportRequest::import_from(module, member),
+                        expr.start(),
+                        checker.semantic(),
+                    )?;
+                    let reference_edit = Edit::range_replacement(binding, expr.range());
+                    Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+                });
             }
         }
     }

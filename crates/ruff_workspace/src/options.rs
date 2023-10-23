@@ -2,12 +2,11 @@ use std::collections::BTreeSet;
 use std::hash::BuildHasherDefault;
 
 use regex::Regex;
-use ruff_formatter::IndentStyle;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::options_base::{OptionsMetadata, Visit};
+use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
@@ -142,7 +141,7 @@ pub struct Options {
     pub required_version: Option<Version>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
-    /// use unstable rules and fixes.
+    /// use unstable rules, fixes, and formatting.
     #[option(
         default = "false",
         value_type = "bool",
@@ -154,7 +153,7 @@ pub struct Options {
     pub preview: Option<bool>,
 
     // File resolver options
-    /// A list of file patterns to exclude from linting.
+    /// A list of file patterns to exclude from formatting and linting.
     ///
     /// Exclusions are based on globs, and can be either:
     ///
@@ -179,7 +178,7 @@ pub struct Options {
     )]
     pub exclude: Option<Vec<String>>,
 
-    /// A list of file patterns to omit from linting, in addition to those
+    /// A list of file patterns to omit from formatting and linting, in addition to those
     /// specified by `exclude`.
     ///
     /// Exclusions are based on globs, and can be either:
@@ -362,10 +361,13 @@ pub struct Options {
         line-length = 120
         "#
     )]
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))]
     pub line_length: Option<LineLength>,
 
-    /// The tabulation size to calculate line length.
+    /// The number of spaces a tab is equal to when enforcing long-line violations (like `E501`)
+    /// or formatting code with the formatter.
+    ///
+    /// This option changes the number of spaces inserted by the formatter when
+    /// using soft-tabs (`indent-style = space`).
     #[option(
         default = "4",
         value_type = "int",
@@ -379,21 +381,11 @@ pub struct Options {
 
     /// The lint sections specified at the top level.
     #[serde(flatten)]
-    pub lint_top_level: LintOptions,
+    pub lint_top_level: LintCommonOptions,
 
-    /// Options to configure the code formatting.
-    ///
-    /// Previously:
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
-    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
-    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
-    ///
-    /// This option has been **deprecated** in favor of `output-format`
-    /// to avoid ambiguity with Ruff's upcoming formatter.
+    /// Options to configure code formatting.
     #[option_group]
-    pub format: Option<FormatOrOutputFormat>,
+    pub format: Option<FormatOptions>,
 }
 
 /// Experimental section to configure Ruff's linting. This new section will eventually
@@ -401,11 +393,56 @@ pub struct Options {
 ///
 /// Options specified in the `lint` section take precedence over the top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct LintOptions {
+    #[serde(flatten)]
+    pub common: LintCommonOptions,
+
+    /// A list of file patterns to exclude from linting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will
+    /// use unstable rules and fixes.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features.
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
+}
+
+// Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
+// is removed.
+
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
     Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct LintOptions {
+pub struct LintCommonOptions {
     /// A list of allowed "confusable" Unicode characters to ignore when
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     #[option(
@@ -434,9 +471,6 @@ pub struct LintOptions {
 
     /// A list of rule codes or prefixes to ignore, in addition to those
     /// specified by `ignore`.
-    ///
-    /// This option has been **deprecated** in favor of `ignore`
-    /// since its usage is now interchangeable with `ignore`.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -445,7 +479,9 @@ pub struct LintOptions {
             extend-ignore = ["F841"]
         "#
     )]
-    #[cfg_attr(feature = "schemars", schemars(skip))]
+    #[deprecated(
+        note = "The `extend-ignore` option is now interchangeable with `ignore`. Please update your configuration to use the `ignore` option instead."
+    )]
     pub extend_ignore: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes or prefixes to enable, in addition to those
@@ -474,10 +510,9 @@ pub struct LintOptions {
 
     /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
     /// specified by `unfixable`.
-    ///
-    /// This option has been **deprecated** in favor of `unfixable` since its usage is now
-    /// interchangeable with `unfixable`.
-    #[cfg_attr(feature = "schemars", schemars(skip))]
+    #[deprecated(
+        note = "The `extend-unfixable` option is now interchangeable with `unfixable`. Please update your configuration to use the `unfixable` option instead."
+    )]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes that are unsupported by Ruff, but should be
@@ -523,6 +558,30 @@ pub struct LintOptions {
         "#
     )]
     pub ignore: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes for which unsafe fixes should be considered
+    /// safe.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Allow applying all unsafe fixes in the `E` rules and `F401` without the `--unsafe-fixes` flag
+            extend_safe_fixes = ["E", "F401"]
+        "#
+    )]
+    pub extend_safe_fixes: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes for which safe fixes should be considered
+    /// unsafe.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
+            extend_unsafe_fixes = ["E", "F401"]
+        "#
+    )]
+    pub extend_unsafe_fixes: Option<Vec<RuleSelector>>,
 
     /// Avoid automatically removing unused imports in `__init__.py` files. Such
     /// imports will still be flagged, but with a dedicated message suggesting
@@ -570,11 +629,11 @@ pub struct LintOptions {
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
     #[option(
-        default = r#"["E", "F"]"#,
+        default = r#"["E4", "E7", "E9", "F"]"#,
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            select = ["E", "F", "B", "Q"]
+            # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            select = ["E4", "E7", "E9", "F", "B", "Q"]
         "#
     )]
     pub select: Option<Vec<RuleSelector>>,
@@ -2333,7 +2392,7 @@ pub struct PylintOptions {
     /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
     #[option(
         default = r#"["str", "bytes"]"#,
-        value_type = r#"list["str" | "bytes" | "complex" | "float" | "int" | "tuple"]"#,
+        value_type = r#"list["str" | "bytes" | "complex" | "float" | "int"]"#,
         example = r#"
             allow-magic-value-types = ["int"]
         "#
@@ -2367,6 +2426,11 @@ pub struct PylintOptions {
         example = r"max-public-methods = 20"
     )]
     pub max_public_methods: Option<usize>,
+
+    /// Maximum number of Boolean expressions allowed within a single `if` statement
+    /// (see: `PLR0916`).
+    #[option(default = r"5", value_type = "int", example = r"max-bool-expr = 5")]
+    pub max_bool_expr: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2377,6 +2441,7 @@ impl PylintOptions {
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
             max_args: self.max_args.unwrap_or(defaults.max_args),
+            max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
@@ -2442,42 +2507,40 @@ impl PyUpgradeOptions {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum FormatOrOutputFormat {
-    Format(FormatOptions),
-    OutputFormat(SerializationFormat),
-}
-
-impl FormatOrOutputFormat {
-    pub const fn as_output_format(&self) -> Option<SerializationFormat> {
-        match self {
-            FormatOrOutputFormat::Format(_) => None,
-            FormatOrOutputFormat::OutputFormat(format) => Some(*format),
-        }
-    }
-}
-
-impl OptionsMetadata for FormatOrOutputFormat {
-    fn record(visit: &mut dyn Visit) {
-        FormatOptions::record(visit);
-    }
-
-    fn documentation() -> Option<&'static str> {
-        FormatOptions::documentation()
-    }
-}
-
 /// Experimental: Configures how `ruff format` formats your code.
 ///
 /// Please provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct FormatOptions {
+    /// A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    ///
+    /// Note that you'll typically want to use
+    /// [`extend-exclude`](#extend-exclude) to modify the excluded paths.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+
     /// Whether to enable the unstable preview style formatting.
     #[option(
         default = "false",
@@ -2518,7 +2581,7 @@ pub struct FormatOptions {
     /// ```
     ///
     /// Ruff will change `a` to use single quotes when using `quote-style = "single"`. However,
-    /// `a` will be unchanged, as converting to single quotes would require the inner `'` to be
+    /// `b` will be unchanged, as converting to single quotes would require the inner `'` to be
     /// escaped, which leads to less readable code: `'It\'s monday morning'`.
     #[option(
         default = r#"double"#,
@@ -2560,16 +2623,16 @@ pub struct FormatOptions {
 
     /// The character Ruff uses at the end of a line.
     ///
+    /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.
     /// * `lf`: Line endings will be converted to `\n`. The default line ending on Unix.
     /// * `cr-lf`: Line endings will be converted to `\r\n`. The default line ending on Windows.
-    /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.
     /// * `native`: Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     #[option(
-        default = r#"lf"#,
-        value_type = r#""lf" | "cr-lf" | "auto" | "native""#,
+        default = r#"auto"#,
+        value_type = r#""auto" | "lf" | "cr-lf" | "native""#,
         example = r#"
-            # Automatically detect the line ending on a file per file basis.
-            line-ending = "auto"
+            # Use `\n` line endings for all files
+            line-ending = "lf"
         "#
     )]
     pub line_ending: Option<LineEnding>,

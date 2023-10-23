@@ -126,11 +126,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
     for (node_id, imports) in errors_by_statement {
-        let fix = if checker.patch(Rule::RuntimeImportInTypeCheckingBlock) {
-            fix_imports(checker, node_id, &imports).ok()
-        } else {
-            None
-        };
+        let fix = fix_imports(checker, node_id, &imports).ok();
 
         for ImportBinding {
             import,
@@ -235,7 +231,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
     )?;
 
     Ok(
-        Fix::sometimes_applies_edits(remove_import_edit, add_import_edit.into_edits()).isolate(
+        Fix::unsafe_edits(remove_import_edit, add_import_edit.into_edits()).isolate(
             Checker::isolation(checker.semantic().parent_statement_id(node_id)),
         ),
     )

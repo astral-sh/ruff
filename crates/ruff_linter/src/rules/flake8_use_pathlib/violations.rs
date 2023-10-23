@@ -799,8 +799,8 @@ impl Violation for OsPathIsabs {
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
 /// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.joinpath()` can improve readability over the `os`
-/// module's counterparts (e.g., `os.path.join()`).
+/// methods such as `Path.joinpath()` or the `/` operator can improve
+/// readability over the `os` module's counterparts (e.g., `os.path.join()`).
 ///
 /// Note that `os` functions may be preferable if performance is a concern,
 /// e.g., in hot loops.
@@ -828,15 +828,29 @@ impl Violation for OsPathIsabs {
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[violation]
 pub struct OsPathJoin {
-    pub module: String,
+    pub(crate) module: String,
+    pub(crate) joiner: Joiner,
 }
 
 impl Violation for OsPathJoin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OsPathJoin { module } = self;
-        format!("`os.{module}.join()` should be replaced by `Path` with `/` operator")
+        let OsPathJoin { module, joiner } = self;
+        match joiner {
+            Joiner::Slash => {
+                format!("`os.{module}.join()` should be replaced by `Path` with `/` operator")
+            }
+            Joiner::Joinpath => {
+                format!("`os.{module}.join()` should be replaced by `Path.joinpath()`")
+            }
+        }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Joiner {
+    Slash,
+    Joinpath,
 }
 
 /// ## What it does

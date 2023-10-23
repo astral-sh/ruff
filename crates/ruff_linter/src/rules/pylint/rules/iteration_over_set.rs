@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Expr};
-
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -30,10 +29,14 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct IterationOverSet;
 
-impl Violation for IterationOverSet {
+impl AlwaysFixableViolation for IterationOverSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a sequence type instead of a `set` when iterating over values")
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Convert to `tuple`")
     }
 }
 
@@ -47,7 +50,16 @@ pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(IterationOverSet, expr.range()));
+    let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
+
+    let tuple = if let [elt] = elts.as_slice() {
+        let elt = checker.locator().slice(elt);
+        format!("({elt},)")
+    } else {
+        let set = checker.locator().slice(expr);
+        format!("({})", &set[1..set.len() - 1])
+    };
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(tuple, expr.range())));
+
+    checker.diagnostics.push(diagnostic);
 }

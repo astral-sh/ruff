@@ -1,4 +1,4 @@
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprYieldFrom;
 
 use crate::expression::expr_yield::AnyExpressionYield;

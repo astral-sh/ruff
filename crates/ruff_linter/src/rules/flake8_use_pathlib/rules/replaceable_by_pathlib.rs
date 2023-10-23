@@ -8,7 +8,7 @@ use crate::rules::flake8_use_pathlib::rules::{
     Glob, OsPathGetatime, OsPathGetctime, OsPathGetmtime, OsPathGetsize,
 };
 use crate::rules::flake8_use_pathlib::violations::{
-    BuiltinOpen, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
+    BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
     OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir, OsPathIsfile,
     OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove, OsRename,
     OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
@@ -60,12 +60,22 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                 ["os", "path", "join"] => Some(
                     OsPathJoin {
                         module: "path".to_string(),
+                        joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                            Joiner::Joinpath
+                        } else {
+                            Joiner::Slash
+                        },
                     }
                     .into(),
                 ),
                 ["os", "sep", "join"] => Some(
                     OsPathJoin {
                         module: "sep".to_string(),
+                        joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                            Joiner::Joinpath
+                        } else {
+                            Joiner::Slash
+                        },
                     }
                     .into(),
                 ),
