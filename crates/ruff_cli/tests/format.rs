@@ -40,7 +40,6 @@ if condition:
         print('Hy "Micha"')  # Should not change quotes
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
 }
 
@@ -89,7 +88,6 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
     Ok(())
 }
@@ -117,7 +115,6 @@ fn mixed_line_endings() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     2 files left unchanged
     "###);
     Ok(())
@@ -187,7 +184,6 @@ OTHER = "OTHER"
     2 files would be reformatted
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
     Ok(())
 }
@@ -221,7 +217,6 @@ if __name__ == '__main__':
     ----- stdout -----
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
     Ok(())
 }
@@ -278,7 +273,6 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     warning: The following rules may cause conflicts when used with the formatter: 'Q000'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     "###);
     Ok(())
@@ -360,7 +354,6 @@ def say_hy(name: str):
     1 file reformatted
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'COM819', 'D206', 'E501', 'ISC001', 'Q000', 'Q001', 'Q002', 'Q003', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     warning: The following isort options may cause conflicts when used with the formatter: 'isort.force-single-line', 'isort.force-wrap-aliases', 'isort.lines-after-imports', 'isort.lines_between_types'. To avoid unexpected behavior, we recommend disabling these options by removing them from the configuration.
     "###);
@@ -400,7 +393,6 @@ def say_hy(name: str):
         print(f"Hy {name}")
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'COM819', 'D206', 'E501', 'ISC001', 'Q000', 'Q001', 'Q002', 'Q003', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     warning: The following isort options may cause conflicts when used with the formatter: 'isort.force-single-line', 'isort.force-wrap-aliases', 'isort.lines-after-imports', 'isort.lines_between_types'. To avoid unexpected behavior, we recommend disabling these options by removing them from the configuration.
     "###);
@@ -443,7 +435,6 @@ fn test_diff() {
          z = 3
 
         ----- stderr -----
-        warning: `ruff format` is not yet stable, and subject to change in future versions.
         2 files would be reformatted, 1 file left unchanged
         "###);
     });
@@ -473,7 +464,6 @@ fn test_diff_no_change() {
          z = 3
 
         ----- stderr -----
-        warning: `ruff format` is not yet stable, and subject to change in future versions.
         1 file would be reformatted
         "###
         );
@@ -507,7 +497,6 @@ fn test_diff_stdin_unformatted() {
      z = 3
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
 }
 
@@ -524,6 +513,5 @@ fn test_diff_stdin_formatted() {
     ----- stdout -----
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
 }

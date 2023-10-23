@@ -172,8 +172,6 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    warn_user_once!("`ruff format` is not yet stable, and subject to change in future versions.");
-
     let (cli, overrides) = args.partition();
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
