@@ -337,6 +337,45 @@ jobs:
       - name: "Remove checkouts from cache"
         run: rm -r target/progress_projects
 
+  check-ruff-lsp:
+    name: "test ruff-lsp"
+    runs-on: ubuntu-latest
+    needs: cargo-test
+    steps:
+      - uses: extractions/setup-just@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/checkout@v4
+        name: "Download ruff-lsp source"
+        with:
+          repository: "astral-sh/ruff-lsp"
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/download-artifact@v3
+        name: Download development ruff binary
+        id: ruff-target
+        with:
+          name: ruff
+          path: target/debug
+
+      - name: Install ruff-lsp dependencies
+        run: |
+          just install
+
+      - name: Run ruff-lsp tests
+        run: |
+          # Setup development binary
+          pip uninstall --yes ruff
+          chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
+          export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
+          ruff version
+
+          just test
+
   benchmarks:
     runs-on: ubuntu-latest
     steps:
