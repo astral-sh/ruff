@@ -10,7 +10,7 @@ E24.py:6:8: E242 [*] Tab after comma
 7 | #: Okay
 8 | b = (1, 20)  # space before 20
   |
-  = help: Replaced tab after comma by whitespace
+  = help: Replace with single space
 
 ℹ Fix
 3 3 | #: Okay

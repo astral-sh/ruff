@@ -35,7 +35,7 @@ impl AlwaysFixableViolation for TabBeforeOperator {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replaced tab before operator by whitespace")
+        format!("Replace with single space")
     }
 }
 
@@ -95,7 +95,7 @@ impl AlwaysFixableViolation for TabAfterOperator {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replaced tab after operator by whitespace")
+        format!("Replace with single space")
     }
 }
 
@@ -153,7 +153,7 @@ impl AlwaysFixableViolation for TabAfterComma {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replaced tab after comma by whitespace")
+        format!("Replace with single space")
     }
 }
 

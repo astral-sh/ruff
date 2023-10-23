@@ -9,7 +9,7 @@ E22.py:48:5: E224 [*] Tab after operator
 49 | b += 1000
 50 | #:
    |
-   = help: Replaced tab after operator by whitespace
+   = help: Replace with single space
 
 ℹ Fix
 45 45 | 
