@@ -635,8 +635,9 @@ fn nursery_group_selector_preview_enabled() {
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     warning: The `NURSERY` selector has been deprecated.
@@ -655,8 +656,9 @@ fn preview_enabled_prefix() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -675,8 +677,9 @@ fn preview_enabled_all() {
     -:1:1: E741 Ambiguous variable name: `I`
     -:1:1: D100 Missing docstring in public module
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 4 errors.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
@@ -695,8 +698,9 @@ fn preview_enabled_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
