@@ -1,4 +1,4 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -69,10 +69,14 @@ impl Violation for UnexpectedSpacesAroundKeywordParameterEquals {
 #[violation]
 pub struct MissingWhitespaceAroundParameterEquals;
 
-impl Violation for MissingWhitespaceAroundParameterEquals {
+impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing whitespace around parameter equals")
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Added missing whitespace around parameter equals")
     }
 }
 
@@ -131,7 +135,13 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                 if annotated_func_arg && parens == 1 {
                     let start = token.start();
                     if start == prev_end && prev_end != TextSize::new(0) {
-                        context.push(MissingWhitespaceAroundParameterEquals, token.range());
+                        let mut diagnostic =
+                            Diagnostic::new(MissingWhitespaceAroundParameterEquals, token.range);
+                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                            " ".to_string(),
+                            token.start(),
+                        )));
+                        context.push_diagnostic(diagnostic);
                     }
 
                     while let Some(next) = iter.peek() {
@@ -141,7 +151,15 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                             let next_start = next.start();
 
                             if next_start == token.end() {
-                                context.push(MissingWhitespaceAroundParameterEquals, token.range());
+                                let mut diagnostic = Diagnostic::new(
+                                    MissingWhitespaceAroundParameterEquals,
+                                    token.range,
+                                );
+                                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                                    " ".to_string(),
+                                    token.end(),
+                                )));
+                                context.push_diagnostic(diagnostic);
                             }
                             break;
                         }
