@@ -76,7 +76,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
     }
 
     fn fix_title(&self) -> String {
-        format!("Added missing whitespace around parameter equals")
+        format!("Add missing whitespace")
     }
 }
 

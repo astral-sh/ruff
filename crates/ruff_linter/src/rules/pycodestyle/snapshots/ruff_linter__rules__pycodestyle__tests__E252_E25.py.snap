@@ -10,7 +10,7 @@ E25.py:46:15: E252 [*] Missing whitespace around parameter equals
 47 |     return a + b + c
 48 | #: Okay
    |
-   = help: Added missing whitespace around parameter equals
+   = help: Add missing whitespace
 
 ℹ Fix
 43 43 | async  def add(a: int = 0, b: int = 0) -> int:
@@ -31,7 +31,7 @@ E25.py:46:15: E252 [*] Missing whitespace around parameter equals
 47 |     return a + b + c
 48 | #: Okay
    |
-   = help: Added missing whitespace around parameter equals
+   = help: Add missing whitespace
 
 ℹ Fix
 43 43 | async  def add(a: int = 0, b: int = 0) -> int:
@@ -52,7 +52,7 @@ E25.py:46:26: E252 [*] Missing whitespace around parameter equals
 47 |     return a + b + c
 48 | #: Okay
    |
-   = help: Added missing whitespace around parameter equals
+   = help: Add missing whitespace
 
 ℹ Fix
 43 43 | async  def add(a: int = 0, b: int = 0) -> int:
@@ -73,7 +73,7 @@ E25.py:46:36: E252 [*] Missing whitespace around parameter equals
 47 |     return a + b + c
 48 | #: Okay
    |
-   = help: Added missing whitespace around parameter equals
+   = help: Add missing whitespace
 
 ℹ Fix
 43 43 | async  def add(a: int = 0, b: int = 0) -> int:
