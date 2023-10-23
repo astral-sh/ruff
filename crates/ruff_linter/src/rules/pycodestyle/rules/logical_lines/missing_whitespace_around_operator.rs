@@ -130,10 +130,7 @@ pub(crate) fn missing_whitespace_around_operator(
     context: &mut LogicalLinesContext,
 ) {
     let mut tokens = line.tokens().iter().peekable();
-    let first_token = tokens.by_ref().find_map(|token| {
-        let kind = token.kind();
-        (!kind.is_trivia()).then_some(token)
-    });
+    let first_token = tokens.by_ref().find(|token| !token.kind().is_trivia());
     let Some(mut prev_token) = first_token else {
         return;
     };
