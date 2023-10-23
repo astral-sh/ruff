@@ -170,7 +170,10 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, marke
     let Expr::Call(ast::ExprCall {
         arguments: Arguments { args, keywords, .. },
         ..
-    }) = &decorator.expression;
+    }) = &decorator.expression
+    else {
+        return;
+    };
 
     if !args.is_empty() || !keywords.is_empty() {
         return;
