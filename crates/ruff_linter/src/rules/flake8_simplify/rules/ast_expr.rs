@@ -113,8 +113,8 @@ impl AlwaysFixableViolation for DictGetWithNoneDefault {
 /// Returns whether the given environment variable is allowed to be lowercase.
 ///
 /// References:
-/// - https://unix.stackexchange.com/a/212972
-/// - https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/#http_proxy-and-https_proxy
+/// - <https://unix.stackexchange.com/a/212972/>
+/// - <https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/#http_proxy-and-https_proxy/>
 fn is_lowercase_allowed(env_var: &str) -> bool {
     matches!(env_var, "https_proxy" | "http_proxy" | "no_proxy")
 }
