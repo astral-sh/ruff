@@ -37,7 +37,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
     }
 
     fn fix_title(&self) -> String {
-        format!("Added missing whitespace around operator")
+        format!("Add missing whitespace")
     }
 }
 
@@ -70,7 +70,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
     }
 
     fn fix_title(&self) -> String {
-        format!("Added missing whitespace around arithmetic operator")
+        format!("Add missing whitespace")
     }
 }
 
@@ -103,7 +103,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
     }
 
     fn fix_title(&self) -> String {
-        format!("Added missing whitespace around bitwise or shift operator")
+        format!("Add missing whitespace")
     }
 }
 
@@ -136,7 +136,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
     }
 
     fn fix_title(&self) -> String {
-        format!("Added missing whitespace around modulo operator")
+        format!("Add missing whitespace")
     }
 }
 

@@ -9,7 +9,7 @@ E22.py:54:11: E225 [*] Missing whitespace around operator
 55 | #: E225
 56 | submitted+= 1
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 51 51 | 
@@ -30,7 +30,7 @@ E22.py:56:10: E225 [*] Missing whitespace around operator
 57 | #: E225
 58 | c =-1
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 53 53 | #: E225
@@ -51,7 +51,7 @@ E22.py:58:3: E225 [*] Missing whitespace around operator
 59 | #: E225
 60 | x = x /2 - 1
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 55 55 | #: E225
@@ -72,7 +72,7 @@ E22.py:76:2: E225 [*] Missing whitespace around operator
 77 | #: E225 E225
 78 | i=i +1
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 73 73 | #: E225
@@ -93,7 +93,7 @@ E22.py:78:2: E225 [*] Missing whitespace around operator
 79 | #: E225
 80 | i = 1and 1
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 75 75 | #: E225 E225
@@ -114,7 +114,7 @@ E22.py:80:6: E225 [*] Missing whitespace around operator
 81 | #: E225
 82 | i = 1or 0
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 77 77 | #: E225 E225
@@ -135,7 +135,7 @@ E22.py:82:6: E225 [*] Missing whitespace around operator
 83 | #: E225
 84 | 1is 1
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 79 79 | #: E225
@@ -156,7 +156,7 @@ E22.py:84:2: E225 [*] Missing whitespace around operator
 85 | #: E225
 86 | 1in []
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 81 81 | #: E225
@@ -177,7 +177,7 @@ E22.py:86:2: E225 [*] Missing whitespace around operator
 87 | #: E225
 88 | i = 1 @2
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 83 83 | #: E225
@@ -198,7 +198,7 @@ E22.py:92:2: E225 [*] Missing whitespace around operator
 93 | #: E225 E226
 94 | i =i+1
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 89 89 | #: E225
@@ -219,7 +219,7 @@ E22.py:94:3: E225 [*] Missing whitespace around operator
 95 | #: E225 E226
 96 | i= i+1
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 91 91 | #: E225 E226
@@ -240,7 +240,7 @@ E22.py:96:2: E225 [*] Missing whitespace around operator
 97 | #: E225 E226
 98 | c = (a +b)*(a - b)
    |
-   = help: Added missing whitespace around operator
+   = help: Add missing whitespace
 
 ℹ Fix
 93 93 | #: E225 E226

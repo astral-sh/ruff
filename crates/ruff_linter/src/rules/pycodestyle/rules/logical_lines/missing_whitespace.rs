@@ -47,8 +47,7 @@ impl AlwaysFixableViolation for MissingWhitespace {
     }
 
     fn fix_title(&self) -> String {
-        let token = self.token_text();
-        format!("Added missing whitespace after '{token}'")
+        format!("Add missing whitespace")
     }
 }
 
