@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E27.py:10:9: E273 Tab after keyword
+E27.py:10:9: E273 [*] Tab after keyword
    |
  8 | if   1:
  9 | #: E273
@@ -10,8 +10,19 @@ E27.py:10:9: E273 Tab after keyword
 11 | #: E273 E274
 12 | True        and False
    |
+   = help: Replace with single space
 
-E27.py:12:5: E273 Tab after keyword
+ℹ Fix
+7  7  | #: E271
+8  8  | if   1:
+9  9  | #: E273
+10    |-True and		False
+   10 |+True and False
+11 11 | #: E273 E274
+12 12 | True		and	False
+13 13 | #: E271
+
+E27.py:12:5: E273 [*] Tab after keyword
    |
 10 | True and        False
 11 | #: E273 E274
@@ -20,8 +31,19 @@ E27.py:12:5: E273 Tab after keyword
 13 | #: E271
 14 | a and  b
    |
+   = help: Replace with single space
 
-E27.py:12:10: E273 Tab after keyword
+ℹ Fix
+9  9  | #: E273
+10 10 | True and		False
+11 11 | #: E273 E274
+12    |-True		and	False
+   12 |+True and	False
+13 13 | #: E271
+14 14 | a and  b
+15 15 | #: E271
+
+E27.py:12:10: E273 [*] Tab after keyword
    |
 10 | True and        False
 11 | #: E273 E274
@@ -30,8 +52,19 @@ E27.py:12:10: E273 Tab after keyword
 13 | #: E271
 14 | a and  b
    |
+   = help: Replace with single space
 
-E27.py:26:6: E273 Tab after keyword
+ℹ Fix
+9  9  | #: E273
+10 10 | True and		False
+11 11 | #: E273 E274
+12    |-True		and	False
+   12 |+True		and False
+13 13 | #: E271
+14 14 | a and  b
+15 15 | #: E271
+
+E27.py:26:6: E273 [*] Tab after keyword
    |
 24 | this  and False
 25 | #: E273
@@ -40,8 +73,19 @@ E27.py:26:6: E273 Tab after keyword
 27 | #: E274
 28 | a       and b
    |
+   = help: Replace with single space
 
-E27.py:30:10: E273 Tab after keyword
+ℹ Fix
+23 23 | #: E272
+24 24 | this  and False
+25 25 | #: E273
+26    |-a and	b
+   26 |+a and b
+27 27 | #: E274
+28 28 | a		and b
+29 29 | #: E273 E274
+
+E27.py:30:10: E273 [*] Tab after keyword
    |
 28 | a       and b
 29 | #: E273 E274
@@ -50,5 +94,16 @@ E27.py:30:10: E273 Tab after keyword
 31 | #: Okay
 32 | from u import (a, b)
    |
+   = help: Replace with single space
+
+ℹ Fix
+27 27 | #: E274
+28 28 | a		and b
+29 29 | #: E273 E274
+30    |-this		and	False
+   30 |+this		and False
+31 31 | #: Okay
+32 32 | from u import (a, b)
+33 33 | from v import c, d
 
 
