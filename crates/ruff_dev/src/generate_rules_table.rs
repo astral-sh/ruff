@@ -22,16 +22,16 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     for rule in rules {
         let fix_token = match rule.fixable() {
             FixAvailability::Always | FixAvailability::Sometimes => {
-                format!("<span title='Automatically fixable'>{FIX_SYMBOL}</span>")
+                format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
             FixAvailability::None => {
-                format!("<span style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>")
+                format!("<span style='visibility: hidden'>{FIX_SYMBOL}</span>")
             }
         };
         let preview_token = if rule.is_preview() || rule.is_nursery() {
-            format!("<span title='Considered experimental or unstable'>{PREVIEW_SYMBOL}</span>")
+            format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
         } else {
-            format!("<span style='opacity: 0.1' aria-hidden='true'>{PREVIEW_SYMBOL}</span>")
+            format!("<span style='visibility: hidden'>{PREVIEW_SYMBOL}</span>")
         };
         let status_token = format!("{fix_token} {preview_token}");
 
