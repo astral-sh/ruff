@@ -10,7 +10,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use log::error;
 use rayon::iter::Either::{Left, Right};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use similar::TextDiff;
 use thiserror::Error;
 use tracing::debug;
@@ -23,10 +23,11 @@ use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use ruff_workspace::resolver::{match_exclusion, python_files_in_path};
+use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
+use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
 use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
 use crate::ExitStatus;
@@ -73,9 +74,34 @@ pub(crate) fn format(
         return Ok(ExitStatus::Success);
     }
 
+    // Discover the package root for each Python file.
+    let package_roots = resolver.package_roots(
+        &paths
+            .iter()
+            .flatten()
+            .map(ResolvedFile::path)
+            .collect::<Vec<_>>(),
+        &pyproject_config,
+    );
+
+    let caches = if cli.no_cache {
+        None
+    } else {
+        // `--no-cache` doesn't respect code changes, and so is often confusing during
+        // development.
+        #[cfg(debug_assertions)]
+        crate::warn_user!("Detected debug build without --no-cache.");
+
+        Some(PackageCacheMap::init(
+            &pyproject_config,
+            &package_roots,
+            &resolver,
+        ))
+    };
+
     let start = Instant::now();
     let (mut results, mut errors): (Vec<_>, Vec<_>) = paths
-        .into_par_iter()
+        .par_iter()
         .filter_map(|entry| {
             match entry {
                 Ok(resolved_file) => {
@@ -110,6 +136,13 @@ pub(crate) fn format(
                         }
                     };
 
+                    let package = path
+                        .parent()
+                        .and_then(|parent| package_roots.get(parent).copied())
+                        .flatten();
+                    let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
+                    let cache = caches.get(cache_root);
+
                     Some(
                         match catch_unwind(|| {
                             format_path(
@@ -118,21 +151,22 @@ pub(crate) fn format(
                                 &unformatted,
                                 source_type,
                                 mode,
+                                cache,
                             )
                         }) {
                             Ok(inner) => inner.map(|result| FormatPathResult {
-                                path: resolved_file.into_path(),
+                                path: resolved_file.path().to_path_buf(),
                                 unformatted,
                                 result,
                             }),
                             Err(error) => Err(FormatCommandError::Panic(
-                                Some(resolved_file.into_path()),
+                                Some(resolved_file.path().to_path_buf()),
                                 error,
                             )),
                         },
                     )
                 }
-                Err(err) => Some(Err(FormatCommandError::Ignore(err))),
+                Err(err) => Some(Err(FormatCommandError::Ignore(err.clone()))),
             }
         })
         .partition_map(|result| match result {
@@ -167,6 +201,8 @@ pub(crate) fn format(
         results.len() + errors.len(),
         duration
     );
+
+    caches.persist()?;
 
     // Report on any errors.
     for error in &errors {
@@ -214,13 +250,26 @@ pub(crate) fn format(
 
 /// Format the file at the given [`Path`].
 #[tracing::instrument(level="debug", skip_all, fields(path = %path.display()))]
-fn format_path(
+pub(crate) fn format_path(
     path: &Path,
     settings: &FormatterSettings,
     unformatted: &SourceKind,
     source_type: PySourceType,
     mode: FormatMode,
+    cache: Option<&Cache>,
 ) -> Result<FormatResult, FormatCommandError> {
+    if let Some(cache) = cache {
+        let relative_path = cache
+            .relative_path(path)
+            .expect("wrong package cache for file");
+
+        if let Ok(cache_key) = FileCacheKey::from_path(path) {
+            if cache.is_formatted(relative_path, &cache_key) {
+                return Ok(FormatResult::Unchanged);
+            }
+        }
+    }
+
     // Format the source.
     let format_result = match format_source(unformatted, source_type, Some(path), settings)? {
         FormattedSource::Formatted(formatted) => match mode {
@@ -231,13 +280,35 @@ fn format_path(
                 formatted
                     .write(&mut writer)
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
+
+                if let Some(cache) = cache {
+                    if let Ok(cache_key) = FileCacheKey::from_path(path) {
+                        let relative_path = cache
+                            .relative_path(path)
+                            .expect("wrong package cache for file");
+                        cache.set_formatted(relative_path.to_path_buf(), &cache_key);
+                    }
+                }
+
                 FormatResult::Formatted
             }
             FormatMode::Check => FormatResult::Formatted,
             FormatMode::Diff => FormatResult::Diff(formatted),
         },
-        FormattedSource::Unchanged => FormatResult::Unchanged,
+        FormattedSource::Unchanged => {
+            if let Some(cache) = cache {
+                if let Ok(cache_key) = FileCacheKey::from_path(path) {
+                    let relative_path = cache
+                        .relative_path(path)
+                        .expect("wrong package cache for file");
+                    cache.set_formatted(relative_path.to_path_buf(), &cache_key);
+                }
+            }
+
+            FormatResult::Unchanged
+        }
     };
+
     Ok(format_result)
 }
 

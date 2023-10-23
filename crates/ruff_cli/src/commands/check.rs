@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::Write;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -7,28 +6,26 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use ignore::Error;
-use itertools::Itertools;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff_linter::settings::types::UnsafeFixes;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
 use ruff_linter::registry::Rule;
+use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::{fs, warn_user_once, IOError};
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::resolver::{
-    match_exclusion, python_files_in_path, PyprojectConfig, PyprojectDiscoveryStrategy,
-    ResolvedFile,
+    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
 };
 
 use crate::args::CliOverrides;
-use crate::cache::{self, Cache};
+use crate::cache::{Cache, PackageCacheMap, PackageCaches};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
@@ -52,28 +49,6 @@ pub(crate) fn check(
         return Ok(Diagnostics::default());
     }
 
-    // Initialize the cache.
-    if cache.into() {
-        fn init_cache(path: &Path) {
-            if let Err(e) = cache::init(path) {
-                error!("Failed to initialize cache at {}: {e:?}", path.display());
-            }
-        }
-
-        match pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => {
-                init_cache(&pyproject_config.settings.cache_dir);
-            }
-            PyprojectDiscoveryStrategy::Hierarchical => {
-                for settings in
-                    std::iter::once(&pyproject_config.settings).chain(resolver.settings())
-                {
-                    init_cache(&settings.cache_dir);
-                }
-            }
-        }
-    };
-
     // Discover the package root for each Python file.
     let package_roots = resolver.package_roots(
         &paths
@@ -85,19 +60,15 @@ pub(crate) fn check(
     );
 
     // Load the caches.
-    let caches = bool::from(cache).then(|| {
-        package_roots
-            .iter()
-            .map(|(package, package_root)| package_root.unwrap_or(package))
-            .unique()
-            .par_bridge()
-            .map(|cache_root| {
-                let settings = resolver.resolve(cache_root, pyproject_config);
-                let cache = Cache::open(cache_root.to_path_buf(), settings);
-                (cache_root, cache)
-            })
-            .collect::<HashMap<&Path, Cache>>()
-    });
+    let caches = if bool::from(cache) {
+        Some(PackageCacheMap::init(
+            pyproject_config,
+            &package_roots,
+            &resolver,
+        ))
+    } else {
+        None
+    };
 
     let start = Instant::now();
     let diagnostics_per_file = paths.par_iter().filter_map(|resolved_file| {
@@ -122,14 +93,7 @@ pub(crate) fn check(
                 }
 
                 let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
-                let cache = caches.as_ref().and_then(|caches| {
-                    if let Some(cache) = caches.get(&cache_root) {
-                        Some(cache)
-                    } else {
-                        debug!("No cache found for {}", cache_root.display());
-                        None
-                    }
-                });
+                let cache = caches.get(cache_root);
 
                 lint_path(
                     path,
@@ -210,11 +174,7 @@ pub(crate) fn check(
     all_diagnostics.messages.sort();
 
     // Store the caches.
-    if let Some(caches) = caches {
-        caches
-            .into_par_iter()
-            .try_for_each(|(_, cache)| cache.store())?;
-    }
+    caches.persist()?;
 
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", checked_files, duration);
@@ -266,13 +226,12 @@ mod test {
     use std::os::unix::fs::OpenOptionsExt;
 
     use anyhow::Result;
-
-    use ruff_linter::settings::types::UnsafeFixes;
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
     use ruff_linter::registry::Rule;
+    use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{flags, LinterSettings};
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff_workspace::Settings;

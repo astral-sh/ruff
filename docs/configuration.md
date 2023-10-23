@@ -390,14 +390,16 @@ Options:
   -h, --help
           Print help
 
+Miscellaneous:
+  -n, --no-cache                         Disable cache reads
+      --cache-dir <CACHE_DIR>            Path to the cache directory [env: RUFF_CACHE_DIR=]
+      --isolated                         Ignore all configuration files
+      --stdin-filename <STDIN_FILENAME>  The name of the file when passing it through stdin
+
 File selection:
       --respect-gitignore       Respect file exclusions via `.gitignore` and other standard ignore files. Use `--no-respect-gitignore` to disable
       --exclude <FILE_PATTERN>  List of paths, used to omit files and/or directories from analysis
       --force-exclude           Enforce exclusions, even for paths passed to Ruff directly on the command-line. Use `--no-force-exclude` to disable
-
-Miscellaneous:
-      --isolated                         Ignore all configuration files
-      --stdin-filename <STDIN_FILENAME>  The name of the file when passing it through stdin
 
 Log levels:
   -v, --verbose  Enable verbose logging
