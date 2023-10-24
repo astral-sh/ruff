@@ -78,18 +78,21 @@ pub(crate) fn invalid_escape_sequence(
     token: &Tok,
     token_range: TextRange,
 ) {
-    let token_source_code = match token {
+    let (token_source_code, string_start_location) = match token {
         Tok::FStringMiddle { value, is_raw } => {
             if *is_raw {
                 return;
             }
-            value.as_str()
+            let Some(range) = indexer.fstring_ranges().innermost(token_range.start()) else {
+                return;
+            };
+            (value.as_str(), range.start())
         }
         Tok::String { kind, .. } => {
             if kind.is_raw() {
                 return;
             }
-            locator.slice(token_range)
+            (locator.slice(token_range), token_range.start())
         }
         _ => return,
     };
@@ -206,17 +209,6 @@ pub(crate) fn invalid_escape_sequence(
             invalid_escape_sequence.push(diagnostic);
         }
     } else {
-        let tok_start = if token.is_f_string_middle() {
-            // SAFETY: If this is a `FStringMiddle` token, then the indexer
-            // must have the f-string range.
-            indexer
-                .fstring_ranges()
-                .innermost(token_range.start())
-                .unwrap()
-                .start()
-        } else {
-            token_range.start()
-        };
         // Turn into raw string.
         for invalid_escape_char in &invalid_escape_chars {
             let diagnostic = Diagnostic::new(
@@ -231,8 +223,8 @@ pub(crate) fn invalid_escape_sequence(
                 // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
                 // `returnr"foo"` is not.
                 Fix::safe_edit(Edit::insertion(
-                    pad_start("r".to_string(), tok_start, locator),
-                    tok_start,
+                    pad_start("r".to_string(), string_start_location, locator),
+                    string_start_location,
                 )),
             );
             invalid_escape_sequence.push(diagnostic);
