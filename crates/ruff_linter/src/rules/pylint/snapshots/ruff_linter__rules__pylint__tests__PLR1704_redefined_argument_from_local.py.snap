@@ -1,0 +1,85 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+redefined_argument_from_local.py:22:9: PLR1704 Redefining argument with the local name `i`
+   |
+21 | def foo(i):
+22 |     for i in range(10):
+   |         ^ PLR1704
+23 |         ...
+   |
+
+redefined_argument_from_local.py:28:25: PLR1704 Redefining argument with the local name `e`
+   |
+26 |     try:
+27 |         ...
+28 |     except Exception as e:
+   |                         ^ PLR1704
+29 |         ...
+   |
+
+redefined_argument_from_local.py:32:24: PLR1704 Redefining argument with the local name `f`
+   |
+31 | def foo(f):
+32 |     with open('', ) as f:
+   |                        ^ PLR1704
+33 |         ...
+   |
+
+redefined_argument_from_local.py:37:13: PLR1704 Redefining argument with the local name `a`
+   |
+35 | def foo(a):
+36 |     def bar(b):
+37 |         for a in range(10):
+   |             ^ PLR1704
+38 |             ...
+   |
+
+redefined_argument_from_local.py:42:13: PLR1704 Redefining argument with the local name `d`
+   |
+40 | def foo(a):
+41 |     def bar(d):
+42 |         for d in range(10):
+   |             ^ PLR1704
+43 |             ...
+   |
+
+redefined_argument_from_local.py:47:13: PLR1704 Redefining argument with the local name `a`
+   |
+45 | def foo(a):
+46 |     def bar(a):
+47 |         for a in range(10):
+   |             ^ PLR1704
+48 |             ...
+   |
+
+redefined_argument_from_local.py:58:13: PLR1704 Redefining argument with the local name `a`
+   |
+56 |         Current way is 1)
+57 |         """
+58 |         for a in range(1):
+   |             ^ PLR1704
+59 |             ...
+   |
+
+redefined_argument_from_local.py:64:13: PLR1704 Redefining argument with the local name `a`
+   |
+62 | def foo(a=1):
+63 |     def bar(b=2):
+64 |         for a in range(1):
+   |             ^ PLR1704
+65 |             ...
+66 |         for b in range(1):
+   |
+
+redefined_argument_from_local.py:66:13: PLR1704 Redefining argument with the local name `b`
+   |
+64 |         for a in range(1):
+65 |             ...
+66 |         for b in range(1):
+   |             ^ PLR1704
+67 |             ...
+68 |         print(a)  # expected = 1 but actual = 0
+   |
+
+
