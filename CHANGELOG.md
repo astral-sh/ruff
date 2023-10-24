@@ -3,9 +3,7 @@
 ## 0.1.2
 
 This release includes the Beta version of the Ruff formatter — an extremely fast, Black-compatible Python formatter.
-Try it today with `ruff format`!
-
-[Check out the blog post](https://astral.sh/blog/the-ruff-formatter) and [read the docs](https://docs.astral.sh/ruff/formatter/).
+Try it today with `ruff format`! [Check out the blog post](https://astral.sh/blog/the-ruff-formatter) and [read the docs](https://docs.astral.sh/ruff/formatter/).
 
 ### Preview features
 
