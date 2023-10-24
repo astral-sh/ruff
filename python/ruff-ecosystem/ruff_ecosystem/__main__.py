@@ -2,7 +2,7 @@
 Enables usage with `python -m ruff_ecosystem`
 """
 
-from ruff_ecosystem.cli import entrypoint
+import ruff_ecosystem.cli
 
 if __name__ == "__main__":
-    entrypoint()
+    ruff_ecosystem.cli.entrypoint()

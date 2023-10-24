@@ -175,7 +175,7 @@ jobs:
       - cargo-test
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-    if: github.event_name == 'pull_request' && needs.determine_changes.outputs.linter == 'true'
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
@@ -196,13 +196,29 @@ jobs:
           branch: ${{ github.event.pull_request.base.ref }}
           check_artifacts: true
 
-      - name: Run ecosystem check
+      - name: Install ruff-ecosystem
+        run: |
+          pip install ./python/ruff-ecosystem
+
+      - name: Run `ruff check` ecosystem check
+        if: ${{ needs.determine_changes.outputs.linter == 'true' }}
         run: |
           # Make executable, since artifact download doesn't preserve this
           chmod +x ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
 
-          scripts/check_ecosystem.py ruff ${{ steps.ruff-target.outputs.download-path }}/ruff | tee ecosystem-result
-          cat ecosystem-result > $GITHUB_STEP_SUMMARY
+          ruff-ecosystem check ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result
+          cat ecosystem-result >> $GITHUB_STEP_SUMMARY
+
+          echo ${{ github.event.number }} > pr-number
+
+      - name: Run `ruff format` ecosystem check
+        if: ${{ needs.determine_changes.outputs.linter == 'true' }}
+        run: |
+          # Make executable, since artifact download doesn't preserve this
+          chmod +x ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+
+          ruff-ecosystem format ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result
+          cat ecosystem-result >> $GITHUB_STEP_SUMMARY
 
           echo ${{ github.event.number }} > pr-number
 

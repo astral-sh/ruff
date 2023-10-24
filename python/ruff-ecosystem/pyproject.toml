@@ -8,3 +8,7 @@ version = "0.0.0"
 
 [project.scripts]
 ruff-ecosystem = "ruff_ecosystem.cli:entrypoint"
+
+
+[tool.ruff]
+extend-select = ["I"]

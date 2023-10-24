@@ -1,66 +1,64 @@
-from .models import Repository, CheckOptions, Target
+from ruff_ecosystem.projects import CheckOptions, Project, Repository
 
-# TODO: Consider exporting this as JSON instead for consistent setup
+# TODO: Consider exporting this as JSON
 DEFAULT_TARGETS = [
-    # Target(repo=Repository(owner="DisnakeDev", name="disnake", branch="master")),
-    # Target(repo=Repository(owner="PostHog", name="HouseWatch", branch="main")),
-    # Target(repo=Repository(owner="RasaHQ", name="rasa", branch="main")),
-    # Target(repo=Repository(owner="Snowflake-Labs", name="snowcli", branch="main")),
-    # Target(repo=Repository(owner="aiven", name="aiven-client", branch="main")),
-    # Target(repo=Repository(owner="alteryx", name="featuretools", branch="main")),
-    # Target(
-    #     repo=Repository(owner="apache", name="airflow", branch="main"),
+    # Project(repo=Repository(owner="DisnakeDev", name="disnake", ref="master")),
+    # Project(repo=Repository(owner="PostHog", name="HouseWatch", ref="main")),
+    # Project(repo=Repository(owner="RasaHQ", name="rasa", ref="main")),
+    # Project(repo=Repository(owner="Snowflake-Labs", name="snowcli", ref="main")),
+    # Project(repo=Repository(owner="aiven", name="aiven-client", ref="main")),
+    # Project(repo=Repository(owner="alteryx", name="featuretools", ref="main")),
+    # Project(
+    #     repo=Repository(owner="apache", name="airflow", ref="main"),
     #     check_options=CheckOptions(select="ALL"),
     # ),
-    # Target(repo=Repository(owner="aws", name="aws-sam-cli", branch="develop")),
-    # Target(repo=Repository(owner="bloomberg", name="pytest-memray", branch="main")),
-    # Target(
-    #     repo=Repository(owner="bokeh", name="bokeh", branch="branch-3.3"),
-    #     check_options=CheckOptions(select="ALL"),
-    # ),
-    # Target(repo=Repository(owner="commaai", name="openpilot", branch="master")),
-    # Target(repo=Repository(owner="demisto", name="content", branch="master")),
-    # Target(repo=Repository(owner="docker", name="docker-py", branch="main")),
-    # Target(
-    #     repo=Repository(owner="freedomofpress", name="securedrop", branch="develop")
-    # ),
-    # Target(repo=Repository(owner="fronzbot", name="blinkpy", branch="dev")),
-    # Target(repo=Repository(owner="ibis-project", name="ibis", branch="master")),
-    # Target(repo=Repository(owner="ing-bank", name="probatus", branch="main")),
-    # Target(repo=Repository(owner="jrnl-org", name="jrnl", branch="develop")),
-    # Target(repo=Repository(owner="latchbio", name="latch", branch="main")),
-    # Target(repo=Repository(owner="lnbits", name="lnbits", branch="main")),
-    # Target(repo=Repository(owner="milvus-io", name="pymilvus", branch="master")),
-    # Target(repo=Repository(owner="mlflow", name="mlflow", branch="master")),
-    # Target(repo=Repository(owner="model-bakers", name="model_bakery", branch="main")),
-    # Target(repo=Repository(owner="pandas-dev", name="pandas", branch="main")),
-    # Target(repo=Repository(owner="prefecthq", name="prefect", branch="main")),
-    # Target(repo=Repository(owner="pypa", name="build", branch="main")),
-    # Target(repo=Repository(owner="pypa", name="cibuildwheel", branch="main")),
-    # Target(repo=Repository(owner="pypa", name="pip", branch="main")),
-    # Target(repo=Repository(owner="pypa", name="setuptools", branch="main")),
-    # Target(repo=Repository(owner="python", name="mypy", branch="master")),
-    # Target(
+    # Project(repo=Repository(owner="aws", name="aws-sam-cli", ref="develop")),
+    # Project(repo=Repository(owner="bloomberg", name="pytest-memray", ref="main")),
+    Project(
+        repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.3"),
+        check_options=CheckOptions(select="ALL"),
+    ),
+    # Project(repo=Repository(owner="commaai", name="openpilot", ref="master")),
+    # Project(repo=Repository(owner="demisto", name="content", ref="master")),
+    # Project(repo=Repository(owner="docker", name="docker-py", ref="main")),
+    # Project(repo=Repository(owner="freedomofpress", name="securedrop", ref="develop")),
+    # Project(repo=Repository(owner="fronzbot", name="blinkpy", ref="dev")),
+    # Project(repo=Repository(owner="ibis-project", name="ibis", ref="master")),
+    # Project(repo=Repository(owner="ing-bank", name="probatus", ref="main")),
+    # Project(repo=Repository(owner="jrnl-org", name="jrnl", ref="develop")),
+    # Project(repo=Repository(owner="latchbio", name="latch", ref="main")),
+    # Project(repo=Repository(owner="lnbits", name="lnbits", ref="main")),
+    # Project(repo=Repository(owner="milvus-io", name="pymilvus", ref="master")),
+    # Project(repo=Repository(owner="mlflow", name="mlflow", ref="master")),
+    # Project(repo=Repository(owner="model-bakers", name="model_bakery", ref="main")),
+    # Project(repo=Repository(owner="pandas-dev", name="pandas", ref="main")),
+    # Project(repo=Repository(owner="prefecthq", name="prefect", ref="main")),
+    # Project(repo=Repository(owner="pypa", name="build", ref="main")),
+    # Project(repo=Repository(owner="pypa", name="cibuildwheel", ref="main")),
+    # Project(repo=Repository(owner="pypa", name="pip", ref="main")),
+    # Project(repo=Repository(owner="pypa", name="setuptools", ref="main")),
+    # Project(repo=Repository(owner="python", name="mypy", ref="master")),
+    # Project(
     #     repo=Repository(
     #         owner="python",
     #         name="typeshed",
-    #         branch="main",
+    #         ref="main",
     #     ),
     #     check_options=CheckOptions(select="PYI"),
     # ),
-    # Target(repo=Repository(owner="python-poetry", name="poetry", branch="master")),
-    # Target(repo=Repository(owner="reflex-dev", name="reflex", branch="main")),
-    # Target(repo=Repository(owner="rotki", name="rotki", branch="develop")),
-    # Target(repo=Repository(owner="scikit-build", name="scikit-build", branch="main")),
-    # Target(
-    #     repo=Repository(owner="scikit-build", name="scikit-build-core", branch="main")
+    # Project(repo=Repository(owner="python-poetry", name="poetry", ref="master")),
+    # Project(repo=Repository(owner="reflex-dev", name="reflex", ref="main")),
+    # Project(repo=Repository(owner="rotki", name="rotki", ref="develop")),
+    # Project(repo=Repository(owner="scikit-build", name="scikit-build", ref="main")),
+    # Project(
+    #     repo=Repository(owner="scikit-build", name="scikit-build-core", ref="main")
     # ),
-    # Target(repo=Repository(owner="sphinx-doc", name="sphinx", branch="master")),
-    # Target(repo=Repository(owner="spruceid", name="siwe-py", branch="main")),
-    # Target(repo=Repository(owner="tiangolo", name="fastapi", branch="master")),
-    # Target(repo=Repository(owner="yandex", name="ch-backup", branch="main")),
-    Target(
-        repo=Repository(owner="zulip", name="zulip", branch="main"),
-        check_options=CheckOptions(select="ALL"),
-    ),
+    # Project(repo=Repository(owner="sphinx-doc", name="sphinx", ref="master")),
+    # Project(repo=Repository(owner="spruceid", name="siwe-py", ref="main")),
+    # Project(repo=Repository(owner="tiangolo", name="fastapi", ref="master")),
+    # Project(repo=Repository(owner="yandex", name="ch-backup", ref="main")),
+    # Project(
+    #     repo=Repository(owner="zulip", name="zulip", ref="main"),
+    #     check_options=CheckOptions(select="ALL"),
+    # ),
 ]

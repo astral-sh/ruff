@@ -1,16 +1,18 @@
 import argparse
 import asyncio
 import logging
+import os
+import shutil
+import sys
+import sysconfig
 import tempfile
-from pathlib import Path
 from contextlib import nullcontext
-from ruff_ecosystem.models import RuffCommand
-from ruff_ecosystem.emitters import EmitterType
-from ruff_ecosystem.defaults import DEFAULT_TARGETS
-from ruff_ecosystem.main import main
+from pathlib import Path
 from signal import SIGINT, SIGTERM
 
-import sys
+from ruff_ecosystem.defaults import DEFAULT_TARGETS
+from ruff_ecosystem.main import OutputFormat, main
+from ruff_ecosystem.projects import RuffCommand
 
 
 def excepthook(type, value, tb):
@@ -18,7 +20,8 @@ def excepthook(type, value, tb):
         # we are in interactive mode or we don't have a tty so call the default
         sys.__excepthook__(type, value, tb)
     else:
-        import traceback, pdb
+        import pdb
+        import traceback
 
         traceback.print_exception(type, value, tb)
         print()
@@ -49,7 +52,7 @@ def entrypoint():
                 ruff_baseline_executable=args.ruff_baseline,
                 ruff_comparison_executable=args.ruff_comparison,
                 targets=DEFAULT_TARGETS,
-                emitter=EmitterType(args.output_format).to_emitter(),
+                format=OutputFormat(args.output_format),
                 cache=Path(cache),
                 raise_on_failure=args.pdb,
             )
@@ -84,7 +87,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-format",
-        choices=[option.name for option in EmitterType],
+        choices=[option.name for option in OutputFormat],
         default="json",
         help="Location for caching cloned repositories",
     )
@@ -114,3 +117,21 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
+
+
+def get_executable_path(name: str) -> str | None:
+    # Add suffix for Windows executables
+    name += ".exe" if sys.platform == "win32" else ""
+
+    path = os.path.join(sysconfig.get_path("scripts"), name)
+
+    # The executable in the current interpreter's scripts directory.
+    if os.path.exists(path):
+        return path
+
+    # The executable in the global environment.
+    environment_path = shutil.which("ruff")
+    if environment_path:
+        return environment_path
+
+    return None
