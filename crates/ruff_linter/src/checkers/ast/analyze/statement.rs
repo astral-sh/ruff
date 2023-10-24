@@ -1166,6 +1166,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::RedefinedLoopName) {
                 pylint::rules::redefined_loop_name(checker, stmt);
             }
+            if checker.enabled(Rule::RedefinedArgumentFromLocal) {
+                pylint::rules::redefined_argument_from_local(checker, stmt);
+            }
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
