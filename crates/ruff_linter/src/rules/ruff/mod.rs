@@ -17,7 +17,7 @@ mod tests {
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::settings::resolve_per_file_ignores;
-    use crate::settings::types::{PerFileIgnore, PythonVersion};
+    use crate::settings::types::{CodePattern, PerFileIgnore, PythonVersion};
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
@@ -106,7 +106,26 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
             &settings::LinterSettings {
-                external: FxHashSet::from_iter(vec!["V101".to_string()]),
+                external: vec![CodePattern::new("V101")?],
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::UnusedNOQA,
+                    Rule::LineTooLong,
+                    Rule::UnusedImport,
+                    Rule::UnusedVariable,
+                    Rule::TabIndentation,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruf100_0_glob() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_0.py"),
+            &settings::LinterSettings {
+                external: vec![CodePattern::new("V*")?],
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::UnusedNOQA,
                     Rule::LineTooLong,

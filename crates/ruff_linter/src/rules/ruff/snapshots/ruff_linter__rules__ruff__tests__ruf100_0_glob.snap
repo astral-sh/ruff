@@ -100,26 +100,6 @@ RUF100_0.py:22:12: RUF100 [*] Unused `noqa` directive (unused: `F841`)
 24 24 |     # Invalid (but external)
 25 25 |     d = 1  # noqa: V500
 
-RUF100_0.py:25:12: RUF100 [*] Unused `noqa` directive (unknown: `V500`)
-   |
-24 |     # Invalid (but external)
-25 |     d = 1  # noqa: V500
-   |            ^^^^^^^^^^^^ RUF100
-26 | 
-27 |     # fmt: off
-   |
-   = help: Remove unused `noqa` directive
-
-ℹ Fix
-22 22 |     d = 1  # noqa: F841, V101
-23 23 | 
-24 24 |     # Invalid (but external)
-25    |-    d = 1  # noqa: V500
-   25 |+    d = 1
-26 26 | 
-27 27 |     # fmt: off
-28 28 |     # Invalid - no space before #
-
 RUF100_0.py:29:10: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 27 |     # fmt: off

@@ -24,8 +24,8 @@ use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
-    UnsafeFixes, Version,
+    CodePattern, FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion,
+    SerializationFormat, UnsafeFixes, Version,
 };
 use ruff_linter::settings::{
     resolve_per_file_ignores, LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS,
@@ -226,7 +226,16 @@ impl Configuration {
                 dummy_variable_rgx: lint
                     .dummy_variable_rgx
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
-                external: FxHashSet::from_iter(lint.external.unwrap_or_default()),
+                external: lint
+                    .external
+                    .map(|code| {
+                        code.into_iter()
+                            .map(|name| CodePattern::new(&name))
+                            .collect()
+                    })
+                    .transpose()
+                    .map_err(|e| anyhow!("Invalid `external` value: {e}"))?
+                    .unwrap_or_default(),
                 ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
                 tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),

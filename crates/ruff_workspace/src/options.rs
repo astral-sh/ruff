@@ -552,6 +552,9 @@ pub struct LintCommonOptions {
     /// preserved when (e.g.) validating `# noqa` directives. Useful for
     /// retaining `# noqa` directives that cover plugins not yet implemented
     /// by Ruff.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = "[]",
         value_type = "list[str]",
