@@ -1309,6 +1309,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ErrorInsteadOfException) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
             }
+            if checker.enabled(Rule::RedefinedArgumentFromLocal) {
+                pylint::rules::redefined_argument_from_local(checker, stmt);
+            }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
             if checker.enabled(Rule::LambdaAssignment) {
