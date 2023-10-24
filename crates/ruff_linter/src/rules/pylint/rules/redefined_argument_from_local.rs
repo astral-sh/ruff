@@ -111,7 +111,10 @@ pub(crate) fn redefined_argument_from_local(checker: &mut Checker, stmt: &Stmt) 
     loop {
         if let ScopeKind::Function(ast::StmtFunctionDef { parameters, .. }) = scope.kind {
             for (name, range) in visitor.names() {
-                if parameters.includes(name) && !already_added.contains(&range) {
+                if already_added.contains(&range) {
+                    continue;
+                }
+                if parameters.includes(name) {
                     dianostics.push(Diagnostic::new(
                         RedefinedArgumentFromLocal {
                             name: name.to_string(),
