@@ -67,8 +67,6 @@ pub enum Command {
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
-    #[doc(hidden)]
-    #[clap(hide = true)]
     Format(FormatCommand),
     /// Display Ruff's version
     Version {
