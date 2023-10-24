@@ -1,4 +1,21 @@
 
+
+# No Errors
+
+def foo(a):
+    for b in range(1):
+        ...
+
+def foo(a):
+    try:
+        ...
+    except Exception as e:
+        ...
+
+def foo(a):
+    with open('', ) as f:
+        ...
+
 # Errors
 
 def foo(i):
