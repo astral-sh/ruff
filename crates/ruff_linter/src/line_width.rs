@@ -253,3 +253,9 @@ impl From<NonZeroU8> for TabSize {
         Self(tab_size)
     }
 }
+
+impl From<TabSize> for NonZeroU8 {
+    fn from(value: TabSize) -> Self {
+        value.0
+    }
+}

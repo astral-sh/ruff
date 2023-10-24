@@ -2,7 +2,7 @@ use memchr::memchr2;
 
 use crate::comments::SourceComment;
 use ruff_formatter::FormatResult;
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprFString;
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};

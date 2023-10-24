@@ -3,7 +3,7 @@ use tracing::Level;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::tokens_and_ranges;
 use ruff_python_parser::lexer::LexicalError;
@@ -60,7 +60,6 @@ where
             }
 
             self.fmt_fields(node, f)?;
-            self.fmt_dangling_comments(node_comments.dangling, f)?;
 
             if is_source_map_enabled {
                 source_position(node.end()).fmt(f)?;

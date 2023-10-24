@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, CmpOp, Constant, ElifElseClause, Expr, Int, StmtIf};
@@ -94,9 +95,10 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
             continue;
         };
 
+        // Detect `sys.version_info`, along with slices (like `sys.version_info[:2]`).
         if !checker
             .semantic()
-            .resolve_call_path(left)
+            .resolve_call_path(map_subscript(left))
             .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "version_info"]))
         {
             continue;

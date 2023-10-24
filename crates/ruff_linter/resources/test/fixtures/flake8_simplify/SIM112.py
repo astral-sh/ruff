@@ -38,3 +38,7 @@ env = os.environ['FOO']
 
 if env := os.environ['FOO']:
     pass
+
+os.environ['https_proxy']
+os.environ.get['http_proxy']
+os.getenv('no_proxy')

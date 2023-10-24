@@ -786,6 +786,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SubprocessRunWithoutCheck) {
                 pylint::rules::subprocess_run_without_check(checker, call);
             }
+            if checker.enabled(Rule::UnspecifiedEncoding) {
+                pylint::rules::unspecified_encoding(checker, call);
+            }
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
                 Rule::PytestRaisesTooBroad,
@@ -1194,6 +1197,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ComparisonWithItself) {
                 pylint::rules::comparison_with_itself(checker, left, ops, comparators);
             }
+            if checker.enabled(Rule::LiteralMembership) {
+                pylint::rules::literal_membership(checker, compare);
+            }
             if checker.enabled(Rule::ComparisonOfConstant) {
                 pylint::rules::comparison_of_constant(checker, left, ops, comparators);
             }
@@ -1261,23 +1267,17 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
         }
-        Expr::Lambda(
-            lambda @ ast::ExprLambda {
-                parameters: _,
-                body: _,
-                range: _,
-            },
-        ) => {
-            if checker.enabled(Rule::ReimplementedListBuiltin) {
-                flake8_pie::rules::reimplemented_list_builtin(checker, lambda);
-            }
-        }
         Expr::IfExp(ast::ExprIfExp {
             test,
             body,
             orelse,
             range: _,
         }) => {
+            if checker.enabled(Rule::IfElseBlockInsteadOfDictGet) {
+                flake8_simplify::rules::if_exp_instead_of_dict_get(
+                    checker, expr, test, body, orelse,
+                );
+            }
             if checker.enabled(Rule::IfExprWithTrueFalse) {
                 flake8_simplify::rules::if_expr_with_true_false(checker, expr, test, body, orelse);
             }

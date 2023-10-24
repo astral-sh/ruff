@@ -12,6 +12,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -87,6 +88,7 @@ mod tests {
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D301.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
+    #[test_case(Rule::TripleSingleQuotes, Path::new("D300.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -99,6 +101,33 @@ mod tests {
                         "gi.repository.GObject.Property".to_string()
                     ]),
                 },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
+    #[test_case(Rule::TripleSingleQuotes, Path::new("D300.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        // Tests for rules with preview features
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pydocstyle").join(path).as_path(),
+            &settings::LinterSettings {
+                pydocstyle: Settings {
+                    convention: None,
+                    ignore_decorators: BTreeSet::from_iter(["functools.wraps".to_string()]),
+                    property_decorators: BTreeSet::from_iter([
+                        "gi.repository.GObject.Property".to_string()
+                    ]),
+                },
+                preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

@@ -51,7 +51,7 @@ aaaaaaaa = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbb
 for converter in connection.ops.get_db_converters(
     expression
 ) + expression.get_db_converters(connection):
-    ...
+    pass
 
 
 aaa = (

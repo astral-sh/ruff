@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)]
+
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -27,6 +29,7 @@ mod panic;
 mod printer;
 pub mod resolve;
 mod stdin;
+mod version;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -134,6 +137,10 @@ pub fn run(
     set_up_logging(&log_level)?;
 
     match command {
+        Command::Version { output_format } => {
+            commands::version::version(output_format)?;
+            Ok(ExitStatus::Success)
+        }
         Command::Rule { rule, all, format } => {
             if all {
                 commands::rule::rules(format)?;
@@ -165,8 +172,6 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    warn_user_once!("`ruff format` is not yet stable, and subject to change in future versions.");
-
     let (cli, overrides) = args.partition();
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
@@ -177,14 +182,6 @@ fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
 }
 
 pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    if args.format.is_some() {
-        if std::env::var("RUFF_FORMAT").is_ok() {
-            warn_user!("The environment variable `RUFF_FORMAT` is deprecated. Use `RUFF_OUTPUT_FORMAT` instead.");
-        } else {
-            warn_user!("The argument `--format=<FORMAT>` is deprecated. Use `--output-format=<FORMAT>` instead.");
-        }
-    }
-
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`

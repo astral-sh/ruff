@@ -6,7 +6,7 @@ use ruff_python_ast::helpers::is_const_none;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::in_dunder_init;
+use crate::rules::pylint::helpers::in_dunder_method;
 
 /// ## What it does
 /// Checks for `__init__` methods that return values.
@@ -58,7 +58,7 @@ pub(crate) fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
         }
     }
 
-    if in_dunder_init(checker.semantic(), checker.settings) {
+    if in_dunder_method("__init__", checker.semantic(), checker.settings) {
         checker
             .diagnostics
             .push(Diagnostic::new(ReturnInInit, stmt.range()));

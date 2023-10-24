@@ -266,15 +266,6 @@ last_call()
 ```diff
 --- Black
 +++ Ruff
-@@ -31,7 +31,7 @@
- -1
- ~int and not v1 ^ 123 + v2 | True
- (~int) and (not ((v1 ^ (123 + v2)) | True))
--+(really ** -(confusing ** ~(operator**-precedence)))
-++really ** -confusing ** ~operator**-precedence
- flags & ~select.EPOLLIN and waiters.write_task is not None
- lambda arg: None
- lambda a=True: a
 @@ -115,7 +115,7 @@
      arg,
      another,
@@ -322,7 +313,7 @@ not great
 -1
 ~int and not v1 ^ 123 + v2 | True
 (~int) and (not ((v1 ^ (123 + v2)) | True))
-+really ** -confusing ** ~operator**-precedence
++(really ** -(confusing ** ~(operator**-precedence)))
 flags & ~select.EPOLLIN and waiters.write_task is not None
 lambda arg: None
 lambda a=True: a

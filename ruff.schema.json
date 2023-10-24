@@ -1,7 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Options",
-  "description": "Experimental section to configure Ruff's linting. This new section will eventually replace the top-level linting options.\n\nOptions specified in the `lint` section take precedence over the top-level settings.",
   "type": "object",
   "properties": {
     "allowed-confusables": {
@@ -41,7 +40,7 @@
       ]
     },
     "exclude": {
-      "description": "A list of file patterns to exclude from linting.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
+      "description": "A list of file patterns to exclude from formatting and linting.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
       "type": [
         "array",
         "null"
@@ -65,7 +64,7 @@
       ]
     },
     "extend-exclude": {
-      "description": "A list of file patterns to omit from linting, in addition to those specified by `exclude`.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "description": "A list of file patterns to omit from formatting and linting, in addition to those specified by `exclude`.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "array",
         "null"
@@ -76,6 +75,17 @@
     },
     "extend-fixable": {
       "description": "A list of rule codes or prefixes to consider fixable, in addition to those specified by `fixable`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
+    "extend-ignore": {
+      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -119,6 +129,17 @@
     },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
+    "extend-unfixable": {
+      "description": "A list of rule codes or prefixes to consider non-auto-fixable, in addition to those specified by `unfixable`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -355,10 +376,10 @@
       ]
     },
     "format": {
-      "description": "Options to configure the code formatting.\n\nPreviously: The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).\n\nThis option has been **deprecated** in favor of `output-format` to avoid ambiguity with Ruff's upcoming formatter.",
+      "description": "Options to configure code formatting.",
       "anyOf": [
         {
-          "$ref": "#/definitions/FormatOrOutputFormat"
+          "$ref": "#/definitions/FormatOptions"
         },
         {
           "type": "null"
@@ -491,7 +512,7 @@
       }
     },
     "preview": {
-      "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will use unstable rules and fixes.",
+      "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will use unstable rules, fixes, and formatting.",
       "type": [
         "boolean",
         "null"
@@ -605,7 +626,7 @@
       }
     },
     "tab-size": {
-      "description": "The tabulation size to calculate line length.",
+      "description": "The number of spaces a tab is equal to when enforcing long-line violations (like `E501`) or formatting code with the formatter.\n\nThis option changes the number of spaces inserted by the formatter when using soft-tabs (`indent-style = space`).",
       "anyOf": [
         {
           "$ref": "#/definitions/TabSize"
@@ -686,8 +707,7 @@
         "complex",
         "float",
         "int",
-        "str",
-        "tuple"
+        "str"
       ]
     },
     "Convention": {
@@ -1209,6 +1229,16 @@
       "description": "Experimental: Configures how `ruff format` formats your code.\n\nPlease provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).",
       "type": "object",
       "properties": {
+        "exclude": {
+          "description": "A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "indent-style": {
           "description": "Whether to use 4 spaces or hard tabs for indenting code.\n\nDefaults to 4 spaces. We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.",
           "anyOf": [
@@ -1221,7 +1251,7 @@
           ]
         },
         "line-ending": {
-          "description": "The character Ruff uses at the end of a line.\n\n* `lf`: Line endings will be converted to `\\n`. The default line ending on Unix. * `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows. * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings. * `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
+          "description": "The character Ruff uses at the end of a line.\n\n* `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings. * `lf`: Line endings will be converted to `\\n`. The default line ending on Unix. * `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows. * `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineEnding"
@@ -1239,7 +1269,7 @@
           ]
         },
         "quote-style": {
-          "description": "Whether to prefer single `'` or double `\"` quotes for strings. Defaults to double quotes.\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for multiline strings and docstrings, regardless of the configured quote style.\n\nRuff may also deviate from this option if using the configured quotes would require escaping quote characters within the string. For example, given:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change `a` to use single quotes when using `quote-style = \"single\"`. However, `a` will be unchanged, as converting to single quotes would require the inner `'` to be escaped, which leads to less readable code: `'It\\'s monday morning'`.",
+          "description": "Whether to prefer single `'` or double `\"` quotes for strings. Defaults to double quotes.\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for multiline strings and docstrings, regardless of the configured quote style.\n\nRuff may also deviate from this option if using the configured quotes would require escaping quote characters within the string. For example, given:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change `a` to use single quotes when using `quote-style = \"single\"`. However, `b` will be unchanged, as converting to single quotes would require the inner `'` to be escaped, which leads to less readable code: `'It\\'s monday morning'`.",
           "anyOf": [
             {
               "$ref": "#/definitions/QuoteStyle"
@@ -1258,16 +1288,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "FormatOrOutputFormat": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/FormatOptions"
-        },
-        {
-          "$ref": "#/definitions/SerializationFormat"
-        }
-      ]
     },
     "ImportSection": {
       "anyOf": [
@@ -1543,6 +1563,13 @@
     "LineEnding": {
       "oneOf": [
         {
+          "description": "The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to [`LineEnding::Lf`] for a files that contain no line endings.",
+          "type": "string",
+          "enum": [
+            "auto"
+          ]
+        },
+        {
           "description": "Line endings will be converted to `\\n` as is common on Unix.",
           "type": "string",
           "enum": [
@@ -1554,13 +1581,6 @@
           "type": "string",
           "enum": [
             "cr-lf"
-          ]
-        },
-        {
-          "description": "The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to [`LineEnding::Lf`] for a files that contain no line endings.",
-          "type": "string",
-          "enum": [
-            "auto"
           ]
         },
         {
@@ -1602,6 +1622,16 @@
             "null"
           ]
         },
+        "exclude": {
+          "description": "A list of file patterns to exclude from linting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "explicit-preview-rules": {
           "description": "Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
           "type": [
@@ -1611,6 +1641,17 @@
         },
         "extend-fixable": {
           "description": "A list of rule codes or prefixes to consider fixable, in addition to those specified by `fixable`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "extend-ignore": {
+          "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
+          "deprecated": true,
           "type": [
             "array",
             "null"
@@ -1644,6 +1685,17 @@
         },
         "extend-select": {
           "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "extend-unfixable": {
+          "description": "A list of rule codes or prefixes to consider non-auto-fixable, in addition to those specified by `unfixable`.",
+          "deprecated": true,
           "type": [
             "array",
             "null"
@@ -1931,6 +1983,13 @@
             }
           }
         },
+        "preview": {
+          "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will use unstable rules and fixes.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "pycodestyle": {
           "description": "Options for the `pycodestyle` plugin.",
           "anyOf": [
@@ -2217,6 +2276,15 @@
         },
         "max-args": {
           "description": "Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "max-bool-expr": {
+          "description": "Maximum number of Boolean expressions allowed within a single `if` statement (see: `PLR0916`).",
           "type": [
             "integer",
             "null"
@@ -2712,6 +2780,7 @@
         "FURB",
         "FURB1",
         "FURB10",
+        "FURB101",
         "FURB105",
         "FURB11",
         "FURB113",
@@ -2880,6 +2949,11 @@
         "PLC19",
         "PLC190",
         "PLC1901",
+        "PLC2",
+        "PLC24",
+        "PLC240",
+        "PLC2401",
+        "PLC2403",
         "PLC3",
         "PLC30",
         "PLC300",
@@ -2905,6 +2979,9 @@
         "PLE060",
         "PLE0604",
         "PLE0605",
+        "PLE07",
+        "PLE070",
+        "PLE0704",
         "PLE1",
         "PLE11",
         "PLE114",
@@ -2956,6 +3033,7 @@
         "PLR0912",
         "PLR0913",
         "PLR0915",
+        "PLR0916",
         "PLR1",
         "PLR17",
         "PLR170",
@@ -2975,12 +3053,17 @@
         "PLR550",
         "PLR5501",
         "PLR6",
+        "PLR62",
+        "PLR620",
+        "PLR6201",
         "PLR63",
         "PLR630",
         "PLR6301",
         "PLW",
         "PLW0",
         "PLW01",
+        "PLW010",
+        "PLW0108",
         "PLW012",
         "PLW0120",
         "PLW0127",
@@ -2994,6 +3077,7 @@
         "PLW060",
         "PLW0602",
         "PLW0603",
+        "PLW0604",
         "PLW07",
         "PLW071",
         "PLW0711",
@@ -3004,6 +3088,7 @@
         "PLW1509",
         "PLW151",
         "PLW1510",
+        "PLW1514",
         "PLW16",
         "PLW164",
         "PLW1641",

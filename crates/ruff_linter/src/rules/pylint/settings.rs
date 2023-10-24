@@ -15,7 +15,6 @@ pub enum ConstantType {
     Float,
     Int,
     Str,
-    Tuple,
 }
 
 impl TryFrom<&Constant> for ConstantType {
@@ -40,6 +39,7 @@ pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
     pub max_args: usize,
     pub max_returns: usize,
+    pub max_bool_expr: usize,
     pub max_branches: usize,
     pub max_statements: usize,
     pub max_public_methods: usize,
@@ -51,6 +51,7 @@ impl Default for Settings {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
             max_args: 5,
             max_returns: 6,
+            max_bool_expr: 5,
             max_branches: 12,
             max_statements: 50,
             max_public_methods: 20,

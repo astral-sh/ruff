@@ -997,37 +997,57 @@ UP035.py:77:1: UP035 [*] Import from `collections.abc` instead: `Callable`
 
 UP035.py:87:1: UP035 [*] Import from `typing` instead: `NamedTuple`
    |
-86 | # Ok: `typing_extensions` contains backported improvements.
+86 | # OK: `typing_extensions` contains backported improvements.
 87 | from typing_extensions import NamedTuple
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
 88 | 
-89 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+89 | # OK: `typing_extensions` supports `frozen_default` (backported from 3.12).
    |
    = help: Import from `typing`
 
 ℹ Fix
 84 84 | from typing_extensions import SupportsIndex
 85 85 | 
-86 86 | # Ok: `typing_extensions` contains backported improvements.
+86 86 | # OK: `typing_extensions` contains backported improvements.
 87    |-from typing_extensions import NamedTuple
    87 |+from typing import NamedTuple
 88 88 | 
-89 89 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+89 89 | # OK: `typing_extensions` supports `frozen_default` (backported from 3.12).
 90 90 | from typing_extensions import dataclass_transform
 
 UP035.py:90:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
    |
-89 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+89 | # OK: `typing_extensions` supports `frozen_default` (backported from 3.12).
 90 | from typing_extensions import dataclass_transform
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+91 | 
+92 | # UP035
    |
    = help: Import from `typing`
 
 ℹ Fix
 87 87 | from typing_extensions import NamedTuple
 88 88 | 
-89 89 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+89 89 | # OK: `typing_extensions` supports `frozen_default` (backported from 3.12).
 90    |-from typing_extensions import dataclass_transform
    90 |+from typing import dataclass_transform
+91 91 | 
+92 92 | # UP035
+93 93 | from backports.strenum import StrEnum
+
+UP035.py:93:1: UP035 [*] Import from `enum` instead: `StrEnum`
+   |
+92 | # UP035
+93 | from backports.strenum import StrEnum
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   |
+   = help: Import from `enum`
+
+ℹ Fix
+90 90 | from typing_extensions import dataclass_transform
+91 91 | 
+92 92 | # UP035
+93    |-from backports.strenum import StrEnum
+   93 |+from enum import StrEnum
 
 

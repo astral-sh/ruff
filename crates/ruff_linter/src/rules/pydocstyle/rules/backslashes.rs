@@ -1,6 +1,6 @@
 use memchr::memchr_iter;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -46,18 +46,21 @@ use crate::docstrings::Docstring;
 #[violation]
 pub struct EscapeSequenceInDocstring;
 
-impl Violation for EscapeSequenceInDocstring {
+impl AlwaysFixableViolation for EscapeSequenceInDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(r#"Use `r"""` if any backslashes in a docstring"#)
+    }
+
+    fn fix_title(&self) -> String {
+        format!(r#"Add `r` prefix"#)
     }
 }
 
 /// D301
 pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     // Docstring is already raw.
-    let contents = docstring.contents;
-    if contents.starts_with('r') || contents.starts_with("ur") {
+    if docstring.leading_quote().contains(['r', 'R']) {
         return;
     }
 
@@ -67,11 +70,15 @@ pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     if memchr_iter(b'\\', bytes).any(|position| {
         let escaped_char = bytes.get(position.saturating_add(1));
         // Allow continuations (backslashes followed by newlines) and Unicode escapes.
-        !matches!(escaped_char, Some(b'\r' | b'\n' | b'u' | b'N'))
+        !matches!(escaped_char, Some(b'\r' | b'\n' | b'u' | b'U' | b'N'))
     }) {
-        checker.diagnostics.push(Diagnostic::new(
-            EscapeSequenceInDocstring,
+        let mut diagnostic = Diagnostic::new(EscapeSequenceInDocstring, docstring.range());
+
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            "r".to_owned() + docstring.contents,
             docstring.range(),
-        ));
+        )));
+
+        checker.diagnostics.push(diagnostic);
     }
 }

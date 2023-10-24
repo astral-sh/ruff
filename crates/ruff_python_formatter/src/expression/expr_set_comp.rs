@@ -1,5 +1,5 @@
 use ruff_formatter::{format_args, write, Buffer, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprSetComp;
 
 use crate::comments::SourceComment;

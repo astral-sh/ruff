@@ -4817,7 +4817,7 @@ pub enum AnyNodeRef<'a> {
     ElifElseClause(&'a ast::ElifElseClause),
 }
 
-impl AnyNodeRef<'_> {
+impl<'a> AnyNodeRef<'a> {
     pub fn as_ptr(&self) -> NonNull<()> {
         match self {
             AnyNodeRef::ModModule(node) => NonNull::from(*node).cast(),
@@ -5456,9 +5456,9 @@ impl AnyNodeRef<'_> {
         )
     }
 
-    pub fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    pub fn visit_preorder<'b, V>(&'b self, visitor: &mut V)
     where
-        V: PreorderVisitor<'a> + ?Sized,
+        V: PreorderVisitor<'b> + ?Sized,
     {
         match self {
             AnyNodeRef::ModModule(node) => node.visit_preorder(visitor),
@@ -5543,6 +5543,66 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::TypeParamParamSpec(node) => node.visit_preorder(visitor),
             AnyNodeRef::ElifElseClause(node) => node.visit_preorder(visitor),
         }
+    }
+
+    /// The last child of the last branch, if the node has multiple branches.
+    pub fn last_child_in_body(&self) -> Option<AnyNodeRef<'a>> {
+        let body = match self {
+            AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
+            | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
+            | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
+            | AnyNodeRef::MatchCase(MatchCase { body, .. })
+            | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
+                body,
+                ..
+            })
+            | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
+            AnyNodeRef::StmtIf(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
+
+            AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
+            | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
+                if orelse.is_empty() {
+                    body
+                } else {
+                    orelse
+                }
+            }
+
+            AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
+                return cases.last().map(AnyNodeRef::from);
+            }
+
+            AnyNodeRef::StmtTry(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                if finalbody.is_empty() {
+                    if orelse.is_empty() {
+                        if handlers.is_empty() {
+                            body
+                        } else {
+                            return handlers.last().map(AnyNodeRef::from);
+                        }
+                    } else {
+                        orelse
+                    }
+                } else {
+                    finalbody
+                }
+            }
+
+            // Not a node that contains an indented child node.
+            _ => return None,
+        };
+
+        body.last().map(AnyNodeRef::from)
     }
 }
 
