@@ -247,7 +247,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R0913") => (RuleGroup::Unspecified, rules::pylint::rules::TooManyArguments),
         (Pylint, "R0915") => (RuleGroup::Unspecified, rules::pylint::rules::TooManyStatements),
         (Pylint, "R1701") => (RuleGroup::Unspecified, rules::pylint::rules::RepeatedIsinstanceCalls),
-        (Pylint, "R1704") => (RuleGroup::Unspecified, rules::pylint::rules::RedefinedArgumentFromLocal),
+        (Pylint, "R1704") => (RuleGroup::Preview, rules::pylint::rules::RedefinedArgumentFromLocal),
         (Pylint, "R1711") => (RuleGroup::Unspecified, rules::pylint::rules::UselessReturn),
         (Pylint, "R1714") => (RuleGroup::Unspecified, rules::pylint::rules::RepeatedEqualityComparison),
         (Pylint, "R1706") => (RuleGroup::Preview, rules::pylint::rules::AndOrTernary),
