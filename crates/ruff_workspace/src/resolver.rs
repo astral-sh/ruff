@@ -2,7 +2,6 @@
 //! filesystem.
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -13,6 +12,7 @@ use globset::{Candidate, GlobSet};
 use ignore::{WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
+use matchit::Router;
 use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -96,13 +96,15 @@ impl Relativity {
 
 #[derive(Default)]
 pub struct Resolver {
-    settings: BTreeMap<PathBuf, Settings>,
+    router: Router<Settings>,
 }
 
 impl Resolver {
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: PathBuf, settings: Settings) {
-        self.settings.insert(path, settings);
+    fn add(&mut self, path: PathBuf, settings: Settings) -> Result<()> {
+        Ok(self
+            .router
+            .insert(format!("{}/*filepath", path.display()), settings)?)
     }
 
     /// Return the appropriate [`Settings`] for a given [`Path`].
@@ -114,11 +116,9 @@ impl Resolver {
         match pyproject_config.strategy {
             PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings,
             PyprojectDiscoveryStrategy::Hierarchical => self
-                .settings
-                .iter()
-                .rev()
-                .find_map(|(root, settings)| path.starts_with(root).then_some(settings))
-                .unwrap_or(&pyproject_config.settings),
+                .router
+                .at(path.to_string_lossy().as_ref())
+                .map_or_else(|_| &pyproject_config.settings, |match_| match_.value),
         }
     }
 
@@ -162,7 +162,7 @@ impl Resolver {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        self.settings.values()
+        std::iter::empty()
     }
 }
 
