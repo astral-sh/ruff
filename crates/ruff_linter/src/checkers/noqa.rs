@@ -128,7 +128,13 @@ pub(crate) fn check_noqa(
                         }
 
                         if line.matches.iter().any(|match_| *match_ == code)
+                            // Perform a fast-check for exact matches first
                             || settings.external.contains(code)
+                            // then check for matching prefixes
+                            || settings
+                                .external
+                                .iter()
+                                .any(|external| code.starts_with(external))
                         {
                             valid_codes.push(code);
                         } else {

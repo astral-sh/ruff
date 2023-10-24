@@ -548,7 +548,7 @@ pub struct LintCommonOptions {
     )]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
 
-    /// A list of rule codes that are unsupported by Ruff, but should be
+    /// A list of rule codes or prefixes that are unsupported by Ruff, but should be
     /// preserved when (e.g.) validating `# noqa` directives. Useful for
     /// retaining `# noqa` directives that cover plugins not yet implemented
     /// by Ruff.
@@ -556,9 +556,9 @@ pub struct LintCommonOptions {
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            # Avoiding flagging (and removing) `V101` from any `# noqa`
-            # directives, despite Ruff's lack of support for `vulture`.
-            external = ["V101"]
+            # Avoiding flagging (and removing) any codes starting with `V` from any
+            # `# noqa` directives, despite Ruff's lack of support for `vulture`.
+            external = ["V"]
         "#
     )]
     pub external: Option<Vec<String>>,
