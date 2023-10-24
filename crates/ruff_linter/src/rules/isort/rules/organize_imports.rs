@@ -120,7 +120,7 @@ pub(crate) fn organize_imports(
         block,
         comments,
         locator,
-        settings.line_length,
+        settings.pycodestyle.max_line_length,
         LineWidthBuilder::new(settings.tab_size).add_str(indentation),
         stylist,
         &settings.src,

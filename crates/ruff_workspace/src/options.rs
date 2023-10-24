@@ -60,7 +60,7 @@ pub struct Options {
     /// this base configuration file, then merge in any properties defined
     /// in the current configuration file.
     #[option(
-        default = r#"None"#,
+        default = r#"null"#,
         value_type = "str",
         example = r#"
             # Extend the `pyproject.toml` file in the parent directory.
@@ -132,7 +132,7 @@ pub struct Options {
     /// results across many environments, e.g., with a `pyproject.toml`
     /// file).
     #[option(
-        default = "None",
+        default = "null",
         value_type = "str",
         example = r#"
             required-version = "0.0.193"
@@ -362,6 +362,8 @@ pub struct Options {
     /// Note: While the formatter will attempt to format lines such that they remain
     /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
     /// exceed the `line-length`.
+    ///
+    /// See [`pycodestyle.max-line-length`](#pycodestyle-max-line-length) to configure different lengths for `E501` and the formatter.
     #[option(
         default = "88",
         value_type = "int",
@@ -1043,7 +1045,7 @@ pub struct Flake8CopyrightOptions {
 
     /// Author to enforce within the copyright notice. If provided, the
     /// author must be present immediately following the copyright notice.
-    #[option(default = "None", value_type = "str", example = r#"author = "Ruff""#)]
+    #[option(default = "null", value_type = "str", example = r#"author = "Ruff""#)]
     pub author: Option<String>,
 
     /// A minimum file size (in bytes) required for a copyright notice to
@@ -2247,6 +2249,32 @@ impl Pep8NamingOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PycodestyleOptions {
+    /// The maximum line length to allow for [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) violations. By default,
+    /// this is set to the value of the [`line-length`](#line-length) option.
+    ///
+    /// Use this option when you want to detect extra-long lines that the formatter can't automatically split by setting
+    /// `pycodestyle.line-length` to a value larger than [`line-length`](#line-length).
+    ///
+    /// ```toml
+    /// line-length = 88 # The formatter wraps lines at a length of 88
+    ///
+    /// [pycodestyle]
+    /// max-line-length = 100 # E501 reports lines that exceed the length of 100.
+    /// ```
+    ///
+    /// The length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.
+    /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
+    ///
+    /// See the [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) rule for more information.
+    #[option(
+        default = "null",
+        value_type = "int",
+        example = r#"
+            max-line-length = 100
+        "#
+    )]
+    pub max_line_length: Option<LineLength>,
+
     /// The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within
     /// documentation (`W505`), including standalone comments. By default,
     /// this is set to null which disables reporting violations.
@@ -2256,7 +2284,7 @@ pub struct PycodestyleOptions {
     ///
     /// See the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.
     #[option(
-        default = "None",
+        default = "null",
         value_type = "int",
         example = r#"
             max-doc-length = 88
@@ -2278,9 +2306,10 @@ pub struct PycodestyleOptions {
 }
 
 impl PycodestyleOptions {
-    pub fn into_settings(self) -> pycodestyle::settings::Settings {
+    pub fn into_settings(self, global_line_length: LineLength) -> pycodestyle::settings::Settings {
         pycodestyle::settings::Settings {
             max_doc_length: self.max_doc_length,
+            max_line_length: self.max_line_length.unwrap_or(global_line_length),
             ignore_overlong_task_comments: self.ignore_overlong_task_comments.unwrap_or_default(),
         }
     }
@@ -2321,7 +2350,7 @@ pub struct PydocstyleOptions {
     /// enabling _additional_ rules on top of a convention is currently
     /// unsupported.
     #[option(
-        default = r#"None"#,
+        default = r#"null"#,
         value_type = r#""google" | "numpy" | "pep257""#,
         example = r#"
             # Use Google-style docstrings.

@@ -21,6 +21,7 @@ use ruff_linter::line_width::{LineLength, TabSize};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
+use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
@@ -183,6 +184,8 @@ impl Configuration {
         let lint = self.lint;
         let lint_preview = lint.preview.unwrap_or(global_preview);
 
+        let line_length = self.line_length.unwrap_or_default();
+
         Ok(Settings {
             cache_dir: self
                 .cache_dir
@@ -225,7 +228,6 @@ impl Configuration {
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
                 external: FxHashSet::from_iter(lint.external.unwrap_or_default()),
                 ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
-                line_length: self.line_length.unwrap_or_default(),
                 tab_size: self.tab_size.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
                 per_file_ignores: resolve_per_file_ignores(
@@ -346,10 +348,14 @@ impl Configuration {
                     .map(Pep8NamingOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
-                pycodestyle: lint
-                    .pycodestyle
-                    .map(PycodestyleOptions::into_settings)
-                    .unwrap_or_default(),
+                pycodestyle: if let Some(pycodestyle) = lint.pycodestyle {
+                    pycodestyle.into_settings(line_length)
+                } else {
+                    pycodestyle::settings::Settings {
+                        max_line_length: line_length,
+                        ..pycodestyle::settings::Settings::default()
+                    }
+                },
                 pydocstyle: lint
                     .pydocstyle
                     .map(PydocstyleOptions::into_settings)

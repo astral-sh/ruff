@@ -425,7 +425,7 @@
       ]
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`) and at which the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0` and less than or equal to `320`.\n\nNote: While the formatter will attempt to format lines such that they remain within the `line-length`, it isn't a hard upper bound, and formatted lines may exceed the `line-length`.",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`) and at which the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0` and less than or equal to `320`.\n\nNote: While the formatter will attempt to format lines such that they remain within the `line-length`, it isn't a hard upper bound, and formatted lines may exceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#pycodestyle-max-line-length) to configure different lengths for `E501` and the formatter.",
       "anyOf": [
         {
           "$ref": "#/definitions/LineLength"
@@ -2196,6 +2196,17 @@
         },
         "max-doc-length": {
           "description": "The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within documentation (`W505`), including standalone comments. By default, this is set to null which disables reporting violations.\n\nThe length is determined by the number of characters per line, except for lines containinAsian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LineLength"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max-line-length": {
+          "description": "The maximum line length to allow for [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) violations. By default, this is set to the value of the [`line-length`](#line-length) option.\n\nUse this option when you want to detect extra-long lines that the formatter can't automatically split by setting `pycodestyle.line-length` to a value larger than [`line-length`](#line-length).\n\n```toml line-length = 88 # The formatter wraps lines at a length of 88\n\n[pycodestyle] max-line-length = 100 # E501 reports lines that exceed the length of 100. ```\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) rule for more information.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineLength"

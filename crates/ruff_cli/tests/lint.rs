@@ -270,3 +270,41 @@ if __name__ == "__main__":
     "###);
     Ok(())
 }
+
+#[test]
+fn line_too_long_width_override() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+line-length = 80
+select = ["E501"]
+
+[pycodestyle]
+max-line-length = 100
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"
+# longer than 80, but less than 100
+_ = "---------------------------------------------------------------------------亜亜亜亜亜亜"
+# longer than 100
+_ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜亜亜亜亜亜亜亜"
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:5:91: E501 Line too long (109 > 100)
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
