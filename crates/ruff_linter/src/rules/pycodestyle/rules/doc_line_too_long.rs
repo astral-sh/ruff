@@ -64,7 +64,7 @@ impl Violation for DocLineTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DocLineTooLong(width, limit) = self;
-        format!("Doc line too long ({width} > {limit} characters)")
+        format!("Doc line too long ({width} > {limit})")
     }
 }
 

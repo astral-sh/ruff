@@ -58,7 +58,7 @@ impl Violation for LineTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         let LineTooLong(width, limit) = self;
-        format!("Line too long ({width} > {limit} characters)")
+        format!("Line too long ({width} > {limit})")
     }
 }
 
