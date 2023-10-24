@@ -437,7 +437,7 @@ pub(crate) enum FormatResult {
     /// The file was unchanged, as the formatted contents matched the existing contents.
     Unchanged,
 
-    /// Skipped formatting because its an unformatted file format
+    /// Skipped formatting because its an unsupported file format
     Skipped,
 }
 
