@@ -2,6 +2,9 @@
 
 ## 0.1.2
 
+This release includes the Beta version of the Ruff formatter — an extremely fast, Black-compatible Python formatter.
+Try it today with `ruff format`.
+
 ### Preview features
 
 - \[`pylint`\] Implement `non-ascii-module-import` (`C2403`) ([#8056](https://github.com/astral-sh/ruff/pull/8056))
