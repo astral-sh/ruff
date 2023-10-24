@@ -351,13 +351,22 @@ pub struct Options {
     pub src: Option<Vec<String>>,
 
     // Global Formatting options
-    /// The line length to use when enforcing long-lines violations (like
-    /// `E501`). Must be greater than `0` and less than or equal to `320`.
+    /// The line length to use when enforcing long-lines violations (like `E501`)
+    /// and at which the formatter prefers to wrap lines.
+    ///
+    /// The length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.
+    /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
+    ///
+    /// The value must be greater than `0` and less than or equal to `320`.
+    ///
+    /// Note: While the formatter will attempt to format lines such that they remain
+    /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
+    /// exceed the `line-length`.
     #[option(
         default = "88",
         value_type = "int",
         example = r#"
-        # Allow lines to be as long as 120 characters.
+        # Allow lines to be as long as 120.
         line-length = 120
         "#
     )]
@@ -2238,9 +2247,12 @@ impl Pep8NamingOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PycodestyleOptions {
-    /// The maximum line length to allow for line-length violations within
+    /// The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within
     /// documentation (`W505`), including standalone comments. By default,
     /// this is set to null which disables reporting violations.
+    ///
+    /// The length is determined by the number of characters per line, except for lines containinAsian characters or emojis.
+    /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
     ///
     /// See the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.
     #[option(
@@ -2597,7 +2609,7 @@ pub struct FormatOptions {
     /// If this option is set to `true`, the magic trailing comma is ignored.
     ///
     /// For example, Ruff leaves the arguments separate even though
-    /// collapsing the arguments to a single line doesn't exceed the line width if `skip-magic-trailing-comma = false`:
+    /// collapsing the arguments to a single line doesn't exceed the line length if `skip-magic-trailing-comma = false`:
     ///
     /// ```python
     ///  # The arguments remain on separate lines because of the trailing comma after `b`

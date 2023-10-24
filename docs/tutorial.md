@@ -107,7 +107,7 @@ To configure Ruff, let's create a `pyproject.toml` file in our project's root di
 
 ```toml
 [tool.ruff]
-# Set the maximum line length to 79 characters.
+# Set the maximum line length to 79.
 line-length = 79
 
 [tool.ruff.linter]
@@ -117,11 +117,11 @@ line-length = 79
 extend-select = ["E501"]
 ```
 
-Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79 characters:
+Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79:
 
 ```shell
 ❯ ruff check .
-numbers/numbers.py:5:80: E501 Line too long (90 > 79 characters)
+numbers/numbers.py:5:80: E501 Line too long (90 > 79)
 Found 1 error.
 ```
 
@@ -134,7 +134,7 @@ specifically, we'll want to make note of the minimum supported Python version:
 requires-python = ">=3.10"
 
 [tool.ruff]
-# Set the maximum line length to 79 characters.
+# Set the maximum line length to 79.
 line-length = 79
 
 [tool.ruff.linter]
