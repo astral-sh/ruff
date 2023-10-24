@@ -1,5 +1,71 @@
 # Changelog
 
+## 0.1.2
+
+This release includes the Beta version of the Ruff formatter — an extremely fast, Black-compatible Python formatter.
+Try it today with `ruff format`.
+
+### Preview features
+
+- \[`pylint`\] Implement `non-ascii-module-import` (`C2403`) ([#8056](https://github.com/astral-sh/ruff/pull/8056))
+- \[`pylint`\] implement `non-ascii-name` (`C2401`) ([#8038](https://github.com/astral-sh/ruff/pull/8038))
+- \[`pylint`\] Implement unnecessary-lambda (W0108) ([#7953](https://github.com/astral-sh/ruff/pull/7953))
+- \[`refurb`\] Implement `read-whole-file` (`FURB101`) ([#7682](https://github.com/astral-sh/ruff/pull/7682))
+- Add fix for `E223`, `E224`, and `E242` ([#8143](https://github.com/astral-sh/ruff/pull/8143))
+- Add fix for `E225`, `E226`, `E227`, and `E228` ([#8136](https://github.com/astral-sh/ruff/pull/8136))
+- Add fix for `E252` ([#8142](https://github.com/astral-sh/ruff/pull/8142))
+- Add fix for `E261` ([#8114](https://github.com/astral-sh/ruff/pull/8114))
+- Add fix for `E273` and `E274` ([#8144](https://github.com/astral-sh/ruff/pull/8144))
+- Add fix for `E275` ([#8133](https://github.com/astral-sh/ruff/pull/8133))
+- Update `SIM401` to catch ternary operations ([#7415](https://github.com/astral-sh/ruff/pull/7415))
+
+### Rule changes
+
+- Add `backports.strenum` to `deprecated-imports` ([#8113](https://github.com/astral-sh/ruff/pull/8113))
+- Update `E721` to allow `is` and `is` not for direct type comparisons ([#7905](https://github.com/astral-sh/ruff/pull/7905))
+- Update `SIM112` to ignore `https_proxy`, `http_proxy`, and `no_proxy` ([#8140](https://github.com/astral-sh/ruff/pull/8140))
+- Update fix for `literal-membership` (`PLR6201`) to be unsafe ([#8097](https://github.com/astral-sh/ruff/pull/8097))
+- Update fix for  `mutable-argument-defaults` (`B006`) to be unsafe ([#8108](https://github.com/astral-sh/ruff/pull/8108))
+
+### Formatter
+
+- Change `line-ending` default to `auto` ([#8057](https://github.com/astral-sh/ruff/pull/8057))
+- Respect parenthesized generators in `has_own_parentheses` ([#8100](https://github.com/astral-sh/ruff/pull/8100))
+- Add caching to formatter ([#8089](https://github.com/astral-sh/ruff/pull/8089))
+- Remove `--line-length` option from `format` command ([#8131](https://github.com/astral-sh/ruff/pull/8131))
+- Add formatter to `line-length` documentation ([#8150](https://github.com/astral-sh/ruff/pull/8150))
+- Warn about incompatible formatter options ([#8088](https://github.com/astral-sh/ruff/pull/8088))
+- Fix range of unparenthesized tuple subject in match statement ([#8101](https://github.com/astral-sh/ruff/pull/8101))
+- Remove experimental formatter warning ([#8148](https://github.com/astral-sh/ruff/pull/8148))
+- Don't move type param opening parenthesis comment ([#8163](https://github.com/astral-sh/ruff/pull/8163))
+- Update versions in format benchmark script ([#8110](https://github.com/astral-sh/ruff/pull/8110))
+- Avoid loading files for cached format results ([#8134](https://github.com/astral-sh/ruff/pull/8134))
+
+### CLI
+
+- Show the `ruff format` command in help menus ([#8167](https://github.com/astral-sh/ruff/pull/8167))
+- Add `ruff version` command with long version display ([#8034](https://github.com/astral-sh/ruff/pull/8034))
+
+### Configuration
+
+- New `pycodestyle.max-line-length` option ([#8039](https://github.com/astral-sh/ruff/pull/8039))
+
+### Bug fixes
+
+- Detect `sys.version_info` slices in `outdated-version-block` ([#8112](https://github.com/astral-sh/ruff/pull/8112))
+- Avoid if-else simplification for `TYPE_CHECKING` blocks ([#8072](https://github.com/astral-sh/ruff/pull/8072))
+- Avoid false-positive print separator diagnostic with starred argument ([#8079](https://github.com/astral-sh/ruff/pull/8079))
+
+### Documentation
+
+- Fix message for `too-many-arguments` lint ([#8092](https://github.com/astral-sh/ruff/pull/8092))
+- Fix `extend-unsafe-fixes` and `extend-safe-fixes` example ([#8139](https://github.com/astral-sh/ruff/pull/8139))
+- Add links to `flake8-import-conventions` options ([#8115](https://github.com/astral-sh/ruff/pull/8115))
+- Rework the documentation to incorporate the Ruff formatter ([#7732](https://github.com/astral-sh/ruff/pull/7732))
+- Fix `Options` JSON schema description ([#8081](https://github.com/astral-sh/ruff/pull/8081))
+- Fix typo (`pytext` -> `pytest`) ([#8117](https://github.com/astral-sh/ruff/pull/8117))
+- Improve `magic-value-comparison` example in docs ([#8111](https://github.com/astral-sh/ruff/pull/8111))
+
 ## 0.1.1
 
 ### Rule changes
