@@ -23,6 +23,8 @@ use super::super::branch::Branch;
 use super::super::helpers::result_exists;
 use super::super::visitor::{ReturnVisitor, Stack};
 
+// CHECK HERE!
+
 /// ## What it does
 /// Checks for the presence of a `return None` statement when `None` is the only
 /// possible return value.
