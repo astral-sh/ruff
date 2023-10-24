@@ -106,7 +106,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
             &settings::LinterSettings {
-                external: FxHashSet::from_iter(vec!["V101".to_string()]),
+                external: vec!["V101".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::UnusedNOQA,
                     Rule::LineTooLong,
@@ -125,7 +125,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
             &settings::LinterSettings {
-                external: FxHashSet::from_iter(vec!["V".to_string()]),
+                external: vec!["V".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::UnusedNOQA,
                     Rule::LineTooLong,
