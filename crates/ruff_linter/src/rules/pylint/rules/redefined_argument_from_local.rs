@@ -14,7 +14,7 @@ use crate::checkers::ast::Checker;
 /// that redefine function parameters.
 ///
 /// ## Why is this bad?
-/// Redefined variable can cause unexpected behavior because of overriden function parameter.
+/// Redefined variable can cause unexpected behavior because of overridden function parameter.
 /// If nested functions are declared, inner function's body can override outer function's parameter.
 ///
 /// ## Example
