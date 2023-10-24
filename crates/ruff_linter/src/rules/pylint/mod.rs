@@ -84,6 +84,7 @@ mod tests {
     )]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
+    #[test_case(Rule::RedefinedArgumentFromLocal, Path::new("redefined_argument_from_local.py"))]
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
