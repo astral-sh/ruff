@@ -1,11 +1,13 @@
-use rustc_hash::FxHashSet;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, ExceptHandlerExceptHandler, Expr, ExprContext, Identifier, Stmt, visitor};
-use ruff_python_ast::ExceptHandler::ExceptHandler;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::ExceptHandler::ExceptHandler;
+use ruff_python_ast::{
+    self as ast, visitor, ExceptHandlerExceptHandler, Expr, ExprContext, Identifier, Stmt,
+};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 
@@ -41,7 +43,7 @@ pub struct RedefinedArgumentFromLocal {
 impl Violation for RedefinedArgumentFromLocal {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedArgumentFromLocal {name} = self;
+        let RedefinedArgumentFromLocal { name } = self;
         format!("Redefining argument with the local name `{name}`")
     }
 }
@@ -54,7 +56,8 @@ struct StoredNamesVisitor<'a> {
 
 impl<'a> StoredNamesVisitor<'a> {
     fn names(&self) -> Vec<(&str, TextRange)> {
-        self.identifiers.iter()
+        self.identifiers
+            .iter()
             .map(|i| (i.as_str(), i.range()))
             .chain(self.expressions.iter().map(|e| (e.id.as_str(), e.range)))
             .collect::<Vec<_>>()
@@ -65,13 +68,10 @@ impl<'a> StoredNamesVisitor<'a> {
 impl<'a> Visitor<'a> for StoredNamesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::For(ast::StmtFor { target, .. }) => {
-                self.visit_expr(target)
-            }
+            Stmt::For(ast::StmtFor { target, .. }) => self.visit_expr(target),
             Stmt::Try(ast::StmtTry { handlers, .. }) => {
                 for handler in handlers {
-                    let ExceptHandler(ExceptHandlerExceptHandler { name, .. })
-                        = handler;
+                    let ExceptHandler(ExceptHandlerExceptHandler { name, .. }) = handler;
                     if let Some(ident) = name {
                         self.identifiers.push(ident);
                     }
@@ -100,10 +100,7 @@ impl<'a> Visitor<'a> for StoredNamesVisitor<'a> {
 }
 
 /// PLR1704
-pub(crate) fn redefined_argument_from_local(
-    checker: &mut Checker,
-    stmt: &Stmt,
-) {
+pub(crate) fn redefined_argument_from_local(checker: &mut Checker, stmt: &Stmt) {
     let mut visitor = StoredNamesVisitor::default();
     visitor.visit_stmt(stmt);
 
@@ -127,7 +124,7 @@ pub(crate) fn redefined_argument_from_local(
         if let Some(scope_id) = scope.parent {
             scope = &checker.semantic().scopes[scope_id];
         } else {
-            break
+            break;
         };
     }
     checker.diagnostics.extend(dianostics);
