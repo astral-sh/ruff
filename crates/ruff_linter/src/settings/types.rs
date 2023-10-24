@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::string::ToString;
 
 use anyhow::{bail, Result};
+use clap::ValueEnum;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
 use ruff_diagnostics::Applicability;
@@ -286,6 +287,68 @@ impl FromStr for PatternPrefixPair {
         let pattern = pattern_str.into();
         let prefix = RuleSelector::from_str(code_string)?;
         Ok(Self { pattern, prefix })
+    }
+}
+
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    CacheKey,
+    EnumIter,
+)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum Language {
+    #[default]
+    Python,
+    Pyi,
+    Ipynb,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExtensionPair {
+    pub extension: String,
+    pub language: Language,
+}
+
+impl ExtensionPair {
+    const EXPECTED_PATTERN: &'static str = "<Extension>:<LanguageCode> pattern";
+}
+
+impl FromStr for ExtensionPair {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let (extension_str, language_str) = {
+            let tokens = s.split('=').collect::<Vec<_>>();
+            if tokens.len() != 2 {
+                bail!("Expected {}", Self::EXPECTED_PATTERN);
+            }
+            (tokens[0].trim(), tokens[1].trim())
+        };
+        let extension = extension_str.into();
+        let Ok(language) = Language::from_str(language_str, true) else {
+            bail!("Unrecognised language {}", language_str)
+        };
+        Ok(Self {
+            extension,
+            language,
+        })
+    }
+}
+
+impl From<ExtensionPair> for (String, Language) {
+    fn from(value: ExtensionPair) -> Self {
+        (value.extension, value.language)
     }
 }
 

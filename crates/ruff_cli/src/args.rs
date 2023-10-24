@@ -8,8 +8,8 @@ use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
-    FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
-    UnsafeFixes,
+    ExtensionPair, FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion,
+    SerializationFormat, UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -343,6 +343,9 @@ pub struct CheckCommand {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
+
+    #[arg(long, hide = true)]
+    pub extension: Option<Vec<ExtensionPair>>,
     /// Dev-only argument to show fixes
     #[arg(long, hide = true)]
     pub ecosystem_ci: bool,
@@ -523,6 +526,7 @@ impl CheckCommand {
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 output_format: self.output_format,
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
+                extension: self.extension,
             },
         )
     }
@@ -633,6 +637,7 @@ pub struct CliOverrides {
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
+    pub extension: Option<Vec<ExtensionPair>>,
 }
 
 impl ConfigurationTransformer for CliOverrides {
@@ -710,6 +715,9 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);
+        }
+        if let Some(extension) = &self.extension {
+            config.lint.extension = Some(extension.clone());
         }
 
         config

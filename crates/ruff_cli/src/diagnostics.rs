@@ -17,13 +17,13 @@ use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::types::UnsafeFixes;
+use ruff_linter::settings::types::{Language, UnsafeFixes};
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::{SourceType, TomlSourceType};
+use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
@@ -177,6 +177,21 @@ impl AddAssign for FixMap {
     }
 }
 
+fn get_override_source_type(
+    path: Option<&Path>,
+    extension: &FxHashMap<String, Language>,
+) -> Option<PySourceType> {
+    let Some(ext) = path.and_then(|p| p.extension()).and_then(|p| p.to_str()) else {
+        return None;
+    };
+    match extension.get(ext) {
+        Some(Language::Python) => Some(PySourceType::Python),
+        Some(Language::Ipynb) => Some(PySourceType::Ipynb),
+        Some(Language::Pyi) => Some(PySourceType::Stub),
+        None => None,
+    }
+}
+
 /// Lint the source code at the given `Path`.
 pub(crate) fn lint_path(
     path: &Path,
@@ -215,32 +230,35 @@ pub(crate) fn lint_path(
     };
 
     debug!("Checking: {}", path.display());
-
-    let source_type = match SourceType::from(path) {
-        SourceType::Toml(TomlSourceType::Pyproject) => {
-            let messages = if settings
-                .rules
-                .iter_enabled()
-                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
-            {
-                let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
-                    Ok(contents) => contents,
-                    Err(err) => {
-                        return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
-                    }
+    let source_type = match get_override_source_type(Some(path), &settings.extension) {
+        Some(source_type) => source_type,
+        None => match SourceType::from(path) {
+            SourceType::Toml(TomlSourceType::Pyproject) => {
+                let messages = if settings
+                    .rules
+                    .iter_enabled()
+                    .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                {
+                    let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
+                        Ok(contents) => contents,
+                        Err(err) => {
+                            return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
+                        }
+                    };
+                    let source_file =
+                        SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+                    lint_pyproject_toml(source_file, settings)
+                } else {
+                    vec![]
                 };
-                let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-                lint_pyproject_toml(source_file, settings)
-            } else {
-                vec![]
-            };
-            return Ok(Diagnostics {
-                messages,
-                ..Diagnostics::default()
-            });
-        }
-        SourceType::Toml(_) => return Ok(Diagnostics::default()),
-        SourceType::Python(source_type) => source_type,
+                return Ok(Diagnostics {
+                    messages,
+                    ..Diagnostics::default()
+                });
+            }
+            SourceType::Toml(_) => return Ok(Diagnostics::default()),
+            SourceType::Python(source_type) => source_type,
+        },
     };
 
     // Extract the sources from the file.
@@ -355,8 +373,15 @@ pub(crate) fn lint_stdin(
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
-    let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
-        return Ok(Diagnostics::default());
+    let source_type = if let Some(source_type) =
+        get_override_source_type(path, &settings.linter.extension)
+    {
+        source_type
+    } else {
+        let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
+            return Ok(Diagnostics::default());
+        };
+        source_type
     };
 
     // Extract the sources from the file.

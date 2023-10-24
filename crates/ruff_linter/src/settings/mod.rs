@@ -10,7 +10,7 @@ use globset::{Glob, GlobMatcher};
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
@@ -29,7 +29,7 @@ use crate::{codes, RuleSelector};
 use super::line_width::IndentWidth;
 
 use self::rule_table::RuleTable;
-use self::types::PreviewMode;
+use self::types::{Language, PreviewMode};
 use crate::rule_selector::PreviewOptions;
 
 pub mod flags;
@@ -40,6 +40,7 @@ pub mod types;
 pub struct LinterSettings {
     pub exclude: FilePatternSet,
     pub project_root: PathBuf,
+    pub extension: FxHashMap<String, Language>,
 
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
@@ -139,6 +140,7 @@ impl LinterSettings {
                 .flat_map(|selector| selector.rules(&PreviewOptions::default()))
                 .collect(),
             allowed_confusables: FxHashSet::from_iter([]),
+            extension: FxHashMap::from_iter([]),
 
             // Needs duplicating
             builtins: vec![],
