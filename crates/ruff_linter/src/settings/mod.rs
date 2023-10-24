@@ -2,7 +2,6 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -54,7 +53,7 @@ pub struct LinterSettings {
     pub allowed_confusables: FxHashSet<char>,
     pub builtins: Vec<String>,
     pub dummy_variable_rgx: Regex,
-    pub external: FxHashSet<String>,
+    pub external: Vec<String>,
     pub ignore_init_module_imports: bool,
     pub logger_objects: Vec<String>,
     pub namespace_packages: Vec<PathBuf>,
@@ -144,7 +143,7 @@ impl LinterSettings {
             builtins: vec![],
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
 
-            external: HashSet::default(),
+            external: vec![],
             ignore_init_module_imports: false,
             logger_objects: vec![],
             namespace_packages: vec![],
