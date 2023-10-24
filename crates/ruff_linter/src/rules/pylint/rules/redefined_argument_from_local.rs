@@ -90,10 +90,11 @@ impl<'a> Visitor<'a> for StoredNamesVisitor<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Name(name) => match &name.ctx {
-                ExprContext::Store => self.expressions.push(name),
-                _ => {}
-            },
+            Expr::Name(name) => {
+                if name.ctx == ExprContext::Store {
+                    self.expressions.push(name);
+                }
+            }
             _ => visitor::walk_expr(self, expr),
         }
     }
