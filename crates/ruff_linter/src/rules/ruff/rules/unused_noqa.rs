@@ -35,6 +35,9 @@ pub struct UnusedCodes {
 ///     foo.bar()
 /// ```
 ///
+/// ## Options
+/// - `external`
+///
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
 #[violation]

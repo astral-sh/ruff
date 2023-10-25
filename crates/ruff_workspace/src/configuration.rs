@@ -226,7 +226,7 @@ impl Configuration {
                 dummy_variable_rgx: lint
                     .dummy_variable_rgx
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
-                external: FxHashSet::from_iter(lint.external.unwrap_or_default()),
+                external: lint.external.unwrap_or_default(),
                 ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
                 tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
