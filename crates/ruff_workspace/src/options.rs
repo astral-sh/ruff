@@ -855,11 +855,11 @@ pub struct LintCommonOptions {
         value_type = "dict[str, Language]",
         example = r#"
             # Treat .ipynb files as python files
-            [tool.ruff.extension]
+            [tool.ruff.extension_override]
             "ipynb" = "python"
         "#
     )]
-    pub extension: Option<FxHashMap<String, Language>>,
+    pub extension_override: Option<FxHashMap<String, Language>>,
 }
 
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]

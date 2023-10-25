@@ -230,7 +230,7 @@ pub(crate) fn lint_path(
     };
 
     debug!("Checking: {}", path.display());
-    let source_type = match get_override_source_type(Some(path), &settings.extension) {
+    let source_type = match get_override_source_type(Some(path), &settings.extension_override) {
         Some(source_type) => source_type,
         None => match SourceType::from(path) {
             SourceType::Toml(TomlSourceType::Pyproject) => {
@@ -374,7 +374,7 @@ pub(crate) fn lint_stdin(
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
     let source_type = if let Some(source_type) =
-        get_override_source_type(path, &settings.linter.extension)
+        get_override_source_type(path, &settings.linter.extension_override)
     {
         source_type
     } else {

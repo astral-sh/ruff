@@ -218,8 +218,8 @@ impl Configuration {
                 preview: lint_preview,
                 target_version,
                 project_root: project_root.to_path_buf(),
-                extension: lint
-                    .extension
+                extension_override: lint
+                    .extension_override
                     .map(|x| x.into_iter().map(|y| (y.extension, y.language)))
                     .map(FxHashMap::from_iter)
                     .unwrap_or_default(),
@@ -538,7 +538,7 @@ impl Configuration {
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
-    pub extension: Option<Vec<ExtensionPair>>,
+    pub extension_override: Option<Vec<ExtensionPair>>,
 
     // Rule selection
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
@@ -684,7 +684,7 @@ impl LintConfiguration {
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
             pyupgrade: options.common.pyupgrade,
-            extension: options.common.extension.map(|extension| {
+            extension_override: options.common.extension_override.map(|extension| {
                 extension
                     .into_iter()
                     .map(|(extension, language)| ExtensionPair {
@@ -998,7 +998,7 @@ impl LintConfiguration {
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
-            extension: self.extension.or(config.extension),
+            extension_override: self.extension_override.or(config.extension_override),
         }
     }
 }

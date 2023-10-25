@@ -158,7 +158,7 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
-    "extension": {
+    "extension-override": {
       "description": "A mapping from file extension to one of python,ipynb,pyi to override default python file type inference",
       "type": [
         "object",
@@ -1750,7 +1750,7 @@
             "$ref": "#/definitions/RuleSelector"
           }
         },
-        "extension": {
+        "extension-override": {
           "description": "A mapping from file extension to one of python,ipynb,pyi to override default python file type inference",
           "type": [
             "object",

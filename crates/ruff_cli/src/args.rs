@@ -345,7 +345,7 @@ pub struct CheckCommand {
     pub show_settings: bool,
     /// List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]).
     #[arg(long, value_delimiter = ',')]
-    pub extension: Option<Vec<ExtensionPair>>,
+    pub extension_override: Option<Vec<ExtensionPair>>,
     /// Dev-only argument to show fixes
     #[arg(long, hide = true)]
     pub ecosystem_ci: bool,
@@ -526,7 +526,7 @@ impl CheckCommand {
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 output_format: self.output_format,
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
-                extension: self.extension,
+                extension_override: self.extension_override,
             },
         )
     }
@@ -637,7 +637,7 @@ pub struct CliOverrides {
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
-    pub extension: Option<Vec<ExtensionPair>>,
+    pub extension_override: Option<Vec<ExtensionPair>>,
 }
 
 impl ConfigurationTransformer for CliOverrides {
@@ -716,8 +716,8 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);
         }
-        if let Some(extension) = &self.extension {
-            config.lint.extension = Some(extension.clone());
+        if let Some(extension) = &self.extension_override {
+            config.lint.extension_override = Some(extension.clone());
         }
 
         config

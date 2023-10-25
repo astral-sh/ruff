@@ -40,7 +40,7 @@ pub mod types;
 pub struct LinterSettings {
     pub exclude: FilePatternSet,
     pub project_root: PathBuf,
-    pub extension: FxHashMap<String, Language>,
+    pub extension_override: FxHashMap<String, Language>,
 
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
@@ -140,7 +140,7 @@ impl LinterSettings {
                 .flat_map(|selector| selector.rules(&PreviewOptions::default()))
                 .collect(),
             allowed_confusables: FxHashSet::from_iter([]),
-            extension: FxHashMap::from_iter([]),
+            extension_override: FxHashMap::from_iter([]),
 
             // Needs duplicating
             builtins: vec![],
