@@ -6,6 +6,7 @@
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
 use crate::Mode;
 
+use compact_str::CompactString;
 use ruff_python_ast::{Int, IpyEscapeKind};
 use ruff_text_size::TextSize;
 use std::fmt;
@@ -66,7 +67,7 @@ pub enum Tok {
         kind: IpyEscapeKind,
     },
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
-    Comment(String),
+    Comment(CompactString),
     /// Token value for a newline.
     Newline,
     /// Token value for a newline that is not a logical line break. These are filtered out of

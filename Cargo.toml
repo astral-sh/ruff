@@ -17,6 +17,7 @@ bitflags = { version = "2.3.1" }
 chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
 clap = { version = "4.4.6", features = ["derive"] }
 colored = { version = "2.0.0" }
+compact_str = { version = "0.7.1" }
 filetime = { version = "0.2.20" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.10" }
@@ -52,7 +53,12 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 unicode-ident = { version = "1.0.12" }
 unicode_names2 = { version = "1.2.0" }
 unicode-width = { version = "0.1.11" }
-uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
+uuid = { version = "1.4.1", features = [
+    "v4",
+    "fast-rng",
+    "macro-diagnostics",
+    "js",
+] }
 wsl = { version = "0.1.0" }
 
 [profile.release]
