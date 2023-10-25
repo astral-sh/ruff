@@ -14,7 +14,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
 use ruff_linter::registry::Rule;
-use ruff_linter::settings::types::UnsafeFixes;
+use ruff_linter::settings::types::{Language, UnsafeFixes};
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::{fs, warn_user_once, IOError};
 use ruff_python_ast::imports::ImportMap;
@@ -30,6 +30,7 @@ use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
@@ -38,6 +39,7 @@ pub(crate) fn check(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
+    extension_override: &FxHashMap<String, Language>,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -103,6 +105,7 @@ pub(crate) fn check(
                     noqa,
                     fix_mode,
                     unsafe_fixes,
+                    extension_override,
                 )
                 .map_err(|e| {
                     (Some(path.to_path_buf()), {
@@ -184,6 +187,7 @@ pub(crate) fn check(
 
 /// Wraps [`lint_path`](crate::diagnostics::lint_path) in a [`catch_unwind`](std::panic::catch_unwind) and emits
 /// a diagnostic if the linting the file panics.
+#[allow(clippy::too_many_arguments)]
 fn lint_path(
     path: &Path,
     package: Option<&Path>,
@@ -192,9 +196,19 @@ fn lint_path(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
+    extension_override: &FxHashMap<String, Language>,
 ) -> Result<Diagnostics> {
     let result = catch_unwind(|| {
-        crate::diagnostics::lint_path(path, package, settings, cache, noqa, fix_mode, unsafe_fixes)
+        crate::diagnostics::lint_path(
+            path,
+            package,
+            settings,
+            cache,
+            noqa,
+            fix_mode,
+            unsafe_fixes,
+            extension_override,
+        )
     });
 
     match result {
@@ -280,6 +294,7 @@ mod test {
             flags::Noqa::Disabled,
             flags::FixMode::Generate,
             UnsafeFixes::Enabled,
+            &FxHashMap::default(),
         )
         .unwrap();
         let mut output = Vec::new();

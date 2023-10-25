@@ -4,7 +4,9 @@ use anyhow::Result;
 
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
+use ruff_linter::settings::types::Language;
 use ruff_workspace::resolver::{match_exclusion, python_file_at_path, PyprojectConfig};
+use rustc_hash::FxHashMap;
 
 use crate::args::CliOverrides;
 use crate::diagnostics::{lint_stdin, Diagnostics};
@@ -17,6 +19,7 @@ pub(crate) fn check_stdin(
     overrides: &CliOverrides,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    extension_override: &FxHashMap<String, Language>,
 ) -> Result<Diagnostics> {
     if let Some(filename) = filename {
         if !python_file_at_path(filename, pyproject_config, overrides)? {
@@ -42,6 +45,7 @@ pub(crate) fn check_stdin(
         &pyproject_config.settings,
         noqa,
         fix_mode,
+        extension_override,
     )?;
     diagnostics.messages.sort_unstable();
     Ok(diagnostics)

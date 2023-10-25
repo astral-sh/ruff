@@ -193,6 +193,7 @@ fn get_override_source_type(
 }
 
 /// Lint the source code at the given `Path`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
@@ -201,6 +202,7 @@ pub(crate) fn lint_path(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
+    extension_override: &FxHashMap<String, Language>,
 ) -> Result<Diagnostics> {
     // Check the cache.
     // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
@@ -230,7 +232,7 @@ pub(crate) fn lint_path(
     };
 
     debug!("Checking: {}", path.display());
-    let source_type = match get_override_source_type(Some(path), &settings.extension_override) {
+    let source_type = match get_override_source_type(Some(path), extension_override) {
         Some(source_type) => source_type,
         None => match SourceType::from(path) {
             SourceType::Toml(TomlSourceType::Pyproject) => {
@@ -371,10 +373,10 @@ pub(crate) fn lint_stdin(
     settings: &Settings,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    extension_override: &FxHashMap<String, Language>,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
-    let source_type = if let Some(source_type) =
-        get_override_source_type(path, &settings.linter.extension_override)
+    let source_type = if let Some(source_type) = get_override_source_type(path, extension_override)
     {
         source_type
     } else {

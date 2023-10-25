@@ -158,16 +158,6 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
-    "extension-override": {
-      "description": "A mapping from file extension to one of python,ipynb,pyi to override default python file type inference",
-      "type": [
-        "object",
-        "null"
-      ],
-      "additionalProperties": {
-        "$ref": "#/definitions/Language"
-      }
-    },
     "external": {
       "description": "A list of rule codes or prefixes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
       "type": [
@@ -1588,14 +1578,6 @@
       },
       "additionalProperties": false
     },
-    "Language": {
-      "type": "string",
-      "enum": [
-        "python",
-        "pyi",
-        "ipynb"
-      ]
-    },
     "LineEnding": {
       "oneOf": [
         {
@@ -1748,16 +1730,6 @@
           ],
           "items": {
             "$ref": "#/definitions/RuleSelector"
-          }
-        },
-        "extension-override": {
-          "description": "A mapping from file extension to one of python,ipynb,pyi to override default python file type inference",
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": {
-            "$ref": "#/definitions/Language"
           }
         },
         "external": {

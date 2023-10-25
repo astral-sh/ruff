@@ -23,7 +23,7 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, Language, PythonVersion, SerializationFormat, Version,
+    IdentifierPattern, PythonVersion, SerializationFormat, Version,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -847,19 +847,6 @@ pub struct LintCommonOptions {
         "#
     )]
     pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
-
-    /// A mapping from file extension to one of python,ipynb,pyi to
-    /// override default python file type inference
-    #[option(
-        default = "{}",
-        value_type = "dict[str, Language]",
-        example = r#"
-            # Treat .ipynb files as python files
-            [tool.ruff.extension_override]
-            "ipynb" = "python"
-        "#
-    )]
-    pub extension_override: Option<FxHashMap<String, Language>>,
 }
 
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]

@@ -17,6 +17,7 @@ use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
+use rustc_hash::FxHashMap;
 
 use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};
@@ -295,6 +296,11 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         unsafe_fixes,
         printer_flags,
     );
+    let extension_override = cli
+        .extension_override
+        .map(|eo| eo.into_iter().map(|y| (y.extension, y.language)))
+        .map(FxHashMap::from_iter)
+        .unwrap_or_default();
 
     if cli.watch {
         if output_format != SerializationFormat::Text {
@@ -323,6 +329,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             noqa.into(),
             fix_mode,
             unsafe_fixes,
+            &extension_override,
         )?;
         printer.write_continuously(&mut writer, &messages)?;
 
@@ -356,6 +363,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         noqa.into(),
                         fix_mode,
                         unsafe_fixes,
+                        &extension_override,
                     )?;
                     printer.write_continuously(&mut writer, &messages)?;
                 }
@@ -373,6 +381,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 &overrides,
                 noqa.into(),
                 fix_mode,
+                &extension_override,
             )?
         } else {
             commands::check::check(
@@ -383,6 +392,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 noqa.into(),
                 fix_mode,
                 unsafe_fixes,
+                &extension_override,
             )?
         };
 
