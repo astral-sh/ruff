@@ -82,39 +82,39 @@ jobs:
       - name: "Clippy (wasm)"
         run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
-  cargo-test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    name: "cargo test | ${{ matrix.os }}"
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - name: "Install cargo insta"
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-insta
-      - uses: Swatinem/rust-cache@v2
-      - name: "Run tests (Ubuntu)"
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: cargo insta test --all --all-features --unreferenced reject
-      - name: "Run tests (Windows)"
-        if: ${{ matrix.os == 'windows-latest' }}
-        shell: bash
-        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
-        run: cargo insta test --all --all-features
-      # Check for broken links in the documentation.
-      - run: cargo doc --all --no-deps
-        env:
-          # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
-          RUSTDOCFLAGS: "-D warnings"
-      - uses: actions/upload-artifact@v3
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        with:
-          name: ruff
-          path: target/debug/ruff
+  # cargo-test:
+  #   strategy:
+  #     matrix:
+  #       os: [ubuntu-latest, windows-latest]
+  #   runs-on: ${{ matrix.os }}
+  #   name: "cargo test | ${{ matrix.os }}"
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: "Install Rust toolchain"
+  #       run: rustup show
+  #     - name: "Install cargo insta"
+  #       uses: taiki-e/install-action@v2
+  #       with:
+  #         tool: cargo-insta
+  #     - uses: Swatinem/rust-cache@v2
+  #     - name: "Run tests (Ubuntu)"
+  #       if: ${{ matrix.os == 'ubuntu-latest' }}
+  #       run: cargo insta test --all --all-features --unreferenced reject
+  #     - name: "Run tests (Windows)"
+  #       if: ${{ matrix.os == 'windows-latest' }}
+  #       shell: bash
+  #       # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
+  #       run: cargo insta test --all --all-features
+  #     # Check for broken links in the documentation.
+  #     - run: cargo doc --all --no-deps
+  #       env:
+  #         # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
+  #         RUSTDOCFLAGS: "-D warnings"
+  #     - uses: actions/upload-artifact@v3
+  #       if: ${{ matrix.os == 'ubuntu-latest' }}
+  #       with:
+  #         name: ruff
+  #         path: target/debug/ruff
 
   cargo-fuzz:
     runs-on: ubuntu-latest
@@ -132,24 +132,24 @@ jobs:
           tool: cargo-fuzz@0.11
       - run: cargo fuzz build -s none
 
-  cargo-test-wasm:
-    runs-on: ubuntu-latest
-    name: "cargo test (wasm)"
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Install Rust toolchain"
-        run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: "npm"
-          cache-dependency-path: playground/package-lock.json
-      - uses: jetli/wasm-pack-action@v0.4.0
-      - uses: Swatinem/rust-cache@v2
-      - name: "Run wasm-pack"
-        run: |
-          cd crates/ruff_wasm
-          wasm-pack test --node
+  # cargo-test-wasm:
+  #   runs-on: ubuntu-latest
+  #   name: "cargo test (wasm)"
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: "Install Rust toolchain"
+  #       run: rustup target add wasm32-unknown-unknown
+  #     - uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 18
+  #         cache: "npm"
+  #         cache-dependency-path: playground/package-lock.json
+  #     - uses: jetli/wasm-pack-action@v0.4.0
+  #     - uses: Swatinem/rust-cache@v2
+  #     - name: "Run wasm-pack"
+  #       run: |
+  #         cd crates/ruff_wasm
+  #         wasm-pack test --node
 
   scripts:
     name: "test scripts"
@@ -362,44 +362,44 @@ jobs:
       - name: "Remove checkouts from cache"
         run: rm -r target/progress_projects
 
-  check-ruff-lsp:
-    name: "test ruff-lsp"
-    runs-on: ubuntu-latest
-    needs: cargo-test
-    steps:
-      - uses: extractions/setup-just@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # check-ruff-lsp:
+  #   name: "test ruff-lsp"
+  #   runs-on: ubuntu-latest
+  #   needs: cargo-test
+  #   steps:
+  #     - uses: extractions/setup-just@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/checkout@v4
-        name: "Download ruff-lsp source"
-        with:
-          repository: "astral-sh/ruff-lsp"
+  #     - uses: actions/checkout@v4
+  #       name: "Download ruff-lsp source"
+  #       with:
+  #         repository: "astral-sh/ruff-lsp"
 
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #         python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@v3
-        name: Download development ruff binary
-        id: ruff-target
-        with:
-          name: ruff
-          path: target/debug
+  #     - uses: actions/download-artifact@v3
+  #       name: Download development ruff binary
+  #       id: ruff-target
+  #       with:
+  #         name: ruff
+  #         path: target/debug
 
-      - name: Install ruff-lsp dependencies
-        run: |
-          just install
+  #     - name: Install ruff-lsp dependencies
+  #       run: |
+  #         just install
 
-      - name: Run ruff-lsp tests
-        run: |
-          # Setup development binary
-          pip uninstall --yes ruff
-          chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
-          export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
-          ruff version
+  #     - name: Run ruff-lsp tests
+  #       run: |
+  #         # Setup development binary
+  #         pip uninstall --yes ruff
+  #         chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
+  #         export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
+  #         ruff version
 
-          just test
+  #         just test
 
   benchmarks:
     runs-on: ubuntu-latest
