@@ -21,6 +21,9 @@ def f() -> None:
     # Invalid (but external)
     d = 1  # noqa: F841, V101
 
+    # Invalid (but external)
+    d = 1  # noqa: V500
+
     # fmt: off
     # Invalid - no space before #
     d = 1# noqa: E501

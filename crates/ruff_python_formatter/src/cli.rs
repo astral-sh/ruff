@@ -6,8 +6,9 @@ use anyhow::{format_err, Context, Result};
 use clap::{command, Parser, ValueEnum};
 
 use ruff_formatter::SourceCode;
+use ruff_python_ast::PySourceType;
 use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse_ok_tokens, Mode};
+use ruff_python_parser::{parse_ok_tokens, AsMode};
 use ruff_text_size::Ranged;
 
 use crate::comments::collect_comments;
@@ -38,15 +39,16 @@ pub struct Cli {
     pub print_comments: bool,
 }
 
-pub fn format_and_debug_print(source: &str, cli: &Cli, source_type: &Path) -> Result<String> {
-    let (tokens, comment_ranges) = tokens_and_ranges(source)
+pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Result<String> {
+    let source_type = PySourceType::from(source_path);
+    let (tokens, comment_ranges) = tokens_and_ranges(source, source_type)
         .map_err(|err| format_err!("Source contains syntax errors {err:?}"))?;
 
     // Parse the AST.
-    let module = parse_ok_tokens(tokens, source, Mode::Module, "<filename>")
+    let module = parse_ok_tokens(tokens, source, source_type.as_mode(), "<filename>")
         .context("Syntax error in input")?;
 
-    let options = PyFormatOptions::from_extension(source_type);
+    let options = PyFormatOptions::from_extension(source_path);
 
     let source_code = SourceCode::new(source);
     let formatted = format_module_ast(&module, &comment_ranges, source, options)

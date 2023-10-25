@@ -49,6 +49,13 @@ class Apples:
     def __doc__(self):
         return "Docstring"
 
+    # Added in Python 3.12
+    def __buffer__(self):  
+        return memoryview(b'')
+
+    def __release_buffer__(self, buf):
+        pass
+
     # Allow dunder methods recommended by attrs.
     def __attrs_post_init__(self):
         pass

@@ -506,7 +506,12 @@ const fn is_simple_power_operand(expr: &Expr) -> bool {
             op: UnaryOp::Not, ..
         }) => false,
         Expr::Constant(ExprConstant {
-            value: Constant::Complex { .. } | Constant::Float(_) | Constant::Int(_),
+            value:
+                Constant::Complex { .. }
+                | Constant::Float(_)
+                | Constant::Int(_)
+                | Constant::None
+                | Constant::Bool(_),
             ..
         }) => true,
         Expr::Name(_) => true,

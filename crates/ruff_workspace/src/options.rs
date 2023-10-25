@@ -548,7 +548,7 @@ pub struct LintCommonOptions {
     )]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
 
-    /// A list of rule codes that are unsupported by Ruff, but should be
+    /// A list of rule codes or prefixes that are unsupported by Ruff, but should be
     /// preserved when (e.g.) validating `# noqa` directives. Useful for
     /// retaining `# noqa` directives that cover plugins not yet implemented
     /// by Ruff.
@@ -556,9 +556,9 @@ pub struct LintCommonOptions {
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            # Avoiding flagging (and removing) `V101` from any `# noqa`
-            # directives, despite Ruff's lack of support for `vulture`.
-            external = ["V101"]
+            # Avoiding flagging (and removing) any codes starting with `V` from any
+            # `# noqa` directives, despite Ruff's lack of support for `vulture`.
+            external = ["V"]
         "#
     )]
     pub external: Option<Vec<String>>,
@@ -1696,6 +1696,9 @@ pub struct IsortOptions {
     /// `combine-as-imports = true`. When `combine-as-imports` isn't
     /// enabled, every aliased `import from` will be given its own line, in
     /// which case, wrapping is not necessary.
+    ///
+    /// When using the formatter, ensure that `format.skip-magic-trailing-comma` is set to `false` (default)
+    /// when enabling `force-wrap-aliases` to avoid that the formatter collapses members if they all fit on a single line.
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -1739,6 +1742,9 @@ pub struct IsortOptions {
     /// the imports will never be folded into one line.
     ///
     /// See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.
+    ///
+    /// When using the formatter, ensure that `format.skip-magic-trailing-comma` is set to `false` (default) when enabling `split-on-trailing-comma`
+    /// to avoid that the formatter removes the trailing commas.
     #[option(
         default = r#"true"#,
         value_type = "bool",
@@ -1920,6 +1926,9 @@ pub struct IsortOptions {
 
     /// The number of blank lines to place after imports.
     /// Use `-1` for automatic determination.
+    ///
+    /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
+    /// it enforces at least one empty and at most two empty lines after imports.
     #[option(
         default = r#"-1"#,
         value_type = "int",
@@ -1931,6 +1940,9 @@ pub struct IsortOptions {
     pub lines_after_imports: Option<isize>,
 
     /// The number of lines to place between "direct" and `import from` imports.
+    ///
+    /// When using the formatter, only the values `0` and `1` are compatible because
+    /// it preserves up to one empty line after imports in nested blocks.
     #[option(
         default = r#"0"#,
         value_type = "int",
@@ -2314,7 +2326,7 @@ pub struct PycodestyleOptions {
     /// documentation (`W505`), including standalone comments. By default,
     /// this is set to null which disables reporting violations.
     ///
-    /// The length is determined by the number of characters per line, except for lines containinAsian characters or emojis.
+    /// The length is determined by the number of characters per line, except for lines containing Asian characters or emojis.
     /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
     ///
     /// See the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.

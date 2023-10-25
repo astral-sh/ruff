@@ -35,8 +35,11 @@ pub struct UnusedCodes {
 ///     foo.bar()
 /// ```
 ///
+/// ## Options
+/// - `external`
+///
 /// ## References
-/// - [Automatic `noqa` management](https://docs.astral.sh/ruff/configuration/#automatic-noqa-management)
+/// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
 #[violation]
 pub struct UnusedNOQA {
     pub codes: Option<UnusedCodes>,

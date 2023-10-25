@@ -19,7 +19,6 @@ use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
-use ruff_linter::rules::isort;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
@@ -107,7 +106,7 @@ pub(crate) fn format(
     };
 
     let start = Instant::now();
-    let (mut results, mut errors): (Vec<_>, Vec<_>) = paths
+    let (results, mut errors): (Vec<_>, Vec<_>) = paths
         .par_iter()
         .filter_map(|entry| {
             match entry {
@@ -168,27 +167,6 @@ pub(crate) fn format(
         });
     let duration = start.elapsed();
 
-    // Make output deterministic, at least as long as we have a path
-    results.sort_unstable_by(|x, y| x.path.cmp(&y.path));
-    errors.sort_by(|x, y| {
-        fn get_key(error: &FormatCommandError) -> Option<&PathBuf> {
-            match &error {
-                FormatCommandError::Ignore(ignore) => {
-                    if let ignore::Error::WithPath { path, .. } = ignore {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                }
-                FormatCommandError::Panic(path, _)
-                | FormatCommandError::Read(path, _)
-                | FormatCommandError::Format(path, _)
-                | FormatCommandError::Write(path, _) => path.as_ref(),
-            }
-        }
-        get_key(x).cmp(&get_key(y))
-    });
-
     debug!(
         "Formatted {} files in {:.2?}",
         results.len() + errors.len(),
@@ -198,15 +176,21 @@ pub(crate) fn format(
     caches.persist()?;
 
     // Report on any errors.
+    errors.sort_unstable_by(|a, b| a.path().cmp(&b.path()));
+
     for error in &errors {
         error!("{error}");
     }
 
-    results.sort_unstable_by(|a, b| a.path.cmp(&b.path));
     let results = FormatResults::new(results.as_slice(), mode);
-
-    if mode.is_diff() {
-        results.write_diff(&mut stdout().lock())?;
+    match mode {
+        FormatMode::Write => {}
+        FormatMode::Check => {
+            results.write_changed(&mut stdout().lock())?;
+        }
+        FormatMode::Diff => {
+            results.write_diff(&mut stdout().lock())?;
+        }
     }
 
     // Report on the formatting changes.
@@ -470,27 +454,55 @@ impl<'a> FormatResults<'a> {
         })
     }
 
+    /// Write a diff of the formatting changes to the given writer.
     fn write_diff(&self, f: &mut impl Write) -> io::Result<()> {
-        for result in self.results {
-            if let FormatResult::Diff {
-                unformatted,
-                formatted,
-            } = &result.result
-            {
-                let text_diff =
-                    TextDiff::from_lines(unformatted.source_code(), formatted.source_code());
-                let mut unified_diff = text_diff.unified_diff();
-                unified_diff.header(
-                    &fs::relativize_path(&result.path),
-                    &fs::relativize_path(&result.path),
-                );
-                unified_diff.to_writer(&mut *f)?;
-            }
+        for (path, unformatted, formatted) in self
+            .results
+            .iter()
+            .filter_map(|result| {
+                if let FormatResult::Diff {
+                    unformatted,
+                    formatted,
+                } = &result.result
+                {
+                    Some((result.path.as_path(), unformatted, formatted))
+                } else {
+                    None
+                }
+            })
+            .sorted_unstable_by_key(|(path, _, _)| *path)
+        {
+            let text_diff =
+                TextDiff::from_lines(unformatted.source_code(), formatted.source_code());
+            let mut unified_diff = text_diff.unified_diff();
+            unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+            unified_diff.to_writer(&mut *f)?;
         }
 
         Ok(())
     }
 
+    /// Write a list of the files that would be changed to the given writer.
+    fn write_changed(&self, f: &mut impl Write) -> io::Result<()> {
+        for path in self
+            .results
+            .iter()
+            .filter_map(|result| {
+                if result.result.is_formatted() {
+                    Some(result.path.as_path())
+                } else {
+                    None
+                }
+            })
+            .sorted_unstable()
+        {
+            writeln!(f, "Would reformat: {}", fs::relativize_path(path).bold())?;
+        }
+
+        Ok(())
+    }
+
+    /// Write a summary of the formatting results to the given writer.
     fn write_summary(&self, f: &mut impl Write) -> io::Result<()> {
         // Compute the number of changed and unchanged files.
         let mut changed = 0u32;
@@ -498,14 +510,6 @@ impl<'a> FormatResults<'a> {
         for result in self.results {
             match &result.result {
                 FormatResult::Formatted => {
-                    // If we're running in check mode, report on any files that would be formatted.
-                    if self.mode.is_check() {
-                        writeln!(
-                            f,
-                            "Would reformat: {}",
-                            fs::relativize_path(&result.path).bold()
-                        )?;
-                    }
                     changed += 1;
                 }
                 FormatResult::Unchanged => unchanged += 1,
@@ -562,6 +566,24 @@ pub(crate) enum FormatCommandError {
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
+}
+
+impl FormatCommandError {
+    fn path(&self) -> Option<&Path> {
+        match self {
+            Self::Ignore(err) => {
+                if let ignore::Error::WithPath { path, .. } = err {
+                    Some(path.as_path())
+                } else {
+                    None
+                }
+            }
+            Self::Panic(path, _)
+            | Self::Read(path, _)
+            | Self::Format(path, _)
+            | Self::Write(path, _) => path.as_deref(),
+        }
+    }
 }
 
 impl Display for FormatCommandError {
@@ -690,32 +712,28 @@ pub(super) fn warn_incompatible_formatter_settings(
             warn!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.", incompatible_rules.join(", "));
         }
 
-        let mut incompatible_options = Vec::new();
+        if setting.linter.rules.enabled(Rule::UnsortedImports) {
+            // The formatter removes empty lines if the value is larger than 2 but always inserts a empty line after imports.
+            // Two empty lines are okay because `isort` only uses this setting for top-level imports (not in nested blocks).
+            if !matches!(setting.linter.isort.lines_after_imports, 1 | 2 | -1) {
+                warn!("The isort option 'isort.lines-after-imports' with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).");
+            }
 
-        let isort_defaults = isort::settings::Settings::default();
+            // Values larger than two get reduced to one line by the formatter if the import is in a nested block.
+            if setting.linter.isort.lines_between_types > 1 {
+                warn!("The isort option 'isort.lines-between-types' with a value larger than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).");
+            }
 
-        if setting.linter.isort.force_single_line != isort_defaults.force_single_line {
-            incompatible_options.push("'isort.force-single-line'");
-        }
+            // isort inserts a trailing comma which the formatter preserves, but only if `skip-magic-trailing-comma` isn't false.
+            if setting.formatter.magic_trailing_comma.is_ignore() {
+                if setting.linter.isort.force_wrap_aliases {
+                    warn!("The isort option 'isort.force-wrap-aliases' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.force-wrap-aliases=false' or 'format.skip-magic-trailing-comma=false'.");
+                }
 
-        if setting.linter.isort.force_wrap_aliases != isort_defaults.force_wrap_aliases {
-            incompatible_options.push("'isort.force-wrap-aliases'");
-        }
-
-        if setting.linter.isort.lines_after_imports != isort_defaults.lines_after_imports {
-            incompatible_options.push("'isort.lines-after-imports'");
-        }
-
-        if setting.linter.isort.lines_between_types != isort_defaults.lines_between_types {
-            incompatible_options.push("'isort.lines_between_types'");
-        }
-
-        if setting.linter.isort.split_on_trailing_comma != isort_defaults.split_on_trailing_comma {
-            incompatible_options.push("'isort.split_on_trailing_comma'");
-        }
-
-        if !incompatible_options.is_empty() {
-            warn!("The following isort options may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these options by removing them from the configuration.", incompatible_options.join(", "));
+                if setting.linter.isort.split_on_trailing_comma {
+                    warn!("The isort option 'isort.split-on-trailing-comma' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.split-on-trailing-comma=false' or 'format.skip-magic-trailing-comma=false'.");
+                }
+            }
         }
     }
 }

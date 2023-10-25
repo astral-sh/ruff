@@ -106,7 +106,26 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
             &settings::LinterSettings {
-                external: FxHashSet::from_iter(vec!["V101".to_string()]),
+                external: vec!["V101".to_string()],
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::UnusedNOQA,
+                    Rule::LineTooLong,
+                    Rule::UnusedImport,
+                    Rule::UnusedVariable,
+                    Rule::TabIndentation,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruf100_0_prefix() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_0.py"),
+            &settings::LinterSettings {
+                external: vec!["V".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::UnusedNOQA,
                     Rule::LineTooLong,

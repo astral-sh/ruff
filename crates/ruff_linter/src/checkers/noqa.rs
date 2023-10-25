@@ -128,7 +128,10 @@ pub(crate) fn check_noqa(
                         }
 
                         if line.matches.iter().any(|match_| *match_ == code)
-                            || settings.external.contains(code)
+                            || settings
+                                .external
+                                .iter()
+                                .any(|external| code.starts_with(external))
                         {
                             valid_codes.push(code);
                         } else {
