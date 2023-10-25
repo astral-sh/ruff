@@ -91,7 +91,10 @@ impl FStringRangesBuilder {
         }
     }
 
-    pub(crate) fn finish(self) -> FStringRanges {
+    pub(crate) fn finish(mut self, end_location: TextSize) -> FStringRanges {
+        while let Some(start) = self.start_locations.pop() {
+            self.raw.insert(start, TextRange::new(start, end_location));
+        }
         FStringRanges { raw: self.raw }
     }
 }

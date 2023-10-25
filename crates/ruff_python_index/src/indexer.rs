@@ -72,7 +72,7 @@ impl Indexer {
         Self {
             comment_ranges: comment_ranges_builder.finish(),
             continuation_lines,
-            fstring_ranges: fstring_ranges_builder.finish(),
+            fstring_ranges: fstring_ranges_builder.finish(locator.text_len()),
         }
     }
 
