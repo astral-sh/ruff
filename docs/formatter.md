@@ -164,10 +164,10 @@ elif False: # fmt: skip
     pass
 
 @Test
-@Test2 # fmt: off
+@Test2 # fmt: skip
 def test(): ...
 
-a = [1, 2, 3, 4, 5] # fmt: off
+a = [1, 2, 3, 4, 5] # fmt: skip
 
 def test(a, b, c, d, e, f) -> int: # fmt: skip
     pass
