@@ -224,7 +224,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_return::rules::function(checker, body, returns.as_ref().map(AsRef::as_ref));
             }
             if checker.enabled(Rule::FunctionReturnHintNone) {
-                ruff::rules::function_return_hint_none(checker)
+                ruff::rules::function_return_hint_none(checker, function_def, body, returns.as_ref().map(AsRef::as_ref));
             }
             if checker.enabled(Rule::UselessReturn) {
                 pylint::rules::useless_return(

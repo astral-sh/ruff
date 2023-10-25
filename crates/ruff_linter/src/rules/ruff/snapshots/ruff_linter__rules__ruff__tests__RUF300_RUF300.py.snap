@@ -1,0 +1,147 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF300.py:16:11: RUF300 [*] Function should use `-> None` return type hint
+   |
+16 | def valid4():  # OK
+   |           ^^ RUF300
+17 |     yield 123
+18 |     return
+   |
+   = help: Replace with `-> None`
+
+ℹ Fix
+13 13 |     return
+14 14 | 
+15 15 | 
+16    |-def valid4():  # OK
+   16 |+def valid4() -> None:  # OK
+17 17 |     yield 123
+18 18 |     return
+19 19 | 
+
+RUF300.py:21:11: RUF300 [*] Function should use `-> None` return type hint
+   |
+21 | def valid5():  # OK
+   |           ^^ RUF300
+22 |     raise NotImplementedError()
+   |
+   = help: Replace with `-> None`
+
+ℹ Fix
+18 18 |     return
+19 19 | 
+20 20 | 
+21    |-def valid5():  # OK
+   21 |+def valid5() -> None:  # OK
+22 22 |     raise NotImplementedError()
+23 23 | 
+24 24 | 
+
+RUF300.py:25:11: RUF300 [*] Function should use `-> None` return type hint
+   |
+25 | def valid5() -> NoReturn:  # OK
+   |           ^^ RUF300
+26 |     raise ValueError()
+   |
+   = help: Replace with `-> None`
+
+ℹ Suggested fix
+22 22 |     raise NotImplementedError()
+23 23 | 
+24 24 | 
+25    |-def valid5() -> NoReturn:  # OK
+   25 |+def valid5() -> None:  # OK
+26 26 |     raise ValueError()
+27 27 | 
+28 28 | 
+
+RUF300.py:29:13: RUF300 [*] Function should use `-> None` return type hint
+   |
+29 | def invalid1():  # RUF300
+   |             ^^ RUF300
+30 |     return None
+   |
+   = help: Replace with `-> None`
+
+ℹ Fix
+26 26 |     raise ValueError()
+27 27 | 
+28 28 | 
+29    |-def invalid1():  # RUF300
+   29 |+def invalid1() -> None:  # RUF300
+30 30 |     return None
+31 31 | 
+32 32 | 
+
+RUF300.py:33:13: RUF300 [*] Function should use `-> None` return type hint
+   |
+33 | def invalid2():  # RUF300
+   |             ^^ RUF300
+34 |     print()
+   |
+   = help: Replace with `-> None`
+
+ℹ Fix
+30 30 |     return None
+31 31 | 
+32 32 | 
+33    |-def invalid2():  # RUF300
+   33 |+def invalid2() -> None:  # RUF300
+34 34 |     print()
+35 35 | 
+36 36 | 
+
+RUF300.py:37:21: RUF300 [*] Function should use `-> None` return type hint
+   |
+37 | def wrong_annotation() -> int:  # RUF300
+   |                     ^^ RUF300
+38 |     print()
+   |
+   = help: Replace with `-> None`
+
+ℹ Suggested fix
+34 34 |     print()
+35 35 | 
+36 36 | 
+37    |-def wrong_annotation() -> int:  # RUF300
+   37 |+def wrong_annotation() -> None:  # RUF300
+38 38 |     print()
+39 39 | 
+40 40 | 
+
+RUF300.py:41:13: RUF300 [*] Function should use `-> None` return type hint
+   |
+41 | def invalid3():  # RUF300
+   |             ^^ RUF300
+42 |     return (None)
+   |
+   = help: Replace with `-> None`
+
+ℹ Fix
+38 38 |     print()
+39 39 | 
+40 40 | 
+41    |-def invalid3():  # RUF300
+   41 |+def invalid3() -> None:  # RUF300
+42 42 |     return (None)
+43 43 | 
+44 44 | 
+
+RUF300.py:45:19: RUF300 [*] Function should use `-> None` return type hint
+   |
+45 | async def invalid4():  # RUF300
+   |                   ^^ RUF300
+46 |     return  # TODO is this correct?
+   |
+   = help: Replace with `-> None`
+
+ℹ Fix
+42 42 |     return (None)
+43 43 | 
+44 44 | 
+45    |-async def invalid4():  # RUF300
+   45 |+async def invalid4() -> None:  # RUF300
+46 46 |     return  # TODO is this correct?
+
+
