@@ -320,6 +320,119 @@ fn stdin_fix_jupyter() {
     Found 2 errors (2 fixed, 0 remaining).
     "###);
 }
+#[test]
+fn stdin_override_parser_ipynb() {
+    let args = ["--extension", "py=ipynb", "--stdin-filename", "Jupyter.py"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin(r#"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "dccc687c-96e2-4604-b957-a8a89b5bec06",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "19e1b029-f516-4662-a9b9-623b93edac1a",
+   "metadata": {},
+   "source": [
+    "Foo"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "cdce7b92-b0fb-4c02-86f6-e233b26fa84f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "e40b33d2-7fe4-46c5-bdf0-8802f3052565",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "1\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a1899bc8-d46f-4ec0-b1d1-e1ca0f04bf60",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.2"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Jupyter.py:cell 1:1:8: F401 [*] `os` imported but unused
+    Jupyter.py:cell 3:1:8: F401 [*] `sys` imported but unused
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn stdin_override_parser_py() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--extension", "ipynb=python", "--stdin-filename", "F401.ipynb"])
+        .pass_stdin("import os\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401.ipynb:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+}
 
 #[test]
 fn stdin_fix_when_not_fixable_should_still_print_contents() {

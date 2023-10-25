@@ -684,7 +684,15 @@ impl LintConfiguration {
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
             pyupgrade: options.common.pyupgrade,
-            extension: None,
+            extension: options.common.extension.map(|extension| {
+                extension
+                    .into_iter()
+                    .map(|(extension, language)| ExtensionPair {
+                        extension,
+                        language,
+                    })
+                    .collect()
+            }),
         })
     }
 

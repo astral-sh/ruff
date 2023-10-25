@@ -337,7 +337,10 @@ impl FromStr for ExtensionPair {
         };
         let extension = extension_str.into();
         let Ok(language) = Language::from_str(language_str, true) else {
-            bail!("Unrecognised language {}", language_str)
+            bail!(
+                "Unrecognised language {}. Must be one of python,pyi,ipynb",
+                language_str
+            )
         };
         Ok(Self {
             extension,

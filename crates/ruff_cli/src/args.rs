@@ -343,8 +343,8 @@ pub struct CheckCommand {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
-
-    #[arg(long, hide = true)]
+    /// List of mappings from file extension to language.
+    #[arg(long, value_delimiter = ',', help_heading = "Miscellaneous")]
     pub extension: Option<Vec<ExtensionPair>>,
     /// Dev-only argument to show fixes
     #[arg(long, hide = true)]
