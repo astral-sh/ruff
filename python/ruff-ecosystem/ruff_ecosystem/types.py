@@ -4,8 +4,7 @@ import abc
 import dataclasses
 import difflib
 from dataclasses import dataclass, is_dataclass
-from typing import TYPE_CHECKING, Any, Iterable, Sequence, Generator
-import heapq
+from typing import TYPE_CHECKING, Any, Generator, Iterable, Sequence
 
 if TYPE_CHECKING:
     from ruff_ecosystem.projects import ClonedRepository, Project

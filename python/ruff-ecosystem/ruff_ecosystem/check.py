@@ -8,9 +8,10 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE
-from typing import TYPE_CHECKING, Any, Iterator, Self, Sequence
+from typing import TYPE_CHECKING, Iterator, Self, Sequence
 
 from ruff_ecosystem import logger
+from ruff_ecosystem.markdown import project_section
 from ruff_ecosystem.types import (
     Comparison,
     Diff,
@@ -18,10 +19,9 @@ from ruff_ecosystem.types import (
     RuffError,
     Serializable,
 )
-from ruff_ecosystem.markdown import project_section
 
 if TYPE_CHECKING:
-    from ruff_ecosystem.projects import ClonedRepository, Project
+    from ruff_ecosystem.projects import ClonedRepository
 
 
 # Matches lines that are summaries rather than diagnostics

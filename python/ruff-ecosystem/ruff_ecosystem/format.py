@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import re
 import time
 from asyncio import create_subprocess_exec
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE
-from unidiff import PatchSet
 from typing import TYPE_CHECKING, Self, Sequence
-import re
+
+from unidiff import PatchSet
+
 from ruff_ecosystem import logger
 from ruff_ecosystem.markdown import project_section
 from ruff_ecosystem.types import Comparison, Diff, Result, RuffError

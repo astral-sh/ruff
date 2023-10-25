@@ -12,7 +12,7 @@ pip install -e ./python/ruff-ecosystem
 
 ## Usage
 
-```
+```shell
 ruff-ecosystem <check | format> <baseline executable> <comparison executable>
 ```
 
