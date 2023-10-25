@@ -476,7 +476,7 @@ impl NeedsParentheses for Expr {
             Expr::List(expr) => expr.needs_parentheses(parent, context),
             Expr::Tuple(expr) => expr.needs_parentheses(parent, context),
             Expr::Slice(expr) => expr.needs_parentheses(parent, context),
-            Expr::IpyEscapeCommand(_) => todo!(),
+            Expr::IpyEscapeCommand(expr) => expr.needs_parentheses(parent, context),
         }
     }
 }
@@ -718,8 +718,8 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::Constant(_)
             | Expr::Starred(_)
             | Expr::Name(_)
-            | Expr::Slice(_) => {}
-            Expr::IpyEscapeCommand(_) => todo!(),
+            | Expr::Slice(_)
+            | Expr::IpyEscapeCommand(_) => {}
         };
 
         walk_expr(self, expr);
