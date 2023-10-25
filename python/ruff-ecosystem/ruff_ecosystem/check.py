@@ -145,8 +145,8 @@ def summarize_check_result(result: Result) -> str:
 
         lines.extend(
             markdown_details(
-                summary="Rule change summary",
-                preface=f"{len(all_rule_changes.rule_codes())} rules changed",
+                summary=f"Changes by rule ({len(all_rule_changes.rule_codes())} rules affected)",
+                preface="",
                 content=table_lines,
             )
         )
