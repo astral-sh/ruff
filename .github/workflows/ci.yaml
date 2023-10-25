@@ -171,9 +171,10 @@ jobs:
   ecosystem:
     name: "ecosystem"
     runs-on: ubuntu-latest
-    needs:
-      - cargo-test
-      - determine_changes
+    # TMP
+    # needs:
+    #   - cargo-test
+    #   - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: github.event_name == 'pull_request'
     steps:
@@ -182,15 +183,17 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@v3
-        name: Download Ruff binary
-        id: ruff-target
-        with:
-          name: ruff
-          path: target/debug
+      # - uses: actions/download-artifact@v3
+      #   name: Download comparison Ruff binary
+      #   id: ruff-target
+      #   with:
+      #     name: ruff
+      #     # TMP
+      #     branch: ${{ github.event.pull_request.base.ref }}
+      #     # path: target/debug
 
       - uses: dawidd6/action-download-artifact@v2
-        name: Download base results
+        name: Download baseline Ruff binary
         with:
           name: ruff
           branch: ${{ github.event.pull_request.base.ref }}
@@ -199,25 +202,26 @@ jobs:
       - name: Install ruff-ecosystem
         run: |
           pip install ./python/ruff-ecosystem
+          pip install ruff==0.0.292 # TMP
 
       - name: Run `ruff check` ecosystem check
-        if: ${{ needs.determine_changes.outputs.linter == 'true' }}
+        # if: ${{ needs.determine_changes.outputs.linter == 'true' }} TMP
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+          chmod +x ruff ./ruff
 
-          ruff-ecosystem check ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result
+          ruff-ecosystem check $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result
           cat ecosystem-result >> $GITHUB_STEP_SUMMARY
 
           echo ${{ github.event.number }} > pr-number
 
       - name: Run `ruff format` ecosystem check
-        if: ${{ needs.determine_changes.outputs.formatter == 'true' }}
+        # if: ${{ needs.determine_changes.outputs.formatter == 'true' }} TMP
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+          chmod +x ruff ./ruff
 
-          ruff-ecosystem format ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result
+          ruff-ecosystem format $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result
           cat ecosystem-result >> $GITHUB_STEP_SUMMARY
 
           echo ${{ github.event.number }} > pr-number
