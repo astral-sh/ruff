@@ -329,7 +329,7 @@ impl FromStr for ExtensionPair {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let (extension_str, language_str) = {
-            let tokens = s.split('=').collect::<Vec<_>>();
+            let tokens = s.split(':').collect::<Vec<_>>();
             if tokens.len() != 2 {
                 bail!("Expected {}", Self::EXPECTED_PATTERN);
             }

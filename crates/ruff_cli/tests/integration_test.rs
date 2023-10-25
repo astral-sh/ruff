@@ -322,7 +322,7 @@ fn stdin_fix_jupyter() {
 }
 #[test]
 fn stdin_override_parser_ipynb() {
-    let args = ["--extension", "py=ipynb", "--stdin-filename", "Jupyter.py"];
+    let args = ["--extension", "py:ipynb", "--stdin-filename", "Jupyter.py"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(args)
@@ -421,7 +421,7 @@ fn stdin_override_parser_ipynb() {
 fn stdin_override_parser_py() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--extension", "ipynb=python", "--stdin-filename", "F401.ipynb"])
+        .args(["--extension", "ipynb:python", "--stdin-filename", "F401.ipynb"])
         .pass_stdin("import os\n"), @r###"
     success: false
     exit_code: 1

@@ -316,6 +316,8 @@ Options:
           See the files Ruff will be run against with the current settings
       --show-settings
           See the settings Ruff will use to lint a given Python file
+      --extension <EXTENSION>
+          List of mappings from file extension to language (one of ["python", "ipynb", "pyi"])
   -h, --help
           Print help
 
