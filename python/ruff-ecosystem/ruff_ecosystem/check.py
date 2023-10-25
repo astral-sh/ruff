@@ -96,10 +96,12 @@ def summarize_check_result(result: Result) -> str:
 
         diff = deduplicate_and_sort_diff(comparison.diff)
 
-        # Display the output diff
-        diff_lines = []
+        # Display the diff
+        # Wrap with `<pre>` for code-styling with support for links
+        diff_lines = ["<pre>"]
         for line in limit_rule_lines(diff, project.check_options.max_lines_per_rule):
             diff_lines.append(add_permalink_to_diagnostic_line(comparison.repo, line))
+        diff_lines.append("</pre>")
 
         lines.extend(
             project_section(
