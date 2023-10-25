@@ -218,8 +218,6 @@ class FormatResult(Result):
 def patch_set_with_permalinks(patch_set: PatchSet, repo: ClonedRepository) -> str:
     lines = []
     for file_patch in patch_set:
-        file_link = repo.url_for(file_patch.path)
-        lines.append(f"<a href='{file_link}'>{file_patch.path}</a>")
         for hunk in file_patch:
             hunk_link = repo.url_for(
                 file_patch.path,
