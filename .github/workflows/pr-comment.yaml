@@ -69,8 +69,9 @@ jobs:
           echo "<br />" >> comment.txt
 
       - name: Check comment
+        id: check-comment
         run: |
-          echo $(test -f comment.txt) >> $GITHUB_OUTPUT
+            test -f comment.txt && echo "comment=true" || echo "comment=false" >> $GITHUB_OUTPUT 
 
       # - name: Generate GitHub output
       #   run: |
@@ -80,7 +81,7 @@ jobs:
 
       - name: Find Comment
         uses: peter-evans/find-comment@v2
-        if: ${{ steps.check-comment.outputs == 'true' }}
+        if: ${{ steps.check-comment.outputs.comment == 'true' }}
         id: find-comment
         with:
           issue-number: ${{ steps.pr-number.outputs.pr-number }}
