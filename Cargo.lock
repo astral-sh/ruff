@@ -2381,6 +2381,7 @@ dependencies = [
  "itertools 0.11.0",
  "lalrpop",
  "lalrpop-util",
+ "memchr",
  "ruff_python_ast",
  "ruff_text_size",
  "rustc-hash",

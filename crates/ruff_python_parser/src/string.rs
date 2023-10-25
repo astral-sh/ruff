@@ -6,9 +6,6 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::lexer::{LexicalError, LexicalErrorType};
 use crate::token::{StringKind, Tok};
 
-// unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
-const MAX_UNICODE_NAME: usize = 88;
-
 pub(crate) struct StringConstantWithRange {
     value: StringConstant,
     range: TextRange,
@@ -57,7 +54,7 @@ impl StringType {
 }
 
 struct StringParser<'a> {
-    chars: std::str::Chars<'a>,
+    rest: &'a str,
     kind: StringKind,
     location: TextSize,
 }
@@ -65,22 +62,18 @@ struct StringParser<'a> {
 impl<'a> StringParser<'a> {
     fn new(source: &'a str, kind: StringKind, start: TextSize) -> Self {
         Self {
-            chars: source.chars(),
+            rest: source,
             kind,
             location: start,
         }
     }
 
     #[inline]
-    fn next_char(&mut self) -> Option<char> {
-        let c = self.chars.next()?;
-        self.location += c.text_len();
-        Some(c)
-    }
-
-    #[inline]
-    fn peek(&mut self) -> Option<char> {
-        self.chars.clone().next()
+    fn skip_bytes(&mut self, bytes: usize) -> &'a str {
+        let skipped_str = &self.rest[..bytes];
+        self.rest = &self.rest[bytes..];
+        self.location += skipped_str.text_len();
+        skipped_str
     }
 
     #[inline]
@@ -91,6 +84,29 @@ impl<'a> StringParser<'a> {
     #[inline]
     fn range(&self, start_location: TextSize) -> TextRange {
         TextRange::new(start_location, self.location)
+    }
+
+    #[inline]
+    fn next_byte(&mut self) -> Option<u8> {
+        self.rest.as_bytes().first().map(|&byte| {
+            self.rest = &self.rest[1..];
+            self.location += TextSize::new(1);
+            byte
+        })
+    }
+
+    #[inline]
+    fn next_char(&mut self) -> Option<char> {
+        self.rest.chars().next().map(|c| {
+            self.rest = &self.rest[c.len_utf8()..];
+            self.location += c.text_len();
+            c
+        })
+    }
+
+    #[inline]
+    fn peek_byte(&self) -> Option<u8> {
+        self.rest.as_bytes().first().copied()
     }
 
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
@@ -110,99 +126,101 @@ impl<'a> StringParser<'a> {
             _ => std::char::from_u32(p).ok_or(unicode_error),
         }
     }
+    fn parse_octet(&mut self, o: u8) -> char {
+        let mut radix_bytes = [o, 0, 0];
+        let mut len = 1;
 
-    fn parse_octet(&mut self, first: char) -> char {
-        let mut octet_content = String::new();
-        octet_content.push(first);
-        while octet_content.len() < 3 {
-            if let Some('0'..='7') = self.peek() {
-                octet_content.push(self.next_char().unwrap());
-            } else {
+        while len < 3 {
+            let Some(b'0'..=b'8') = self.peek_byte() else {
                 break;
-            }
+            };
+
+            radix_bytes[len] = self.next_byte().unwrap();
+            len += 1;
         }
-        let value = u32::from_str_radix(&octet_content, 8).unwrap();
+
+        // SAFETY: radix_bytes is always going to be in the ASCII range.
+        #[allow(unsafe_code)]
+        let radix_str = unsafe { std::str::from_utf8_unchecked(&radix_bytes[..len]) };
+
+        let value = u32::from_str_radix(radix_str, 8).unwrap();
         char::from_u32(value).unwrap()
     }
 
     fn parse_unicode_name(&mut self) -> Result<char, LexicalError> {
         let start_pos = self.get_pos();
-        match self.next_char() {
-            Some('{') => {}
-            _ => return Err(LexicalError::new(LexicalErrorType::StringError, start_pos)),
-        }
-        let start_pos = self.get_pos();
-        let mut name = String::new();
-        loop {
-            match self.next_char() {
-                Some('}') => break,
-                Some(c) => name.push(c),
-                None => {
-                    return Err(LexicalError::new(
-                        LexicalErrorType::StringError,
-                        self.get_pos(),
-                    ))
-                }
-            }
-        }
 
-        if name.len() > MAX_UNICODE_NAME {
+        let Some(b'{') = self.next_byte() else {
+            return Err(LexicalError::new(LexicalErrorType::StringError, start_pos));
+        };
+
+        let start_pos = self.get_pos();
+        let Some(close_idx) = memchr::memchr(b'}', self.rest.as_bytes()) else {
             return Err(LexicalError::new(
-                LexicalErrorType::UnicodeError,
+                LexicalErrorType::StringError,
                 self.get_pos(),
             ));
-        }
+        };
 
-        unicode_names2::character(&name)
+        let name_and_ending = self.skip_bytes(close_idx + 1);
+        let name = &name_and_ending[..name_and_ending.len() - 1];
+
+        unicode_names2::character(name)
             .ok_or_else(|| LexicalError::new(LexicalErrorType::UnicodeError, start_pos))
     }
 
-    fn parse_escaped_char(&mut self) -> Result<String, LexicalError> {
-        match self.next_char() {
-            Some(c) => {
-                let char = match c {
-                    '\\' => '\\',
-                    '\'' => '\'',
-                    '\"' => '"',
-                    'a' => '\x07',
-                    'b' => '\x08',
-                    'f' => '\x0c',
-                    'n' => '\n',
-                    'r' => '\r',
-                    't' => '\t',
-                    'v' => '\x0b',
-                    o @ '0'..='7' => self.parse_octet(o),
-                    'x' => self.parse_unicode_literal(2)?,
-                    'u' if !self.kind.is_any_bytes() => self.parse_unicode_literal(4)?,
-                    'U' if !self.kind.is_any_bytes() => self.parse_unicode_literal(8)?,
-                    'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
-                    // Special cases where the escape sequence is not a single character
-                    '\n' => return Ok(String::new()),
-                    '\r' => {
-                        if self.peek() == Some('\n') {
-                            self.next_char();
-                        }
-                        return Ok(String::new());
-                    }
-                    c => {
-                        if self.kind.is_any_bytes() && !c.is_ascii() {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::OtherError(
-                                    "bytes can only contain ASCII literal characters".to_owned(),
-                                ),
-                                location: self.get_pos(),
-                            });
-                        }
-                        return Ok(format!("\\{c}"));
-                    }
-                };
-                Ok(char.to_string())
-            }
-            None => Err(LexicalError {
+    fn parse_escaped_char(&mut self, string: &mut String) -> Result<(), LexicalError> {
+        let Some(first_byte) = self.next_byte() else {
+            return Err(LexicalError {
                 error: LexicalErrorType::StringError,
                 location: self.get_pos(),
-            }),
-        }
+            });
+        };
+
+        let new_char = match first_byte {
+            b'\\' => '\\',
+            b'\'' => '\'',
+            b'\"' => '"',
+            b'a' => '\x07',
+            b'b' => '\x08',
+            b'f' => '\x0c',
+            b'n' => '\n',
+            b'r' => '\r',
+            b't' => '\t',
+            b'v' => '\x0b',
+            o @ b'0'..=b'7' => self.parse_octet(o),
+            b'x' => self.parse_unicode_literal(2)?,
+            b'u' if !self.kind.is_any_bytes() => self.parse_unicode_literal(4)?,
+            b'U' if !self.kind.is_any_bytes() => self.parse_unicode_literal(8)?,
+            b'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
+            // Special cases where the escape sequence is not a single character
+            b'\n' => return Ok(()),
+            b'\r' => {
+                if self.peek_byte() == Some(b'\n') {
+                    self.next_byte();
+                }
+
+                return Ok(());
+            }
+            _ => {
+                string.push('\\');
+
+                if self.kind.is_any_bytes() && !first_byte.is_ascii() {
+                    return Err(LexicalError {
+                        error: LexicalErrorType::OtherError(
+                            "bytes can only contain ASCII literal characters".to_owned(),
+                        ),
+                        location: self.get_pos(),
+                    });
+                }
+
+                first_byte as char
+            }
+        };
+
+        string.push(new_char);
+
+        Ok(())
     }
 
     fn parse_fstring_middle(&mut self) -> Result<Expr, LexicalError> {
@@ -230,8 +248,8 @@ impl<'a> StringParser<'a> {
                 // This is still an invalid escape sequence, but we don't want to
                 // raise a syntax error as is done by the CPython parser. It might
                 // be supported in the future, refer to point 3: https://peps.python.org/pep-0701/#rejected-ideas
-                '\\' if !self.kind.is_raw() && self.peek().is_some() => {
-                    value.push_str(&self.parse_escaped_char()?);
+                '\\' if !self.kind.is_raw() && self.peek_byte().is_some() => {
+                    self.parse_escaped_char(&mut value)?;
                 }
                 // If there are any curly braces inside a `FStringMiddle` token,
                 // then they were escaped (i.e. `{{` or `}}`). This means that
@@ -255,7 +273,7 @@ impl<'a> StringParser<'a> {
         while let Some(ch) = self.next_char() {
             match ch {
                 '\\' if !self.kind.is_raw() => {
-                    content.push_str(&self.parse_escaped_char()?);
+                    self.parse_escaped_char(&mut content)?;
                 }
                 ch => {
                     if !ch.is_ascii() {
@@ -278,16 +296,26 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_string(&mut self) -> Result<StringType, LexicalError> {
-        let mut value = String::new();
         let start_location = self.get_pos();
-        while let Some(ch) = self.next_char() {
-            match ch {
-                '\\' if !self.kind.is_raw() => {
-                    value.push_str(&self.parse_escaped_char()?);
-                }
-                ch => value.push(ch),
+        let mut value = String::new();
+
+        if self.kind.is_raw() {
+            value.push_str(self.skip_bytes(self.rest.len()));
+        } else {
+            loop {
+                let Some(escape_idx) = memchr::memchr(b'\\', self.rest.as_bytes()) else {
+                    value.push_str(self.skip_bytes(self.rest.len()));
+                    break;
+                };
+
+                let before_with_slash = self.skip_bytes(escape_idx + 1);
+                let before = &before_with_slash[..before_with_slash.len() - 1];
+
+                value.push_str(before);
+                self.parse_escaped_char(&mut value)?;
             }
         }
+
         Ok(StringType::Str(StringConstantWithRange {
             value: StringConstant {
                 value,
