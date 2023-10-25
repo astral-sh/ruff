@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Self, Sequence
 from unidiff import PatchSet
 
 from ruff_ecosystem import logger
-from ruff_ecosystem.markdown import project_section
+from ruff_ecosystem.markdown import markdown_project_section
 from ruff_ecosystem.types import Comparison, Diff, Result, RuffError
 
 if TYPE_CHECKING:
@@ -56,7 +56,7 @@ def summarize_format_result(result: Result) -> str:
         title = f"+{comparison.diff.lines_added}, -{comparison.diff.lines_removed} lines in {files} file{s}"
 
         lines.extend(
-            project_section(
+            markdown_project_section(
                 title=title,
                 content=patch_set_with_permalinks(patch_set, comparison.repo),
                 options=project.format_options.markdown(),
@@ -66,7 +66,7 @@ def summarize_format_result(result: Result) -> str:
 
     for project, error in result.errored:
         lines.extend(
-            project_section(
+            markdown_project_section(
                 title="error",
                 content=str(error),
                 options="",

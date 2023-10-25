@@ -11,7 +11,7 @@ from subprocess import PIPE
 from typing import TYPE_CHECKING, Iterator, Self, Sequence
 
 from ruff_ecosystem import logger
-from ruff_ecosystem.markdown import project_section
+from ruff_ecosystem.markdown import markdown_project_section, markdown_details
 from ruff_ecosystem.types import (
     Comparison,
     Diff,
@@ -78,15 +78,13 @@ def summarize_check_result(result: Result) -> str:
     error_count = len(result.errored)
 
     if total_removed == 0 and total_added == 0 and error_count == 0:
-        return "\u2705 ecosystem check detected no `ruff check` changes."
+        return "\u2705 ecosystem check detected no linter changes."
 
     # Summarize the total changes
     s = "s" if error_count != 1 else ""
     changes = f"(+{total_added}, -{total_removed}, {error_count} error{s})"
 
-    lines.append(
-        f"\u2139\ufe0f ecosystem check **detected `ruff check` changes**. {changes}"
-    )
+    lines.append(f"\u2139\ufe0f ecosystem check **detected linter changes**. {changes}")
     lines.append("")
 
     # Then per-project changes
@@ -111,9 +109,9 @@ def summarize_check_result(result: Result) -> str:
         diff_lines.append("</pre>")
 
         lines.extend(
-            project_section(
+            markdown_project_section(
                 title=f"+{diff.lines_added}, -{diff.lines_removed}",
-                content="\n".join(diff_lines),
+                content=diff_lines,
                 options=project.check_options.markdown(),
                 project=project,
             )
@@ -121,7 +119,7 @@ def summarize_check_result(result: Result) -> str:
 
     for project, error in result.errored:
         lines.extend(
-            project_section(
+            markdown_project_section(
                 title="error",
                 content=str(error),
                 options="",
@@ -131,10 +129,9 @@ def summarize_check_result(result: Result) -> str:
 
     # Display a summary table of changed rules
     if all_rule_changes:
-        lines.append(f"Rules changed: {len(all_rule_changes.rule_codes())}")
-        lines.append("")
-        lines.append("| Rule | Changes | Additions | Removals |")
-        lines.append("| ---- | ------- | --------- | -------- |")
+        table_lines = []
+        table_lines.append("| Rule | Changes | Additions | Removals |")
+        table_lines.append("| ---- | ------- | --------- | -------- |")
         for rule, total in sorted(
             all_rule_changes.total_changes_by_rule(),
             key=lambda item: item[1],  # Sort by the total changes
@@ -144,7 +141,15 @@ def summarize_check_result(result: Result) -> str:
                 all_rule_changes.added[rule],
                 all_rule_changes.removed[rule],
             )
-            lines.append(f"| {rule} | {total} | {additions} | {removals} |")
+            table_lines.append(f"| {rule} | {total} | {additions} | {removals} |")
+
+        lines.extend(
+            markdown_details(
+                summary=f"Rules changed: {len(all_rule_changes.rule_codes())}",
+                preface="",
+                content=table_lines,
+            )
+        )
 
     return "\n".join(lines)
 

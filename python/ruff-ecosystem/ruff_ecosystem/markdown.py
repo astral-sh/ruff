@@ -6,18 +6,27 @@ if TYPE_CHECKING:
     from ruff_ecosystem.projects import Project
 
 
-def project_section(
-    title: str, content: str, options: str, project: Project
+def markdown_project_section(
+    title: str, content: str | list[str], options: str, project: Project
 ) -> list[str]:
-    lines = []
-    lines.append(
-        f'<details><summary><a href="{project.repo.url}">{project.repo.fullname}</a> ({title})</summary>'
+    return markdown_details(
+        summary=f'<a href="{project.repo.url}">{project.repo.fullname}</a> ({title})',
+        preface=options,
+        content=content,
     )
-    lines.append(options)
+
+
+def markdown_details(summary: str, preface: str, content: str | list[str]):
+    lines = []
+    lines.append(f"<details><summary>{summary}</summary>")
+    lines.append(preface)
     lines.append("<p>")
     lines.append("")
 
-    lines.append(content)
+    if isinstance(content, str):
+        lines.append(content)
+    else:
+        lines.extend(content)
 
     lines.append("")
     lines.append("</p>")
