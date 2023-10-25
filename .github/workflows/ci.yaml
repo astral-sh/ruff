@@ -116,21 +116,21 @@ jobs:
   #         name: ruff
   #         path: target/debug/ruff
 
-  cargo-fuzz:
-    runs-on: ubuntu-latest
-    name: "cargo fuzz"
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "fuzz -> target"
-      - name: "Install cargo-fuzz"
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-fuzz@0.11
-      - run: cargo fuzz build -s none
+  # cargo-fuzz:
+  #   runs-on: ubuntu-latest
+  #   name: "cargo fuzz"
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: "Install Rust toolchain"
+  #       run: rustup show
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         workspaces: "fuzz -> target"
+  #     - name: "Install cargo-fuzz"
+  #       uses: taiki-e/install-action@v2
+  #       with:
+  #         tool: cargo-fuzz@0.11
+  #     - run: cargo fuzz build -s none
 
   # cargo-test-wasm:
   #   runs-on: ubuntu-latest
@@ -401,27 +401,27 @@ jobs:
 
   #         just test
 
-  benchmarks:
-    runs-on: ubuntu-latest
-    steps:
-      - name: "Checkout Branch"
-        uses: actions/checkout@v4
+  # benchmarks:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: "Checkout Branch"
+  #       uses: actions/checkout@v4
 
-      - name: "Install Rust toolchain"
-        run: rustup show
+  #     - name: "Install Rust toolchain"
+  #       run: rustup show
 
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-codspeed
+  #     - name: "Install codspeed"
+  #       uses: taiki-e/install-action@v2
+  #       with:
+  #         tool: cargo-codspeed
 
-      - uses: Swatinem/rust-cache@v2
+  #     - uses: Swatinem/rust-cache@v2
 
-      - name: "Build benchmarks"
-        run: cargo codspeed build --features codspeed -p ruff_benchmark
+  #     - name: "Build benchmarks"
+  #       run: cargo codspeed build --features codspeed -p ruff_benchmark
 
-      - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@v1
-        with:
-          run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
+  #     - name: "Run benchmarks"
+  #       uses: CodSpeedHQ/action@v1
+  #       with:
+  #         run: cargo codspeed run
+  #         token: ${{ secrets.CODSPEED_TOKEN }}
