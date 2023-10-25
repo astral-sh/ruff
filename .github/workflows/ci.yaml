@@ -210,8 +210,8 @@ jobs:
           # Make executable, since artifact download doesn't preserve this
           chmod +x ruff ./ruff
 
-          ruff-ecosystem check $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result
-          cat ecosystem-result >> $GITHUB_STEP_SUMMARY
+          ruff-ecosystem check $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check
+          cat ecosystem-result-check > $GITHUB_STEP_SUMMARY
 
           echo ${{ github.event.number }} > pr-number
 
@@ -221,10 +221,15 @@ jobs:
           # Make executable, since artifact download doesn't preserve this
           chmod +x ruff ./ruff
 
-          ruff-ecosystem format $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result
-          cat ecosystem-result >> $GITHUB_STEP_SUMMARY
+          ruff-ecosystem format $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
+          cat ecosystem-result-format > $GITHUB_STEP_SUMMARY
 
           echo ${{ github.event.number }} > pr-number
+
+      - name: Combine ecosystem check results
+        # if: ${{ needs.determine_changes.outputs.formatter == 'true' }} TMP
+        run: |
+          cat ecosystem-result-check ecosystem-result-format > ecosystem-result
 
       - uses: actions/upload-artifact@v3
         name: Upload PR Number
