@@ -59,7 +59,7 @@ def summarize_format_result(result: Result) -> str:
             markdown_project_section(
                 title=title,
                 content=patch_set_with_permalinks(patch_set, comparison.repo),
-                options=project.format_options.markdown(),
+                options=project.format_options,
                 project=project,
             )
         )
@@ -69,7 +69,7 @@ def summarize_format_result(result: Result) -> str:
             markdown_project_section(
                 title="error",
                 content=str(error),
-                options="",
+                options=project.format_options,
                 project=project,
             )
         )
@@ -176,13 +176,12 @@ def create_format_comparison(repo: ClonedRepository, diff: str) -> FormatCompari
 @dataclass(frozen=True)
 class FormatOptions:
     """
-    Ruff format options
+    Ruff format options.
     """
 
-    pass
-
-    def markdown(self: Self) -> str:
-        return ""
+    def to_cli_args(self) -> list[str]:
+        args = ["format", "--diff"]
+        return args
 
 
 @dataclass(frozen=True)

@@ -112,7 +112,7 @@ def summarize_check_result(result: Result) -> str:
             markdown_project_section(
                 title=f"+{diff.lines_added}, -{diff.lines_removed}",
                 content=diff_lines,
-                options=project.check_options.markdown(),
+                options=project.check_options,
                 project=project,
             )
         )
@@ -122,7 +122,7 @@ def summarize_check_result(result: Result) -> str:
             markdown_project_section(
                 title="error",
                 content=str(error),
-                options="",
+                options=project.check_options,
                 project=project,
             )
         )
@@ -146,7 +146,7 @@ def summarize_check_result(result: Result) -> str:
         lines.extend(
             markdown_details(
                 summary="Rule change summary",
-                preface="f"{len(all_rule_changes.rule_codes())} rules changed"",
+                preface=f"{len(all_rule_changes.rule_codes())} rules changed",
                 content=table_lines,
             )
         )
@@ -166,18 +166,10 @@ def add_permalink_to_diagnostic_line(repo: ClonedRepository, line: str) -> str:
 
 async def ruff_check(
     *, executable: Path, path: Path, name: str, options: CheckOptions
-) -> Sequence[str]:
+) -> tuple[str, Sequence[str]]:
     """Run the given ruff binary against the specified path."""
     logger.debug(f"Checking {name} with {executable}")
-    ruff_args = ["check", "--no-cache", "--exit-zero"]
-    if options.select:
-        ruff_args.extend(["--select", options.select])
-    if options.ignore:
-        ruff_args.extend(["--ignore", options.ignore])
-    if options.exclude:
-        ruff_args.extend(["--exclude", options.exclude])
-    if options.show_fixes:
-        ruff_args.extend(["--show-fixes", "--ecosystem-ci"])
+    ruff_args = options.to_cli_args()
 
     start = time.time()
     proc = await create_subprocess_exec(
@@ -224,6 +216,18 @@ class CheckOptions(Serializable):
 
     def markdown(self) -> str:
         return f"select {self.select} ignore {self.ignore} exclude {self.exclude}"
+
+    def to_cli_args(self) -> list[str]:
+        args = ["check", "--no-cache", "--exit-zero"]
+        if self.select:
+            args.extend(["--select", self.select])
+        if self.ignore:
+            args.extend(["--ignore", self.ignore])
+        if self.exclude:
+            args.extend(["--exclude", self.exclude])
+        if self.show_fixes:
+            args.extend(["--show-fixes", "--ecosystem-ci"])
+        return args
 
 
 @dataclass(frozen=True)

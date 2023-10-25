@@ -11,7 +11,7 @@ def markdown_project_section(
 ) -> list[str]:
     return markdown_details(
         summary=f'<a href="{project.repo.url}">{project.repo.fullname}</a> ({title})',
-        preface=options,
+        preface="`ruff " + " ".join(options.to_cli_args()) + "`",
         content=content,
     )
 
