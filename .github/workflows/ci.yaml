@@ -222,6 +222,12 @@ jobs:
           ruff-ecosystem format $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
           cat ecosystem-result-format > $GITHUB_STEP_SUMMARY
 
+      - name: Combine ecosystem check results
+        run: |
+          cat ecosystem-result-check > ecosystem-result
+          echo "" >> ecosystem-result
+          cat ecosystem-result-format >> ecosystem-result
+
       - name: Export pull request number
         run: |
           echo ${{ github.event.number }} > pr-number
@@ -235,14 +241,8 @@ jobs:
       - uses: actions/upload-artifact@v3
         name: Upload Results
         with:
-          name: ecosystem-result-check
-          path: ecosystem-result-check
-
-      - uses: actions/upload-artifact@v3
-        name: Upload Results
-        with:
-          name: ecosystem-result-format
-          path: ecosystem-result-format
+          name: ecosystem-result
+          path: ecosystem-result
 
 
   # cargo-udeps:
