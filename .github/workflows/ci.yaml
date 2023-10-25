@@ -212,7 +212,7 @@ jobs:
           echo ${{ github.event.number }} > pr-number
 
       - name: Run `ruff format` ecosystem check
-        if: ${{ needs.determine_changes.outputs.linter == 'true' }}
+        if: ${{ needs.determine_changes.outputs.formatter == 'true' }}
         run: |
           # Make executable, since artifact download doesn't preserve this
           chmod +x ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
