@@ -2301,7 +2301,7 @@ pub struct PycodestyleOptions {
     /// documentation (`W505`), including standalone comments. By default,
     /// this is set to null which disables reporting violations.
     ///
-    /// The length is determined by the number of characters per line, except for lines containinAsian characters or emojis.
+    /// The length is determined by the number of characters per line, except for lines containing Asian characters or emojis.
     /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
     ///
     /// See the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.
