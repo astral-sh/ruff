@@ -18,7 +18,7 @@ use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
-use crate::args::{Args, CheckCommand, Command, FormatCommand};
+use crate::args::{Args, CheckCommand, Command, FormatCommand, HelpFormat};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -101,6 +101,22 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     file == Path::new("-")
 }
 
+/// Get the actual value of the `format` desired from either `output_format`
+/// or `format`, and warn the user if they're using the deprecated form.
+fn warn_about_deprecated_help_format(
+    output_format: HelpFormat,
+    format: Option<HelpFormat>,
+) -> HelpFormat {
+    if format.is_some() {
+        if std::env::var("RUFF_FORMAT").is_ok() {
+            warn_user!("The environment variable `RUFF_FORMAT` is deprecated. Use `RUFF_OUTPUT_FORMAT` instead.");
+        } else {
+            warn_user!("The argument `--format=<FORMAT>` is deprecated. Use `--output-format=<FORMAT>` instead.");
+        }
+    }
+    format.unwrap_or(output_format)
+}
+
 pub fn run(
     Args {
         command,
@@ -137,16 +153,26 @@ pub fn run(
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Version { output_format } => {
+        Command::Version {
+            format,
+            mut output_format,
+        } => {
+            output_format = warn_about_deprecated_help_format(output_format, format);
             commands::version::version(output_format)?;
             Ok(ExitStatus::Success)
         }
-        Command::Rule { rule, all, format } => {
+        Command::Rule {
+            rule,
+            all,
+            format,
+            mut output_format,
+        } => {
+            output_format = warn_about_deprecated_help_format(output_format, format);
             if all {
-                commands::rule::rules(format)?;
+                commands::rule::rules(output_format)?;
             }
             if let Some(rule) = rule {
-                commands::rule::rule(rule, format)?;
+                commands::rule::rule(rule, output_format)?;
             }
             Ok(ExitStatus::Success)
         }
@@ -154,8 +180,12 @@ pub fn run(
             commands::config::config(option.as_deref())?;
             Ok(ExitStatus::Success)
         }
-        Command::Linter { format } => {
-            commands::linter::linter(format)?;
+        Command::Linter {
+            format,
+            mut output_format,
+        } => {
+            output_format = warn_about_deprecated_help_format(output_format, format);
+            commands::linter::linter(output_format)?;
             Ok(ExitStatus::Success)
         }
         Command::Clean => {

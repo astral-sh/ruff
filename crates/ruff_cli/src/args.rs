@@ -49,16 +49,36 @@ pub enum Command {
         all: bool,
 
         /// Output format
-        #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        #[arg(long, value_enum, default_value = "text", env = "RUFF_OUTPUT_FORMAT")]
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(
+            long,
+            value_enum,
+            conflicts_with = "output_format",
+            hide = true,
+            env = "RUFF_FORMAT"
+        )]
+        format: Option<HelpFormat>,
     },
     /// List or describe the available configuration options.
     Config { option: Option<String> },
     /// List all supported upstream linters.
     Linter {
         /// Output format
-        #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        #[arg(long, value_enum, default_value = "text", env = "RUFF_OUTPUT_FORMAT")]
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(
+            long,
+            value_enum,
+            conflicts_with = "output_format",
+            hide = true,
+            env = "RUFF_FORMAT"
+        )]
+        format: Option<HelpFormat>,
     },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
@@ -70,8 +90,18 @@ pub enum Command {
     Format(FormatCommand),
     /// Display Ruff's version
     Version {
-        #[arg(long, value_enum, default_value = "text")]
+        #[arg(long, value_enum, default_value = "text", env = "RUFF_OUTPUT_FORMAT")]
         output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(
+            long,
+            value_enum,
+            conflicts_with = "output_format",
+            hide = true,
+            env = "RUFF_FORMAT"
+        )]
+        format: Option<HelpFormat>,
     },
 }
 
