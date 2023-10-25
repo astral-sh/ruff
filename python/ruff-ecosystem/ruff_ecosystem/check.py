@@ -166,7 +166,7 @@ def add_permalink_to_diagnostic_line(repo: ClonedRepository, line: str) -> str:
 
 async def ruff_check(
     *, executable: Path, path: Path, name: str, options: CheckOptions
-) -> tuple[str, Sequence[str]]:
+) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
     logger.debug(f"Checking {name} with {executable}")
     ruff_args = options.to_cli_args()
