@@ -511,13 +511,30 @@ fn test_diff() {
         ----- stdout -----
         --- resources/test/fixtures/unformatted.ipynb
         +++ resources/test/fixtures/unformatted.ipynb
-        @@ -1,3 +1,4 @@
+        @@ -1,12 +1,20 @@
          import numpy
         -maths = (numpy.arange(100)**2).sum()
         -stats= numpy.asarray([1,2,3,4]).median()
         +
         +maths = (numpy.arange(100) ** 2).sum()
         +stats = numpy.asarray([1, 2, 3, 4]).median()
+         # A cell with IPython escape command
+         def some_function(foo, bar):
+             pass
+        +
+        +
+         %matplotlib inline
+         foo = %pwd
+        -def some_function(foo,bar,):
+        +
+        +
+        +def some_function(
+        +    foo,
+        +    bar,
+        +):
+             # Another cell with IPython escape command
+             foo = %pwd
+             print(foo)
         --- resources/test/fixtures/unformatted.py
         +++ resources/test/fixtures/unformatted.py
         @@ -1,3 +1,3 @@
