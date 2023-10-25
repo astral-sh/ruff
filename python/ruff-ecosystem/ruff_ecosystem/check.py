@@ -90,17 +90,24 @@ def summarize_check_result(result: Result) -> str:
     lines.append("")
 
     # Then per-project changes
+    max_lines_per_project = 200
     for project, comparison in result.completed:
         if not comparison.diff:
             continue  # Skip empty diffs
 
         diff = deduplicate_and_sort_diff(comparison.diff)
+        limited_diff = limit_rule_lines(diff, project.check_options.max_lines_per_rule)
 
         # Display the diff
         # Wrap with `<pre>` for code-styling with support for links
         diff_lines = ["<pre>"]
-        for line in limit_rule_lines(diff, project.check_options.max_lines_per_rule):
+        for line in limited_diff[:max_lines_per_project]:
             diff_lines.append(add_permalink_to_diagnostic_line(comparison.repo, line))
+
+        omitted_lines = len(limited_diff) - max_lines_per_project
+        if omitted_lines > 0:
+            diff_lines.append(f"... {omitted_lines} additional lines omitted")
+
         diff_lines.append("</pre>")
 
         lines.extend(
@@ -338,6 +345,6 @@ def limit_rule_lines(diff: Diff, max_per_rule: int | None = 100) -> list[str]:
     for code, count in counts.items():
         hidden_count = count - max_per_rule
         if hidden_count > 0:
-            reduced.append(f"{hidden_count} changes omitted for rule {code}")
+            reduced.append(f"... {hidden_count} changes omitted for rule {code}")
 
     return reduced
