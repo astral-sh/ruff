@@ -537,28 +537,6 @@ def update_emission_strength():
     value = self.emission_strength * 2
 ```
 
-#### Type annotations may be parenthesized when expanded ([#7315](https://github.com/astral-sh/ruff/issues/7315))
-
-Black will avoid parenthesizing type annotations in an annotated assignment, while Ruff will insert
-parentheses in some cases.
-
-For example:
-
-```python
-# Black
-StartElementHandler: Callable[[str, dict[str, str]], Any] | Callable[[str, list[str]], Any] | Callable[
-    [str, dict[str, str], list[str]], Any
-] | None
-
-# Ruff
-StartElementHandler: (
-    Callable[[str, dict[str, str]], Any]
-    | Callable[[str, list[str]], Any]
-    | Callable[[str, dict[str, str], list[str]], Any]
-    | None
-)
-```
-
 #### Call chain calls break differently ([#7051](https://github.com/astral-sh/ruff/issues/7051))
 
 Black occasionally breaks call chains differently than Ruff; in particular, Black occasionally
