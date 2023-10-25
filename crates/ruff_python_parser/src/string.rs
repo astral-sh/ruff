@@ -170,32 +170,32 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_escaped_char(&mut self, string: &mut String) -> Result<(), LexicalError> {
-        let Some(first_byte) = self.next_byte() else {
+        let Some(first_char) = self.next_char() else {
             return Err(LexicalError {
                 error: LexicalErrorType::StringError,
                 location: self.get_pos(),
             });
         };
 
-        let new_char = match first_byte {
-            b'\\' => '\\',
-            b'\'' => '\'',
-            b'\"' => '"',
-            b'a' => '\x07',
-            b'b' => '\x08',
-            b'f' => '\x0c',
-            b'n' => '\n',
-            b'r' => '\r',
-            b't' => '\t',
-            b'v' => '\x0b',
-            o @ b'0'..=b'7' => self.parse_octet(o),
-            b'x' => self.parse_unicode_literal(2)?,
-            b'u' if !self.kind.is_any_bytes() => self.parse_unicode_literal(4)?,
-            b'U' if !self.kind.is_any_bytes() => self.parse_unicode_literal(8)?,
-            b'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
+        let new_char = match first_char {
+            '\\' => '\\',
+            '\'' => '\'',
+            '\"' => '"',
+            'a' => '\x07',
+            'b' => '\x08',
+            'f' => '\x0c',
+            'n' => '\n',
+            'r' => '\r',
+            't' => '\t',
+            'v' => '\x0b',
+            o @ '0'..='7' => self.parse_octet(o as u8),
+            'x' => self.parse_unicode_literal(2)?,
+            'u' if !self.kind.is_any_bytes() => self.parse_unicode_literal(4)?,
+            'U' if !self.kind.is_any_bytes() => self.parse_unicode_literal(8)?,
+            'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
             // Special cases where the escape sequence is not a single character
-            b'\n' => return Ok(()),
-            b'\r' => {
+            '\n' => return Ok(()),
+            '\r' => {
                 if self.peek_byte() == Some(b'\n') {
                     self.next_byte();
                 }
@@ -205,7 +205,7 @@ impl<'a> StringParser<'a> {
             _ => {
                 string.push('\\');
 
-                if self.kind.is_any_bytes() && !first_byte.is_ascii() {
+                if self.kind.is_any_bytes() && !first_char.is_ascii() {
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError(
                             "bytes can only contain ASCII literal characters".to_owned(),
@@ -214,7 +214,7 @@ impl<'a> StringParser<'a> {
                     });
                 }
 
-                first_byte as char
+                first_char
             }
         };
 
