@@ -213,8 +213,6 @@ jobs:
           ruff-ecosystem check $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check
           cat ecosystem-result-check > $GITHUB_STEP_SUMMARY
 
-          echo ${{ github.event.number }} > pr-number
-
       - name: Run `ruff format` ecosystem check
         # if: ${{ needs.determine_changes.outputs.formatter == 'true' }} TMP
         run: |
@@ -224,12 +222,9 @@ jobs:
           ruff-ecosystem format $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
           cat ecosystem-result-format > $GITHUB_STEP_SUMMARY
 
-          echo ${{ github.event.number }} > pr-number
-
-      - name: Combine ecosystem check results
-        # if: ${{ needs.determine_changes.outputs.formatter == 'true' }} TMP
+      - name: Export pull request number
         run: |
-          cat ecosystem-result-check ecosystem-result-format > ecosystem-result
+          echo ${{ github.event.number }} > pr-number
 
       - uses: actions/upload-artifact@v3
         name: Upload PR Number
@@ -240,8 +235,15 @@ jobs:
       - uses: actions/upload-artifact@v3
         name: Upload Results
         with:
-          name: ecosystem-result
-          path: ecosystem-result
+          name: ecosystem-result-check
+          path: ecosystem-result-check
+
+      - uses: actions/upload-artifact@v3
+        name: Upload Results
+        with:
+          name: ecosystem-result-format
+          path: ecosystem-result-format
+
 
   # cargo-udeps:
   #   name: "cargo udeps"

@@ -33,33 +33,54 @@ jobs:
           fi
 
       - uses: dawidd6/action-download-artifact@v2
-        name: "Download Ecosystem Result"
-        id: download-ecosystem-result
+        name: "Download ecosystem result for `check`"
+        id: download-ecosystem-result-check
         if: steps.pr-number.outputs.pr-number
         with:
-          name: ecosystem-result
+          name: ecosystem-result-check
           workflow: ci.yaml
           pr: ${{ steps.pr-number.outputs.pr-number }}
-          path: pr/ecosystem
+          path: pr/ecosystem-check
           if_no_artifact_found: ignore
 
-      - name: Generate Comment
-        id: generate-comment
-        if: steps.download-ecosystem-result.outputs.found_artifact == 'true'
+      - uses: dawidd6/action-download-artifact@v2
+        name: "Download ecosystem result for `format`"
+        id: download-ecosystem-result-format
+        if: steps.pr-number.outputs.pr-number
+        with:
+          name: ecosystem-result-format
+          workflow: ci.yaml
+          pr: ${{ steps.pr-number.outputs.pr-number }}
+          path: pr/ecosystem-format
+          if_no_artifact_found: ignore
+      
+      - name: Generate `check` ecosystem comment
+        if: steps.download-ecosystem-result-check.outputs.found_artifact == 'true'
         run: |
-          echo '## PR Check Results' >> comment.txt
+          echo "## Ecosystem results `ruff check`" >> comment.txt
+          cat pr/ecosystem/ecosystem-result-check >> comment.txt
+          echo "<br />" >> comment.txt
 
-          echo "### Ecosystem" >> comment.txt
-          cat pr/ecosystem/ecosystem-result >> comment.txt
-          echo "" >> comment.txt
+      - name: Generate `format` ecosystem comment
+        if: steps.download-ecosystem-result-format.outputs.found_artifact == 'true'
+        run: |
+          echo "## Ecosystem results `ruff format`" >> comment.txt
+          cat pr/ecosystem/ecosystem-result-format >> comment.txt
+          echo "<br />" >> comment.txt
 
-          echo 'comment<<EOF' >> $GITHUB_OUTPUT
-          cat comment.txt >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
+      - name: Check comment
+        run: |
+          echo $(test -f comment.txt) >> $GITHUB_OUTPUT
+
+      # - name: Generate GitHub output
+      #   run: |
+      #     echo 'comment<<EOF' >> $GITHUB_OUTPUT
+      #     cat comment.txt >> $GITHUB_OUTPUT
+      #     echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Find Comment
         uses: peter-evans/find-comment@v2
-        if: steps.generate-comment.outcome == 'success'
+        if: ${{ steps.check-comment.outputs == 'true' }}
         id: find-comment
         with:
           issue-number: ${{ steps.pr-number.outputs.pr-number }}
