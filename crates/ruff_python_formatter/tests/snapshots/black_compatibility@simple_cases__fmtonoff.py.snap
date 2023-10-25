@@ -225,8 +225,11 @@ d={'a':1,
          # fmt: on
          goes + here,
          andhere,
-@@ -122,8 +123,10 @@
+@@ -120,10 +121,13 @@
+ 
+     The comments between will be formatted. This is a known limitation.
      """
++
      # fmt: off
  
 -    # hey, that won't work
@@ -237,7 +240,7 @@ d={'a':1,
      # fmt: on
      pass
  
-@@ -138,7 +141,7 @@
+@@ -138,7 +142,7 @@
      now . considers . multiple . fmt . directives . within . one . prefix
      # fmt: on
      # fmt: off
@@ -246,7 +249,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -178,14 +181,18 @@
+@@ -178,14 +182,18 @@
          $
          """,
          # fmt: off
@@ -395,6 +398,7 @@ def off_and_on_without_data():
 
     The comments between will be formatted. This is a known limitation.
     """
+
     # fmt: off
 
 
