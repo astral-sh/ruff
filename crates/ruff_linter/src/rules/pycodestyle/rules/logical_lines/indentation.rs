@@ -23,6 +23,10 @@ use super::LogicalLine;
 ///     a = 1
 /// ```
 ///
+/// ## Using with the formatter
+/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
+/// indentations, making this rule redundant. The rule is incompatible with the formatter when using `indent-width` with a value other than `4`.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[violation]
 pub struct IndentationWithInvalidMultiple {
@@ -54,6 +58,9 @@ impl Violation for IndentationWithInvalidMultiple {
 /// if True:
 ///     # a = 1
 /// ```
+/// ## Using with the formatter
+/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
+/// indentations, making this rule redundant. The rule is incompatible with the formatter when using `indent-width` with a value other than `4`.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[violation]

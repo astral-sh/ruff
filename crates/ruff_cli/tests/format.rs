@@ -230,7 +230,9 @@ fn format_option_inheritance() -> Result<()> {
         &ruff_toml,
         r#"
 extend = "base.toml"
-extend-select = ["Q000"]
+
+[lint]
+extend-select = ["COM812"]
 
 [format]
 quote-style = "single"
@@ -273,7 +275,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: 'Q000'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The following rules may cause conflicts when used with the formatter: 'COM812'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     "###);
     Ok(())
 }
@@ -359,18 +361,27 @@ fn conflicting_options() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
+indent-width = 2
+
+[lint]
 select = ["ALL"]
 ignore = ["D203", "D212"]
 
-[isort]
+[lint.isort]
 lines-after-imports = 3
 lines-between-types = 2
 force-wrap-aliases = true
 combine-as-imports = true
 split-on-trailing-comma = true
 
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "single"
+multiline-quotes = "single"
+
 [format]
 skip-magic-trailing-comma = true
+indent-style = "tab"
 "#,
     )?;
 
@@ -392,7 +403,10 @@ def say_hy(name: str):
     1 file reformatted
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'COM819', 'D206', 'E501', 'ISC001', 'Q000', 'Q001', 'Q002', 'Q003', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'D206', 'ISC001', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The `flake8-quotes.inline-quotes` option is incompatible with the formatter's `format.quote-style` option. We recommend disabling 'Q000' and 'Q003' when using the formatter because they're redundant. If you do need the rules, change the configuration and set both options either to `"single"` or `"double"`.
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling 'Q001' when using the formatter because it enforces double quotes for multiline strings, making this rule redundant. If you do need the rule, change the `flake8-quotes.multiline-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling 'Q002' when using the formatter because it enforce double quotes for docstrings, making this rule redundant. If you do need the rule, change the `flake8-quotes.docstring-quotes` option to `"double"`.
     warning: The isort option 'isort.lines-after-imports' with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
     warning: The isort option 'isort.lines-between-types' with a value larger than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
     warning: The isort option 'isort.force-wrap-aliases' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.force-wrap-aliases=false' or 'format.skip-magic-trailing-comma=false'.
@@ -408,18 +422,27 @@ fn conflicting_options_stdin() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
+indent-width = 2
+
+[lint]
 select = ["ALL"]
 ignore = ["D203", "D212"]
 
-[isort]
+[lint.isort]
 lines-after-imports = 3
 lines-between-types = 2
 force-wrap-aliases = true
 combine-as-imports = true
 split-on-trailing-comma = true
 
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "single"
+multiline-quotes = "single"
+
 [format]
 skip-magic-trailing-comma = true
+indent-style = "tab"
 "#,
     )?;
 
@@ -434,10 +457,13 @@ def say_hy(name: str):
     exit_code: 0
     ----- stdout -----
     def say_hy(name: str):
-        print(f"Hy {name}")
+    	print(f"Hy {name}")
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'COM819', 'D206', 'E501', 'ISC001', 'Q000', 'Q001', 'Q002', 'Q003', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'D206', 'ISC001', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The `flake8-quotes.inline-quotes` option is incompatible with the formatter's `format.quote-style` option. We recommend disabling 'Q000' and 'Q003' when using the formatter because they're redundant. If you do need the rules, change the configuration and set both options either to `"single"` or `"double"`.
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling 'Q001' when using the formatter because it enforces double quotes for multiline strings, making this rule redundant. If you do need the rule, change the `flake8-quotes.multiline-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling 'Q002' when using the formatter because it enforce double quotes for docstrings, making this rule redundant. If you do need the rule, change the `flake8-quotes.docstring-quotes` option to `"double"`.
     warning: The isort option 'isort.lines-after-imports' with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
     warning: The isort option 'isort.lines-between-types' with a value larger than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
     warning: The isort option 'isort.force-wrap-aliases' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.force-wrap-aliases=false' or 'format.skip-magic-trailing-comma=false'.
@@ -453,18 +479,25 @@ fn valid_linter_options() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
+[lint]
 select = ["ALL"]
-ignore = ["D203", "D212"]
+ignore = ["D203", "D212", "COM812", "ISC001"]
 
-[isort]
+[lint.isort]
 lines-after-imports = 2
 lines-between-types = 1
 force-wrap-aliases = true
 combine-as-imports = true
 split-on-trailing-comma = true
 
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "double"
+multiline-quotes = "double"
+
 [format]
 skip-magic-trailing-comma = false
+quote-style = "single"
 "#,
     )?;
 
@@ -486,10 +519,48 @@ def say_hy(name: str):
     1 file reformatted
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'COM819', 'D206', 'E501', 'ISC001', 'Q000', 'Q001', 'Q002', 'Q003', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     "###);
     Ok(())
 }
+
+#[test]
+fn all_rules_default_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["ALL"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("test.py");
+    fs::write(
+        &test_path,
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--no-cache", "--config"])
+        .arg(&ruff_toml)
+        .arg(test_path), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
+    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
+    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'ISC001'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    "###);
+    Ok(())
+}
+
 #[test]
 fn test_diff() {
     let args = ["format", "--no-cache", "--isolated", "--diff"];

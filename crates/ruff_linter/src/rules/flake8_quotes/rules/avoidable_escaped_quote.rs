@@ -27,6 +27,10 @@ use crate::settings::LinterSettings;
 /// ```python
 /// foo = "bar's"
 /// ```
+///
+/// ## Using with the formatter
+/// We don't recommend using this rule when using the formatter because the formatter automatically removes
+/// unnecessary escapes, making this rule redundant.
 #[violation]
 pub struct AvoidableEscapedQuote;
 

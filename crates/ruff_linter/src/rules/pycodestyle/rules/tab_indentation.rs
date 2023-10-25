@@ -26,6 +26,10 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 ///     a = 1
 /// ```
 ///
+/// ## Using with the formatter
+/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
+/// indentations, making this rule redundant. The rule is incompatible with the formatter when using `format.indent-style="tab"`.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 #[violation]
 pub struct TabIndentation;

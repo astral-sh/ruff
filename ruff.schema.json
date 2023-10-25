@@ -1083,7 +1083,7 @@
           ]
         },
         "docstring-quotes": {
-          "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").",
+          "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").\n\nWhen using the formatter, only `\"double\"` is compatible because the formatter enforces double quotes for docstrings strings.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1094,7 +1094,7 @@
           ]
         },
         "inline-quotes": {
-          "description": "Quote style to prefer for inline strings (either \"single\" or \"double\").",
+          "description": "Quote style to prefer for inline strings (either \"single\" or \"double\").\n\nWhen using the formatter, ensure that `format.quote-style` is set to the the same preferred quote style.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1105,7 +1105,7 @@
           ]
         },
         "multiline-quotes": {
-          "description": "Quote style to prefer for multiline strings (either \"single\" or \"double\").",
+          "description": "Quote style to prefer for multiline strings (either \"single\" or \"double\").\n\nWhen using the formatter, only `\"double\"` is compatible because the formatter enforces double quotes for multiline strings.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"

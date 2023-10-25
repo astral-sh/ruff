@@ -1412,6 +1412,9 @@ impl Flake8PytestStyleOptions {
 pub struct Flake8QuotesOptions {
     /// Quote style to prefer for inline strings (either "single" or
     /// "double").
+    ///
+    /// When using the formatter, ensure that `format.quote-style` is set to the the same preferred
+    /// quote style.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,
@@ -1423,6 +1426,9 @@ pub struct Flake8QuotesOptions {
 
     /// Quote style to prefer for multiline strings (either "single" or
     /// "double").
+    ///
+    /// When using the formatter, only `"double"` is compatible because the formatter
+    /// enforces double quotes for multiline strings.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,
@@ -1433,6 +1439,9 @@ pub struct Flake8QuotesOptions {
     pub multiline_quotes: Option<Quote>,
 
     /// Quote style to prefer for docstrings (either "single" or "double").
+    ///
+    /// When using the formatter, only `"double"` is compatible because the formatter
+    /// enforces double quotes for docstrings strings.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,

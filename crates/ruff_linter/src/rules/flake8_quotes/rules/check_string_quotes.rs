@@ -32,6 +32,10 @@ use super::super::settings::Quote;
 ///
 /// ## Options
 /// - `flake8-quotes.inline-quotes`
+///
+/// ## Using with the formatter
+/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
+/// quotes for inline strings automatically, making this rule redundant.
 #[violation]
 pub struct BadQuotesInlineString {
     preferred_quote: Quote,
@@ -81,6 +85,10 @@ impl AlwaysFixableViolation for BadQuotesInlineString {
 ///
 /// ## Options
 /// - `flake8-quotes.multiline-quotes`
+///
+/// ## Using with the formatter
+/// We don't recommend using this rule when using the formatter because the formatter enforces double quotes
+/// for multiline strings automatically, making this rule redundant.
 #[violation]
 pub struct BadQuotesMultilineString {
     preferred_quote: Quote,
@@ -129,6 +137,10 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 ///
 /// ## Options
 /// - `flake8-quotes.docstring-quotes`
+///
+/// ## Using with the formatter
+/// We don't recommend using this rule when using the formatter because the formatter enforces double
+/// quotes for docstrings automatically, making this rule redundant.
 #[violation]
 pub struct BadQuotesDocstring {
     preferred_quote: Quote,

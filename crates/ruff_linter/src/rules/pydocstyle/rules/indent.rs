@@ -38,6 +38,10 @@ use crate::registry::Rule;
 ///     """
 /// ```
 ///
+/// ## Using with the formatter
+/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
+/// indentations, making this rule redundant. The rule is incompatible with the formatter when using `format.indent-style="tab"`.
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -125,6 +129,10 @@ impl AlwaysFixableViolation for UnderIndentation {
 ///     sort algorithm.
 ///     """
 /// ```
+///
+/// ## Using with the formatter
+/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
+/// indentations, making this rule redundant.
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
