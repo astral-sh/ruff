@@ -7,7 +7,7 @@ use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::tokens_and_ranges;
 use ruff_python_parser::lexer::LexicalError;
-use ruff_python_parser::{parse_ok_tokens, Mode, ParseError};
+use ruff_python_parser::{parse_ok_tokens, AsMode, ParseError};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
@@ -130,8 +130,9 @@ pub fn format_module_source(
     source: &str,
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
-    let (tokens, comment_ranges) = tokens_and_ranges(source)?;
-    let module = parse_ok_tokens(tokens, source, Mode::Module, "<filename>")?;
+    let source_type = options.source_type();
+    let (tokens, comment_ranges) = tokens_and_ranges(source, source_type)?;
+    let module = parse_ok_tokens(tokens, source, source_type.as_mode(), "<filename>")?;
     let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
@@ -172,9 +173,10 @@ mod tests {
     use anyhow::Result;
     use insta::assert_snapshot;
 
+    use ruff_python_ast::PySourceType;
     use ruff_python_index::tokens_and_ranges;
 
-    use ruff_python_parser::{parse_ok_tokens, Mode};
+    use ruff_python_parser::{parse_ok_tokens, AsMode};
 
     use crate::{format_module_ast, format_module_source, PyFormatOptions};
 
@@ -213,11 +215,12 @@ def main() -> None:
         ]
 
 "#;
-        let (tokens, comment_ranges) = tokens_and_ranges(source).unwrap();
+        let source_type = PySourceType::Python;
+        let (tokens, comment_ranges) = tokens_and_ranges(source, source_type).unwrap();
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let module = parse_ok_tokens(tokens, source, Mode::Module, source_path).unwrap();
+        let module = parse_ok_tokens(tokens, source, source_type.as_mode(), source_path).unwrap();
         let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&module, &comment_ranges, source, options).unwrap();
 
