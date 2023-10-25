@@ -58,14 +58,14 @@ jobs:
         if: steps.download-ecosystem-result-check.outputs.found_artifact == 'true'
         run: |
           echo '## Ecosystem results `ruff check`' >> comment.txt
-          cat pr/ecosystem/ecosystem-result-check >> comment.txt
+          cat pr/ecosystem-check >> comment.txt
           echo "<br />" >> comment.txt
 
       - name: Generate `format` ecosystem comment
         if: steps.download-ecosystem-result-format.outputs.found_artifact == 'true'
         run: |
           echo '## Ecosystem results `ruff format`' >> comment.txt
-          cat pr/ecosystem/ecosystem-result-format >> comment.txt
+          cat pr/ecosystem-format >> comment.txt
           echo "<br />" >> comment.txt
 
       - name: Check comment
