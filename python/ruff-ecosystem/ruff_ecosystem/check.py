@@ -50,7 +50,7 @@ def markdown_check_result(result: Result) -> str:
         project: CheckDiff.from_simple_diff(comparison.diff)
         for project, comparison in result.completed
     }
-    project_rule_changes: dict[Project, Comparison] = {}
+    project_rule_changes: dict[Project, RuleChanges] = {}
     for project, diff in project_diffs.items():
         project_rule_changes[project] = changes = RuleChanges.from_diff(diff)
         all_rule_changes.update(changes)
@@ -67,13 +67,12 @@ def markdown_check_result(result: Result) -> str:
 
     # Summarize the total changes
     s = "s" if error_count != 1 else ""
-    changes = f"(+{total_added}, -{total_removed} violations; +{total_added_fixes}, -{total_removed_fixes} fixes; {error_count} error{s})"
+    changes = f"(+{total_added} -{total_removed} violations, +{total_added_fixes} -{total_removed_fixes} fixes, {error_count} error{s})"
 
     lines.append(f"\u2139\ufe0f ecosystem check **detected linter changes**. {changes}")
     lines.append("")
 
     # Then per-project changes
-    max_lines_per_project = 200
     for project, comparison in result.completed:
         if not comparison.diff:
             continue  # Skip empty diffs
@@ -100,10 +99,10 @@ def markdown_check_result(result: Result) -> str:
 
         rule_changes = project_rule_changes[project]
         title = (
-            f"+{rule_changes.added_violations}, "
-            f"-{rule_changes.removed_violations} violations; "
-            f"+{rule_changes.added_fixes} "
-            f"-{rule_changes.removed_fixes} fixes; "
+            f"+{rule_changes.total_added_violations()} "
+            f"-{rule_changes.total_removed_violations()} violations, "
+            f"+{rule_changes.total_added_fixes()} "
+            f"-{rule_changes.total_removed_fixes()} fixes"
         )
 
         lines.extend(
