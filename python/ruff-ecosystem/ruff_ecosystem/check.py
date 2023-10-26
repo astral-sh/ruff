@@ -42,6 +42,8 @@ CHECK_DIAGNOSTIC_LINE_RE = re.compile(
 
 CHECK_VIOLATION_FIX_INDICATOR = " [*]"
 
+GITHUB_MAX_COMMENT_LENGTH = 65536  # characters
+
 
 def markdown_check_result(result: Result) -> str:
     # Calculate the total number of rule changes
@@ -60,6 +62,9 @@ def markdown_check_result(result: Result) -> str:
     total_added = all_rule_changes.total_added_violations()
     total_added_fixes = all_rule_changes.total_added_fixes()
     total_removed_fixes = all_rule_changes.total_removed_fixes()
+    total_changes = (
+        total_added + total_removed + total_added_fixes + total_removed_fixes
+    )
     error_count = len(result.errored)
     total_affected_rules = len(all_rule_changes.rule_codes())
 
@@ -73,9 +78,9 @@ def markdown_check_result(result: Result) -> str:
     lines.append(f"\u2139\ufe0f ecosystem check **detected linter changes**. {changes}")
     lines.append("")
 
-    # Limit the number of items displayed per rule to between 10 and 200
+    # Limit the number of items displayed per rule to between 5 and 200
     max_display_per_rule = max(
-        10,
+        5,
         # Calculate the number of affected rules that we would display to increase
         # the maximum if there are less rules affected
         200 // total_affected_rules,
@@ -83,11 +88,36 @@ def markdown_check_result(result: Result) -> str:
 
     # Display per project changes
     for project, comparison in result.completed:
+        # TODO: This is not a performant way to check the length but the whole
+        #       GitHub comment length issue needs to be addressed anyway
+        if len(" ".join(lines)) > GITHUB_MAX_COMMENT_LENGTH // 3:
+            lines.append("")
+            lines.append(
+                "_... Truncated remaining completed projected reports due to GitHub comment length restrictions_"
+            )
+            lines.append("")
+            break
+
         if not comparison.diff:
             continue  # Skip empty diffs
 
         diff = project_diffs[project]
         rule_changes = project_rule_changes[project]
+
+        project_removed = rule_changes.total_removed_violations()
+        project_added = rule_changes.total_added_violations()
+        project_added_fixes = rule_changes.total_added_fixes()
+        project_removed_fixes = rule_changes.total_removed_fixes()
+        project_changes = (
+            project_added
+            + project_removed
+            + project_added_fixes
+            + project_removed_fixes
+        )
+
+        # Limit the number of items displayed per project to between 10 and 200
+        # based on the number of total changes present in this project
+        max_project_lines = max(10, int((project_changes / total_changes) * 200))
 
         # Display the diff
         displayed_per_rule = Counter()
@@ -118,6 +148,15 @@ def markdown_check_result(result: Result) -> str:
                 diff_lines.append(
                     f"... {hidden_count} additional changes omitted for rule {rule_code}"
                 )
+
+            if len(diff_lines) >= max_project_lines:
+                continue
+
+        if project_changes > max_project_lines:
+            hidden_count = project_changes - max_project_lines
+            diff_lines.append(
+                f"... {hidden_count} additional changes omitted for project"
+            )
 
         diff_lines.append("</pre>")
 
