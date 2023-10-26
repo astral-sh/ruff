@@ -62,7 +62,7 @@ def markdown_format_result(result: Result) -> str:
 
         files = len(patch_set.modified_files)
         s = "s" if files != 1 else ""
-        title = f"+{comparison.diff.lines_added}, -{comparison.diff.lines_removed} lines in {files} file{s}"
+        title = f"+{comparison.diff.lines_added} -{comparison.diff.lines_removed} lines in {files} file{s}"
 
         lines.extend(
             markdown_project_section(
