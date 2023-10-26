@@ -46,7 +46,10 @@ class Diff(Serializable):
         return len(self.removed)
 
     @classmethod
-    def new(cls, baseline: Sequence[str], comparison: Sequence[str]):
+    def from_pair(cls, baseline: Sequence[str], comparison: Sequence[str]):
+        """
+        Construct a diff from before and after.
+        """
         return cls(difflib.ndiff(baseline, comparison))
 
     def jsonable(self) -> Any:
@@ -55,15 +58,23 @@ class Diff(Serializable):
 
 @dataclass(frozen=True)
 class Result(Serializable):
+    """
+    The result of an ecosystem check for a collection of projects.
+    """
+
     errored: list[tuple[Project, Exception]]
     completed: list[tuple[Project, Comparison]]
 
 
 @dataclass(frozen=True)
 class Comparison(Serializable):
+    """
+    The result of a completed ecosystem comparison for a single project.
+    """
+
     diff: Diff
     repo: ClonedRepository
 
 
 class RuffError(Exception):
-    """An error reported by ruff."""
+    """An error reported by Ruff."""

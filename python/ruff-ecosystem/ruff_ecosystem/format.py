@@ -1,3 +1,7 @@
+"""
+Execution, comparison, and summary of `ruff format` ecosystem checks.
+"""
+
 from __future__ import annotations
 
 import re
@@ -6,7 +10,7 @@ from asyncio import create_subprocess_exec
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE
-from typing import TYPE_CHECKING, Self, Sequence
+from typing import TYPE_CHECKING, Sequence
 
 from unidiff import PatchSet
 
@@ -15,13 +19,13 @@ from ruff_ecosystem.markdown import markdown_project_section
 from ruff_ecosystem.types import Comparison, Diff, Result, RuffError
 
 if TYPE_CHECKING:
-    from ruff_ecosystem.projects import ClonedRepository, Project
+    from ruff_ecosystem.projects import ClonedRepository
 
 
 FORMAT_IGNORE_LINES = re.compile("^warning: `ruff format` is a work-in-progress.*")
 
 
-def summarize_format_result(result: Result) -> str:
+def markdown_format_result(result: Result) -> str:
     lines = []
     total_lines_removed = total_lines_added = 0
     total_files_modified = 0
@@ -58,7 +62,7 @@ def summarize_format_result(result: Result) -> str:
         lines.extend(
             markdown_project_section(
                 title=title,
-                content=patch_set_with_permalinks(patch_set, comparison.repo),
+                content=format_patchset(patch_set, comparison.repo),
                 options=project.format_options,
                 project=project,
             )
@@ -75,6 +79,57 @@ def summarize_format_result(result: Result) -> str:
         )
 
     return "\n".join(lines)
+
+
+def format_patchset(patch_set: PatchSet, repo: ClonedRepository) -> str:
+    """
+    Convert a patchset to markdown, adding permalinks to the start of each hunk.
+    """
+    lines = []
+    for file_patch in patch_set:
+        for hunk in file_patch:
+            # Note:  When used for `format` checks, the line number is not exact because
+            #        we formatted the repository for a baseline; we can't know the exact
+            #        line number in the original
+            #        source file.
+            hunk_link = repo.url_for(file_patch.path, hunk.source_start)
+            hunk_lines = str(hunk).splitlines()
+
+            # Add a link before the hunk
+            link_title = file_patch.path + "~L" + str(hunk.source_start)
+            lines.append(f"<a href='{hunk_link}'>{link_title}</a>")
+
+            # Wrap the contents of the hunk in a diff code block
+            lines.append("```diff")
+            lines.extend(hunk_lines[1:])
+            lines.append("```")
+
+    return "\n".join(lines)
+
+
+async def compare_format(
+    ruff_baseline_executable: Path,
+    ruff_comparison_executable: Path,
+    options: FormatOptions,
+    cloned_repo: ClonedRepository,
+):
+    # Run format without diff to get the baseline
+    await ruff_format(
+        executable=ruff_baseline_executable.resolve(),
+        path=cloned_repo.path,
+        name=cloned_repo.fullname,
+        options=options,
+    )
+    # Then get the diff from stdout
+    diff = await ruff_format(
+        executable=ruff_comparison_executable.resolve(),
+        path=cloned_repo.path,
+        name=cloned_repo.fullname,
+        options=options,
+        diff=True,
+    )
+
+    return Comparison(diff=Diff(diff), repo=cloned_repo)
 
 
 async def ruff_format(
@@ -113,66 +168,6 @@ async def ruff_format(
     return lines
 
 
-async def black_format(
-    *,
-    executable: Path,
-    path: Path,
-    name: str,
-) -> Sequence[str]:
-    """Run the given black binary against the specified path."""
-    logger.debug(f"Formatting {name} with {executable}")
-    black_args = []
-
-    start = time.time()
-    proc = await create_subprocess_exec(
-        executable.absolute(),
-        *black_args,
-        ".",
-        stdout=PIPE,
-        stderr=PIPE,
-        cwd=path,
-    )
-    result, err = await proc.communicate()
-    end = time.time()
-
-    logger.debug(f"Finished formatting {name} with {executable} in {end - start:.2f}s")
-
-    if proc.returncode != 0:
-        raise RuffError(err.decode("utf8"))
-
-    lines = result.decode("utf8").splitlines()
-    return [line for line in lines if not FORMAT_IGNORE_LINES.match(line)]
-
-
-async def compare_format(
-    ruff_baseline_executable: Path,
-    ruff_comparison_executable: Path,
-    options: FormatOptions,
-    cloned_repo: ClonedRepository,
-):
-    # Run format without diff to get the baseline
-    await ruff_format(
-        executable=ruff_baseline_executable.resolve(),
-        path=cloned_repo.path,
-        name=cloned_repo.fullname,
-        options=options,
-    )
-    # Then get the diff from stdout
-    diff = await ruff_format(
-        executable=ruff_comparison_executable.resolve(),
-        path=cloned_repo.path,
-        name=cloned_repo.fullname,
-        options=options,
-        diff=True,
-    )
-
-    return create_format_comparison(cloned_repo, FormatDiff(lines=diff))
-
-
-def create_format_comparison(repo: ClonedRepository, diff: str) -> FormatComparison:
-    return FormatComparison(diff=diff, repo=repo)
-
-
 @dataclass(frozen=True)
 class FormatOptions:
     """
@@ -182,55 +177,3 @@ class FormatOptions:
     def to_cli_args(self) -> list[str]:
         args = ["format", "--diff"]
         return args
-
-
-@dataclass(frozen=True)
-class FormatDiff(Diff):
-    """A diff from ruff format."""
-
-    lines: list[str]
-
-    def __bool__(self: Self) -> bool:
-        """Return true if this diff is non-empty."""
-        return bool(self.lines)
-
-    @property
-    def added(self) -> set[str]:
-        return set(line for line in self.lines if line.startswith("+"))
-
-    @property
-    def removed(self) -> set[str]:
-        return set(line for line in self.lines if line.startswith("-"))
-
-
-@dataclass(frozen=True)
-class FormatComparison(Comparison):
-    diff: FormatDiff
-    repo: ClonedRepository
-
-
-@dataclass(frozen=True)
-class FormatResult(Result):
-    comparisons: tuple[Project, FormatComparison]
-
-
-def patch_set_with_permalinks(patch_set: PatchSet, repo: ClonedRepository) -> str:
-    lines = []
-    for file_patch in patch_set:
-        for hunk in file_patch:
-            # Note: The line number is not exact because we formatted the repository for
-            #        a baseline; we can't know the exact line number in the original
-            #        source file.
-            hunk_link = repo.url_for(file_patch.path, hunk.source_start)
-            hunk_lines = str(hunk).splitlines()
-
-            # Add a link before the hunk
-            link_title = file_patch.path + "~L" + str(hunk.source_start)
-            lines.append(f"<a href='{hunk_link}'>{link_title}</a>")
-
-            # Wrap the contents of the hunk in a diff code block
-            lines.append("```diff")
-            lines.extend(hunk_lines[1:])
-            lines.append("```")
-
-    return "\n".join(lines)

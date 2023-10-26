@@ -1,3 +1,6 @@
+"""
+Execution, comparison, and summary of `ruff check` ecosystem checks.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -11,7 +14,7 @@ from subprocess import PIPE
 from typing import TYPE_CHECKING, Iterator, Self, Sequence
 
 from ruff_ecosystem import logger
-from ruff_ecosystem.markdown import markdown_project_section, markdown_details
+from ruff_ecosystem.markdown import markdown_details, markdown_project_section
 from ruff_ecosystem.types import (
     Comparison,
     Diff,
@@ -33,40 +36,7 @@ CHECK_DIFF_LINE_RE = re.compile(
 )
 
 
-async def compare_check(
-    ruff_baseline_executable: Path,
-    ruff_comparison_executable: Path,
-    options: CheckOptions,
-    cloned_repo: ClonedRepository,
-) -> Comparison:
-    async with asyncio.TaskGroup() as tg:
-        baseline_task = tg.create_task(
-            ruff_check(
-                executable=ruff_baseline_executable.resolve(),
-                path=cloned_repo.path,
-                name=cloned_repo.fullname,
-                options=options,
-            ),
-        )
-        comparison_task = tg.create_task(
-            ruff_check(
-                executable=ruff_comparison_executable.resolve(),
-                path=cloned_repo.path,
-                name=cloned_repo.fullname,
-                options=options,
-            ),
-        )
-
-    baseline_output, comparison_output = (
-        baseline_task.result(),
-        comparison_task.result(),
-    )
-    diff = Diff.new(baseline_output, comparison_output)
-
-    return Comparison(diff=diff, repo=cloned_repo)
-
-
-def summarize_check_result(result: Result) -> str:
+def markdown_check_result(result: Result) -> str:
     # Calculate the total number of rule changes
     all_rule_changes = RuleChanges()
     for _, comparison in result.completed:
@@ -152,82 +122,6 @@ def summarize_check_result(result: Result) -> str:
         )
 
     return "\n".join(lines)
-
-
-def add_permalink_to_diagnostic_line(repo: ClonedRepository, line: str) -> str:
-    match = CHECK_DIFF_LINE_RE.match(line)
-    if match is None:
-        return line
-
-    pre, inner, path, lnum, post = match.groups()
-    url = repo.url_for(path, int(lnum))
-    return f"{pre} <a href='{url}'>{inner}</a> {post}"
-
-
-async def ruff_check(
-    *, executable: Path, path: Path, name: str, options: CheckOptions
-) -> Sequence[str]:
-    """Run the given ruff binary against the specified path."""
-    logger.debug(f"Checking {name} with {executable}")
-    ruff_args = options.to_cli_args()
-
-    start = time.time()
-    proc = await create_subprocess_exec(
-        executable.absolute(),
-        *ruff_args,
-        ".",
-        stdout=PIPE,
-        stderr=PIPE,
-        cwd=path,
-    )
-    result, err = await proc.communicate()
-    end = time.time()
-
-    logger.debug(f"Finished checking {name} with {executable} in {end - start:.2f}s")
-
-    if proc.returncode != 0:
-        raise RuffError(err.decode("utf8"))
-
-    # Strip summary lines so the diff is only diagnostic lines
-    lines = [
-        line
-        for line in result.decode("utf8").splitlines()
-        if not CHECK_SUMMARY_LINE_RE.match(line)
-    ]
-
-    return lines
-
-
-@dataclass(frozen=True)
-class CheckOptions(Serializable):
-    """
-    Ruff check options
-    """
-
-    select: str = ""
-    ignore: str = ""
-    exclude: str = ""
-
-    # Generating fixes is slow and verbose
-    show_fixes: bool = False
-
-    # Limit the number of reported lines per rule
-    max_lines_per_rule: int | None = 50
-
-    def markdown(self) -> str:
-        return f"select {self.select} ignore {self.ignore} exclude {self.exclude}"
-
-    def to_cli_args(self) -> list[str]:
-        args = ["check", "--no-cache", "--exit-zero"]
-        if self.select:
-            args.extend(["--select", self.select])
-        if self.ignore:
-            args.extend(["--ignore", self.ignore])
-        if self.exclude:
-            args.extend(["--exclude", self.exclude])
-        if self.show_fixes:
-            args.extend(["--show-fixes", "--ecosystem-ci"])
-        return args
 
 
 @dataclass(frozen=True)
@@ -357,3 +251,112 @@ def limit_rule_lines(diff: Diff, max_per_rule: int | None = 100) -> list[str]:
             reduced.append(f"... {hidden_count} changes omitted for rule {code}")
 
     return reduced
+
+
+def add_permalink_to_diagnostic_line(repo: ClonedRepository, line: str) -> str:
+    match = CHECK_DIFF_LINE_RE.match(line)
+    if match is None:
+        return line
+
+    pre, inner, path, lnum, post = match.groups()
+    url = repo.url_for(path, int(lnum))
+    return f"{pre} <a href='{url}'>{inner}</a> {post}"
+
+
+async def compare_check(
+    ruff_baseline_executable: Path,
+    ruff_comparison_executable: Path,
+    options: CheckOptions,
+    cloned_repo: ClonedRepository,
+) -> Comparison:
+    async with asyncio.TaskGroup() as tg:
+        baseline_task = tg.create_task(
+            ruff_check(
+                executable=ruff_baseline_executable.resolve(),
+                path=cloned_repo.path,
+                name=cloned_repo.fullname,
+                options=options,
+            ),
+        )
+        comparison_task = tg.create_task(
+            ruff_check(
+                executable=ruff_comparison_executable.resolve(),
+                path=cloned_repo.path,
+                name=cloned_repo.fullname,
+                options=options,
+            ),
+        )
+
+    baseline_output, comparison_output = (
+        baseline_task.result(),
+        comparison_task.result(),
+    )
+    diff = Diff.from_pair(baseline_output, comparison_output)
+
+    return Comparison(diff=diff, repo=cloned_repo)
+
+
+async def ruff_check(
+    *, executable: Path, path: Path, name: str, options: CheckOptions
+) -> Sequence[str]:
+    """Run the given ruff binary against the specified path."""
+    logger.debug(f"Checking {name} with {executable}")
+    ruff_args = options.to_cli_args()
+
+    start = time.time()
+    proc = await create_subprocess_exec(
+        executable.absolute(),
+        *ruff_args,
+        ".",
+        stdout=PIPE,
+        stderr=PIPE,
+        cwd=path,
+    )
+    result, err = await proc.communicate()
+    end = time.time()
+
+    logger.debug(f"Finished checking {name} with {executable} in {end - start:.2f}s")
+
+    if proc.returncode != 0:
+        raise RuffError(err.decode("utf8"))
+
+    # Strip summary lines so the diff is only diagnostic lines
+    lines = [
+        line
+        for line in result.decode("utf8").splitlines()
+        if not CHECK_SUMMARY_LINE_RE.match(line)
+    ]
+
+    return lines
+
+
+@dataclass(frozen=True)
+class CheckOptions(Serializable):
+    """
+    Ruff check options
+    """
+
+    select: str = ""
+    ignore: str = ""
+    exclude: str = ""
+
+    # Generating fixes is slow and verbose
+    show_fixes: bool = False
+
+    # Limit the number of reported lines per rule
+    max_lines_per_rule: int | None = 50
+
+    def markdown(self) -> str:
+        return f"select {self.select} ignore {self.ignore} exclude {self.exclude}"
+
+    def to_cli_args(self) -> list[str]:
+        args = ["check", "--no-cache", "--exit-zero"]
+        if self.select:
+            args.extend(["--select", self.select])
+        if self.ignore:
+            args.extend(["--ignore", self.ignore])
+        if self.exclude:
+            args.extend(["--exclude", self.exclude])
+        if self.show_fixes:
+            args.extend(["--show-fixes", "--ecosystem-ci"])
+        return args

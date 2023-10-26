@@ -1,3 +1,7 @@
+"""
+Abstractions and utilities for working with projects to run ecosystem checks on.
+"""
+
 from __future__ import annotations
 
 from asyncio import create_subprocess_exec
@@ -36,7 +40,7 @@ class ProjectSetupError(Exception):
 @dataclass(frozen=True)
 class Repository(Serializable):
     """
-    A remote GitHub repository
+    A remote GitHub repository.
     """
 
     owner: str
@@ -75,13 +79,7 @@ class Repository(Serializable):
                         f"Failed to checkout {self.ref}: {stderr.decode()}"
                     )
 
-            return ClonedRepository(
-                name=self.name,
-                owner=self.owner,
-                ref=self.ref,
-                path=checkout_dir,
-                commit_hash=await self._get_head_commit(checkout_dir),
-            )
+            return await ClonedRepository.from_path(checkout_dir, self)
 
         logger.debug(f"Cloning {self.owner}:{self.name} to {checkout_dir}")
         command = [
@@ -113,35 +111,13 @@ class Repository(Serializable):
         logger.debug(
             f"Finished cloning {self.fullname} with status {status_code}",
         )
-        return ClonedRepository(
-            name=self.name,
-            owner=self.owner,
-            ref=self.ref,
-            path=checkout_dir,
-            commit_hash=await self._get_head_commit(checkout_dir),
-        )
-
-    @staticmethod
-    async def _get_head_commit(checkout_dir: Path) -> str:
-        """
-        Return the commit sha for the repository in the checkout directory.
-        """
-        process = await create_subprocess_exec(
-            *["git", "rev-parse", "HEAD"],
-            cwd=checkout_dir,
-            stdout=PIPE,
-        )
-        stdout, _ = await process.communicate()
-        if await process.wait() != 0:
-            raise ProjectSetupError(f"Failed to retrieve commit sha at {checkout_dir}")
-
-        return stdout.decode().strip()
+        return await ClonedRepository.from_path(checkout_dir, self)
 
 
 @dataclass(frozen=True)
 class ClonedRepository(Repository, Serializable):
     """
-    A cloned GitHub repository, which includes the hash of the cloned commit.
+    A cloned GitHub repository, which includes the hash of the current commit.
     """
 
     commit_hash: str
@@ -166,3 +142,29 @@ class ClonedRepository(Repository, Serializable):
     @property
     def url(self: Self) -> str:
         return f"https://github.com/{self.owner}/{self.name}@{self.commit_hash}"
+
+    @classmethod
+    async def from_path(cls, path: Path, repo: Repository):
+        return cls(
+            name=repo.name,
+            owner=repo.owner,
+            ref=repo.ref,
+            path=path,
+            commit_hash=await cls._get_head_commit(path),
+        )
+
+    @staticmethod
+    async def _get_head_commit(checkout_dir: Path) -> str:
+        """
+        Return the commit sha for the repository in the checkout directory.
+        """
+        process = await create_subprocess_exec(
+            *["git", "rev-parse", "HEAD"],
+            cwd=checkout_dir,
+            stdout=PIPE,
+        )
+        stdout, _ = await process.communicate()
+        if await process.wait() != 0:
+            raise ProjectSetupError(f"Failed to retrieve commit sha at {checkout_dir}")
+
+        return stdout.decode().strip()

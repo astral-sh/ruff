@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import TypeVar
 
 from ruff_ecosystem import logger
-from ruff_ecosystem.check import compare_check, summarize_check_result
-from ruff_ecosystem.format import compare_format, summarize_format_result
+from ruff_ecosystem.check import compare_check, markdown_check_result
+from ruff_ecosystem.format import compare_format, markdown_format_result
 from ruff_ecosystem.projects import (
     Project,
     RuffCommand,
@@ -38,6 +38,7 @@ async def main(
     logger.debug("Using cache directory %s", cache)
     logger.debug("Checking %s targets", len(targets))
 
+    # Limit parallelism to avoid high memory consumption
     semaphore = asyncio.Semaphore(max_parallelism)
 
     async def limited_parallelism(coroutine: T) -> T:
@@ -61,15 +62,15 @@ async def main(
     )
     comparisons_by_target = dict(zip(targets, comparisons, strict=True))
 
-    errors, successes = [], []
+    # Split comparisons into errored / completed
+    errored, completed = [], []
     for target, comparison in comparisons_by_target.items():
         if isinstance(comparison, Exception):
-            errors.append((target, comparison))
-            continue
+            errored.append((target, comparison))
+        else:
+            completed.append((target, comparison))
 
-        successes.append((target, comparison))
-
-    result = Result(completed=successes, errored=errors)
+    result = Result(completed=completed, errored=errored)
 
     match format:
         case OutputFormat.json:
@@ -77,9 +78,9 @@ async def main(
         case OutputFormat.markdown:
             match command:
                 case RuffCommand.check:
-                    print(summarize_check_result(result))
+                    print(markdown_check_result(result))
                 case RuffCommand.format:
-                    print(summarize_format_result(result))
+                    print(markdown_format_result(result))
                 case _:
                     raise ValueError(f"Unknown target Ruff command {command}")
         case _:

@@ -117,21 +117,3 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
-
-def get_executable_path(name: str) -> str | None:
-    # Add suffix for Windows executables
-    name += ".exe" if sys.platform == "win32" else ""
-
-    path = os.path.join(sysconfig.get_path("scripts"), name)
-
-    # The executable in the current interpreter's scripts directory.
-    if os.path.exists(path):
-        return path
-
-    # The executable in the global environment.
-    environment_path = shutil.which("ruff")
-    if environment_path:
-        return environment_path
-
-    return None
