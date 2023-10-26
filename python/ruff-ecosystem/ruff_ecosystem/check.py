@@ -72,10 +72,14 @@ def markdown_check_result(result: Result) -> str:
         return "\u2705 ecosystem check detected no linter changes."
 
     # Summarize the total changes
-    s = "s" if error_count != 1 else ""
-    changes = f"(+{total_added} -{total_removed} violations, +{total_added_fixes} -{total_removed_fixes} fixes, {error_count} error{s})"
+    changes = f"+{total_added} -{total_removed} violations, +{total_added_fixes} -{total_removed_fixes} fixes in {len(result.completed)} projects"
+    if error_count:
+        s = "s" if error_count != 1 else ""
+        changes += f"; {error_count} project error{s}"
 
-    lines.append(f"\u2139\ufe0f ecosystem check **detected linter changes**. {changes}")
+    lines.append(
+        f"\u2139\ufe0f ecosystem check **detected linter changes**. ({changes})"
+    )
     lines.append("")
 
     # Limit the number of items displayed per rule to between 5 and 200

@@ -44,10 +44,15 @@ def markdown_format_result(result: Result) -> str:
         return "\u2705 ecosystem check detected no format changes."
 
     # Summarize the total changes
-    es = "s" if error_count != 1 else ""
-    fs = "s" if total_files_modified != 1 else ""
-    changes = f"(+{total_lines_added}, -{total_lines_removed} lines in {total_files_modified} file{fs}, {error_count} error{es})"
-    lines.append(f"\u2139\ufe0f ecosystem check **detected format changes**. {changes}")
+    s = "s" if total_files_modified != 1 else ""
+    changes = f"+{total_lines_added} -{total_lines_removed} lines in {total_files_modified} file{s} in {len(result.completed)} projects"
+    if error_count:
+        s = "s" if error_count != 1 else ""
+        changes += f"; {error_count} project error{s}"
+
+    lines.append(
+        f"\u2139\ufe0f ecosystem check **detected format changes**. ({changes})"
+    )
     lines.append("")
 
     # Then per-project changes
