@@ -108,7 +108,7 @@ fn warn_about_deprecated_help_format(
     format: Option<HelpFormat>,
 ) -> HelpFormat {
     if format.is_some() {
-        warn_user!("The argument `--format=<FORMAT>` is deprecated. Use `--output-format=<FORMAT>` instead.");
+        warn_user!("The `--format` argument is deprecated. Use `--output-format` instead.");
     }
     format.unwrap_or(output_format)
 }
