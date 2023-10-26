@@ -101,7 +101,7 @@ def markdown_check_result(result: Result) -> str:
                 continue
 
             diff_lines.append(
-                add_permalink_to_diagnostic_line(comparison.repo, line.construct_line())
+                add_permalink_to_diagnostic_line(comparison.repo, line.to_string())
             )
 
             displayed_per_rule[rule_code] += 1
@@ -273,7 +273,7 @@ class DiagnosticLine:
     location: str
     message: str
 
-    def construct_line(self) -> str:
+    def to_string(self) -> str:
         """
         Construct the line from the components
         """
@@ -299,29 +299,29 @@ class DiagnosticLine:
             **{**dataclasses.asdict(self), "is_added": None, "is_removed": None}
         )
 
+    @classmethod
+    def try_from_string(cls: type[Self], line: str) -> Self | None:
+        """
+        Parse the rule code from a diagnostic line string
+        """
+        match = CHECK_DIAGNOSTIC_LINE_RE.match(line)
 
-def parse_diagnostic_line(line: str) -> DiagnosticLine | None:
-    """
-    Parse the rule code from a diagnostic line
-    """
-    match = CHECK_DIAGNOSTIC_LINE_RE.match(line)
+        if match is None:
+            # Handle case where there are no regex match e.g.
+            # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501, ERA001
+            # Which was found in local testing
+            return None
 
-    if match is None:
-        # Handle case where there are no regex match e.g.
-        # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501, ERA001
-        # Which was found in local testing
-        return None
+        match_items = match.groupdict()
 
-    match_items = match.groupdict()
-
-    return DiagnosticLine(
-        location=match_items["location"],
-        is_removed=match_items.get("diff") == "-",
-        is_added=match_items.get("diff") == "+",
-        fix_available=match_items.get("fixable") is not None,
-        rule_code=match_items["code"],
-        message=match_items["message"],
-    )
+        return DiagnosticLine(
+            location=match_items["location"],
+            is_removed=match_items.get("diff") == "-",
+            is_added=match_items.get("diff") == "+",
+            fix_available=match_items.get("fixable") is not None,
+            rule_code=match_items["code"],
+            message=match_items["message"],
+        )
 
 
 class CheckDiff(Diff):
@@ -354,7 +354,7 @@ class CheckDiff(Diff):
         parsed_lines: list[DiagnosticLine] = list(
             filter(
                 None,
-                (parse_diagnostic_line(line) for line in sorted_lines),
+                (DiagnosticLine.try_from_string(line) for line in sorted_lines),
             )
         )
 
@@ -371,7 +371,7 @@ class CheckDiff(Diff):
                 if line.fix_available
                 else line.with_fix_available()
             )
-            if toggled.without_diff().construct_line() in other_set:
+            if toggled.without_diff().to_string() in other_set:
                 fix_only.add(line)
 
         return CheckDiff(
