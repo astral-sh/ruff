@@ -79,3 +79,6 @@ from ZeroDivisionError
 raise IndexError() from ZeroDivisionError
 
 raise IndexError();
+
+# RSE102
+raise Foo()
