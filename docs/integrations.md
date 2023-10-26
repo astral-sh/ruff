@@ -55,6 +55,10 @@ or isort, _unless_ you enable autofix, in which case, Ruff's pre-commit hook sho
 Black, isort, and other formatting tools, as Ruff's autofix behavior can output code changes that
 require reformatting.
 
+As long as your Ruff configuration avoids any [linter-formatter incompatibilities](formatter.md#conflicting-lint-rules),
+`ruff format` should never introduce new lint errors, so it's safe to run Ruff's format hook _after_
+`ruff check --fix`.
+
 ## Language Server Protocol (Official)
 
 Ruff supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
