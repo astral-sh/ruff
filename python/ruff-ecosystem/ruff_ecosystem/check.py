@@ -278,12 +278,12 @@ class RuleChanges:
         """
         rule_changes = cls()
 
-        for line in sorted(diff.added):
+        for line in set(diff.added):
             code = parse_rule_code(line)
             if code is not None:
                 rule_changes.added[code] += 1
 
-        for line in sorted(diff.removed):
+        for line in set(diff.removed):
             code = parse_rule_code(line)
             if code is not None:
                 rule_changes.removed[code] += 1
