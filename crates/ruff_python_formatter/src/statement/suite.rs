@@ -536,7 +536,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 }
 
 /// A statement representing a docstring.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct DocstringStmt<'a>(&'a Stmt);
 
 impl<'a> DocstringStmt<'a> {
@@ -589,7 +589,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
 }
 
 /// A Child of a suite.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum SuiteChildStatement<'a> {
     /// A docstring documenting a class or function definition.
     Docstring(DocstringStmt<'a>),
