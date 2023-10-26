@@ -284,13 +284,13 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 # Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.2
+  rev: v0.1.3
   hooks:
     - id: ruff
 # Run the Ruff formatter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.291
+  rev: v0.1.3
   hooks:
     - id: ruff-format
 ```
