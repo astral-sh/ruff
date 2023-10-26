@@ -19,9 +19,12 @@ use crate::checkers::ast::Checker;
 /// ## Known problems
 /// Parentheses can only be omitted if the exception is a class, as opposed to
 /// a function call. This rule isn't always capable of distinguishing between
-/// the two. For example, if you define a method `get_exception` that itself
-/// returns an exception object, this rule will falsy mark the parentheses
-/// in `raise get_exception()` as unnecessary.
+/// the two.
+///
+/// For example, if you import a function `module.get_exception` from another
+/// module, and `module.get_exception` returns an exception object, this rule will
+/// incorrectly mark the parentheses in `raise module.get_exception()` as
+/// unnecessary.
 ///
 /// ## Example
 /// ```python
