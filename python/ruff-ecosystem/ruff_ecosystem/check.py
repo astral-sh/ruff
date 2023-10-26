@@ -186,7 +186,7 @@ def markdown_check_result(result: Result) -> str:
         lines.extend(
             markdown_project_section(
                 title="error",
-                content=str(error),
+                content=f"```\n{error}\n```",
                 options=project.check_options,
                 project=project,
             )
