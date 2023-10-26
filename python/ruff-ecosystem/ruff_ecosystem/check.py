@@ -12,7 +12,7 @@ import dataclasses
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE
-from typing import TYPE_CHECKING, Iterator, Self, Sequence
+from typing import TYPE_CHECKING, Iterable, Iterator, Self, Sequence
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.markdown import markdown_details, markdown_project_section
@@ -46,9 +46,13 @@ CHECK_VIOLATION_FIX_INDICATOR = " [*]"
 def markdown_check_result(result: Result) -> str:
     # Calculate the total number of rule changes
     all_rule_changes = RuleChanges()
+    project_diffs = {
+        project: CheckDiff.from_simple_diff(comparison.diff)
+        for project, comparison in result.completed
+    }
     project_rule_changes: dict[Project, Comparison] = {}
-    for project, comparison in result.completed:
-        project_rule_changes[project] = changes = RuleChanges.from_diff(comparison.diff)
+    for project, diff in project_diffs.items():
+        project_rule_changes[project] = changes = RuleChanges.from_diff(diff)
         all_rule_changes.update(changes)
 
     lines = []
@@ -74,18 +78,23 @@ def markdown_check_result(result: Result) -> str:
         if not comparison.diff:
             continue  # Skip empty diffs
 
-        diff = deduplicate_and_sort_diff(comparison.diff)
-        limited_diff = limit_rule_lines(diff, project.check_options.max_lines_per_rule)
+        diff = project_diffs[project]
+        # limited_diff = limit_rule_lines(diff, project.check_options.max_lines_per_rule)
 
         # Display the diff
         # Wrap with `<pre>` for code-styling with support for links
         diff_lines = ["<pre>"]
-        for line in limited_diff[:max_lines_per_project]:
-            diff_lines.append(add_permalink_to_diagnostic_line(comparison.repo, line))
+        for line in diff.parsed_lines:
+            if line in diff.fix_only_lines:
+                continue
 
-        omitted_lines = len(limited_diff) - max_lines_per_project
-        if omitted_lines > 0:
-            diff_lines.append(f"... {omitted_lines} additional lines omitted")
+            diff_lines.append(
+                add_permalink_to_diagnostic_line(comparison.repo, line.construct_line())
+            )
+
+        # omitted_lines = len(limited_diff) - max_lines_per_project
+        # if omitted_lines > 0:
+        #     diff_lines.append(f"... {omitted_lines} additional lines omitted")
 
         diff_lines.append("</pre>")
 
@@ -202,98 +211,29 @@ class RuleChanges:
         yield from totals.items()
 
     @classmethod
-    def from_diff(cls: type[Self], diff: Diff) -> Self:
+    def from_diff(cls: type[Self], diff: CheckDiff) -> Self:
         """
         Parse a diff from `ruff check` to determine the additions and removals for each rule
         """
         rule_changes = cls()
 
-        parsed_lines: list[DiagnosticLine] = list(
-            filter(None, (parse_diagnostic_line(line) for line in set(diff)))
-        )
-        added: set[DiagnosticLine] = set()
-        removed: set[DiagnosticLine] = set()
-        fix_only: set[DiagnosticLine] = set()
-
-        for line in parsed_lines:
+        for line in diff.parsed_lines:
             if line.is_added:
-                added.add(line.without_diff())
-            elif line.is_removed:
-                removed.add(line.without_diff())
-
-        for line in parsed_lines:
-            other_set = removed if line.is_added else added
-            if (
-                line.fix_available
-                and line.without_fix_available().without_diff() in other_set
-            ):
-                if line.is_added:
-                    rule_changes.added_fixes[line.rule_code] += 1
+                if line in diff.fix_only_lines:
+                    if line.fix_available:
+                        rule_changes.added_fixes[line.rule_code] += 1
+                    else:
+                        rule_changes.removed_fixes[line.rule_code] += 1
                 else:
-                    rule_changes.removed_fixes[line.rule_code] += 1
-                fix_only.add(line)
-            elif (
-                not line.fix_available
-                and line.with_fix_available().without_diff() in other_set
-            ):
-                if line.is_removed:
-                    rule_changes.added_fixes[line.rule_code] += 1
-                else:
-                    rule_changes.removed_fixes[line.rule_code] += 1
-                fix_only.add(line)
-
-        for line in parsed_lines:
-            if line in fix_only:
-                continue
-
-            if line.is_added:
-                rule_changes.added_violations[line.rule_code] += 1
+                    rule_changes.added_violations[line.rule_code] += 1
             elif line.is_removed:
-                rule_changes.removed_violations[line.rule_code] += 1
-
-        # only_fix_status_changed = set()
-
-        # for (check, other) in [(added, removed), (removed, added)]
-        #     for line in check:
-        #         if line.fix_available:
-        #             line_with_toggled = line.without_fix_available().construct_line()
-        #         else:
-        #             line_with_toggled = line.with_fix_available().construct_line()
-
-        #         if line_without_fix in removed:
-        #             rule_changes.added_fixes[line.rule_code] += 1
-
-        #             # It's important to track both version of the line or we would falsely
-        #             # report the paired `line_without_fix` as added or removed
-        #             only_fix_status_changed.add(line)
-        #             only_fix_status_changed.add(line_with_toggled)
-        #         else:
-        #             line_without_fix = line.without_fix_available().construct_line()
-        #             if line_without_fix in removed:
-
-        # for line in removed:
-        #     line_without_fix = line.replace(CHECK_VIOLATION_FIX_INDICATOR, "")
-        #     if line_without_fix in added:
-        #         only_fix_status_changed.add(line)
-        #         only_fix_status_changed.add(line_without_fix)
-
-        # for line in added:
-        #     code = parse_rule_code(line)
-        #     if code is None:
-        #         continue
-        #     if line not in only_fix_status_changed:
-        #         rule_changes.added_violations[code] += 1
-        #     else:
-        #         # We cannot know how many fixes are added or removed with the above approach
-        #         # the values will always be symmetrical so we just report how many have changed
-        #         rule_changes.added_fixes[code] += 1
-
-        # for line in removed:
-        #     code = parse_rule_code(line)
-        #     if code is None:
-        #         continue
-        #     if line not in only_fix_status_changed:
-        #         rule_changes.removed_violations[code] += 1
+                if line in diff.fix_only_lines:
+                    if line.fix_available:
+                        rule_changes.removed_fixes[line.rule_code] += 1
+                    else:
+                        rule_changes.added_fixes[line.rule_code] += 1
+                else:
+                    rule_changes.removed_violations[line.rule_code] += 1
 
         return rule_changes
 
@@ -317,12 +257,13 @@ class DiagnosticLine:
         line = ""
         if self.is_added:
             line += "+ "
-        elif self.is_removd:
+        elif self.is_removed:
             line += "- "
         line += f"{self.location}: {self.rule_code} "
         if self.fix_available:
             line += "[*] "
         line += self.message
+        return line
 
     def with_fix_available(self) -> DiagnosticLine:
         return DiagnosticLine(**{**dataclasses.asdict(self), "fix_available": True})
@@ -360,19 +301,59 @@ def parse_diagnostic_line(line: str) -> DiagnosticLine | None:
     )
 
 
-def deduplicate_and_sort_diff(diff: Diff) -> Diff:
+class CheckDiff(Diff):
     """
-    Removes any duplicate lines and any unchanged lines from the diff.
+    Extends the normal diff with diagnostic parsing
     """
-    lines = set()
-    for line in diff:
-        if line.startswith("+ "):
-            lines.add(line)
-        elif line.startswith("- "):
-            lines.add(line)
 
-    # Sort without the leading + or -
-    return Diff(list(sorted(lines, key=lambda line: line[2:])))
+    def __init__(
+        self,
+        lines: Iterable[str],
+        parsed_lines: list[DiagnosticLine],
+        fix_only_lines: set[DiagnosticLine],
+    ) -> None:
+        self.parsed_lines = parsed_lines
+        self.fix_only_lines = fix_only_lines
+        super().__init__(lines)
+
+    @classmethod
+    def from_simple_diff(cls, diff: Diff) -> CheckDiff:
+        """
+        Parse a simple diff to include check-specific analyses.
+        """
+        # Drop unchanged lines
+        diff = diff.without_unchanged_lines()
+
+        # Sort without account for the leading + / -
+        sorted_lines = list(sorted(diff, key=lambda line: line[2:]))
+
+        # Parse the lines, drop lines that cannot be parsed
+        parsed_lines: list[DiagnosticLine] = list(
+            filter(
+                None,
+                (parse_diagnostic_line(line) for line in sorted_lines),
+            )
+        )
+
+        # Calculate which lines only changed fix availability
+        fix_only: set[DiagnosticLine] = set()
+
+        # TODO(zanieb): There has to be a cleaner way to express this logic
+        # We check if each added line is available in the removed set with fix
+        # availability toggled and vice-versa
+        for line in parsed_lines:
+            other_set = diff.removed if line.is_added else diff.added
+            toggled = (
+                line.without_fix_available()
+                if line.fix_available
+                else line.with_fix_available()
+            )
+            if toggled.without_diff().construct_line() in other_set:
+                fix_only.add(line)
+
+        return CheckDiff(
+            lines=sorted_lines, parsed_lines=parsed_lines, fix_only_lines=fix_only
+        )
 
 
 def limit_rule_lines(diff: Diff, max_per_rule: int | None = 100) -> list[str]:
@@ -447,8 +428,7 @@ async def compare_check(
         comparison_task.result(),
     )
 
-    # Drop unchanged lines from the diff since we don't need "context" for diagnostic lines
-    diff = Diff.from_pair(baseline_output, comparison_output).without_unchanged_lines()
+    diff = Diff.from_pair(baseline_output, comparison_output)
 
     return Comparison(diff=diff, repo=cloned_repo)
 
