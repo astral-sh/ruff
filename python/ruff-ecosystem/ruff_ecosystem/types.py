@@ -24,12 +24,20 @@ class Serializable(abc.ABC):
 
 
 class Diff(Serializable):
-    def __init__(self, lines: Iterable[str]) -> None:
+    def __init__(self, lines: Iterable[str], leading_spaces: int = 0) -> None:
         self.lines = list(lines)
 
         # Compute added and removed lines once
-        self.added = list(line[2:] for line in self.lines if line.startswith("+ "))
-        self.removed = list(line[2:] for line in self.lines if line.startswith("- "))
+        self.added = list(
+            line[2:]
+            for line in self.lines
+            if line.startswith("+" + " " * leading_spaces)
+        )
+        self.removed = list(
+            line[2:]
+            for line in self.lines
+            if line.startswith("-" + " " * leading_spaces)
+        )
 
     def __bool__(self) -> bool:
         return bool(self.added or self.removed)
@@ -50,7 +58,7 @@ class Diff(Serializable):
         """
         Construct a diff from before and after.
         """
-        return cls(difflib.ndiff(baseline, comparison))
+        return cls(difflib.ndiff(baseline, comparison), leading_spaces=1)
 
     def without_unchanged_lines(self) -> Diff:
         return Diff(
