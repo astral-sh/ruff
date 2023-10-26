@@ -107,24 +107,24 @@ def markdown_check_result(result: Result) -> str:
 
         diff = project_diffs[project]
         rule_changes = project_rule_changes[project]
-
-        project_removed = rule_changes.total_removed_violations()
-        project_added = rule_changes.total_added_violations()
+        project_removed_violations = rule_changes.total_removed_violations()
+        project_added_violations = rule_changes.total_added_violations()
         project_added_fixes = rule_changes.total_added_fixes()
         project_removed_fixes = rule_changes.total_removed_fixes()
         project_changes = (
-            project_added
-            + project_removed
+            project_added_violations
+            + project_removed_violations
             + project_added_fixes
             + project_removed_fixes
         )
 
         # Limit the number of items displayed per project to between 10 and 50
         # based on the number of total changes present in this project
-        max_project_lines = max(10, int((project_changes / total_changes) * 50))
+        max_display_per_project = max(10, int((project_changes / total_changes) * 50))
 
         # Display the diff
-        displayed_per_rule = Counter()
+        displayed_changes_per_rule = Counter()
+        displayed_changes = 0
 
         # Wrap with `<pre>` for code-styling with support for links
         diff_lines = ["<pre>"]
@@ -132,16 +132,18 @@ def markdown_check_result(result: Result) -> str:
             rule_code = line.rule_code
 
             # Limit the number of changes we'll show per rule code
-            if displayed_per_rule[rule_code] > max_display_per_rule:
+            if displayed_changes_per_rule[rule_code] > max_display_per_rule:
                 continue
 
             diff_lines.append(
                 add_permalink_to_diagnostic_line(comparison.repo, line.to_string())
             )
 
-            displayed_per_rule[rule_code] += 1
+            displayed_changes_per_rule[rule_code] += 1
+            displayed_changes += 1
+
             # If we just reached the maximum... display an omission line
-            if displayed_per_rule[rule_code] > max_display_per_rule:
+            if displayed_changes_per_rule[rule_code] > max_display_per_rule:
                 hidden_count = (
                     rule_changes.added_violations[rule_code]
                     + rule_changes.removed_violations[rule_code]
@@ -153,11 +155,11 @@ def markdown_check_result(result: Result) -> str:
                     f"... {hidden_count} additional changes omitted for rule {rule_code}"
                 )
 
-            if len(diff_lines) >= max_project_lines:
-                continue
+            if displayed_changes >= max_display_per_project:
+                break
 
-        if project_changes > max_project_lines:
-            hidden_count = project_changes - max_project_lines
+        if project_changes > max_display_per_project:
+            hidden_count = project_changes - displayed_changes
             diff_lines.append(
                 f"... {hidden_count} additional changes omitted for project"
             )
@@ -165,10 +167,10 @@ def markdown_check_result(result: Result) -> str:
         diff_lines.append("</pre>")
 
         title = (
-            f"+{rule_changes.total_added_violations()} "
-            f"-{rule_changes.total_removed_violations()} violations, "
-            f"+{rule_changes.total_added_fixes()} "
-            f"-{rule_changes.total_removed_fixes()} fixes"
+            f"+{project_added_violations} "
+            f"-{project_removed_violations} violations, "
+            f"+{project_added_fixes} "
+            f"-{project_removed_fixes} fixes"
         )
 
         lines.extend(
