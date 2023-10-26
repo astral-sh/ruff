@@ -155,8 +155,8 @@ def markdown_check_result(result: Result) -> str:
 
     # Display a summary table of changed rules
     table_lines = []
-    table_lines.append("| code | total | + violation | - violation | + fix | - fix")
-    table_lines.append("| ---- | ------- | --------- | -------- |")
+    table_lines.append("| code | total | + violation | - violation | + fix | - fix |")
+    table_lines.append("| ---- | ------- | --------- | -------- | ----- | ")
     for rule, total in sorted(
         all_rule_changes.total_changes_by_rule(),
         key=lambda item: item[1],  # Sort by the total changes
