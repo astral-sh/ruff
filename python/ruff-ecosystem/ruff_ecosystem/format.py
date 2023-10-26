@@ -218,15 +218,14 @@ def patch_set_with_permalinks(patch_set: PatchSet, repo: ClonedRepository) -> st
     lines = []
     for file_patch in patch_set:
         for hunk in file_patch:
-            hunk_link = repo.url_for(
-                file_patch.path,
-                hunk.source_start,
-                hunk.source_start + hunk.source_length,
-            )
+            # Note: The line number is not exact because we formatted the repository for
+            #        a baseline; we can't know the exact line number in the original
+            #        source file.
+            hunk_link = repo.url_for(file_patch.path, hunk.source_start)
             hunk_lines = str(hunk).splitlines()
 
             # Add a link before the hunk
-            link_title = file_patch.path + hunk_link.split(file_patch.path)[-1]
+            link_title = file_patch.path + "~L" + str(hunk.source_start)
             lines.append(f"<a href='{hunk_link}'>{link_title}</a>")
 
             # Wrap the contents of the hunk in a diff code block
