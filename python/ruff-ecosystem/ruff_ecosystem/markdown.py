@@ -3,9 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from unidiff import PatchSet
-
-    from ruff_ecosystem.projects import ClonedRepository, Project
+    from ruff_ecosystem.projects import Project
 
 
 def markdown_project_section(

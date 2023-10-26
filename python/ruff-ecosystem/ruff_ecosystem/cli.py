@@ -1,10 +1,7 @@
 import argparse
 import asyncio
 import logging
-import os
-import shutil
 import sys
-import sysconfig
 import tempfile
 from contextlib import nullcontext
 from pathlib import Path
