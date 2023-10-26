@@ -1,3 +1,5 @@
+# comment
+
 class Test(
     Aaaaaaaaaaaaaaaaa,
     Bbbbbbbbbbbbbbbb,

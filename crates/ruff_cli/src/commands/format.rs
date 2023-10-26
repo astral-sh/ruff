@@ -11,7 +11,6 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use similar::TextDiff;
 use thiserror::Error;
 use tracing::debug;
 
@@ -472,11 +471,7 @@ impl<'a> FormatResults<'a> {
             })
             .sorted_unstable_by_key(|(path, _, _)| *path)
         {
-            let text_diff =
-                TextDiff::from_lines(unformatted.source_code(), formatted.source_code());
-            let mut unified_diff = text_diff.unified_diff();
-            unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
-            unified_diff.to_writer(&mut *f)?;
+            unformatted.diff(formatted, Some(path), f)?;
         }
 
         Ok(())
@@ -566,6 +561,7 @@ pub(crate) enum FormatCommandError {
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
+    Diff(Option<PathBuf>, io::Error),
 }
 
 impl FormatCommandError {
@@ -581,7 +577,8 @@ impl FormatCommandError {
             Self::Panic(path, _)
             | Self::Read(path, _)
             | Self::Format(path, _)
-            | Self::Write(path, _) => path.as_deref(),
+            | Self::Write(path, _)
+            | Self::Diff(path, _) => path.as_deref(),
         }
     }
 }
@@ -647,6 +644,24 @@ impl Display for FormatCommandError {
                     )
                 } else {
                     write!(f, "{}{} {err}", "Failed to format".bold(), ":".bold())
+                }
+            }
+            Self::Diff(path, err) => {
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{}{}{} {err}",
+                        "Failed to generate diff for ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{}{} {err}",
+                        "Failed to generate diff".bold(),
+                        ":".bold()
+                    )
                 }
             }
             Self::Panic(path, err) => {

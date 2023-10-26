@@ -352,7 +352,7 @@ pub struct Options {
 
     // Global Formatting options
     /// The line length to use when enforcing long-lines violations (like `E501`)
-    /// and at which the formatter prefers to wrap lines.
+    /// and at which `isort` and the formatter prefers to wrap lines.
     ///
     /// The length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.
     /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.

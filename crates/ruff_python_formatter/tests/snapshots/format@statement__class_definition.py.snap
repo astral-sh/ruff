@@ -4,6 +4,8 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/
 ---
 ## Input
 ```py
+# comment
+
 class Test(
     Aaaaaaaaaaaaaaaaa,
     Bbbbbbbbbbbbbbbb,
@@ -232,6 +234,9 @@ class QuerySet(AltersData):
 
 ## Output
 ```py
+# comment
+
+
 class Test(
     Aaaaaaaaaaaaaaaaa,
     Bbbbbbbbbbbbbbbb,

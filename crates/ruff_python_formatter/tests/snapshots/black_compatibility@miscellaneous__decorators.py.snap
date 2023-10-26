@@ -162,7 +162,7 @@ def f():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,29 +1,205 @@
+@@ -1,29 +1,206 @@
 +# This file doesn't use the standard decomposition.
 +# Decorator syntax test cases are separated by double # comments.
 +# Those before the 'output' comment are valid under the old syntax.
@@ -171,6 +171,7 @@ def f():
 +# the comment before the test case to be ignored.
 +
 +##
++
 +
 +@decorator
 +def f():
@@ -209,43 +210,48 @@ def f():
 +    ...
 +
 +
-+##
-+
+ ##
+ 
+-@decorator()()
 +
 +@decorator(**kwargs)
-+def f():
-+    ...
+ def f():
+     ...
+ 
 +
-+
-+##
-+
+ ##
+ 
+-@(decorator)
 +
 +@decorator(*args, **kwargs)
-+def f():
-+    ...
+ def f():
+     ...
+ 
 +
-+
-+##
-+
+ ##
+ 
+-@sequence["decorator"]
 +
 +@decorator(
 +    *args,
 +    **kwargs,
 +)
-+def f():
-+    ...
+ def f():
+     ...
+ 
 +
-+
-+##
-+
+ ##
+ 
+-@decorator[List[str]]
 +
 +@dotted.decorator
-+def f():
-+    ...
+ def f():
+     ...
+ 
 +
-+
-+##
-+
+ ##
+ 
+-@var := decorator
 +
 +@dotted.decorator(arg)
 +def f():
@@ -260,48 +266,43 @@ def f():
 +    ...
 +
 +
- ##
- 
--@decorator()()
++##
++
 +
 +@dotted.decorator(*args)
- def f():
-     ...
- 
++def f():
++    ...
 +
- ##
- 
--@(decorator)
++
++##
++
 +
 +@dotted.decorator(**kwargs)
- def f():
-     ...
- 
++def f():
++    ...
 +
- ##
- 
--@sequence["decorator"]
++
++##
++
 +
 +@dotted.decorator(*args, **kwargs)
- def f():
-     ...
- 
++def f():
++    ...
 +
- ##
- 
--@decorator[List[str]]
++
++##
++
 +
 +@dotted.decorator(
 +    *args,
 +    **kwargs,
 +)
- def f():
-     ...
- 
++def f():
++    ...
 +
- ##
- 
--@var := decorator
++
++##
++
 +
 +@double.dotted.decorator
 +def f():
@@ -386,6 +387,7 @@ def f():
 # the comment before the test case to be ignored.
 
 ##
+
 
 @decorator
 def f():
