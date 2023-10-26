@@ -23,11 +23,16 @@ use super::LogicalLine;
 ///     a = 1
 /// ```
 ///
-/// ## Using with the formatter
-/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
-/// indentations, making this rule redundant. The rule is incompatible with the formatter when using `indent-width` with a value other than `4`.
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent indentation, making the rule redundant.
+///
+/// The rule is also incompatible with the [formatter] when using
+/// `indent-width` with a value other than `4`.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct IndentationWithInvalidMultiple {
     indent_size: usize,
@@ -58,11 +63,16 @@ impl Violation for IndentationWithInvalidMultiple {
 /// if True:
 ///     # a = 1
 /// ```
-/// ## Using with the formatter
-/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
-/// indentations, making this rule redundant. The rule is incompatible with the formatter when using `indent-width` with a value other than `4`.
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent indentation, making the rule redundant.
+///
+/// The rule is also incompatible with the [formatter] when using
+/// `indent-width` with a value other than `4`.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct IndentationWithInvalidMultipleComment {
     indent_size: usize,

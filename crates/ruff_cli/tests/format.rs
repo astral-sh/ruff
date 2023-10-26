@@ -275,7 +275,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: 'COM812'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The following rules may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     "###);
     Ok(())
 }
@@ -403,14 +403,14 @@ def say_hy(name: str):
     1 file reformatted
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'D206', 'ISC001', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
-    warning: The `flake8-quotes.inline-quotes` option is incompatible with the formatter's `format.quote-style` option. We recommend disabling 'Q000' and 'Q003' when using the formatter because they're redundant. If you do need the rules, change the configuration and set both options either to `"single"` or `"double"`.
-    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling 'Q001' when using the formatter because it enforces double quotes for multiline strings, making this rule redundant. If you do need the rule, change the `flake8-quotes.multiline-quotes` option to `"double"`.`
-    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling 'Q002' when using the formatter because it enforce double quotes for docstrings, making this rule redundant. If you do need the rule, change the `flake8-quotes.docstring-quotes` option to `"double"`.
-    warning: The isort option 'isort.lines-after-imports' with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
-    warning: The isort option 'isort.lines-between-types' with a value larger than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
-    warning: The isort option 'isort.force-wrap-aliases' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.force-wrap-aliases=false' or 'format.skip-magic-trailing-comma=false'.
-    warning: The isort option 'isort.split-on-trailing-comma' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.split-on-trailing-comma=false' or 'format.skip-magic-trailing-comma=false'.
+    warning: The following rules may cause conflicts when used with the formatter: `COM812`, `D206`, `ISC001`, `W191`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `Q000` and `Q003` when using the formatter, which is capable of enforcing quote style. Alternatively, set both options to `"single"` or `"double"` consistently.
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
+    warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
+    warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
+    warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
+    warning: The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.
     "###);
     Ok(())
 }
@@ -460,14 +460,14 @@ def say_hy(name: str):
     	print(f"Hy {name}")
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'D206', 'ISC001', 'W191'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
-    warning: The `flake8-quotes.inline-quotes` option is incompatible with the formatter's `format.quote-style` option. We recommend disabling 'Q000' and 'Q003' when using the formatter because they're redundant. If you do need the rules, change the configuration and set both options either to `"single"` or `"double"`.
-    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling 'Q001' when using the formatter because it enforces double quotes for multiline strings, making this rule redundant. If you do need the rule, change the `flake8-quotes.multiline-quotes` option to `"double"`.`
-    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling 'Q002' when using the formatter because it enforce double quotes for docstrings, making this rule redundant. If you do need the rule, change the `flake8-quotes.docstring-quotes` option to `"double"`.
-    warning: The isort option 'isort.lines-after-imports' with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
-    warning: The isort option 'isort.lines-between-types' with a value larger than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
-    warning: The isort option 'isort.force-wrap-aliases' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.force-wrap-aliases=false' or 'format.skip-magic-trailing-comma=false'.
-    warning: The isort option 'isort.split-on-trailing-comma' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.split-on-trailing-comma=false' or 'format.skip-magic-trailing-comma=false'.
+    warning: The following rules may cause conflicts when used with the formatter: `COM812`, `D206`, `ISC001`, `W191`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `Q000` and `Q003` when using the formatter, which is capable of enforcing quote style. Alternatively, set both options to `"single"` or `"double"` consistently.
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
+    warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
+    warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
+    warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
+    warning: The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.
     "###);
     Ok(())
 }
@@ -556,7 +556,7 @@ def say_hy(name: str):
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
     warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
-    warning: The following rules may cause conflicts when used with the formatter: 'COM812', 'ISC001'. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The following rules may cause conflicts when used with the formatter: `COM812`, `ISC001`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     "###);
     Ok(())
 }

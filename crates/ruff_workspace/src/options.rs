@@ -1413,8 +1413,8 @@ pub struct Flake8QuotesOptions {
     /// Quote style to prefer for inline strings (either "single" or
     /// "double").
     ///
-    /// When using the formatter, ensure that `format.quote-style` is set to the the same preferred
-    /// quote style.
+    /// When using the formatter, ensure that `format.quote-style` is set to
+    /// the same preferred quote style.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,
@@ -1427,7 +1427,7 @@ pub struct Flake8QuotesOptions {
     /// Quote style to prefer for multiline strings (either "single" or
     /// "double").
     ///
-    /// When using the formatter, only `"double"` is compatible because the formatter
+    /// When using the formatter, only "double" is compatible, as the formatter
     /// enforces double quotes for multiline strings.
     #[option(
         default = r#""double""#,
@@ -1440,7 +1440,7 @@ pub struct Flake8QuotesOptions {
 
     /// Quote style to prefer for docstrings (either "single" or "double").
     ///
-    /// When using the formatter, only `"double"` is compatible because the formatter
+    /// When using the formatter, only "double" is compatible, as the formatter
     /// enforces double quotes for docstrings strings.
     #[option(
         default = r#""double""#,

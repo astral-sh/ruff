@@ -28,9 +28,12 @@ use crate::settings::LinterSettings;
 /// foo = "bar's"
 /// ```
 ///
-/// ## Using with the formatter
-/// We don't recommend using this rule when using the formatter because the formatter automatically removes
-/// unnecessary escapes, making this rule redundant.
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter automatically removes unnecessary escapes, making the rule
+/// redundant.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct AvoidableEscapedQuote;
 

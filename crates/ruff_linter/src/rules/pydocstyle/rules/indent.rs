@@ -14,9 +14,7 @@ use crate::registry::Rule;
 /// Checks for docstrings that are indented with tabs.
 ///
 /// ## Why is this bad?
-/// [PEP 8](https://peps.python.org/pep-0008/#tabs-or-spaces) recommends using
-/// spaces over tabs for indentation.
-///
+/// [PEP 8] recommends using spaces over tabs for indentation.
 ///
 /// ## Example
 /// ```python
@@ -38,14 +36,20 @@ use crate::registry::Rule;
 ///     """
 /// ```
 ///
-/// ## Using with the formatter
-/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
-/// indentations, making this rule redundant. The rule is incompatible with the formatter when using `format.indent-style="tab"`.
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent indentation, making the rule redundant.
+///
+/// The rule is also incompatible with the [formatter] when using
+/// `format.indent-style="tab"`.
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct IndentWithSpaces;
 
@@ -130,9 +134,9 @@ impl AlwaysFixableViolation for UnderIndentation {
 ///     """
 /// ```
 ///
-/// ## Using with the formatter
-/// We don't recommend using this rule when using the formatter because the formatter enforces consistent
-/// indentations, making this rule redundant.
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent indentation, making the rule redundant.
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -140,6 +144,7 @@ impl AlwaysFixableViolation for UnderIndentation {
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct OverIndentation;
 

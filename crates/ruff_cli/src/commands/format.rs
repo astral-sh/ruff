@@ -741,7 +741,7 @@ pub(super) fn warn_incompatible_formatter_settings(
         if !incompatible_rules.is_empty() {
             let mut rule_names: Vec<_> = incompatible_rules
                 .into_iter()
-                .map(|rule| format!("'{}'", rule.noqa_code()))
+                .map(|rule| format!("`{}`", rule.noqa_code()))
                 .collect();
             rule_names.sort();
             warn!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.", rule_names.join(", "));
@@ -752,49 +752,53 @@ pub(super) fn warn_incompatible_formatter_settings(
             .linter
             .rules
             .any_enabled(&[Rule::BadQuotesInlineString, Rule::AvoidableEscapedQuote])
-            && matches!(
-                (
-                    setting.formatter.quote_style,
-                    setting.linter.flake8_quotes.inline_quotes
-                ),
-                (QuoteStyle::Single, Quote::Double) | (QuoteStyle::Double, Quote::Single)
-            )
         {
-            warn!("The `flake8-quotes.inline-quotes` option is incompatible with the formatter's `format.quote-style` option. We recommend disabling 'Q000' and 'Q003' when using the formatter because they're redundant. If you do need the rules, change the configuration and set both options either to `\"single\"` or `\"double\"`.");
+            match (
+                setting.linter.flake8_quotes.inline_quotes,
+                setting.formatter.quote_style,
+            ) {
+                (Quote::Double, QuoteStyle::Single) => {
+                    warn!("The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which is capable of enforcing quote style. Alternatively, set both options to `\"single\"` or `\"double\"` consistently.");
+                }
+                (Quote::Single, QuoteStyle::Double) => {
+                    warn!("The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which is capable of enforcing quote style. Alternatively, set both options to `\"single\"` or `\"double\"` consistently.");
+                }
+                _ => {}
+            }
         }
 
         if setting.linter.rules.enabled(Rule::BadQuotesMultilineString)
             && setting.linter.flake8_quotes.multiline_quotes == Quote::Single
         {
-            warn!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling 'Q001' when using the formatter because it enforces double quotes for multiline strings, making this rule redundant. If you do need the rule, change the `flake8-quotes.multiline-quotes` option to `\"double\"`.`");
+            warn!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`");
         }
 
         if setting.linter.rules.enabled(Rule::BadQuotesDocstring)
             && setting.linter.flake8_quotes.docstring_quotes == Quote::Single
         {
-            warn!("The `flake8-quotes.docstring-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling 'Q002' when using the formatter because it enforce double quotes for docstrings, making this rule redundant. If you do need the rule, change the `flake8-quotes.docstring-quotes` option to `\"double\"`.");
+            warn!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
         }
 
         if setting.linter.rules.enabled(Rule::UnsortedImports) {
             // The formatter removes empty lines if the value is larger than 2 but always inserts a empty line after imports.
             // Two empty lines are okay because `isort` only uses this setting for top-level imports (not in nested blocks).
             if !matches!(setting.linter.isort.lines_after_imports, 1 | 2 | -1) {
-                warn!("The isort option 'isort.lines-after-imports' with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).");
+                warn!("The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).");
             }
 
             // Values larger than two get reduced to one line by the formatter if the import is in a nested block.
             if setting.linter.isort.lines_between_types > 1 {
-                warn!("The isort option 'isort.lines-between-types' with a value larger than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).");
+                warn!("The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).");
             }
 
             // isort inserts a trailing comma which the formatter preserves, but only if `skip-magic-trailing-comma` isn't false.
             if setting.formatter.magic_trailing_comma.is_ignore() {
                 if setting.linter.isort.force_wrap_aliases {
-                    warn!("The isort option 'isort.force-wrap-aliases' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.force-wrap-aliases=false' or 'format.skip-magic-trailing-comma=false'.");
+                    warn!("The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.");
                 }
 
                 if setting.linter.isort.split_on_trailing_comma {
-                    warn!("The isort option 'isort.split-on-trailing-comma' is incompatible with the formatter 'format.skip-magic-trailing-comma=true' option. To avoid unexpected behavior, we recommend either setting 'isort.split-on-trailing-comma=false' or 'format.skip-magic-trailing-comma=false'.");
+                    warn!("The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.");
                 }
             }
         }
