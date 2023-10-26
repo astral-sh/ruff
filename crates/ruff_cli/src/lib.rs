@@ -108,11 +108,7 @@ fn warn_about_deprecated_help_format(
     format: Option<HelpFormat>,
 ) -> HelpFormat {
     if format.is_some() {
-        if std::env::var("RUFF_FORMAT").is_ok() {
-            warn_user!("The environment variable `RUFF_FORMAT` is deprecated. Use `RUFF_OUTPUT_FORMAT` instead.");
-        } else {
-            warn_user!("The argument `--format=<FORMAT>` is deprecated. Use `--output-format=<FORMAT>` instead.");
-        }
+        warn_user!("The argument `--format=<FORMAT>` is deprecated. Use `--output-format=<FORMAT>` instead.");
     }
     format.unwrap_or(output_format)
 }
@@ -153,11 +149,7 @@ pub fn run(
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Version {
-            format,
-            mut output_format,
-        } => {
-            output_format = warn_about_deprecated_help_format(output_format, format);
+        Command::Version { output_format } => {
             commands::version::version(output_format)?;
             Ok(ExitStatus::Success)
         }
