@@ -3,8 +3,6 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::error;
-use ruff_linter::fs;
-use similar::TextDiff;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -109,14 +107,9 @@ fn format_source_code(
             }
             FormatMode::Check => {}
             FormatMode::Diff => {
-                let mut writer = stdout().lock();
-                let text_diff =
-                    TextDiff::from_lines(source_kind.source_code(), formatted.source_code());
-                let mut unified_diff = text_diff.unified_diff();
-                if let Some(path) = path {
-                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
-                }
-                unified_diff.to_writer(&mut writer).unwrap();
+                source_kind
+                    .diff(formatted, path, &mut stdout().lock())
+                    .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
             }
         },
         FormattedSource::Unchanged => {
