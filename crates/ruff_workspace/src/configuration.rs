@@ -228,6 +228,7 @@ impl Configuration {
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
                 external: lint.external.unwrap_or_default(),
                 ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
+                line_length,
                 tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
                 per_file_ignores: resolve_per_file_ignores(

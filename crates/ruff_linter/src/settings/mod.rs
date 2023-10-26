@@ -14,6 +14,7 @@ use rustc_hash::FxHashSet;
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
 
+use crate::line_width::LineLength;
 use crate::registry::{Linter, Rule, RuleSet};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
@@ -59,6 +60,7 @@ pub struct LinterSettings {
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,
     pub tab_size: IndentWidth,
+    pub line_length: LineLength,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
 
@@ -155,6 +157,7 @@ impl LinterSettings {
             src: vec![path_dedot::CWD.clone()],
             // Needs duplicating
             tab_size: IndentWidth::default(),
+            line_length: LineLength::default(),
 
             task_tags: TASK_TAGS.iter().map(ToString::to_string).collect(),
             typing_modules: vec![],
