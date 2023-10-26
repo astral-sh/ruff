@@ -15,7 +15,11 @@ from subprocess import PIPE
 from typing import TYPE_CHECKING, Iterable, Iterator, Self, Sequence
 
 from ruff_ecosystem import logger
-from ruff_ecosystem.markdown import markdown_details, markdown_project_section
+from ruff_ecosystem.markdown import (
+    markdown_details,
+    markdown_project_section,
+    markdown_plus_minus,
+)
 from ruff_ecosystem.types import (
     Comparison,
     Diff,
@@ -72,7 +76,11 @@ def markdown_check_result(result: Result) -> str:
         return "\u2705 ecosystem check detected no linter changes."
 
     # Summarize the total changes
-    changes = f"+{total_added} -{total_removed} violations, +{total_added_fixes} -{total_removed_fixes} fixes in {len(result.completed)} projects"
+    changes = (
+        f"{markdown_plus_minus(total_added, total_removed)} violations, "
+        f"{markdown_plus_minus(total_added_fixes, total_removed_fixes)} fixes"
+        f"in {len(result.completed)} projects"
+    )
     if error_count:
         s = "s" if error_count != 1 else ""
         changes += f"; {error_count} project error{s}"
@@ -186,7 +194,7 @@ def markdown_check_result(result: Result) -> str:
         lines.extend(
             markdown_project_section(
                 title="error",
-                content=f"```\n{error}\n```",
+                content=f"```\n{error}```",
                 options=project.check_options,
                 project=project,
             )

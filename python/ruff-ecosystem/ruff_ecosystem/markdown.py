@@ -17,6 +17,10 @@ def markdown_project_section(
     )
 
 
+def markdown_plus_minus(added: int, removed: int) -> str:
+    return f'<span style="color: green;">+{added}</span> <span style="color: red;">-{removed}</span>'
+
+
 def markdown_details(summary: str, preface: str, content: str | list[str]):
     lines = []
     lines.append(f"<details><summary>{summary}</summary>")
