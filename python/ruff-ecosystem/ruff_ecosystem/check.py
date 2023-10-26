@@ -168,7 +168,12 @@ class RuleChanges:
     removed_fixes: Counter = field(default_factory=Counter)
 
     def rule_codes(self) -> set[str]:
-        return set(self.added_violations.keys()).union(self.removed_violations.keys())
+        return (
+            set(self.added_violations.keys())
+            .union(self.removed_violations.keys())
+            .union(self.added_fixes.keys())
+            .union(self.removed_fixes.keys())
+        )
 
     def __add__(self, other: Self) -> Self:
         if not isinstance(other, type(self)):
