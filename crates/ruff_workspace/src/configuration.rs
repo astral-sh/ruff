@@ -218,7 +218,6 @@ impl Configuration {
                 preview: lint_preview,
                 target_version,
                 project_root: project_root.to_path_buf(),
-
                 allowed_confusables: lint
                     .allowed_confusables
                     .map(FxHashSet::from_iter)
