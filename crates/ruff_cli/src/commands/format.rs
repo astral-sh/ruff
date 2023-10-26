@@ -758,10 +758,10 @@ pub(super) fn warn_incompatible_formatter_settings(
                 setting.formatter.quote_style,
             ) {
                 (Quote::Double, QuoteStyle::Single) => {
-                    warn!("The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which is capable of enforcing quote style. Alternatively, set both options to `\"single\"` or `\"double\"` consistently.");
+                    warn!("The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
                 }
                 (Quote::Single, QuoteStyle::Double) => {
-                    warn!("The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which is capable of enforcing quote style. Alternatively, set both options to `\"single\"` or `\"double\"` consistently.");
+                    warn!("The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
                 }
                 _ => {}
             }
