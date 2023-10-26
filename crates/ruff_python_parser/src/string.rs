@@ -86,6 +86,10 @@ impl<'a> StringParser<'a> {
         TextRange::new(start_location, self.location)
     }
 
+    /// Returns the next byte in the string, if there is one.
+    ///
+    /// # Panics
+    ///  - When the next byte is a part of a multi-byte character.
     #[inline]
     fn next_byte(&mut self) -> Option<u8> {
         self.rest.as_bytes().first().map(|&byte| {
@@ -150,7 +154,7 @@ impl<'a> StringParser<'a> {
     fn parse_unicode_name(&mut self) -> Result<char, LexicalError> {
         let start_pos = self.get_pos();
 
-        let Some(b'{') = self.next_byte() else {
+        let Some('{') = self.next_char() else {
             return Err(LexicalError::new(LexicalErrorType::StringError, start_pos));
         };
 
