@@ -78,12 +78,7 @@ def markdown_check_result(result: Result) -> str:
         10,
         # Calculate the number of affected rules that we would display to increase
         # the maximum if there are less rules affected
-        200
-        // len(
-            set(all_rule_changes.added_violations.keys()).union(
-                all_rule_changes.removed_violations.keys()
-            )
-        ),
+        200 // total_affected_rules,
     )
 
     # Display per project changes
@@ -100,9 +95,6 @@ def markdown_check_result(result: Result) -> str:
         # Wrap with `<pre>` for code-styling with support for links
         diff_lines = ["<pre>"]
         for line in diff.parsed_lines:
-            if line in diff.fix_only_lines:
-                continue
-
             rule_code = line.rule_code
 
             # Limit the number of changes we'll show per rule code
@@ -119,6 +111,8 @@ def markdown_check_result(result: Result) -> str:
                 hidden_count = (
                     rule_changes.added_violations[rule_code]
                     + rule_changes.removed_violations[rule_code]
+                    + rule_changes.added_fixes[rule_code]
+                    + rule_changes.removed_fixes[rule_code]
                     - max_display_per_rule
                 )
                 diff_lines.append(
