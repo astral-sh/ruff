@@ -61,8 +61,9 @@ def markdown_check_result(result: Result) -> str:
     total_added_fixes = all_rule_changes.total_added_fixes()
     total_removed_fixes = all_rule_changes.total_removed_fixes()
     error_count = len(result.errored)
+    total_affected_rules = len(all_rule_changes.rule_codes())
 
-    if total_removed == 0 and total_added == 0 and error_count == 0:
+    if total_affected_rules == 0 and error_count == 0:
         return "\u2705 ecosystem check detected no linter changes."
 
     # Summarize the total changes
@@ -72,32 +73,51 @@ def markdown_check_result(result: Result) -> str:
     lines.append(f"\u2139\ufe0f ecosystem check **detected linter changes**. {changes}")
     lines.append("")
 
-    # Then per-project changes
+    # Limit the number of items displayed per rule with a floor of 10 and
+    # ceiling of 200  depending on the total number of affected rules
+    max_display_per_rule = max(10, 200 // total_affected_rules)
+
+    # Display per project changes
     for project, comparison in result.completed:
         if not comparison.diff:
             continue  # Skip empty diffs
 
         diff = project_diffs[project]
-        # limited_diff = limit_rule_lines(diff, project.check_options.max_lines_per_rule)
+        rule_changes = project_rule_changes[project]
 
         # Display the diff
+        displayed_per_rule = Counter()
+
         # Wrap with `<pre>` for code-styling with support for links
         diff_lines = ["<pre>"]
         for line in diff.parsed_lines:
             if line in diff.fix_only_lines:
                 continue
 
+            rule_code = line.rule_code
+
+            # Limit the number of changes we'll show per rule code
+            if displayed_per_rule[rule_code] > max_display_per_rule:
+                continue
+
             diff_lines.append(
                 add_permalink_to_diagnostic_line(comparison.repo, line.construct_line())
             )
 
-        # omitted_lines = len(limited_diff) - max_lines_per_project
-        # if omitted_lines > 0:
-        #     diff_lines.append(f"... {omitted_lines} additional lines omitted")
+            displayed_per_rule[rule_code] += 1
+            # If we just reached the maximum... display an omission line
+            if displayed_per_rule[rule_code] > max_display_per_rule:
+                hidden_count = (
+                    rule_changes.added_violations[rule_code]
+                    + rule_changes.removed_violations[rule_code]
+                    - max_display_per_rule
+                )
+                diff_lines.append(
+                    f"... {hidden_count} additional changes omitted for rule {rule_code}"
+                )
 
         diff_lines.append("</pre>")
 
-        rule_changes = project_rule_changes[project]
         title = (
             f"+{rule_changes.total_added_violations()} "
             f"-{rule_changes.total_removed_violations()} violations, "
@@ -125,33 +145,32 @@ def markdown_check_result(result: Result) -> str:
         )
 
     # Display a summary table of changed rules
-    if all_rule_changes:
-        table_lines = []
-        table_lines.append("| code | total | + violation | - violation | + fix | - fix")
-        table_lines.append("| ---- | ------- | --------- | -------- |")
-        for rule, total in sorted(
-            all_rule_changes.total_changes_by_rule(),
-            key=lambda item: item[1],  # Sort by the total changes
-            reverse=True,
-        ):
-            added_violations, removed_violations, added_fixes, removed_fixes = (
-                all_rule_changes.added_violations[rule],
-                all_rule_changes.removed_violations[rule],
-                all_rule_changes.added_fixes[rule],
-                all_rule_changes.removed_fixes[rule],
-            )
-            table_lines.append(
-                f"| {rule} | {total} | {added_violations} | {removed_violations} "
-                f"| {added_fixes} | {removed_fixes} |"
-            )
-
-        lines.extend(
-            markdown_details(
-                summary=f"Changes by rule ({len(all_rule_changes.rule_codes())} rules affected)",
-                preface="",
-                content=table_lines,
-            )
+    table_lines = []
+    table_lines.append("| code | total | + violation | - violation | + fix | - fix")
+    table_lines.append("| ---- | ------- | --------- | -------- |")
+    for rule, total in sorted(
+        all_rule_changes.total_changes_by_rule(),
+        key=lambda item: item[1],  # Sort by the total changes
+        reverse=True,
+    ):
+        added_violations, removed_violations, added_fixes, removed_fixes = (
+            all_rule_changes.added_violations[rule],
+            all_rule_changes.removed_violations[rule],
+            all_rule_changes.added_fixes[rule],
+            all_rule_changes.removed_fixes[rule],
         )
+        table_lines.append(
+            f"| {rule} | {total} | {added_violations} | {removed_violations} "
+            f"| {added_fixes} | {removed_fixes} |"
+        )
+
+    lines.extend(
+        markdown_details(
+            summary=f"Changes by rule ({total_affected_rules} rules affected)",
+            preface="",
+            content=table_lines,
+        )
+    )
 
     return "\n".join(lines)
 
@@ -358,39 +377,6 @@ class CheckDiff(Diff):
         return CheckDiff(
             lines=sorted_lines, parsed_lines=parsed_lines, fix_only_lines=fix_only
         )
-
-
-def limit_rule_lines(diff: Diff, max_per_rule: int | None = 100) -> list[str]:
-    """
-    Reduce the diff to include a maximum number of lines for each rule.
-    """
-    if max_per_rule is None:
-        return diff
-
-    counts = Counter()
-    reduced = []
-
-    for line in diff:
-        code = parse_diagnostic_line(line).rule_code
-
-        # Do not omit any unparsable lines
-        if not code:
-            reduced.append(line)
-            continue
-
-        counts[code] += 1
-        if counts[code] > max_per_rule:
-            continue
-
-        reduced.append(line)
-
-    # Add lines summarizing the omitted changes
-    for code, count in counts.items():
-        hidden_count = count - max_per_rule
-        if hidden_count > 0:
-            reduced.append(f"... {hidden_count} changes omitted for rule {code}")
-
-    return reduced
 
 
 def add_permalink_to_diagnostic_line(repo: ClonedRepository, line: str) -> str:
