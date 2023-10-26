@@ -792,7 +792,10 @@ pub(super) fn warn_incompatible_formatter_settings(
             }
 
             // isort inserts a trailing comma which the formatter preserves, but only if `skip-magic-trailing-comma` isn't false.
-            if setting.formatter.magic_trailing_comma.is_ignore() {
+            // This isn't relevant when using `force-single-line`, since isort will never include a trailing comma in that case.
+            if setting.formatter.magic_trailing_comma.is_ignore()
+                && !setting.linter.isort.force_single_line
+            {
                 if setting.linter.isort.force_wrap_aliases {
                     warn!("The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.");
                 }
