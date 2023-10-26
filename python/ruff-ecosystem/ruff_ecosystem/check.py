@@ -73,9 +73,18 @@ def markdown_check_result(result: Result) -> str:
     lines.append(f"\u2139\ufe0f ecosystem check **detected linter changes**. {changes}")
     lines.append("")
 
-    # Limit the number of items displayed per rule with a floor of 10 and
-    # ceiling of 200  depending on the total number of affected rules
-    max_display_per_rule = max(10, 200 // total_affected_rules)
+    # Limit the number of items displayed per rule to between 10 and 200
+    max_display_per_rule = max(
+        10,
+        # Calculate the number of affected rules that we would display to increase
+        # the maximum if there are less rules affected
+        200
+        // len(
+            set(all_rule_changes.added_violations.keys()).union(
+                all_rule_changes.removed_violations.keys()
+            )
+        ),
+    )
 
     # Display per project changes
     for project, comparison in result.completed:
