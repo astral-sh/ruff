@@ -526,16 +526,20 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
                 && has_parentheses(expr, context).is_some_and(OwnParentheses::is_non_empty)
         }
 
-        // Only use the layout if the first or last expression has parentheses of some sort, and
+        // Only use the layout if the first expression starts with parentheses
+        // or the last expression ends with parentheses of some sort, and
         // those parentheses are non-empty.
-        let first_parenthesized = visitor
-            .first
-            .is_some_and(|first| is_parenthesized(first, context));
-        let last_parenthesized = visitor
+        if visitor
             .last
-            .is_some_and(|last| is_parenthesized(last, context));
-
-        first_parenthesized || last_parenthesized
+            .is_some_and(|last| is_parenthesized(last, context))
+        {
+            true
+        } else {
+            visitor
+                .first
+                .expression()
+                .is_some_and(|first| is_parenthesized(first, context))
+        }
     }
 }
 
@@ -545,7 +549,7 @@ struct CanOmitOptionalParenthesesVisitor<'input> {
     max_precedence_count: u32,
     any_parenthesized_expressions: bool,
     last: Option<&'input Expr>,
-    first: Option<&'input Expr>,
+    first: First<'input>,
     context: &'input PyFormatContext<'input>,
 }
 
@@ -557,7 +561,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             max_precedence_count: 0,
             any_parenthesized_expressions: false,
             last: None,
-            first: None,
+            first: First::None,
         }
     }
 
@@ -670,6 +674,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 if op.is_invert() {
                     self.update_max_precedence(OperatorPrecedence::BitwiseInversion);
                 }
+                self.first.set_if_none(First::Token);
             }
 
             // `[a, b].test.test[300].dot`
@@ -706,17 +711,22 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 self.update_max_precedence(OperatorPrecedence::String);
             }
 
-            Expr::Tuple(_)
-            | Expr::NamedExpr(_)
-            | Expr::GeneratorExp(_)
-            | Expr::Lambda(_)
+            // Expressions with sub expressions but a preceding token
+            // Mark this expression as first expression and not the sub expression.
+            Expr::Lambda(_)
             | Expr::Await(_)
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
+            | Expr::Starred(_) => {
+                self.first.set_if_none(First::Token);
+            }
+
+            Expr::Tuple(_)
+            | Expr::NamedExpr(_)
+            | Expr::GeneratorExp(_)
             | Expr::FormattedValue(_)
             | Expr::FString(_)
             | Expr::Constant(_)
-            | Expr::Starred(_)
             | Expr::Name(_)
             | Expr::Slice(_)
             | Expr::IpyEscapeCommand(_) => {}
@@ -741,8 +751,32 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
             self.visit_subexpression(expr);
         }
 
-        if self.first.is_none() {
-            self.first = Some(expr);
+        self.first.set_if_none(First::Expression(expr));
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum First<'a> {
+    None,
+
+    /// Expression starts with a non-parentheses token. E.g. `not a`
+    Token,
+
+    Expression(&'a Expr),
+}
+
+impl<'a> First<'a> {
+    #[inline]
+    fn set_if_none(&mut self, first: First<'a>) {
+        if matches!(self, First::None) {
+            *self = first;
+        }
+    }
+
+    fn expression(self) -> Option<&'a Expr> {
+        match self {
+            First::None | First::Token => None,
+            First::Expression(expr) => Some(expr),
         }
     }
 }

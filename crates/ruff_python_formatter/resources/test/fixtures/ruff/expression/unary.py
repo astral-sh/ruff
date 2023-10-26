@@ -180,3 +180,16 @@ if "root" not in (
 ):
     msg = "Could not find root. Please try a different forest."
     raise ValueError(msg)
+
+# Regression for https://github.com/astral-sh/ruff/issues/8183
+def foo():
+    while (
+        not (aaaaaaaaaaaaaaaaaaaaa(bbbbbbbb, ccccccc)) and dddddddddd < eeeeeeeeeeeeeee
+    ):
+        pass
+
+def foo():
+    while (
+        not (aaaaaaaaaaaaaaaaaaaaa[bbbbbbbb, ccccccc]) and dddddddddd < eeeeeeeeeeeeeee
+    ):
+        pass

@@ -580,21 +580,27 @@ fn test_diff() {
         success: false
         exit_code: 1
         ----- stdout -----
-        --- resources/test/fixtures/unformatted.ipynb
-        +++ resources/test/fixtures/unformatted.ipynb
-        @@ -1,12 +1,20 @@
+        --- resources/test/fixtures/unformatted.ipynb:cell 1
+        +++ resources/test/fixtures/unformatted.ipynb:cell 1
+        @@ -1,3 +1,4 @@
          import numpy
         -maths = (numpy.arange(100)**2).sum()
         -stats= numpy.asarray([1,2,3,4]).median()
         +
         +maths = (numpy.arange(100) ** 2).sum()
         +stats = numpy.asarray([1, 2, 3, 4]).median()
+        --- resources/test/fixtures/unformatted.ipynb:cell 3
+        +++ resources/test/fixtures/unformatted.ipynb:cell 3
+        @@ -1,4 +1,6 @@
          # A cell with IPython escape command
          def some_function(foo, bar):
              pass
         +
         +
          %matplotlib inline
+        --- resources/test/fixtures/unformatted.ipynb:cell 4
+        +++ resources/test/fixtures/unformatted.ipynb:cell 4
+        @@ -1,5 +1,10 @@
          foo = %pwd
         -def some_function(foo,bar,):
         +
@@ -606,6 +612,7 @@ fn test_diff() {
              # Another cell with IPython escape command
              foo = %pwd
              print(foo)
+
         --- resources/test/fixtures/unformatted.py
         +++ resources/test/fixtures/unformatted.py
         @@ -1,3 +1,3 @@
@@ -613,6 +620,7 @@ fn test_diff() {
         -y=2
         +y = 2
          z = 3
+
 
         ----- stderr -----
         2 files would be reformatted, 1 file left unchanged
@@ -642,6 +650,7 @@ fn test_diff_no_change() {
         -y=2
         +y = 2
          z = 3
+
 
         ----- stderr -----
         1 file would be reformatted
@@ -675,6 +684,7 @@ fn test_diff_stdin_unformatted() {
     -y=2
     +y = 2
      z = 3
+
 
     ----- stderr -----
     "###);

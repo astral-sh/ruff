@@ -549,4 +549,27 @@ if True:
 ```
 
 
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -245,13 +245,11 @@
+ class Path:
+     if sys.version_info >= (3, 11):
+ 
+-        def joinpath(self):
+-            ...
++        def joinpath(self): ...
+ 
+     # The .open method comes from pathlib.pyi and should be kept in sync.
+     @overload
+-    def open(self):
+-        ...
++    def open(self): ...
+ 
+ 
+ def fakehttp():
+```
+
+
 
