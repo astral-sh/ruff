@@ -18,7 +18,10 @@ def markdown_project_section(
 
 
 def markdown_plus_minus(added: int, removed: int) -> str:
-    return f'<span style="color: green;">+{added}</span> <span style="color: red;">-{removed}</span>'
+    # TODO(zanieb): GitHub does not support coloring with <span> it seems like the only
+    #               way is to use LateX `${\text{\color{green}+10 \color{red}-10}}$` but
+    #               it renders so ugly it's not worth doing yet
+    return f"+{added} -{removed}"
 
 
 def markdown_details(summary: str, preface: str, content: str | list[str]):
