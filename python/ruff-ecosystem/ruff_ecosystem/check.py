@@ -281,7 +281,7 @@ class RuleChanges:
     def total_removed_fixes(self) -> int:
         return sum(self.removed_fixes.values())
 
-    def total_changes_by_rule(self) -> Iterator[str, int]:
+    def total_changes_by_rule(self) -> Iterator[tuple[str, int]]:
         """
         Yields the sum of changes for each rule
         """
