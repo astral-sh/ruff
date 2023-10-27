@@ -76,17 +76,17 @@ def markdown_check_result(result: Result) -> str:
         return "\u2705 ecosystem check detected no linter changes."
 
     # Summarize the total changes
-    changes = (
+    change_summary = (
         f"{markdown_plus_minus(total_added, total_removed)} violations, "
         f"{markdown_plus_minus(total_added_fixes, total_removed_fixes)} fixes"
         f"in {len(result.completed)} projects"
     )
     if error_count:
         s = "s" if error_count != 1 else ""
-        changes += f"; {error_count} project error{s}"
+        change_summary += f"; {error_count} project error{s}"
 
     lines.append(
-        f"\u2139\ufe0f ecosystem check **detected linter changes**. ({changes})"
+        f"\u2139\ufe0f ecosystem check **detected linter changes**. ({change_summary})"
     )
     lines.append("")
 
@@ -234,7 +234,10 @@ def markdown_check_result(result: Result) -> str:
 @dataclass(frozen=True)
 class RuleChanges:
     """
-    The number of additions and removals by rule code
+    The number of additions and removals by rule code.
+
+    While the attributes are frozen to avoid accidentally changing the value of an attribute,
+    the counters themselves are mutable and this class can be mutated with `+` and `update`.
     """
 
     added_violations: Counter = field(default_factory=Counter)
@@ -254,7 +257,7 @@ class RuleChanges:
         if not isinstance(other, type(self)):
             return NotImplemented
 
-        new = RuleChanges()
+        new = type(self)()
         new.update(self)
         new.update(other)
         return new
