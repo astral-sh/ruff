@@ -1,6 +1,6 @@
 # ruff-ecosystem
 
-Ruff ecosystem checks.
+Compare lint and format results for two different ruff versions (e.g. main and a PR) on real world projects.
 
 ## Installation
 
