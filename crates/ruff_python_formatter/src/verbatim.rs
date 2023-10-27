@@ -395,14 +395,18 @@ fn write_suppressed_statements<'a>(
             statement = SuiteChildStatement::Other(next_statement);
             leading_node_comments = comments.leading(next_statement);
         } else {
-            let mut nodes =
-                std::iter::successors(Some(AnyNodeRef::from(statement.statement())), |statement| {
-                    statement.last_child_in_body()
-                });
-
-            let end = nodes
-                .find_map(|statement| comments.trailing(statement).last().map(Ranged::end))
-                .unwrap_or(statement.end());
+            let mut current = AnyNodeRef::from(statement.statement());
+            // Expand the range of the statement to include any trailing comments or semicolons.
+            let end = loop {
+                if let Some(comment) = comments.trailing(current).last() {
+                    break comment.end();
+                } else if let Some(child) = AnyNodeRef::from(current).last_child_in_body() {
+                    current = child;
+                } else {
+                    break trailing_semicolon(current, source)
+                        .map_or(statement.end(), TextRange::end);
+                }
+            };
 
             FormatVerbatimStatementRange {
                 verbatim_range: TextRange::new(format_off_comment.end(), end),
