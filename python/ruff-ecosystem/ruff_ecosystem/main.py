@@ -28,7 +28,7 @@ async def main(
     ruff_baseline_executable: Path,
     ruff_comparison_executable: Path,
     targets: list[Project],
-    cache: Path | None,
+    project_dir: Path,
     format: OutputFormat,
     max_parallelism: int = 50,
     raise_on_failure: bool = False,
@@ -36,7 +36,7 @@ async def main(
     logger.debug("Using command %s", command.value)
     logger.debug("Using baseline executable at %s", ruff_baseline_executable)
     logger.debug("Using comparison executable at %s", ruff_comparison_executable)
-    logger.debug("Using cache directory %s", cache)
+    logger.debug("Using checkout_dir directory %s", project_dir)
     logger.debug("Checking %s targets", len(targets))
 
     # Limit parallelism to avoid high memory consumption
@@ -54,7 +54,7 @@ async def main(
                     ruff_baseline_executable,
                     ruff_comparison_executable,
                     target,
-                    cache,
+                    project_dir,
                 )
             )
             for target in targets
@@ -95,7 +95,7 @@ async def clone_and_compare(
     ruff_baseline_executable: Path,
     ruff_comparison_executable: Path,
     target: Project,
-    cache: Path,
+    project_dir: Path,
 ) -> Comparison:
     """Check a specific repository against two versions of ruff."""
     assert ":" not in target.repo.owner
@@ -115,7 +115,7 @@ async def clone_and_compare(
         case _:
             raise ValueError(f"Unknown target Ruff command {command}")
 
-    checkout_dir = cache.joinpath(f"{target.repo.owner}:{target.repo.name}")
+    checkout_dir = project_dir.joinpath(f"{target.repo.owner}:{target.repo.name}")
     cloned_repo = await target.repo.clone(checkout_dir)
 
     try:

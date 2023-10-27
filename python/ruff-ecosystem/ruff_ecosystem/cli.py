@@ -50,7 +50,7 @@ def entrypoint():
                 ruff_comparison_executable=args.ruff_comparison,
                 targets=DEFAULT_TARGETS,
                 format=OutputFormat(args.output_format),
-                cache=Path(cache),
+                project_dir=Path(cache),
                 raise_on_failure=args.pdb,
             )
         )

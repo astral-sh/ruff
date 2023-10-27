@@ -55,9 +55,7 @@ class Repository(Serializable):
     def url(self: Self) -> str:
         return f"https://github.com/{self.owner}/{self.name}"
 
-    async def clone(
-        self: Self, checkout_dir: Path
-    ) -> AsyncGenerator[ClonedRepository, None]:
+    async def clone(self: Self, checkout_dir: Path) -> ClonedRepository:
         """
         Shallow clone this repository
         """
