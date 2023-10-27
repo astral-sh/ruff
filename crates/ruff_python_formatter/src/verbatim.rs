@@ -400,7 +400,7 @@ fn write_suppressed_statements<'a>(
             let end = loop {
                 if let Some(comment) = comments.trailing(current).last() {
                     break comment.end();
-                } else if let Some(child) = AnyNodeRef::from(current).last_child_in_body() {
+                } else if let Some(child) = current.last_child_in_body() {
                     current = child;
                 } else {
                     break trailing_semicolon(current, source)

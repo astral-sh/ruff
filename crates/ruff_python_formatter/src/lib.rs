@@ -206,13 +206,13 @@ if True:
     #[test]
     fn quick_test() {
         let source = r#"
-def f():
-    # fmt: off
-
+def main() -> None:
     if True:
-        with_semicolon = 20 \
-            ; # comment
-
+        some_very_long_variable_name_abcdefghijk = Foo()
+        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
+            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
+            == "This is a very long string abcdefghijk"
+        ]
 
 "#;
         let source_type = PySourceType::Python;
