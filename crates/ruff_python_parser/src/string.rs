@@ -89,7 +89,8 @@ impl<'a> StringParser<'a> {
     /// Returns the next byte in the string, if there is one.
     ///
     /// # Panics
-    ///  - When the next byte is a part of a multi-byte character.
+    ///
+    /// When the next byte is a part of a multi-byte character.
     #[inline]
     fn next_byte(&mut self) -> Option<u8> {
         self.rest.as_bytes().first().map(|&byte| {
