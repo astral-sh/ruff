@@ -82,12 +82,9 @@ jobs:
       - name: "Clippy (wasm)"
         run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
-  cargo-test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    name: "cargo test | ${{ matrix.os }}"
+  cargo-test-linux:
+    runs-on: ubuntu-latest
+    name: "cargo test (linux)"
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -97,14 +94,8 @@ jobs:
         with:
           tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
-      - name: "Run tests (Ubuntu)"
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+      - name: "Run tests"
         run: cargo insta test --all --all-features --unreferenced reject
-      - name: "Run tests (Windows)"
-        if: ${{ matrix.os == 'windows-latest' }}
-        shell: bash
-        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
-        run: cargo insta test --all --all-features
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -115,6 +106,23 @@ jobs:
         with:
           name: ruff
           path: target/debug/ruff
+
+  cargo-test-windows:
+    runs-on: windows-latest
+    name: "cargo test (windows)"
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run tests"
+        shell: bash
+        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
+        run: cargo insta test --all --all-features
 
   cargo-fuzz:
     runs-on: ubuntu-latest
@@ -172,7 +180,7 @@ jobs:
     name: "ecosystem"
     runs-on: ubuntu-latest
     needs:
-      - cargo-test
+      - cargo-test-linux
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: github.event_name == 'pull_request' && needs.determine_changes.outputs.linter == 'true'
@@ -340,7 +348,7 @@ jobs:
   check-ruff-lsp:
     name: "test ruff-lsp"
     runs-on: ubuntu-latest
-    needs: cargo-test
+    needs: cargo-test-linux
     steps:
       - uses: extractions/setup-just@v1
         env:
