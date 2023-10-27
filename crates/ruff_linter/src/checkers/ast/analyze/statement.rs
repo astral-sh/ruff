@@ -570,15 +570,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
                 if checker.enabled(Rule::BannedApi) {
-                    flake8_tidy_imports::rules::banned_api(
-                        checker,
-                        &flake8_tidy_imports::matchers::NameMatchPolicy::MatchNameOrParent(
-                            flake8_tidy_imports::matchers::MatchNameOrParent {
-                                module: &alias.name,
-                            },
-                        ),
-                        &alias,
-                    );
+                    flake8_tidy_imports::rules::banned_api(checker, &alias.name, &alias, true);
                 }
 
                 if checker.enabled(Rule::BannedModuleLevelImports) {
@@ -751,28 +743,20 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if let Some(module) =
                     helpers::resolve_imported_module_path(level, module, checker.module_path)
                 {
-                    flake8_tidy_imports::rules::banned_api(
-                        checker,
-                        &flake8_tidy_imports::matchers::NameMatchPolicy::MatchNameOrParent(
-                            flake8_tidy_imports::matchers::MatchNameOrParent { module: &module },
-                        ),
-                        &stmt,
-                    );
+                    flake8_tidy_imports::rules::banned_api(checker, &module, &stmt, true);
 
                     for alias in names {
                         if &alias.name == "*" {
                             continue;
                         }
+                        /* TODO(akx): re-enable
                         flake8_tidy_imports::rules::banned_api(
                             checker,
-                            &flake8_tidy_imports::matchers::NameMatchPolicy::MatchName(
-                                flake8_tidy_imports::matchers::MatchName {
-                                    module: &module,
-                                    member: &alias.name,
-                                },
-                            ),
+                            format!("{}.{}", module, alias.name),
                             &alias,
+                            false,
                         );
+                         */
                     }
                 }
             }

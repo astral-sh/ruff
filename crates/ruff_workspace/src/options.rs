@@ -27,6 +27,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
+use ruff_python_ast::call_path_pattern;
 use ruff_python_formatter::QuoteStyle;
 
 use crate::settings::LineEnding;
@@ -1567,7 +1568,17 @@ impl Flake8TidyImportsOptions {
     pub fn into_settings(self) -> flake8_tidy_imports::settings::Settings {
         flake8_tidy_imports::settings::Settings {
             ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
-            banned_api: self.banned_api.unwrap_or_default(),
+            banned_api: self
+                .banned_api
+                .unwrap_or_default()
+                .iter()
+                .map(|(pattern, ban)| {
+                    (
+                        call_path_pattern::from_qualified_name(pattern).unwrap(), // TODO: panic? not good
+                        ban.clone(),
+                    )
+                })
+                .collect(),
             banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
         }
     }
