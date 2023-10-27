@@ -373,7 +373,7 @@ class DiagnosticLine:
 
         match_items = match.groupdict()
 
-        return DiagnosticLine(
+        return cls(
             location=match_items["location"],
             is_removed=match_items.get("diff") == "-",
             is_added=match_items.get("diff") == "+",
