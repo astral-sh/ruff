@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from subprocess import PIPE
-from typing import AsyncGenerator, Self
+from typing import Self
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.check import CheckOptions

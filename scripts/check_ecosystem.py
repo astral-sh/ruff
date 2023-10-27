@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-DEPRECATED: This script is being replaced by the ruff-ecosystem package at `python/ruff-ecosystem`.
+**DEPRECATED** This script is being replaced by the ruff-ecosystem package.
+
 
 Check two versions of ruff against a corpus of open-source code.
 

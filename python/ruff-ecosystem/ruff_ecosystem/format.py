@@ -4,7 +4,6 @@ Execution, comparison, and summary of `ruff format` ecosystem checks.
 
 from __future__ import annotations
 
-import re
 import time
 from asyncio import create_subprocess_exec
 from dataclasses import dataclass
