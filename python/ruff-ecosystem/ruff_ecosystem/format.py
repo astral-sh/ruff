@@ -22,9 +22,6 @@ if TYPE_CHECKING:
     from ruff_ecosystem.projects import ClonedRepository
 
 
-FORMAT_IGNORE_LINES = re.compile("^warning: `ruff format` is a work-in-progress.*")
-
-
 def markdown_format_result(result: Result) -> str:
     lines = []
     total_lines_removed = total_lines_added = 0
