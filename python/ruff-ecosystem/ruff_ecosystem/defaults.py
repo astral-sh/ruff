@@ -1,7 +1,7 @@
 """
 Default projects for ecosystem checks
 """
-from ruff_ecosystem.projects import CheckOptions, Project, Repository
+from ruff_ecosystem.projects import CheckOptions, Project, Repository, FormatOptions
 
 # TODO(zanieb): Consider exporting this as JSON and loading from there instead
 DEFAULT_TARGETS = [
@@ -22,7 +22,13 @@ DEFAULT_TARGETS = [
         check_options=CheckOptions(select="ALL"),
     ),
     Project(repo=Repository(owner="commaai", name="openpilot", ref="master")),
-    Project(repo=Repository(owner="demisto", name="content", ref="master")),
+    Project(
+        repo=Repository(owner="demisto", name="content", ref="master"),
+        format_options=FormatOptions(
+            # Syntax errors in this file
+            exclude="Packs/ThreatQ/Integrations/ThreatQ/ThreatQ.py"
+        ),
+    ),
     Project(repo=Repository(owner="docker", name="docker-py", ref="main")),
     Project(repo=Repository(owner="freedomofpress", name="securedrop", ref="develop")),
     Project(repo=Repository(owner="fronzbot", name="blinkpy", ref="dev")),
