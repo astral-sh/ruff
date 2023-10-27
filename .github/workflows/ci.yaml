@@ -206,9 +206,9 @@ jobs:
         if: ${{ needs.determine_changes.outputs.linter == 'true' }}
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ruff ./ruff
+          chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
 
-          ruff-ecosystem check ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check
+          ruff-ecosystem check ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check
 
           cat ecosystem-result-check > $GITHUB_STEP_SUMMARY
           cat ecosystem-result-check > ecosystem-result
@@ -218,9 +218,9 @@ jobs:
         if: ${{ needs.determine_changes.outputs.formatter == 'true' }}
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ruff ./ruff
+          chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
 
-          ruff-ecosystem format ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
+          ruff-ecosystem format ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
 
           cat ecosystem-result-format > $GITHUB_STEP_SUMMARY
           cat ecosystem-result-format >> ecosystem-result
