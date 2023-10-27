@@ -67,89 +67,89 @@ jobs:
         run: rustup component add rustfmt
       - run: cargo fmt --all --check
 
-  # cargo-clippy:
-  #   name: "cargo clippy"
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: "Install Rust toolchain"
-  #       run: |
-  #         rustup component add clippy
-  #         rustup target add wasm32-unknown-unknown
-  #     - uses: Swatinem/rust-cache@v2
-  #     - name: "Clippy"
-  #       run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-  #     - name: "Clippy (wasm)"
-  #       run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
+  cargo-clippy:
+    name: "cargo clippy"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: |
+          rustup component add clippy
+          rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: "Clippy"
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: "Clippy (wasm)"
+        run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
-  # cargo-test:
-  #   strategy:
-  #     matrix:
-  #       os: [ubuntu-latest, windows-latest]
-  #   runs-on: ${{ matrix.os }}
-  #   name: "cargo test | ${{ matrix.os }}"
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: "Install Rust toolchain"
-  #       run: rustup show
-  #     - name: "Install cargo insta"
-  #       uses: taiki-e/install-action@v2
-  #       with:
-  #         tool: cargo-insta
-  #     - uses: Swatinem/rust-cache@v2
-  #     - name: "Run tests (Ubuntu)"
-  #       if: ${{ matrix.os == 'ubuntu-latest' }}
-  #       run: cargo insta test --all --all-features --unreferenced reject
-  #     - name: "Run tests (Windows)"
-  #       if: ${{ matrix.os == 'windows-latest' }}
-  #       shell: bash
-  #       # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
-  #       run: cargo insta test --all --all-features
-  #     # Check for broken links in the documentation.
-  #     - run: cargo doc --all --no-deps
-  #       env:
-  #         # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
-  #         RUSTDOCFLAGS: "-D warnings"
-  #     - uses: actions/upload-artifact@v3
-  #       if: ${{ matrix.os == 'ubuntu-latest' }}
-  #       with:
-  #         name: ruff
-  #         path: target/debug/ruff
+  cargo-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    name: "cargo test | ${{ matrix.os }}"
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run tests (Ubuntu)"
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: cargo insta test --all --all-features --unreferenced reject
+      - name: "Run tests (Windows)"
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: bash
+        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
+        run: cargo insta test --all --all-features
+      # Check for broken links in the documentation.
+      - run: cargo doc --all --no-deps
+        env:
+          # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
+          RUSTDOCFLAGS: "-D warnings"
+      - uses: actions/upload-artifact@v3
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        with:
+          name: ruff
+          path: target/debug/ruff
 
-  # cargo-fuzz:
-  #   runs-on: ubuntu-latest
-  #   name: "cargo fuzz"
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: "Install Rust toolchain"
-  #       run: rustup show
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         workspaces: "fuzz -> target"
-  #     - name: "Install cargo-fuzz"
-  #       uses: taiki-e/install-action@v2
-  #       with:
-  #         tool: cargo-fuzz@0.11
-  #     - run: cargo fuzz build -s none
+  cargo-fuzz:
+    runs-on: ubuntu-latest
+    name: "cargo fuzz"
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "fuzz -> target"
+      - name: "Install cargo-fuzz"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz@0.11
+      - run: cargo fuzz build -s none
 
-  # cargo-test-wasm:
-  #   runs-on: ubuntu-latest
-  #   name: "cargo test (wasm)"
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: "Install Rust toolchain"
-  #       run: rustup target add wasm32-unknown-unknown
-  #     - uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 18
-  #         cache: "npm"
-  #         cache-dependency-path: playground/package-lock.json
-  #     - uses: jetli/wasm-pack-action@v0.4.0
-  #     - uses: Swatinem/rust-cache@v2
-  #     - name: "Run wasm-pack"
-  #       run: |
-  #         cd crates/ruff_wasm
-  #         wasm-pack test --node
+  cargo-test-wasm:
+    runs-on: ubuntu-latest
+    name: "cargo test (wasm)"
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: playground/package-lock.json
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run wasm-pack"
+        run: |
+          cd crates/ruff_wasm
+          wasm-pack test --node
 
   scripts:
     name: "test scripts"
@@ -171,10 +171,9 @@ jobs:
   ecosystem:
     name: "ecosystem"
     runs-on: ubuntu-latest
-    # TMP
-    # needs:
-    #   - cargo-test
-    #   - determine_changes
+    needs:
+      - cargo-test
+      - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: github.event_name == 'pull_request'
     steps:
@@ -183,14 +182,12 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # - uses: actions/download-artifact@v3
-      #   name: Download comparison Ruff binary
-      #   id: ruff-target
-      #   with:
-      #     name: ruff
-      #     # TMP
-      #     branch: ${{ github.event.pull_request.base.ref }}
-      #     # path: target/debug
+      - uses: actions/download-artifact@v3
+        name: Download comparison Ruff binary
+        id: ruff-target
+        with:
+          name: ruff
+          path: target/debug
 
       - uses: dawidd6/action-download-artifact@v2
         name: Download baseline Ruff binary
@@ -202,30 +199,28 @@ jobs:
       - name: Install ruff-ecosystem
         run: |
           pip install ./python/ruff-ecosystem
-          pip install ruff==0.0.292 # TMP
 
       - name: Run `ruff check` ecosystem check
-        # if: ${{ needs.determine_changes.outputs.linter == 'true' }} TMP
+        if: ${{ needs.determine_changes.outputs.linter == 'true' }}
         run: |
           # Make executable, since artifact download doesn't preserve this
           chmod +x ruff ./ruff
 
-          ruff-ecosystem check $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check
+          ruff-ecosystem check ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check
+
           cat ecosystem-result-check > $GITHUB_STEP_SUMMARY
-
-      - name: Run `ruff format` ecosystem check
-        # if: ${{ needs.determine_changes.outputs.formatter == 'true' }} TMP
-        run: |
-          # Make executable, since artifact download doesn't preserve this
-          chmod +x ruff ./ruff
-
-          ruff-ecosystem format $(which ruff) ./ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
-          cat ecosystem-result-format > $GITHUB_STEP_SUMMARY
-
-      - name: Combine ecosystem check results
-        run: |
           cat ecosystem-result-check > ecosystem-result
           echo "" >> ecosystem-result
+
+      - name: Run `ruff format` ecosystem check
+        if: ${{ needs.determine_changes.outputs.formatter == 'true' }}
+        run: |
+          # Make executable, since artifact download doesn't preserve this
+          chmod +x ruff ./ruff
+
+          ruff-ecosystem format ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
+
+          cat ecosystem-result-format > $GITHUB_STEP_SUMMARY
           cat ecosystem-result-format >> ecosystem-result
 
       - name: Export pull request number
@@ -245,185 +240,185 @@ jobs:
           path: ecosystem-result
 
 
-  # cargo-udeps:
-  #   name: "cargo udeps"
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: "Install nightly Rust toolchain"
-  #       # Only pinned to make caching work, update freely
-  #       run: rustup toolchain install nightly-2023-10-15
-  #     - uses: Swatinem/rust-cache@v2
-  #     - name: "Install cargo-udeps"
-  #       uses: taiki-e/install-action@cargo-udeps
-  #     - name: "Run cargo-udeps"
-  #       run: cargo +nightly-2023-10-15 udeps
+  cargo-udeps:
+    name: "cargo udeps"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install nightly Rust toolchain"
+        # Only pinned to make caching work, update freely
+        run: rustup toolchain install nightly-2023-10-15
+      - uses: Swatinem/rust-cache@v2
+      - name: "Install cargo-udeps"
+        uses: taiki-e/install-action@cargo-udeps
+      - name: "Run cargo-udeps"
+        run: cargo +nightly-2023-10-15 udeps
 
-  # python-package:
-  #   name: "python package"
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
-  #         architecture: x64
-  #     - uses: Swatinem/rust-cache@v2
-  #     - name: "Prep README.md"
-  #       run: python scripts/transform_readme.py --target pypi
-  #     - name: "Build wheels"
-  #       uses: PyO3/maturin-action@v1
-  #       with:
-  #         args: --out dist
-  #     - name: "Test wheel"
-  #       run: |
-  #         pip install --force-reinstall --find-links dist ${{ env.PACKAGE_NAME }}
-  #         ruff --help
-  #         python -m ruff --help
-  #     - name: "Remove wheels from cache"
-  #       run: rm -rf target/wheels
+  python-package:
+    name: "python package"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: x64
+      - uses: Swatinem/rust-cache@v2
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --out dist
+      - name: "Test wheel"
+        run: |
+          pip install --force-reinstall --find-links dist ${{ env.PACKAGE_NAME }}
+          ruff --help
+          python -m ruff --help
+      - name: "Remove wheels from cache"
+        run: rm -rf target/wheels
 
-  # pre-commit:
-  #   name: "pre-commit"
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
-  #     - name: "Install Rust toolchain"
-  #       run: rustup show
-  #     - uses: Swatinem/rust-cache@v2
-  #     - name: "Install pre-commit"
-  #       run: pip install pre-commit
-  #     - name: "Cache pre-commit"
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: ~/.cache/pre-commit
-  #         key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
-  #     - name: "Run pre-commit"
-  #       run: |
-  #         echo '```console' > $GITHUB_STEP_SUMMARY
-  #         # Enable color output for pre-commit and remove it for the summary
-  #         SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always | \
-  #           tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> $GITHUB_STEP_SUMMARY) >&1
-  #         exit_code=${PIPESTATUS[0]}
-  #         echo '```' >> $GITHUB_STEP_SUMMARY
-  #         exit $exit_code
+  pre-commit:
+    name: "pre-commit"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: "Install pre-commit"
+        run: pip install pre-commit
+      - name: "Cache pre-commit"
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: "Run pre-commit"
+        run: |
+          echo '```console' > $GITHUB_STEP_SUMMARY
+          # Enable color output for pre-commit and remove it for the summary
+          SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always | \
+            tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> $GITHUB_STEP_SUMMARY) >&1
+          exit_code=${PIPESTATUS[0]}
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit $exit_code
 
-  # docs:
-  #   name: "mkdocs"
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v4
-  #     - name: "Add SSH key"
-  #       if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-  #       uses: webfactory/ssh-agent@v0.8.0
-  #       with:
-  #         ssh-private-key: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY }}
-  #     - name: "Install Rust toolchain"
-  #       run: rustup show
-  #     - uses: Swatinem/rust-cache@v2
-  #     - name: "Install Insiders dependencies"
-  #       if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-  #       run: pip install -r docs/requirements-insiders.txt
-  #     - name: "Install dependencies"
-  #       if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
-  #       run: pip install -r docs/requirements.txt
-  #     - name: "Update README File"
-  #       run: python scripts/transform_readme.py --target mkdocs
-  #     - name: "Generate docs"
-  #       run: python scripts/generate_mkdocs.py
-  #     - name: "Check docs formatting"
-  #       run: python scripts/check_docs_formatted.py
-  #     - name: "Build Insiders docs"
-  #       if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-  #       run: mkdocs build --strict -f mkdocs.insiders.yml
-  #     - name: "Build docs"
-  #       if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
-  #       run: mkdocs build --strict -f mkdocs.generated.yml
+  docs:
+    name: "mkdocs"
+    runs-on: ubuntu-latest
+    env:
+      MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+      - name: "Add SSH key"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY }}
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: "Install Insiders dependencies"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
+        run: pip install -r docs/requirements-insiders.txt
+      - name: "Install dependencies"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
+        run: pip install -r docs/requirements.txt
+      - name: "Update README File"
+        run: python scripts/transform_readme.py --target mkdocs
+      - name: "Generate docs"
+        run: python scripts/generate_mkdocs.py
+      - name: "Check docs formatting"
+        run: python scripts/check_docs_formatted.py
+      - name: "Build Insiders docs"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
+        run: mkdocs build --strict -f mkdocs.insiders.yml
+      - name: "Build docs"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
+        run: mkdocs build --strict -f mkdocs.generated.yml
 
-  # check-formatter-ecosystem:
-  #   name: "Formatter ecosystem and progress checks"
-  #   runs-on: ubuntu-latest
-  #   needs: determine_changes
-  #   if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: "Install Rust toolchain"
-  #       run: rustup show
-  #     - name: "Cache rust"
-  #       uses: Swatinem/rust-cache@v2
-  #     - name: "Formatter progress"
-  #       run: scripts/formatter_ecosystem_checks.sh
-  #     - name: "Github step summary"
-  #       run: cat target/progress_projects_stats.txt > $GITHUB_STEP_SUMMARY
-  #     - name: "Remove checkouts from cache"
-  #       run: rm -r target/progress_projects
+  check-formatter-ecosystem:
+    name: "Formatter ecosystem and progress checks"
+    runs-on: ubuntu-latest
+    needs: determine_changes
+    if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Cache rust"
+        uses: Swatinem/rust-cache@v2
+      - name: "Formatter progress"
+        run: scripts/formatter_ecosystem_checks.sh
+      - name: "Github step summary"
+        run: cat target/progress_projects_stats.txt > $GITHUB_STEP_SUMMARY
+      - name: "Remove checkouts from cache"
+        run: rm -r target/progress_projects
 
-  # check-ruff-lsp:
-  #   name: "test ruff-lsp"
-  #   runs-on: ubuntu-latest
-  #   needs: cargo-test
-  #   steps:
-  #     - uses: extractions/setup-just@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  check-ruff-lsp:
+    name: "test ruff-lsp"
+    runs-on: ubuntu-latest
+    needs: cargo-test
+    steps:
+      - uses: extractions/setup-just@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  #     - uses: actions/checkout@v4
-  #       name: "Download ruff-lsp source"
-  #       with:
-  #         repository: "astral-sh/ruff-lsp"
+      - uses: actions/checkout@v4
+        name: "Download ruff-lsp source"
+        with:
+          repository: "astral-sh/ruff-lsp"
 
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-  #     - uses: actions/download-artifact@v3
-  #       name: Download development ruff binary
-  #       id: ruff-target
-  #       with:
-  #         name: ruff
-  #         path: target/debug
+      - uses: actions/download-artifact@v3
+        name: Download development ruff binary
+        id: ruff-target
+        with:
+          name: ruff
+          path: target/debug
 
-  #     - name: Install ruff-lsp dependencies
-  #       run: |
-  #         just install
+      - name: Install ruff-lsp dependencies
+        run: |
+          just install
 
-  #     - name: Run ruff-lsp tests
-  #       run: |
-  #         # Setup development binary
-  #         pip uninstall --yes ruff
-  #         chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
-  #         export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
-  #         ruff version
+      - name: Run ruff-lsp tests
+        run: |
+          # Setup development binary
+          pip uninstall --yes ruff
+          chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
+          export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
+          ruff version
 
-  #         just test
+          just test
 
-  # benchmarks:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: "Checkout Branch"
-  #       uses: actions/checkout@v4
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@v4
 
-  #     - name: "Install Rust toolchain"
-  #       run: rustup show
+      - name: "Install Rust toolchain"
+        run: rustup show
 
-  #     - name: "Install codspeed"
-  #       uses: taiki-e/install-action@v2
-  #       with:
-  #         tool: cargo-codspeed
+      - name: "Install codspeed"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-codspeed
 
-  #     - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
 
-  #     - name: "Build benchmarks"
-  #       run: cargo codspeed build --features codspeed -p ruff_benchmark
+      - name: "Build benchmarks"
+        run: cargo codspeed build --features codspeed -p ruff_benchmark
 
-  #     - name: "Run benchmarks"
-  #       uses: CodSpeedHQ/action@v1
-  #       with:
-  #         run: cargo codspeed run
-  #         token: ${{ secrets.CODSPEED_TOKEN }}
+      - name: "Run benchmarks"
+        uses: CodSpeedHQ/action@v1
+        with:
+          run: cargo codspeed run
+          token: ${{ secrets.CODSPEED_TOKEN }}
