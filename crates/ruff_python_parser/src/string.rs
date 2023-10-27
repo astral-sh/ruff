@@ -207,8 +207,6 @@ impl<'a> StringParser<'a> {
                 return Ok(());
             }
             _ => {
-                string.push('\\');
-
                 if self.kind.is_any_bytes() && !first_char.is_ascii() {
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError(
@@ -217,6 +215,8 @@ impl<'a> StringParser<'a> {
                         location: self.get_pos(),
                     });
                 }
+
+                string.push('\\');
 
                 first_char
             }
