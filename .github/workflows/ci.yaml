@@ -102,7 +102,6 @@ jobs:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
       - uses: actions/upload-artifact@v3
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         with:
           name: ruff
           path: target/debug/ruff
