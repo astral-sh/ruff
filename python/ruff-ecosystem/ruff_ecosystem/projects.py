@@ -98,7 +98,7 @@ class Repository(Serializable):
         command.extend(
             [
                 f"https://github.com/{self.owner}/{self.name}",
-                checkout_dir,
+                str(checkout_dir),
             ],
         )
 
