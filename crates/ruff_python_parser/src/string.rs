@@ -159,7 +159,7 @@ impl<'a> StringParser<'a> {
         };
 
         let start_pos = self.get_pos();
-        let Some(close_idx) = memchr::memchr(b'}', self.rest.as_bytes()) else {
+        let Some(close_idx) = self.rest.find('}') else {
             return Err(LexicalError::new(
                 LexicalErrorType::StringError,
                 self.get_pos(),
@@ -307,7 +307,7 @@ impl<'a> StringParser<'a> {
             value.push_str(self.skip_bytes(self.rest.len()));
         } else {
             loop {
-                let Some(escape_idx) = memchr::memchr(b'\\', self.rest.as_bytes()) else {
+                let Some(escape_idx) = self.rest.find('\\') else {
                     value.push_str(self.skip_bytes(self.rest.len()));
                     break;
                 };
