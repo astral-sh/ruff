@@ -81,7 +81,7 @@ def markdown_check_result(result: Result) -> str:
     # Summarize the total changes
     change_summary = (
         f"{markdown_plus_minus(total_added, total_removed)} violations, "
-        f"{markdown_plus_minus(total_added_fixes, total_removed_fixes)} fixes"
+        f"{markdown_plus_minus(total_added_fixes, total_removed_fixes)} fixes "
         f"in {len(result.completed)} projects"
     )
     if error_count:
