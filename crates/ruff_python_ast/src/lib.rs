@@ -7,6 +7,7 @@ pub use nodes::*;
 
 pub mod all;
 pub mod call_path;
+pub mod call_path_pattern;
 pub mod comparable;
 pub mod docstrings;
 mod expression;
