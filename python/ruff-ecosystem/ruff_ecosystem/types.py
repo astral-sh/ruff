@@ -52,6 +52,11 @@ class Diff(Serializable):
         """
         return cls(difflib.ndiff(baseline, comparison))
 
+    def without_unchanged_lines(self) -> Diff:
+        return Diff(
+            line for line in self.lines if line.startswith("+") or line.startswith("-")
+        )
+
     def jsonable(self) -> Any:
         return self.lines
 

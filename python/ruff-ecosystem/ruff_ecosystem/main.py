@@ -15,6 +15,7 @@ from ruff_ecosystem.projects import (
 from ruff_ecosystem.types import Comparison, Result, Serializable
 
 T = TypeVar("T")
+GITHUB_MAX_COMMENT_LENGTH = 65536
 
 
 class OutputFormat(Enum):
