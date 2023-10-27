@@ -1,7 +1,10 @@
 import argparse
 import asyncio
 import logging
+import os
+import shutil
 import sys
+import sysconfig
 import tempfile
 from contextlib import nullcontext
 from pathlib import Path
@@ -10,6 +13,7 @@ from signal import SIGINT, SIGTERM
 from ruff_ecosystem.defaults import DEFAULT_TARGETS
 from ruff_ecosystem.main import OutputFormat, main
 from ruff_ecosystem.projects import RuffCommand
+from ruff_ecosystem import logger
 
 
 def excepthook(type, value, tb):
@@ -41,13 +45,41 @@ def entrypoint():
         tempfile.TemporaryDirectory() if not args.cache else nullcontext(args.cache)
     )
 
+    ruff_baseline = args.ruff_baseline
+    if not args.ruff_baseline.exists():
+        ruff_baseline = get_executable_path(str(args.ruff_baseline))
+        if not ruff_baseline:
+            print(
+                f"Could not find ruff baseline executable: {args.ruff_baseline}",
+                sys.stderr,
+            )
+            exit(1)
+        logger.info(
+            "Resolved baseline executable %s to %s", args.ruff_baseline, ruff_baseline
+        )
+
+    ruff_comparison = args.ruff_comparison
+    if not args.ruff_comparison.exists():
+        ruff_comparison = get_executable_path(str(args.ruff_comparison))
+        if not ruff_comparison:
+            print(
+                f"Could not find ruff comparison executable: {args.ruff_comparison}",
+                sys.stderr,
+            )
+            exit(1)
+        logger.info(
+            "Resolved comparison executable %s to %s",
+            args.ruff_comparison,
+            ruff_comparison,
+        )
+
     with cache_context as cache:
         loop = asyncio.get_event_loop()
         main_task = asyncio.ensure_future(
             main(
                 command=RuffCommand(args.ruff_command),
-                ruff_baseline_executable=args.ruff_baseline,
-                ruff_comparison_executable=args.ruff_comparison,
+                ruff_baseline_executable=ruff_baseline,
+                ruff_comparison_executable=ruff_comparison,
                 targets=DEFAULT_TARGETS,
                 format=OutputFormat(args.output_format),
                 project_dir=Path(cache),
@@ -114,3 +146,21 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
+
+
+def get_executable_path(name: str) -> Path | None:
+    # Add suffix for Windows executables
+    name += ".exe" if sys.platform == "win32" and not name.endswith(".exe") else ""
+
+    path = os.path.join(sysconfig.get_path("scripts"), name)
+
+    # The executable in the current interpreter's scripts directory.
+    if os.path.exists(path):
+        return Path(path)
+
+    # The executable in the global environment.
+    environment_path = shutil.which(name)
+    if environment_path:
+        return Path(environment_path)
+
+    return None
