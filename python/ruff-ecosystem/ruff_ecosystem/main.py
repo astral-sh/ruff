@@ -3,7 +3,7 @@ import dataclasses
 import json
 from enum import Enum
 from pathlib import Path
-from typing import TypeVar
+from typing import Awaitable, TypeVar
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.check import compare_check, markdown_check_result
@@ -42,7 +42,7 @@ async def main(
     # Limit parallelism to avoid high memory consumption
     semaphore = asyncio.Semaphore(max_parallelism)
 
-    async def limited_parallelism(coroutine: T) -> T:
+    async def limited_parallelism(coroutine: Awaitable[T]) -> T:
         async with semaphore:
             return await coroutine
 
