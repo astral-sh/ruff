@@ -99,14 +99,6 @@ def markdown_check_result(result: Result) -> str:
         )
     lines.append("")
 
-    # Limit the number of items displayed per rule to between 5 and 50
-    max_display_per_rule = max(
-        5,
-        # Calculate the number of affected rules that we would display to increase
-        # the maximum if there are less rules affected
-        50 // total_affected_rules,
-    )
-
     # Display per project changes
     for project, comparison in result.completed:
         # TODO: This is not a performant way to check the length but the whole
@@ -136,8 +128,14 @@ def markdown_check_result(result: Result) -> str:
         )
 
         # Limit the number of items displayed per project to between 10 and 50
-        # based on the number of total changes present in this project
+        # based on the proportion of total changes present in this project
         max_display_per_project = max(10, int((project_changes / total_changes) * 50))
+
+        # Limit the number of items displayed per rule to between 5 and the max for
+        # the project based on the number of rules affected (less rules, more per rule)
+        max_display_per_rule = max(
+            5, max_display_per_project // len(rule_changes.rule_codes())
+        )
 
         # Display the diff
         displayed_changes_per_rule = Counter()
