@@ -4,11 +4,11 @@ Execution, comparison, and summary of `ruff check` ecosystem checks.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import re
 import time
 from asyncio import create_subprocess_exec
 from collections import Counter
-import dataclasses
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE
@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING, Iterable, Iterator, Self, Sequence
 from ruff_ecosystem import logger
 from ruff_ecosystem.markdown import (
     markdown_details,
-    markdown_project_section,
     markdown_plus_minus,
+    markdown_project_section,
 )
 from ruff_ecosystem.types import (
     Comparison,

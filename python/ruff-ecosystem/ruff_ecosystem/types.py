@@ -17,7 +17,7 @@ class Serializable(abc.ABC):
 
     def jsonable(self) -> Any:
         # Default implementation for dataclasses
-        if is_dataclass(self):
+        if is_dataclass(self) and not isinstance(self, type):
             return dataclasses.asdict(self)
 
         raise NotImplementedError()
