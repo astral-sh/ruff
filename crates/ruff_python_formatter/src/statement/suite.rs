@@ -19,7 +19,7 @@ use crate::verbatim::{
 };
 
 /// Level at which the [`Suite`] appears in the source code.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum SuiteKind {
     /// Statements at the module level / top level
     TopLevel,
@@ -123,7 +123,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let first_comments = comments.leading_dangling_trailing(first);
 
-        let (mut preceding, mut after_class_docstring) = if first_comments
+        let (mut preceding, mut empty_line_after_docstring) = if first_comments
             .leading
             .iter()
             .any(|comment| comment.is_suppression_off_comment(source))
@@ -143,11 +143,23 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             )
         } else {
             first.fmt(f)?;
-            (
-                first.statement(),
-                matches!(first, SuiteChildStatement::Docstring(_))
-                    && matches!(self.kind, SuiteKind::Class),
-            )
+            let empty_line_after_docstring = if matches!(first, SuiteChildStatement::Docstring(_))
+                && self.kind == SuiteKind::Class
+            {
+                true
+            } else if f.options().preview().is_enabled()
+                && DocstringStmt::try_from_statement(first.statement()).is_some()
+                && self.kind == SuiteKind::TopLevel
+            {
+                // Only in preview mode, insert a newline after a module level docstring, but treat
+                // it as a docstring otherwise
+                // https://github.com/psf/black/pull/3932
+                // https://github.com/astral-sh/ruff/issues/7995
+                true
+            } else {
+                false
+            };
+            (first.statement(), empty_line_after_docstring)
         };
 
         let mut preceding_comments = comments.leading_dangling_trailing(preceding);
@@ -303,7 +315,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         }
                     },
                 }
-            } else if after_class_docstring {
+            } else if empty_line_after_docstring {
                 // Enforce an empty line after a class docstring, e.g., these are both stable
                 // formatting:
                 // ```python
@@ -389,7 +401,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 preceding_comments = following_comments;
             }
 
-            after_class_docstring = false;
+            empty_line_after_docstring = false;
         }
 
         Ok(())
