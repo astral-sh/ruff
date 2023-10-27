@@ -83,7 +83,7 @@ def markdown_check_result(result: Result) -> str:
         # Only errors
         s = "s" if error_count != 1 else ""
         lines.append(
-            f"\u2139\ufe0f ecosystem check **encounted linter errors**. (no lint changes; {error_count} project error{s})"
+            f"\u2139\ufe0f ecosystem check **encountered linter errors**. (no lint changes; {error_count} project error{s})"
         )
     else:
         change_summary = (

@@ -1,7 +1,7 @@
 """
 Default projects for ecosystem checks
 """
-from ruff_ecosystem.projects import CheckOptions, Project, Repository, FormatOptions
+from ruff_ecosystem.projects import CheckOptions, FormatOptions, Project, Repository
 
 # TODO(zanieb): Consider exporting this as JSON and loading from there instead
 DEFAULT_TARGETS = [
