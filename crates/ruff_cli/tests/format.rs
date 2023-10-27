@@ -256,6 +256,55 @@ OTHER = "OTHER"
 }
 
 #[test]
+fn exclude_dir() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[format]
+exclude = ["out"]
+"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#,
+    )?;
+
+    let out_dir = tempdir.path().join("out");
+    fs::create_dir(&out_dir)?;
+
+    fs::write(
+        &out_dir.join("test.py"),
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--no-cache", "--check", "--config"])
+        .arg(ruff_toml.file_name().unwrap())
+        .arg("."), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    Would reformat: out/test.py
+    2 files would be reformatted
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
 fn exclude_stdin() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
