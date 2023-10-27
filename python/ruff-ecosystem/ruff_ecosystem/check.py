@@ -50,6 +50,9 @@ GITHUB_MAX_COMMENT_LENGTH = 65536  # characters
 
 
 def markdown_check_result(result: Result) -> str:
+    """
+    Render a `ruff check` ecosystem check result as markdown.
+    """
     # Calculate the total number of rule changes
     all_rule_changes = RuleChanges()
     project_diffs = {

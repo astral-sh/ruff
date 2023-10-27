@@ -22,6 +22,9 @@ if TYPE_CHECKING:
 
 
 def markdown_format_result(result: Result) -> str:
+    """
+    Render a `ruff format` ecosystem check result as markdown.
+    """
     lines = []
     total_lines_removed = total_lines_added = 0
     total_files_modified = 0
