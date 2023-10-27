@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use ruff_python_parser::Tok;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// Stores the ranges of all f-strings in a file sorted by [`TextRange::start`].
 /// There can be multiple overlapping ranges for nested f-strings.
@@ -10,21 +10,21 @@ use ruff_text_size::{TextRange, TextSize};
 #[derive(Debug)]
 pub struct FStringRanges {
     // Mapping from the f-string start location to its range.
-    raw: BTreeMap<TextSize, TextRange>,
+    raw: BTreeMap<TextSize, FStringRange>,
 }
 
 impl FStringRanges {
     /// Return the [`TextRange`] of the innermost f-string at the given offset.
-    pub fn innermost(&self, offset: TextSize) -> Option<TextRange> {
+    pub fn innermost(&self, offset: TextSize) -> Option<&FStringRange> {
         self.raw
             .range(..=offset)
             .rev()
             .find(|(_, range)| range.contains(offset))
-            .map(|(_, range)| *range)
+            .map(|(_, range)| range)
     }
 
     /// Return the [`TextRange`] of the outermost f-string at the given offset.
-    pub fn outermost(&self, offset: TextSize) -> Option<TextRange> {
+    pub fn outermost(&self, offset: TextSize) -> Option<&FStringRange> {
         // Explanation of the algorithm:
         //
         // ```python
@@ -50,7 +50,7 @@ impl FStringRanges {
             .skip_while(|(_, range)| !range.contains(offset))
             .take_while(|(_, range)| range.contains(offset))
             .last()
-            .map(|(_, range)| *range)
+            .map(|(_, range)| range)
     }
 
     /// Returns an iterator over all f-string [`TextRange`] sorted by their
@@ -59,7 +59,7 @@ impl FStringRanges {
     /// For nested f-strings, the outermost f-string is yielded first, moving
     /// inwards with each iteration.
     #[inline]
-    pub fn values(&self) -> impl Iterator<Item = &TextRange> + '_ {
+    pub fn values(&self) -> impl Iterator<Item = &FStringRange> + '_ {
         self.raw.values()
     }
 
@@ -73,7 +73,7 @@ impl FStringRanges {
 #[derive(Default)]
 pub(crate) struct FStringRangesBuilder {
     start_locations: Vec<TextSize>,
-    raw: BTreeMap<TextSize, TextRange>,
+    raw: BTreeMap<TextSize, FStringRange>,
 }
 
 impl FStringRangesBuilder {
@@ -84,14 +84,49 @@ impl FStringRangesBuilder {
             }
             Tok::FStringEnd => {
                 if let Some(start) = self.start_locations.pop() {
-                    self.raw.insert(start, TextRange::new(start, range.end()));
+                    self.raw.insert(
+                        start,
+                        FStringRange::new(TextRange::new(start, range.end()), true),
+                    );
                 }
             }
             _ => {}
         }
     }
 
-    pub(crate) fn finish(self) -> FStringRanges {
+    pub(crate) fn finish(mut self, end_location: TextSize) -> FStringRanges {
+        while let Some(start) = self.start_locations.pop() {
+            self.raw.insert(
+                start,
+                FStringRange::new(TextRange::new(start, end_location), false),
+            );
+        }
         FStringRanges { raw: self.raw }
+    }
+}
+
+#[derive(Debug)]
+pub struct FStringRange {
+    range: TextRange,
+    complete: bool,
+}
+
+impl FStringRange {
+    fn new(range: TextRange, complete: bool) -> Self {
+        Self { range, complete }
+    }
+
+    pub fn range(&self) -> TextRange {
+        self.range
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.complete
+    }
+}
+
+impl Ranged for FStringRange {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }

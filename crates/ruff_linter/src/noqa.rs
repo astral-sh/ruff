@@ -728,23 +728,65 @@ impl<'a> NoqaDirectives<'a> {
     }
 }
 
+pub enum Completeness {
+    Complete,
+    Incomplete,
+}
+
+pub struct NoqaOffset {
+    range: TextRange,
+    completeness: Completeness,
+}
+
+impl NoqaOffset {
+    pub fn new(range: TextRange, completeness: Completeness) -> Self {
+        Self {
+            range,
+            completeness,
+        }
+    }
+
+    pub fn completeness(&self) -> Completeness {
+        self.completeness
+    }
+
+    pub const fn is_complete(&self) -> bool {
+        matches!(self.completeness, Completeness::Complete)
+    }
+}
+
+impl Ranged for NoqaOffset {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl From<TextRange> for NoqaOffset {
+    fn from(range: TextRange) -> Self {
+        Self {
+            range,
+            completeness: Completeness::Complete,
+        }
+    }
+}
+
 /// Remaps offsets falling into one of the ranges to instead check for a noqa comment on the
 /// line specified by the offset.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct NoqaMapping {
-    ranges: Vec<TextRange>,
+    offsets: Vec<NoqaOffset>,
 }
 
 impl NoqaMapping {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
-            ranges: Vec::with_capacity(capacity),
+            offsets: Vec::with_capacity(capacity),
         }
     }
 
     /// Returns the re-mapped position or `position` if no mapping exists.
-    pub(crate) fn resolve(&self, offset: TextSize) -> TextSize {
-        let index = self.ranges.binary_search_by(|range| {
+    pub(crate) fn resolve(&self, offset: TextSize) -> Option<TextSize> {
+        let index = self.offsets.binary_search_by(|range| {
             if range.end() < offset {
                 std::cmp::Ordering::Less
             } else if range.contains(offset) {
@@ -755,30 +797,36 @@ impl NoqaMapping {
         });
 
         if let Ok(index) = index {
-            self.ranges[index].end()
+            let offset = self.offsets[index];
+            if offset.is_complete() {
+                Some(offset.end())
+            } else {
+                None
+            }
         } else {
-            offset
+            Some(offset)
         }
     }
 
-    pub(crate) fn push_mapping(&mut self, range: TextRange) {
-        if let Some(last_range) = self.ranges.last_mut() {
+    pub(crate) fn push_mapping(&mut self, offset: Into<NoqaOffset>) {
+        let offset: NoqaOffset = offset.into();
+        if let Some(last_offset) = self.offsets.last_mut() {
             // Strictly sorted insertion
-            if last_range.end() < range.start() {
+            if last_offset.end() < offset.start() {
                 // OK
-            } else if range.end() < last_range.start() {
+            } else if offset.end() < last_offset.start() {
                 // Incoming range is strictly before the last range which violates
                 // the function's contract.
-                panic!("Ranges must be inserted in sorted order")
+                panic!("Offsets must be inserted in sorted order")
             } else {
                 // Here, it's guaranteed that `last_range` and `range` overlap
                 // in some way. We want to merge them into a single range.
-                *last_range = last_range.cover(range);
+                *last_offset = last_offset.range().cover(offset.range());
                 return;
             }
         }
 
-        self.ranges.push(range);
+        self.offsets.push(offset);
     }
 }
 

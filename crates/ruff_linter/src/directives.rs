@@ -156,10 +156,10 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
     // the inner f-strings.
     let mut last_fstring_range: TextRange = TextRange::default();
     for fstring_range in indexer.fstring_ranges().values() {
-        if !locator.contains_line_break(*fstring_range) {
+        if !locator.contains_line_break(fstring_range.range()) {
             continue;
         }
-        if last_fstring_range.contains_range(*fstring_range) {
+        if last_fstring_range.contains_range(fstring_range.range()) {
             continue;
         }
         let new_range = TextRange::new(
