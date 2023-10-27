@@ -407,7 +407,9 @@ impl<'source> Lexer<'source> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), '#');
 
-        self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
+        let bytes = self.cursor.rest().as_bytes();
+        let offset = memchr::memchr2(b'\n', b'\r', bytes).unwrap_or(bytes.len());
+        self.cursor.skip_bytes(offset);
 
         Tok::Comment(self.token_text().to_string())
     }
