@@ -79,18 +79,24 @@ def markdown_check_result(result: Result) -> str:
         return "\u2705 ecosystem check detected no linter changes."
 
     # Summarize the total changes
-    change_summary = (
-        f"{markdown_plus_minus(total_added, total_removed)} violations, "
-        f"{markdown_plus_minus(total_added_fixes, total_removed_fixes)} fixes "
-        f"in {len(result.completed)} projects"
-    )
-    if error_count:
+    if total_affected_rules == 0:
+        # Only errors
         s = "s" if error_count != 1 else ""
-        change_summary += f"; {error_count} project error{s}"
-
-    lines.append(
-        f"\u2139\ufe0f ecosystem check **detected linter changes**. ({change_summary})"
-    )
+        lines.append(
+            f"\u2139\ufe0f ecosystem check **encounted linter errors**. (no lint changes; {error_count} project error{s})"
+        )
+    else:
+        change_summary = (
+            f"{markdown_plus_minus(total_added, total_removed)} violations, "
+            f"{markdown_plus_minus(total_added_fixes, total_removed_fixes)} fixes "
+            f"in {len(result.completed)} projects"
+        )
+        if error_count:
+            s = "s" if error_count != 1 else ""
+            change_summary += f"; {error_count} project error{s}"
+        lines.append(
+            f"\u2139\ufe0f ecosystem check **detected linter changes**. ({change_summary})"
+        )
     lines.append("")
 
     # Limit the number of items displayed per rule to between 5 and 50
@@ -204,32 +210,35 @@ def markdown_check_result(result: Result) -> str:
         )
 
     # Display a summary table of changed rules
-    table_lines = []
-    table_lines.append("| code | total | + violation | - violation | + fix | - fix |")
-    table_lines.append("| ---- | ------- | --------- | -------- | ----- | ---- |")
-    for rule, total in sorted(
-        all_rule_changes.total_changes_by_rule(),
-        key=lambda item: item[1],  # Sort by the total changes
-        reverse=True,
-    ):
-        added_violations, removed_violations, added_fixes, removed_fixes = (
-            all_rule_changes.added_violations[rule],
-            all_rule_changes.removed_violations[rule],
-            all_rule_changes.added_fixes[rule],
-            all_rule_changes.removed_fixes[rule],
-        )
+    if all_rule_changes:
+        table_lines = []
         table_lines.append(
-            f"| {rule} | {total} | {added_violations} | {removed_violations} "
-            f"| {added_fixes} | {removed_fixes} |"
+            "| code | total | + violation | - violation | + fix | - fix |"
         )
+        table_lines.append("| ---- | ------- | --------- | -------- | ----- | ---- |")
+        for rule, total in sorted(
+            all_rule_changes.total_changes_by_rule(),
+            key=lambda item: item[1],  # Sort by the total changes
+            reverse=True,
+        ):
+            added_violations, removed_violations, added_fixes, removed_fixes = (
+                all_rule_changes.added_violations[rule],
+                all_rule_changes.removed_violations[rule],
+                all_rule_changes.added_fixes[rule],
+                all_rule_changes.removed_fixes[rule],
+            )
+            table_lines.append(
+                f"| {rule} | {total} | {added_violations} | {removed_violations} "
+                f"| {added_fixes} | {removed_fixes} |"
+            )
 
-    lines.extend(
-        markdown_details(
-            summary=f"Changes by rule ({total_affected_rules} rules affected)",
-            preface="",
-            content=table_lines,
+        lines.extend(
+            markdown_details(
+                summary=f"Changes by rule ({total_affected_rules} rules affected)",
+                preface="",
+                content=table_lines,
+            )
         )
-    )
 
     return "\n".join(lines)
 
@@ -323,7 +332,12 @@ class RuleChanges:
         return rule_changes
 
     def __bool__(self):
-        return bool(self.added_violations or self.removed_violations)
+        return bool(
+            self.added_violations
+            or self.removed_violations
+            or self.added_fixes
+            or self.removed_fixes
+        )
 
 
 @dataclass(frozen=True)
