@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/rules/pycodestyle/mod.rs
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
 W605_2.py:4:11: W605 [*] Invalid escape sequence: `\.`
   |
@@ -9,7 +9,7 @@ W605_2.py:4:11: W605 [*] Invalid escape sequence: `\.`
 5 | 
 6 | #: W605:2:1
   |
-  = help: Add backslash to escape sequence
+  = help: Use a raw string literal
 
 ℹ Fix
 1 1 | # Same as `W605_0.py` but using f-strings instead.
@@ -29,7 +29,7 @@ W605_2.py:8:1: W605 [*] Invalid escape sequence: `\.`
   | ^^ W605
 9 | '''
   |
-  = help: Add backslash to escape sequence
+  = help: Use a raw string literal
 
 ℹ Fix
 4 4 | regex = f'\.png$'
@@ -49,7 +49,7 @@ W605_2.py:13:7: W605 [*] Invalid escape sequence: `\_`
    |       ^^ W605
 14 | )
    |
-   = help: Add backslash to escape sequence
+   = help: Use a raw string literal
 
 ℹ Fix
 10 10 | 
@@ -70,7 +70,7 @@ W605_2.py:20:6: W605 [*] Invalid escape sequence: `\_`
 21 | in the middle
 22 | """
    |
-   = help: Add backslash to escape sequence
+   = help: Use a raw string literal
 
 ℹ Fix
 14 14 | )
@@ -129,7 +129,7 @@ W605_2.py:44:11: W605 [*] Invalid escape sequence: `\{`
 45 | value = f'\{1}'
 46 | value = f'{1:\}'
    |
-   = help: Add backslash to escape sequence
+   = help: Use a raw string literal
 
 ℹ Fix
 41 41 | '''  # noqa
@@ -150,7 +150,7 @@ W605_2.py:45:11: W605 [*] Invalid escape sequence: `\{`
 46 | value = f'{1:\}'
 47 | value = f"{f"\{1}"}"
    |
-   = help: Add backslash to escape sequence
+   = help: Use a raw string literal
 
 ℹ Fix
 42 42 | 
@@ -171,7 +171,7 @@ W605_2.py:46:14: W605 [*] Invalid escape sequence: `\}`
 47 | value = f"{f"\{1}"}"
 48 | value = rf"{f"\{1}"}"
    |
-   = help: Add backslash to escape sequence
+   = help: Use a raw string literal
 
 ℹ Fix
 43 43 | regex = f'\\\_'
@@ -191,7 +191,7 @@ W605_2.py:47:14: W605 [*] Invalid escape sequence: `\{`
    |              ^^ W605
 48 | value = rf"{f"\{1}"}"
    |
-   = help: Add backslash to escape sequence
+   = help: Use a raw string literal
 
 ℹ Fix
 44 44 | value = f'\{{1}}'
@@ -212,7 +212,7 @@ W605_2.py:48:15: W605 [*] Invalid escape sequence: `\{`
 49 | 
 50 | # Okay
    |
-   = help: Add backslash to escape sequence
+   = help: Use a raw string literal
 
 ℹ Fix
 45 45 | value = f'\{1}'

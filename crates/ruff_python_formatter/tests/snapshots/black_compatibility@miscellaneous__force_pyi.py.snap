@@ -5,6 +5,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 ## Input
 
 ```py
+# flags: --pyi
 from typing import Union
 
 @bird
@@ -42,7 +43,8 @@ def eggs() -> Union[str, int]: ...
 ```diff
 --- Black
 +++ Ruff
-@@ -1,32 +1,58 @@
+@@ -1,32 +1,59 @@
++# flags: --pyi
  from typing import Union
  
 +
@@ -67,13 +69,13 @@ def eggs() -> Union[str, int]: ...
 -    def BMethod(self, arg: List[str]) -> None: ...
 +    def BMethod(self, arg: List[str]) -> None:
 +        ...
-+
-+
-+class C:
-+    ...
  
 -class C: ...
  
++class C:
++    ...
++
++
  @hmm
 -class D: ...
 +class D:
@@ -118,6 +120,7 @@ def eggs() -> Union[str, int]: ...
 ## Ruff Output
 
 ```py
+# flags: --pyi
 from typing import Union
 
 
