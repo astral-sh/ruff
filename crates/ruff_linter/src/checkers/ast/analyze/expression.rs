@@ -749,6 +749,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SysExitAlias) {
                 pylint::rules::sys_exit_alias(checker, func);
             }
+            if checker.enabled(Rule::BadOpenMode) {
+                pylint::rules::bad_open_mode(checker, call);
+            }
             if checker.enabled(Rule::BadStrStripCall) {
                 pylint::rules::bad_str_strip_call(checker, func, args);
             }
