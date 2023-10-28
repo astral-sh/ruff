@@ -265,7 +265,7 @@ impl Violation for MissingReturnTypePrivateFunction {
 /// or `ruff.toml` file:
 ///
 /// ```toml
-/// [tool.ruff.flake8-annotations]
+/// [tool.ruff.lint.flake8-annotations]
 /// mypy-init-return = true
 /// ```
 ///

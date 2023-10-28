@@ -10,6 +10,6 @@ dependencies = ["unidiff==0.7.5"]
 [project.scripts]
 ruff-ecosystem = "ruff_ecosystem.cli:entrypoint"
 
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["I"]
 preview = true
