@@ -40,7 +40,7 @@ classifiers = [
 [project.urls]
 Repository = "https://github.com/astral-sh/ruff"
 Documentation = "https://docs.astral.sh/ruff/"
-Changelog = "https://github.com/astral-sh/ruff/releases"
+Changelog = "https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md"
 
 [tool.maturin]
 bindings = "bin"
