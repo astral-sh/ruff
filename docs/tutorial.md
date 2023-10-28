@@ -251,7 +251,7 @@ For more in-depth instructions on ignoring errors, please see [_Error suppressio
 When enabling a new rule on an existing codebase, you may want to ignore all _existing_
 violations of that rule and instead focus on enforcing it going forward.
 
-Ruff enables this workflow via the `--add-noqa` flag, which will adds a `# noqa` directive to each
+Ruff enables this workflow via the `--add-noqa` flag, which will add a `# noqa` directive to each
 line based on its existing violations. We can combine `--add-noqa` with the `--select` command-line
 flag to add `# noqa` directives to all existing `UP035` violations:
 

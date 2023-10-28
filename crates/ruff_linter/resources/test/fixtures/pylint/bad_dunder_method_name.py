@@ -70,6 +70,10 @@ class Apples:
     def __html__(self):
         pass
 
+    # Allow Python's __index__
+    def __index__(self):
+        pass
+
     # Allow _missing_, used by enum.Enum.
     @classmethod
     def _missing_(cls, value):

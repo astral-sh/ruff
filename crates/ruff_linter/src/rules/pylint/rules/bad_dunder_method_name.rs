@@ -132,6 +132,7 @@ fn is_known_dunder_method(method: &str) -> bool {
             | "__imatmul__"
             | "__imod__"
             | "__imul__"
+            | "__index__"
             | "__init__"
             | "__init_subclass__"
             | "__instancecheck__"

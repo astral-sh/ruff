@@ -64,7 +64,7 @@ pub(crate) fn generate() -> String {
     table_out.push('\n');
 
     table_out.push_str(&format!(
-        "The {PREVIEW_SYMBOL} emoji indicates that a rule in [\"preview\"](faq.md#what-is-preview)."
+        "The {PREVIEW_SYMBOL} emoji indicates that a rule is in [\"preview\"](faq.md#what-is-preview)."
     ));
     table_out.push('\n');
     table_out.push('\n');
