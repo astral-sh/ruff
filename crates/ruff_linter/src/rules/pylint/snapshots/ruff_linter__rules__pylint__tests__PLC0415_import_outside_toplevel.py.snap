@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+import_outside_toplevel.py:2:5: PLC0415 Import outside toplevel (sys)
+  |
+1 | def print_python_version():
+2 |     import sys  # C0415
+  |     ^^^^^^^^^^ PLC0415
+3 | 
+4 |     print(sys.version_info)
+  |
+
+import_outside_toplevel.py:7:5: PLC0415 Import outside toplevel (sys, string)
+  |
+6 | def print_python_version():
+7 |     import sys, string  # C0415
+  |     ^^^^^^^^^^^^^^^^^^ PLC0415
+8 | 
+9 |     print(sys.version_info, string.ascii.digits)
+  |
+
+
