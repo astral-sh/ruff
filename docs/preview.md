@@ -50,7 +50,7 @@ Similarly, it would _not_ be enabled via the `ALL` selector:
 select = ["ALL"]
 ```
 
-However, it would be enabled in any of the above cases if you you enabled preview in your configuration file:
+However, it would be enabled in any of the above cases if you enabled preview in your configuration file:
 
 ```toml
 [tool.ruff]
