@@ -148,13 +148,11 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             {
                 true
             } else if f.options().preview().is_enabled()
-                && DocstringStmt::try_from_statement(first.statement()).is_some()
                 && self.kind == SuiteKind::TopLevel
+                && DocstringStmt::try_from_statement(first.statement()).is_some()
             {
                 // Only in preview mode, insert a newline after a module level docstring, but treat
-                // it as a docstring otherwise
-                // https://github.com/psf/black/pull/3932
-                // https://github.com/astral-sh/ruff/issues/7995
+                // it as a docstring otherwise. See: https://github.com/psf/black/pull/3932.
                 true
             } else {
                 false
@@ -559,9 +557,11 @@ impl<'a> DocstringStmt<'a> {
         };
 
         if let Expr::Constant(ExprConstant { value, .. }) = value.as_ref() {
-            if !value.is_implicit_concatenated() {
-                return Some(DocstringStmt(stmt));
-            }
+            return match value {
+                Constant::Str(value) if !value.implicit_concatenated => Some(DocstringStmt(stmt)),
+                Constant::Bytes(value) if !value.implicit_concatenated => Some(DocstringStmt(stmt)),
+                _ => None,
+            };
         }
 
         None

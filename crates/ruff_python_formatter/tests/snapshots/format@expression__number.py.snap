@@ -25,17 +25,4 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
 ```
 
 
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,5 @@
- 0.1
-+
- 1.0
- 1e1
- 1e-1
-```
-
-
 
