@@ -20,9 +20,8 @@ For the full list of supported options, run `ruff check --help`.
 
 ## Rule selection
 
-The set of enabled rules is controlled via the [`select`](settings.md#select) and [`ignore`](settings.md#ignore)
-settings, along with the [`extend-select`](settings.md#extend-select) and [`extend-ignore`](settings.md#extend-ignore)
-modifiers.
+The set of enabled rules is controlled via the [`select`](settings.md#select) along with [`extend-select`](settings.md#extend-select) and the [`ignore`](settings.md#ignore)
+settings.
 
 Ruff's linter mirrors Flake8's rule code system, in which each rule code consists of a one-to-three
 letter prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
@@ -47,8 +46,7 @@ formats. Ruff will automatically disable any conflicting rules when `ALL` is ena
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
-- Prefer `select` and `ignore` over `extend-select` and `extend-ignore`, to make your rule set
-    explicit.
+- Prefer `select` over `extend-select` to make your rule set explicit.
 - Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
 - Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
     you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
@@ -80,7 +78,7 @@ of sources, including the current `pyproject.toml`, any inherited `pyproject.tom
 CLI (e.g., `--select`).
 
 In those scenarios, Ruff uses the "highest-priority" `select` as the basis for the rule set, and
-then applies any `extend-select`, `ignore`, and `extend-ignore` adjustments. CLI options are given
+then applies `extend-select` and `ignore` adjustments. CLI options are given
 higher priority than `pyproject.toml` options, and the current `pyproject.toml` file is given higher
 priority than any inherited `pyproject.toml` files.
 
@@ -196,8 +194,7 @@ fixable = ["F401"]
 Ruff supports several mechanisms for suppressing lint errors, be they false positives or
 permissible violations.
 
-To omit a lint rule entirely, add it to the "ignore" list via the [`ignore`](settings.md#ignore)
-or [`extend-ignore`](settings.md#extend-ignore) settings, either on the command-line
+To omit a lint rule entirely, add it to the "ignore" list via the [`ignore`](settings.md#ignore) settings, either on the command-line
 or in your `pyproject.toml` or `ruff.toml` file.
 
 To suppress a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
