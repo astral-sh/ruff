@@ -2613,9 +2613,6 @@ pub struct FormatOptions {
     ///   (e.g., the directory containing your `pyproject.toml`).
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
-    ///
-    /// Note that you'll typically want to use
-    /// [`extend-exclude`](#extend-exclude) to modify the excluded paths.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
