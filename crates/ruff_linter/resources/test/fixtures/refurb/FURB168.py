@@ -47,5 +47,5 @@ if isinstance(foo, None):
     pass
 
 # This is also a TypeError, which the rule ignores.
-if isinstance(foo, (None)):
+if isinstance(foo, (None,)):
     pass
