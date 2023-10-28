@@ -20,8 +20,8 @@ For the full list of supported options, run `ruff check --help`.
 
 ## Rule selection
 
-The set of enabled rules is controlled via the [`select`](settings.md#select) along with [`extend-select`](settings.md#extend-select) and the [`ignore`](settings.md#ignore)
-settings.
+The set of enabled rules is controlled via the [`select`](settings.md#select),
+[`extend-select`](settings.md#extend-select), and [`ignore`](settings.md#ignore) settings.
 
 Ruff's linter mirrors Flake8's rule code system, in which each rule code consists of a one-to-three
 letter prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
@@ -194,8 +194,8 @@ fixable = ["F401"]
 Ruff supports several mechanisms for suppressing lint errors, be they false positives or
 permissible violations.
 
-To omit a lint rule entirely, add it to the "ignore" list via the [`ignore`](settings.md#ignore) settings, either on the command-line
-or in your `pyproject.toml` or `ruff.toml` file.
+To omit a lint rule entirely, add it to the "ignore" list via the [`ignore`](settings.md#ignore)
+setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` file.
 
 To suppress a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
