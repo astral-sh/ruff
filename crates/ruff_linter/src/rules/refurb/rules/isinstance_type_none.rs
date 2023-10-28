@@ -6,6 +6,7 @@ use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 
 /// ## What it does
 /// Checks for uses of `isinstance` that check if an object is of type `None`.
@@ -16,12 +17,12 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// isinstance(foo, type(None))
+/// isinstance(obj, type(None))
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// foo is None
+/// obj is None
 /// ```
 ///
 /// ## References
@@ -46,30 +47,34 @@ impl Violation for IsinstanceTypeNone {
 }
 
 /// FURB168
-pub(crate) fn isinstance_type_none(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    if let Expr::Name(ast::ExprName { id, .. }) = func {
-        if id.as_str() != "isinstance" {
+pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) {
+    let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
+        return;
+    };
+    if id.as_str() != "isinstance" {
+        return;
+    }
+    if !checker.semantic().is_builtin(id) {
+        return;
+    }
+    let Some(types) = call.arguments.find_positional(1) else {
+        return;
+    };
+
+    if is_none(types) {
+        let Some(Expr::Name(ast::ExprName {
+            id: object_name, ..
+        })) = call.arguments.find_positional(0)
+        else {
             return;
-        }
-        if !checker.semantic().is_builtin(id) {
-            return;
-        }
-        if let Some(types) = args.get(1) {
-            if is_none(types) {
-                let object_name = match &args[0] {
-                    Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
-                    _ => return,
-                };
-                let mut diagnostic = Diagnostic::new(IsinstanceTypeNone, expr.range());
-                let replacement = generate_is_none_replacement(object_name, checker.generator());
-                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                    replacement,
-                    expr.start(),
-                    expr.end(),
-                )));
-                checker.diagnostics.push(diagnostic);
-            }
-        }
+        };
+        let mut diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range());
+        let replacement = generate_replacement(object_name, checker.generator());
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(replacement, call.range(), checker.locator()),
+            call.range(),
+        )));
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -100,7 +105,7 @@ fn is_none(expr: &Expr) -> bool {
             }
 
             // Ex) `(type(None),)`
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(|e| inner(e, false)),
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(|elt| inner(elt, false)),
 
             // Ex) `type(None) | type(None)`
             Expr::BinOp(ast::ExprBinOp {
@@ -117,9 +122,8 @@ fn is_none(expr: &Expr) -> bool {
     inner(expr, false)
 }
 
-/// Format a code snippet comparing `name` to `None`.
-/// Ex) `name is None`
-fn generate_is_none_replacement(name: &str, generator: Generator) -> String {
+/// Format a code snippet comparing `name` to `None` (e.g., `name is None`).
+fn generate_replacement(name: &str, generator: Generator) -> String {
     // Construct `name`.
     let var = ast::ExprName {
         id: name.to_string(),
